@@ -437,29 +437,54 @@ export async function getDestinationById(id: string) {
 export async function createDestination(destinationData: any) {
   console.log('🌍 Creando destino:', destinationData);
   
-  // Para crear destinos básicos (solo con nombre), usar datos mínimos
-  // Las agencias pueden editarlos después para agregar imágenes y descripción
-  const basicDestinationData = {
-    name: destinationData.name || destinationData,
-    description: null,
-    country: null,
-    region: null,
-    best_time_to_visit: null,
-    average_temperature: null,
-    currency: null,
-    language: null,
-    time_zone: null,
-    main_image_url: null,
+  // Si destinationData es solo un string (nombre), crear objeto básico
+  if (typeof destinationData === 'string') {
+    const basicDestinationData = {
+      name: destinationData,
+      is_active: true
+    };
+    
+    const { data, error } = await supabase
+      .from('destinations')
+      .insert(basicDestinationData)
+      .select()
+      .single();
+    
+    console.log('📝 Resultado de creación de destino básico:', { data, error });
+    return { data, error };
+  }
+  
+  // Si es un objeto completo, usar todos los campos disponibles
+  const destinationToInsert: any = {
+    name: destinationData.name,
     is_active: true
   };
   
+  // Solo agregar campos opcionales si tienen valores
+  if (destinationData.description) destinationToInsert.description = destinationData.description;
+  if (destinationData.country) destinationToInsert.country = destinationData.country;
+  if (destinationData.region) destinationToInsert.region = destinationData.region;
+  if (destinationData.best_time_to_visit) destinationToInsert.best_time_to_visit = destinationData.best_time_to_visit;
+  if (destinationData.average_temperature) destinationToInsert.average_temperature = destinationData.average_temperature;
+  if (destinationData.currency) destinationToInsert.currency = destinationData.currency;
+  if (destinationData.language) destinationToInsert.language = destinationData.language;
+  if (destinationData.time_zone) destinationToInsert.time_zone = destinationData.time_zone;
+  if (destinationData.main_image_url) destinationToInsert.main_image_url = destinationData.main_image_url;
+  
+  // Solo agregar campos de imagen base64 si están presentes
+  if (destinationData.main_image_base64) {
+    destinationToInsert.main_image_base64 = destinationData.main_image_base64;
+    destinationToInsert.main_image_type = destinationData.main_image_type;
+    destinationToInsert.main_image_size = destinationData.main_image_size;
+  }
+  
   const { data, error } = await supabase
     .from('destinations')
-    .insert(basicDestinationData)
+    .insert(destinationToInsert)
     .select()
     .single();
   
-  console.log('📝 Resultado de creación de destino:', { data, error });
+  console.log('📝 Resultado de creación de destino completo:', { data, error });
   return { data, error };
 }
 
@@ -528,7 +553,6 @@ export async function getOrCreateDestination(name: string) {
     }
 
     // If not found, create new destination with only the name
-    // Las agencias pueden editarlo después para agregar más detalles
     console.log('➕ Creando nuevo destino básico:', name);
     const { data: newDest, error: createError } = await createDestination(name);
     
