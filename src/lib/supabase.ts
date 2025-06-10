@@ -450,9 +450,6 @@ export async function createDestination(destinationData: any) {
     language: null,
     time_zone: null,
     main_image_url: null,
-    main_image_base64: null,
-    main_image_size: null,
-    main_image_type: null,
     is_active: true
   };
   
