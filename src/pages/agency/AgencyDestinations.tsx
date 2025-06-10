@@ -1,0 +1,549 @@
+import React, { useState, useEffect } from 'react';
+import { Plus, Edit, Trash2, Image, MapPin, Globe, Clock, DollarSign, Users, Save, X, Upload } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { getAllDestinations, createDestination, updateDestination, addDestinationImage, deleteDestinationImage, getImageSrc } from '../../lib/supabase';
+import { Destination, DestinationImage, ImageUploadData } from '../../types';
+import ImageUploader from '../../components/ImageUploader';
+
+const AgencyDestinations: React.FC = () => {
+  const { user } = useAuth();
+  const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingDestination, setEditingDestination] = useState<Destination | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    main_image_base64: '',
+    main_image_type: '',
+    main_image_size: 0,
+    country: '',
+    region: '',
+    best_time_to_visit: '',
+    average_temperature: '',
+    currency: '',
+    language: '',
+    time_zone: '',
+  });
+
+  const [newImageData, setNewImageData] = useState<ImageUploadData | null>(null);
+  const [newImageCaption, setNewImageCaption] = useState('');
+
+  useEffect(() => {
+    fetchDestinations();
+  }, []);
+
+  const fetchDestinations = async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+      
+      const { data, error } = await getAllDestinations();
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      setDestinations(data || []);
+    } catch (err: any) {
+      setError(err.message || 'Error al cargar destinos');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      description: '',
+      main_image_base64: '',
+      main_image_type: '',
+      main_image_size: 0,
+      country: '',
+      region: '',
+      best_time_to_visit: '',
+      average_temperature: '',
+      currency: '',
+      language: '',
+      time_zone: '',
+    });
+    setNewImageData(null);
+    setNewImageCaption('');
+  };
+
+  const handleCreate = () => {
+    resetForm();
+    setIsCreating(true);
+    setEditingDestination(null);
+  };
+
+  const handleEdit = (destination: Destination) => {
+    setFormData({
+      name: destination.name || '',
+      description: destination.description || '',
+      main_image_base64: destination.main_image_base64 || '',
+      main_image_type: destination.main_image_type || '',
+      main_image_size: destination.main_image_size || 0,
+      country: destination.country || '',
+      region: destination.region || '',
+      best_time_to_visit: destination.best_time_to_visit || '',
+      average_temperature: destination.average_temperature || '',
+      currency: destination.currency || '',
+      language: destination.language || '',
+      time_zone: destination.time_zone || '',
+    });
+    setEditingDestination(destination);
+    setIsCreating(false);
+  };
+
+  const handleCancel = () => {
+    setIsCreating(false);
+    setEditingDestination(null);
+    resetForm();
+  };
+
+  const handleMainImageSelect = (base64: string, type: string, size: number) => {
+    setFormData({
+      ...formData,
+      main_image_base64: base64,
+      main_image_type: type,
+      main_image_size: size
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      if (!user?.id) {
+        throw new Error('Usuario no autenticado');
+      }
+
+      if (editingDestination) {
+        // Update existing destination
+        const { error } = await updateDestination(editingDestination.id, formData);
+        if (error) throw error;
+      } else {
+        // Create new destination
+        const { error } = await createDestination(formData);
+        if (error) throw error;
+      }
+
+      await fetchDestinations();
+      handleCancel();
+    } catch (err: any) {
+      setError(err.message || 'Error al guardar destino');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAddImage = async (destinationId: string) => {
+    if (!newImageData) return;
+
+    try {
+      setIsSubmitting(true);
+      
+      const imageData = {
+        image_base64: newImageData.base64,
+        image_type: newImageData.type,
+        image_size: newImageData.size,
+        caption: newImageCaption || null,
+        is_featured: false,
+        uploaded_by: user?.id
+      };
+
+      const { error } = await addDestinationImage(destinationId, imageData);
+      if (error) throw error;
+
+      await fetchDestinations();
+      setNewImageData(null);
+      setNewImageCaption('');
+    } catch (err: any) {
+      setError(err.message || 'Error al agregar imagen');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteImage = async (imageId: string) => {
+    if (!confirm('¿Estás seguro de que quieres eliminar esta imagen?')) return;
+
+    try {
+      setIsSubmitting(true);
+      
+      const { error } = await deleteDestinationImage(imageId);
+      if (error) throw error;
+
+      await fetchDestinations();
+    } catch (err: any) {
+      setError(err.message || 'Error al eliminar imagen');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getTourCount = (destination: Destination) => {
+    return destination.tour_destinations?.length || 0;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Gestionar Destinos</h1>
+        <button
+          onClick={handleCreate}
+          className="btn btn-primary"
+          disabled={isCreating || editingDestination}
+        >
+          <Plus className="h-5 w-5 mr-2" />
+          Agregar Destino
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-6 bg-error-50 text-error-600 p-4 rounded-md">
+          {error}
+        </div>
+      )}
+
+      {/* Create/Edit Form */}
+      {(isCreating || editingDestination) && (
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">
+            {editingDestination ? 'Editar Destino' : 'Crear Nuevo Destino'}
+          </h2>
+          
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nombre del Destino *
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  className="input"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  País
+                </label>
+                <input
+                  type="text"
+                  value={formData.country}
+                  onChange={(e) => setFormData({...formData, country: e.target.value})}
+                  className="input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Región
+                </label>
+                <input
+                  type="text"
+                  value={formData.region}
+                  onChange={(e) => setFormData({...formData, region: e.target.value})}
+                  className="input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Mejor Época para Visitar
+                </label>
+                <input
+                  type="text"
+                  value={formData.best_time_to_visit}
+                  onChange={(e) => setFormData({...formData, best_time_to_visit: e.target.value})}
+                  className="input"
+                  placeholder="ej. Abril - Octubre"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Temperatura Promedio
+                </label>
+                <input
+                  type="text"
+                  value={formData.average_temperature}
+                  onChange={(e) => setFormData({...formData, average_temperature: e.target.value})}
+                  className="input"
+                  placeholder="ej. 20-25°C"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Moneda
+                </label>
+                <input
+                  type="text"
+                  value={formData.currency}
+                  onChange={(e) => setFormData({...formData, currency: e.target.value})}
+                  className="input"
+                  placeholder="ej. MXN, USD, EUR"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Idioma
+                </label>
+                <input
+                  type="text"
+                  value={formData.language}
+                  onChange={(e) => setFormData({...formData, language: e.target.value})}
+                  className="input"
+                  placeholder="ej. Español, Inglés"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Zona Horaria
+                </label>
+                <input
+                  type="text"
+                  value={formData.time_zone}
+                  onChange={(e) => setFormData({...formData, time_zone: e.target.value})}
+                  className="input"
+                  placeholder="ej. GMT-6, UTC-5"
+                />
+              </div>
+            </div>
+
+            {/* Main Image Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Imagen Principal del Destino
+              </label>
+              <ImageUploader
+                onImageSelect={handleMainImageSelect}
+                currentImage={formData.main_image_base64}
+                maxSizeMB={5}
+                placeholder="Seleccionar imagen principal"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Descripción
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                className="input"
+                rows={4}
+                placeholder="Describe el destino, sus atracciones principales, cultura, etc."
+              />
+            </div>
+
+            <div className="flex justify-end space-x-4">
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="btn btn-outline"
+                disabled={isSubmitting}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="btn btn-primary"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {isSubmitting ? 'Guardando...' : 'Guardar Destino'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Destinations List */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        {destinations.map((destination) => (
+          <div key={destination.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+            {/* Destination Header */}
+            <div className="relative h-48">
+              <img
+                src={getImageSrc(destination.main_image_base64, destination.main_image_url)}
+                alt={destination.name}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute top-2 right-2 flex space-x-2">
+                <button
+                  onClick={() => handleEdit(destination)}
+                  className="bg-white/80 hover:bg-white rounded-full p-2 text-gray-700"
+                  disabled={isCreating || editingDestination}
+                >
+                  <Edit className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
+                <h3 className="text-white text-xl font-bold">{destination.name}</h3>
+                {destination.country && (
+                  <p className="text-white/90 text-sm flex items-center">
+                    <MapPin className="h-4 w-4 mr-1" />
+                    {destination.country}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Destination Info */}
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-gray-500 flex items-center">
+                  <Users className="h-4 w-4 mr-1" />
+                  {getTourCount(destination)} tours
+                </span>
+                <span className="text-xs text-gray-400">
+                  {new Date(destination.updated_at).toLocaleDateString()}
+                </span>
+              </div>
+
+              {destination.description && (
+                <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+                  {destination.description}
+                </p>
+              )}
+
+              {/* Quick Info */}
+              <div className="space-y-2 text-xs text-gray-500">
+                {destination.best_time_to_visit && (
+                  <div className="flex items-center">
+                    <Clock className="h-3 w-3 mr-2" />
+                    <span>Mejor época: {destination.best_time_to_visit}</span>
+                  </div>
+                )}
+                {destination.currency && (
+                  <div className="flex items-center">
+                    <DollarSign className="h-3 w-3 mr-2" />
+                    <span>Moneda: {destination.currency}</span>
+                  </div>
+                )}
+                {destination.language && (
+                  <div className="flex items-center">
+                    <Globe className="h-3 w-3 mr-2" />
+                    <span>Idioma: {destination.language}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Images Section */}
+              <div className="mt-4 border-t pt-4">
+                <h4 className="text-sm font-medium mb-2 flex items-center">
+                  <Image className="h-4 w-4 mr-2" />
+                  Galería ({destination.destination_images?.length || 0})
+                </h4>
+                
+                {/* Add Image Form */}
+                <div className="space-y-2 mb-3">
+                  <ImageUploader
+                    onImageSelect={(base64, type, size) => setNewImageData({ base64, type, size })}
+                    maxSizeMB={3}
+                    placeholder="Agregar imagen a galería"
+                    className="text-xs"
+                  />
+                  
+                  {newImageData && (
+                    <div className="flex space-x-2">
+                      <input
+                        type="text"
+                        value={newImageCaption}
+                        onChange={(e) => setNewImageCaption(e.target.value)}
+                        placeholder="Descripción (opcional)"
+                        className="flex-1 text-xs p-2 border border-gray-300 rounded"
+                      />
+                      <button
+                        onClick={() => handleAddImage(destination.id)}
+                        disabled={isSubmitting}
+                        className="px-3 py-2 bg-primary-600 text-white rounded text-xs hover:bg-primary-700 disabled:opacity-50"
+                      >
+                        <Upload className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Images Grid */}
+                {destination.destination_images && destination.destination_images.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {destination.destination_images.slice(0, 6).map((image) => (
+                      <div key={image.id} className="relative group">
+                        <img
+                          src={getImageSrc(image.image_base64, image.image_url)}
+                          alt={image.caption || 'Imagen del destino'}
+                          className="w-full h-16 object-cover rounded"
+                        />
+                        <button
+                          onClick={() => handleDeleteImage(image.id)}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          disabled={isSubmitting}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                        {image.caption && (
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 rounded-b">
+                            {image.caption}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 text-center py-2">
+                    No hay imágenes adicionales
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {destinations.length === 0 && !isLoading && (
+        <div className="bg-white rounded-lg shadow-md p-8 text-center">
+          <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold mb-2">No hay destinos</h3>
+          <p className="text-gray-600 mb-6">
+            Comienza agregando destinos para que las agencias puedan crear tours.
+          </p>
+          <button
+            onClick={handleCreate}
+            className="btn btn-primary"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Agregar Primer Destino
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AgencyDestinations;
