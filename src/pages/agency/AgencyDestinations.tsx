@@ -20,13 +20,9 @@ const AgencyDestinations: React.FC = () => {
     main_image_base64: '',
     main_image_type: '',
     main_image_size: 0,
-    country: '',
+    country: 'México',
     region: '',
     best_time_to_visit: '',
-    average_temperature: '',
-    currency: '',
-    language: '',
-    time_zone: '',
   });
 
   const [newImageData, setNewImageData] = useState<ImageUploadData | null>(null);
@@ -62,13 +58,9 @@ const AgencyDestinations: React.FC = () => {
       main_image_base64: '',
       main_image_type: '',
       main_image_size: 0,
-      country: '',
+      country: 'México',
       region: '',
       best_time_to_visit: '',
-      average_temperature: '',
-      currency: '',
-      language: '',
-      time_zone: '',
     });
     setNewImageData(null);
     setNewImageCaption('');
@@ -87,13 +79,9 @@ const AgencyDestinations: React.FC = () => {
       main_image_base64: destination.main_image_base64 || '',
       main_image_type: destination.main_image_type || '',
       main_image_size: destination.main_image_size || 0,
-      country: destination.country || '',
+      country: destination.country || 'México',
       region: destination.region || '',
       best_time_to_visit: destination.best_time_to_visit || '',
-      average_temperature: destination.average_temperature || '',
-      currency: destination.currency || '',
-      language: destination.language || '',
-      time_zone: destination.time_zone || '',
     });
     setEditingDestination(destination);
     setIsCreating(false);
@@ -253,18 +241,21 @@ const AgencyDestinations: React.FC = () => {
                   value={formData.country}
                   onChange={(e) => setFormData({...formData, country: e.target.value})}
                   className="input"
+                  placeholder="México"
+                  defaultValue="México"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Región
+                  Estado/Región
                 </label>
                 <input
                   type="text"
                   value={formData.region}
                   onChange={(e) => setFormData({...formData, region: e.target.value})}
                   className="input"
+                  placeholder="ej. Quintana Roo, Yucatán, CDMX"
                 />
               </div>
 
@@ -277,59 +268,7 @@ const AgencyDestinations: React.FC = () => {
                   value={formData.best_time_to_visit}
                   onChange={(e) => setFormData({...formData, best_time_to_visit: e.target.value})}
                   className="input"
-                  placeholder="ej. Abril - Octubre"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Temperatura Promedio
-                </label>
-                <input
-                  type="text"
-                  value={formData.average_temperature}
-                  onChange={(e) => setFormData({...formData, average_temperature: e.target.value})}
-                  className="input"
-                  placeholder="ej. 20-25°C"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Moneda
-                </label>
-                <input
-                  type="text"
-                  value={formData.currency}
-                  onChange={(e) => setFormData({...formData, currency: e.target.value})}
-                  className="input"
-                  placeholder="ej. MXN, USD, EUR"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Idioma
-                </label>
-                <input
-                  type="text"
-                  value={formData.language}
-                  onChange={(e) => setFormData({...formData, language: e.target.value})}
-                  className="input"
-                  placeholder="ej. Español, Inglés"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Zona Horaria
-                </label>
-                <input
-                  type="text"
-                  value={formData.time_zone}
-                  onChange={(e) => setFormData({...formData, time_zone: e.target.value})}
-                  className="input"
-                  placeholder="ej. GMT-6, UTC-5"
+                  placeholder="ej. Noviembre - Abril (temporada seca)"
                 />
               </div>
             </div>
@@ -440,16 +379,16 @@ const AgencyDestinations: React.FC = () => {
                     <span>Mejor época: {destination.best_time_to_visit}</span>
                   </div>
                 )}
-                {destination.currency && (
+                {destination.region && (
                   <div className="flex items-center">
-                    <DollarSign className="h-3 w-3 mr-2" />
-                    <span>Moneda: {destination.currency}</span>
+                    <MapPin className="h-3 w-3 mr-2" />
+                    <span>Región: {destination.region}</span>
                   </div>
                 )}
-                {destination.language && (
+                {destination.country && destination.country !== 'México' && (
                   <div className="flex items-center">
                     <Globe className="h-3 w-3 mr-2" />
-                    <span>Idioma: {destination.language}</span>
+                    <span>País: {destination.country}</span>
                   </div>
                 )}
               </div>
