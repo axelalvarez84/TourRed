@@ -545,28 +545,13 @@ export async function deleteDestinationImage(imageId: string) {
 export async function deleteDestination(id: string) {
   console.log('🗑️ Eliminando destino:', id);
   
-  try {
-    const { data, error } = await supabase.rpc('delete_destination', {
-      destination_uuid: id
-    });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    if (data && data.length > 0) {
-      const result = data[0];
-      if (!result.success) {
-        throw new Error(result.message);
-      }
-    }
-
-    console.log('✅ Destino eliminado correctamente');
-    return { data: true, error: null };
-  } catch (err: any) {
-    console.error('❌ Error eliminando destino:', err);
-    return { data: null, error: { message: err.message } };
-  }
+  const { error } = await supabase
+    .from('destinations')
+    .delete()
+    .eq('id', id);
+  
+  console.log('📝 Resultado de eliminación de destino:', { error });
+  return { data: !error, error };
 }
 
 // Helper function to get or create destination
@@ -912,21 +897,13 @@ export async function updateTour(id: string, updates: any) {
 export async function deleteTour(id: string) {
   console.log('🗑️ Eliminando tour:', id);
   
-  const { data, error } = await supabase.rpc('delete_destination', {
-    destination_uuid: id
-  });
+  const { error } = await supabase
+    .from('tours')
+    .delete()
+    .eq('id', id);
 
-  console.log('📝 Resultado de eliminación de destino:', { data, error });
-  
-  if (error) {
-    return { error };
-  }
-  
-  if (data && data.length > 0 && !data[0].success) {
-    return { error: { message: data[0].message } };
-  }
-  
-  return { error: null };
+  console.log('📝 Resultado de eliminación de tour:', { error });
+  return { error };
 }
 
 // Admin functions

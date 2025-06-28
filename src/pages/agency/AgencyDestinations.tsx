@@ -27,6 +27,7 @@ const AgencyDestinations: React.FC = () => {
 
   const [newImageData, setNewImageData] = useState<ImageUploadData | null>(null);
   const [newImageCaption, setNewImageCaption] = useState('');
+  const [deletingDestination, setDeletingDestination] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDestinations();
@@ -221,21 +222,21 @@ const AgencyDestinations: React.FC = () => {
     }
   };
 
-  const handleDelete = async (destinationId: string, destinationName: string) => {
+  const handleDelete = async (destination: Destination) => {
     if (!isAdmin) {
       setError('Solo los administradores pueden eliminar destinos');
       return;
     }
 
-    if (!confirm(`¿Estás seguro de que quieres eliminar el destino "${destinationName}"?\n\nEsta acción no se puede deshacer y eliminará también todas las imágenes asociadas.`)) {
+    if (!confirm(`¿Estás seguro de que quieres eliminar el destino "${destination.name}"?\n\nEsta acción no se puede deshacer y eliminará también todas las imágenes asociadas.`)) {
       return;
     }
 
     try {
-      setIsSubmitting(true);
+      setDeletingDestination(destination.id);
       setError('');
       
-      const { error } = await deleteDestination(destinationId);
+      const { error } = await deleteDestination(destination.id);
       if (error) {
         throw new Error(error.message);
       }
@@ -246,7 +247,7 @@ const AgencyDestinations: React.FC = () => {
       console.error('❌ Error eliminando destino:', err);
       setError(err.message || 'Error al eliminar el destino');
     } finally {
-      setIsSubmitting(false);
+      setDeletingDestination(null);
     }
   };
 
