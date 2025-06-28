@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Image, MapPin, Globe, Clock, DollarSign, Users, Save, X, Upload, Shield, AlertCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Image, MapPin, Globe, Clock, DollarSign, Users, Save, X, Upload, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getAllDestinations, createDestination, updateDestination, addDestinationImage, deleteDestinationImage, deleteDestination, getImageSrc } from '../../lib/supabase';
 import { Destination, DestinationImage, ImageUploadData } from '../../types';
@@ -142,7 +142,7 @@ const AgencyDestinations: React.FC = () => {
         if (error) throw error;
       } else {
         // Create new destination
-        // Solo enviar campos que no sean vacíos
+        // Only send non-empty fields
         const createData: any = {
           name: formData.name.trim(),
           is_active: true
@@ -153,7 +153,7 @@ const AgencyDestinations: React.FC = () => {
         if (formData.region) createData.region = formData.region;
         if (formData.best_time_to_visit) createData.best_time_to_visit = formData.best_time_to_visit;
         
-        // Solo agregar campos de imagen si están presentes
+        // Only add image fields if present
         if (formData.main_image_base64) {
           createData.main_image_base64 = formData.main_image_base64;
           createData.main_image_type = formData.main_image_type;
@@ -544,7 +544,7 @@ const AgencyDestinations: React.FC = () => {
               {isAdmin && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
                   <div className="flex items-center text-xs text-amber-600 mb-2">
-                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    <AlertCircle className="h-3 w-3 mr-1" />
                     <span>Acciones de Administrador</span>
                   </div>
                   <button
@@ -555,56 +555,6 @@ const AgencyDestinations: React.FC = () => {
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                         : 'bg-red-100 text-red-700 hover:bg-red-200'
                     }`}
-                    title={getTourCount(destination) > 0 
-                      ? 'No se puede eliminar: tiene tours asociados' 
-                      : 'Eliminar destino permanentemente'
-                    }
-                  >
-                    {deletingDestination === destination.id ? (
-                      <>
-                        <div className="animate-spin rounded-full h-3 w-3 border-t border-b border-red-600 inline mr-1"></div>
-                        Eliminando...
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 className="h-3 w-3 inline mr-1" />
-                        Eliminar Destino
-                      </>
-                    )}
-                  </button>
-                  {getTourCount(destination) > 0 && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Elimina primero los {getTourCount(destination)} tour(s) asociado(s)
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Acciones de Administrador */}
-              {isAdmin && (
-                <div className="mt-4 border-t pt-4">
-                  <h4 className="text-sm font-medium mb-2 flex items-center text-red-600">
-                    <Shield className="h-4 w-4 mr-2" />
-                    Acciones de Administrador
-                  </h4>
-                  
-                  {getTourCount(destination) > 0 ? (
-                    <div className="text-xs text-gray-500 bg-yellow-50 border border-yellow-200 rounded p-2">
-                      <AlertCircle className="h-3 w-3 inline mr-1" />
-                      No se puede eliminar: tiene {getTourCount(destination)} tour(s) asociado(s)
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => handleDelete(destination.id, destination.name)}
-                      disabled={isSubmitting}
-                      className="text-xs bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 disabled:opacity-50 flex items-center"
-                    >
-                      <Trash2 className="h-3 w-3 mr-1" />
-                      {isSubmitting ? 'Eliminando...' : 'Eliminar Destino'}
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         ))}
