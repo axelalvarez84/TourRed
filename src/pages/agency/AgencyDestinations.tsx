@@ -560,6 +560,7 @@ const AgencyDestinations: React.FC = () => {
                     {deletingDestination === destination.id ? 'Eliminando...' : 'Eliminar'}
                   </button>
                 </div>
+              )}
             </div>
           </div>
         ))}
