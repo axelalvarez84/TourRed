@@ -276,14 +276,17 @@ const AgencyDestinations: React.FC = () => {
             {/* Main Image Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Imagen Principal del Destino
+                Imagen Principal del Destino (Opcional)
               </label>
               <ImageUploader
                 onImageSelect={handleMainImageSelect}
                 currentImage={formData.main_image_base64}
                 maxSizeMB={5}
-                placeholder="Seleccionar imagen principal"
+                placeholder="Seleccionar imagen principal (opcional)"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Puedes agregar la imagen principal después de crear el destino
+              </p>
             </div>
 
             <div>
@@ -295,7 +298,7 @@ const AgencyDestinations: React.FC = () => {
                 onChange={(e) => setFormData({...formData, description: e.target.value})}
                 className="input"
                 rows={4}
-                placeholder="Describe el destino, sus atracciones principales, cultura, etc."
+                placeholder="Describe el destino, sus atracciones principales, cultura, etc. (opcional)"
               />
             </div>
 
