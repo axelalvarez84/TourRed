@@ -555,6 +555,11 @@ const AgencyDestinations: React.FC = () => {
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                         : 'bg-red-100 text-red-700 hover:bg-red-200'
                     }`}
+                  >
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    {deletingDestination === destination.id ? 'Eliminando...' : 'Eliminar'}
+                  </button>
+                </div>
             </div>
           </div>
         ))}
