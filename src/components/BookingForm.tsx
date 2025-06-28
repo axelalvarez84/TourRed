@@ -51,6 +51,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
       return;
     }
 
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
     if (!isTraveler) {
       setError('Solo los viajeros pueden reservar tours.');
       return;
@@ -131,7 +136,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session?.access_token) {
-        throw new Error('No hay sesión válida');
+        throw new Error('No hay sesión válida. Por favor inicia sesión nuevamente.');
       }
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`, {
@@ -151,13 +156,13 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
       
       if (!response.ok) {
         // Manejar específicamente el error de configuración de Stripe
-        if (result.details === 'stripe_key_missing') {
+        if (result && result.details === 'stripe_key_missing') {
           throw new Error(
             'La configuración de pagos no está completa. ' +
             'Por favor, contacta al administrador del sistema para configurar Stripe.'
           );
         }
-        throw new Error(result.error || 'Error en el procesamiento del pago');
+        throw new Error(result?.error || 'Error en el procesamiento del pago');
       }
 
       return result;
@@ -273,7 +278,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           <div className="flex items-start">
             <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
             <div className="text-sm text-blue-800">
-              <p className="font-medium mb-1">Proceso de Pago:</p>
+              <span className="font-medium">{error}</span>
               <ul className="space-y-1 text-xs">
                 <li>• Serás redirigido a una página segura de Stripe para ingresar tus datos de pago</li>
                 <li>• Pagarás ${userPayment.toLocaleString()} ahora (depósito + cargo por servicio)</li>

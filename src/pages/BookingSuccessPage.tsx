@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { CheckCircle, Calendar, MapPin, Users, DollarSign, ArrowRight } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, Users, DollarSign, ArrowRight, CreditCard, Mail } from 'lucide-react';
 import { supabase, parseDateFromDB } from '../lib/supabase';
 import { Booking, Tour } from '../types';
 import { format } from 'date-fns';
@@ -54,13 +54,11 @@ const BookingSuccessPage: React.FC = () => {
       // Update booking status to confirmed if payment was successful
       if (bookingData.payment_status === 'processing') {
         const { error: updateError } = await supabase
-          .from('bookings')
-          .update({ 
-            status: 'confirmed',
-            payment_status: 'succeeded',
-            paid_at: new Date().toISOString()
-          })
-          .eq('id', bookingId);
+          .rpc('update_booking_payment_status', {
+            p_booking_id: bookingId,
+            p_status: 'confirmed',
+            p_payment_status: 'succeeded'
+          });
 
         if (updateError) {
           console.error('Error updating booking status:', updateError);
@@ -151,9 +149,10 @@ const BookingSuccessPage: React.FC = () => {
                 <div className="flex items-center">
                   <MapPin className="h-4 w-4 mr-1" />
                   <span>{tour.destination}</span>
-                </div>
-              </div>
-            </div>
+                    <div className="text-sm text-gray-500">Método de Pago</div>
+                    <div className="font-medium flex items-center">
+                      <CreditCard className="h-4 w-4 mr-1 text-gray-400" />
+                      {booking.payment_method || 'Tarjeta'}
           </div>
 
           <div className="p-6">
@@ -249,6 +248,10 @@ const BookingSuccessPage: React.FC = () => {
               <div>
                 <div className="font-medium">Confirmación por Email</div>
                 <div className="text-sm text-gray-600">Recibirás un email con todos los detalles de tu reserva</div>
+                <div className="mt-1 text-xs text-gray-500 flex items-center">
+                  <Mail className="h-3 w-3 mr-1" />
+                  {booking.users?.email}
+                </div>
               </div>
             </div>
             
@@ -266,9 +269,16 @@ const BookingSuccessPage: React.FC = () => {
               <div className="flex-shrink-0 w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center mr-3 mt-0.5">
                 <span className="text-primary-600 text-sm font-bold">3</span>
               </div>
-              <div>
-                <div className="font-medium">Pago del Saldo</div>
-                <div className="text-sm text-gray-600">Coordina el pago del saldo restante directamente con la agencia</div>
+              <div className="flex-1">
+                <div className="font-medium flex items-center">
+                  Pago del Saldo
+                  <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">
+                    ${((booking.total_price || 0) - (booking.deposit_amount || 0)).toLocaleString()}
+                  </span>
+                </div>
+                <div className="text-sm text-gray-600">
+                  Coordina el pago del saldo restante directamente con {tour.agencies?.name}
+                </div>
               </div>
             </div>
           </div>

@@ -8,10 +8,10 @@ export interface StripeProduct {
 
 export const stripeProducts: StripeProduct[] = [
   {
-    id: 'prod_STH0j31AYzyZHz',
-    priceId: 'price_1RYKSQGa0TlrgX47BhDL8emD',
+    id: 'service_fee',
+    priceId: 'price_1RYKSQGa0TlrgX47BhDL8emD', // Reemplaza con tu price_id real
     name: 'Cargo Por Servicio',
-    description: 'Cargo por servicio de procesamiento de reservas',
+    description: 'Cargo por servicio de procesamiento de reservas (3% del valor del tour)',
     mode: 'payment',
   },
 ];

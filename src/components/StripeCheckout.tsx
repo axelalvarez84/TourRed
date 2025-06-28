@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CreditCard, Loader2 } from 'lucide-react';
+import { CreditCard, Loader2, AlertCircle } from 'lucide-react';
 import { useStripe } from '../hooks/useStripe';
 import { stripeProducts, type StripeProduct } from '../stripe-config';
 
@@ -32,8 +32,8 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({
     try {
       setError(null);
       await redirectToCheckout({
-        priceId: selectedProduct.priceId,
-        mode: selectedProduct.mode,
+        priceId: selectedProduct?.priceId,
+        mode: selectedProduct?.mode || 'payment',
         successUrl: `${window.location.origin}/success?product=${selectedProduct.id}`,
         cancelUrl: `${window.location.origin}/cancel`,
       });
@@ -47,10 +47,14 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({
       <div className="text-center">
         <h3 className="text-xl font-semibold mb-2">{selectedProduct.name}</h3>
         <p className="text-gray-600 mb-4">{selectedProduct.description}</p>
-        
+
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-red-600 text-sm">{error}</p>
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-start">
+            <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 mr-2 flex-shrink-0" />
+            <div>
+              <p className="text-red-600 text-sm font-medium">Error al procesar el pago</p>
+              <p className="text-red-600 text-sm">{error}</p>
+            </div>
           </div>
         )}
 
@@ -67,8 +71,8 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = ({
               </>
             ) : (
               <>
-                <CreditCard className="h-4 w-4 mr-2" />
-                Purchase {selectedProduct.name}
+                <CreditCard className="h-5 w-5 mr-2" />
+                Comprar {selectedProduct.name}
               </>
             )}
           </button>

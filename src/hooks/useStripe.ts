@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 
 interface CheckoutOptions {
   priceId: string;
@@ -25,7 +26,7 @@ export function useStripe() {
 
     setIsLoading(true);
 
-    try {
+    setIsLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session?.access_token) {
@@ -35,7 +36,7 @@ export function useStripe() {
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-checkout`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${session?.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -47,7 +48,7 @@ export function useStripe() {
       });
 
       const result = await response.json();
-
+      
       if (!response.ok) {
         return { error: result.error || 'Failed to create checkout session' };
       }
@@ -56,7 +57,7 @@ export function useStripe() {
     } catch (error: any) {
       return { error: error.message || 'An unexpected error occurred' };
     } finally {
-      setIsLoading(false);
+      setTimeout(() => setIsLoading(false), 500);
     }
   };
 

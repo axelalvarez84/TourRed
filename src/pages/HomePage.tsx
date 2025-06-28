@@ -163,13 +163,44 @@ const HomePage: React.FC = () => {
       {/* Service Charge Section - Only show to authenticated users */}
       {user && (
         <section className="py-12 bg-primary-50">
-          <div className="container-custom">
-            <div className="max-w-2xl mx-auto text-center">
-              <h2 className="text-2xl md:text-3xl font-bold mb-4">Cargo por Servicio</h2>
-              <p className="text-lg text-gray-600 mb-8">
-                Para mantener nuestra plataforma funcionando y brindar el mejor servicio, aplicamos un pequeño cargo por servicio en cada reserva.
+          <div className="container-custom relative">
+            <div className="max-w-3xl mx-auto text-center">
+              <h2 className="text-2xl md:text-3xl font-bold mb-4">Cómo Funcionan Nuestros Pagos</h2>
+              <p className="text-lg text-gray-600 mb-6">
+                En ToursRed, hacemos que reservar tours sea seguro y transparente:
               </p>
-              <StripeCheckout className="max-w-md mx-auto" />
+              
+              <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+                  <div className="space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 mb-3">
+                      <span className="font-bold">1</span>
+                    </div>
+                    <h3 className="font-semibold">Depósito Inicial</h3>
+                    <p className="text-sm text-gray-600">Pagas solo un depósito para asegurar tu lugar (generalmente 30-50% del precio total)</p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 mb-3">
+                      <span className="font-bold">2</span>
+                    </div>
+                    <h3 className="font-semibold">Cargo por Servicio</h3>
+                    <p className="text-sm text-gray-600">Aplicamos un pequeño cargo del 3% para mantener la plataforma y garantizar seguridad</p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 mb-3">
+                      <span className="font-bold">3</span>
+                    </div>
+                    <h3 className="font-semibold">Saldo Restante</h3>
+                    <p className="text-sm text-gray-600">El saldo restante se paga directamente a la agencia según sus políticas</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="max-w-md mx-auto">
+                <StripeCheckout />
+              </div>
             </div>
           </div>
         </section>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { CheckCircle, ArrowRight, Home } from 'lucide-react';
+import { CheckCircle, ArrowRight, Home, CreditCard } from 'lucide-react';
 import { getProductById } from '../stripe-config';
 
 const SuccessPage: React.FC = () => {
@@ -24,26 +24,29 @@ const SuccessPage: React.FC = () => {
           </div>
           
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Payment Successful!
+            ¡Pago Exitoso!
           </h2>
           
           <p className="text-gray-600 mb-6">
-            Thank you for your purchase. Your payment has been processed successfully.
+            Gracias por tu compra. Tu pago ha sido procesado exitosamente.
           </p>
 
           {product && (
             <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Purchase Details
+              <h3 className="text-lg font-semibold text-gray-900 mb-2 flex items-center">
+                <CreditCard className="h-5 w-5 mr-2 text-primary-600" />
+                Detalles de la Compra
               </h3>
               <div className="text-left space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Product:</span>
+                  <span className="text-gray-600">Producto:</span>
                   <span className="font-medium">{product.name}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Type:</span>
-                  <span className="font-medium capitalize">{product.mode}</span>
+                  <span className="text-gray-600">Tipo:</span>
+                  <span className="font-medium capitalize">
+                    {product.mode === 'payment' ? 'Pago único' : 'Suscripción'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -54,7 +57,7 @@ const SuccessPage: React.FC = () => {
               to="/dashboard"
               className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
             >
-              Go to Dashboard
+              Ir al Panel
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
             
@@ -63,7 +66,7 @@ const SuccessPage: React.FC = () => {
               className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
             >
               <Home className="mr-2 h-4 w-4" />
-              Back to Home
+              Volver al Inicio
             </Link>
           </div>
         </div>
