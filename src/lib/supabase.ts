@@ -437,6 +437,11 @@ export async function getDestinationById(id: string) {
 export async function createDestination(destinationData: any) {
   console.log('🌍 Creando destino:', destinationData);
   
+  // Verificar si tenemos los datos necesarios
+  if (!destinationData || (!destinationData.name && typeof destinationData !== 'string')) {
+    throw new Error('Se requiere al menos el nombre del destino');
+  }
+  
   // Si destinationData es solo un string (nombre), crear objeto básico
   if (typeof destinationData === 'string') {
     const basicDestinationData = {
@@ -456,7 +461,7 @@ export async function createDestination(destinationData: any) {
   
   // Si es un objeto completo, usar todos los campos disponibles
   const destinationToInsert: any = {
-    name: destinationData.name,
+    name: destinationData.name || '',
     is_active: true
   };
   
@@ -478,13 +483,20 @@ export async function createDestination(destinationData: any) {
     destinationToInsert.main_image_size = destinationData.main_image_size;
   }
   
+  console.log('📊 Datos a insertar:', destinationToInsert);
+  
   const { data, error } = await supabase
     .from('destinations')
     .insert(destinationToInsert)
     .select()
     .single();
   
-  console.log('📝 Resultado de creación de destino completo:', { data, error });
+  if (error) {
+    console.error('❌ Error creando destino:', error);
+  } else {
+    console.log('✅ Destino creado correctamente:', data);
+  }
+  
   return { data, error };
 }
 

@@ -112,6 +112,11 @@ const AgencyDestinations: React.FC = () => {
         throw new Error('Usuario no autenticado');
       }
 
+      // Validar que el nombre no esté vacío
+      if (!formData.name.trim()) {
+        throw new Error('El nombre del destino es obligatorio');
+      }
+
       if (editingDestination) {
         // Update existing destination
         // Solo enviar campos que no sean vacíos
@@ -138,7 +143,7 @@ const AgencyDestinations: React.FC = () => {
         // Create new destination
         // Solo enviar campos que no sean vacíos
         const createData: any = {
-          name: formData.name,
+          name: formData.name.trim(),
           is_active: true
         };
         
@@ -151,11 +156,15 @@ const AgencyDestinations: React.FC = () => {
         if (formData.main_image_base64) {
           createData.main_image_base64 = formData.main_image_base64;
           createData.main_image_type = formData.main_image_type;
-          createData.main_image_size = formData.main_image_size;
+          createData.main_image_size = formData.main_image_size || formData.main_image_base64.length;
         }
         
+        console.log('🌍 Enviando datos para crear destino:', createData);
         const { error } = await createDestination(createData);
-        if (error) throw error;
+        if (error) {
+          console.error('❌ Error detallado al crear destino:', error);
+          throw new Error(`Error al crear destino: ${error.message}`);
+        }
       }
 
       await fetchDestinations();
@@ -294,6 +303,7 @@ const AgencyDestinations: React.FC = () => {
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
                   className="input"
                   required
+                  placeholder="Ej: Cancún, Oaxaca, Ciudad de México"
                 />
               </div>
 
