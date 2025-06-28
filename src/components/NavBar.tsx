@@ -67,7 +67,7 @@ const NavBar: React.FC = () => {
         <div className="flex justify-between h-16">
           <div className="flex">
             <Link to="/" className="flex-shrink-0 flex items-center">
-              <img src="/logo.svg" alt="ToursRed Logo" className="h-8 w-8" />
+              <img src="/logo.svg" alt="ToursRed Logo" className="h-10 w-10" />
               <span className="ml-2 text-xl font-bold text-gray-900">ToursRed</span>
             </Link>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">

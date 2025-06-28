@@ -45,14 +45,16 @@ const HomePage: React.FC = () => {
       {/* Hero Section */}
       <section className="relative bg-gray-900 text-white">
         <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-gray-900/80 to-gray-900/60"></div>
           <img
             src="https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg"
             alt="Fondo de viaje"
-            className="w-full h-full object-cover opacity-40"
+            className="w-full h-full object-cover opacity-60"
           />
         </div>
-        <div className="relative container-custom py-20 md:py-32">
-          <div className="max-w-3xl">
+        <div className="relative container-custom py-24 md:py-36">
+          <div className="max-w-3xl flex flex-col items-start">
+            <img src="/logo.svg" alt="ToursRed Logo" className="h-20 w-20 mb-6" />
             <h1 className="text-4xl md:text-5xl font-bold mb-4 animate-fade-in">
               Descubre Tu Próxima<br />Aventura
             </h1>

@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="256" cy="256" r="256" fill="#E5F7F7"/>
-  <path d="M256 128C256 128 192 192 128 192C128 256 192 384 256 384C320 384 384 256 384 192C320 192 256 128 256 128Z" fill="#E63E2E"/>
-  <path d="M256 176L288 208H272V272H240V208H224L256 176Z" fill="white"/>
-  <path d="M256 304C256 304 240 288 224 288C224 272 240 240 256 240C272 240 288 272 288 288C272 288 256 304 256 304Z" fill="white"/>
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Red location pin background -->
+  <path d="M60 10C36.8 10 18 28.8 18 52C18 84 60 110 60 110C60 110 102 84 102 52C102 28.8 83.2 10 60 10Z" fill="#E63946"/>
+  
+  <!-- Airplane -->
+  <path d="M80 40L65 55L45 45L35 50L55 65L40 80L30 75L35 65L25 60L40 45L75 30L80 40Z" fill="white"/>
+  
+  <!-- Palm tree -->
+  <path d="M55 75C55 75 50 65 45 65C40 65 45 75 45 75M65 75C65 75 70 65 75 65C80 65 75 75 75 75M60 90C60 90 58 75 60 75C62 75 60 90 60 90Z" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M60 75C65 75 70 70 70 65C70 60 65 55 60 55C55 55 50 60 50 65C50 70 55 75 60 75Z" fill="white"/>
 </svg>
