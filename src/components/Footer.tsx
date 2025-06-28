@@ -9,8 +9,8 @@ const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
             <div className="flex items-center mb-4">
-              <Compass className="h-8 w-8 text-primary-400" />
-              <span className="ml-2 text-xl font-bold">TourRed</span>
+              <img src="/logo.svg" alt="ToursRed Logo" className="h-8 w-8" />
+              <span className="ml-2 text-xl font-bold">ToursRed</span>
             </div>
             <p className="text-gray-400 mb-4">
               Descubre destinos extraordinarios y experiencias inolvidables con nuestros socios de viaje de confianza.
@@ -99,7 +99,7 @@ const Footer: React.FC = () => {
         <div className="border-t border-gray-800 mt-8 pt-6">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400 text-sm">
-              &copy; {new Date().getFullYear()} TourRed. Todos los derechos reservados.
+              &copy; {new Date().getFullYear()} ToursRed. Todos los derechos reservados.
             </p>
             <div className="flex space-x-4 mt-4 md:mt-0">
               <Link to="/privacy-policy" className="text-gray-400 hover:text-white text-sm transition-colors">

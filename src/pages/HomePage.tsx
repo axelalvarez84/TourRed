@@ -181,7 +181,7 @@ const HomePage: React.FC = () => {
               <div className="md:w-2/3 mb-6 md:mb-0 md:pr-8">
                 <h2 className="text-2xl md:text-3xl font-bold mb-4">¿Eres una Agencia de Viajes?</h2>
                 <p className="text-lg text-gray-600 mb-6">
-                  Únete a nuestro marketplace y llega a miles de viajeros buscando su próxima aventura. Gestiona tus tours, recibe reservas y haz crecer tu negocio con nosotros.
+                  Únete a ToursRed y llega a miles de viajeros buscando su próxima aventura. Gestiona tus tours, recibe reservas y haz crecer tu negocio con nosotros.
                 </p>
                 <Link to="/agency-signup" className="btn btn-primary">
                   <Users className="mr-2 h-5 w-5" />
