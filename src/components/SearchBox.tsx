@@ -37,7 +37,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
   };
 
   return (
-    <div className={`bg-white rounded-lg shadow-lg p-4 md:p-6 ${className}`}>
+    <div className={`bg-blue-100 rounded-lg shadow-lg p-4 md:p-6 ${className}`}>
       <form onSubmit={handleSearch}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="relative">

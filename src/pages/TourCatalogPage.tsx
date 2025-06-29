@@ -141,14 +141,14 @@ const TourCatalogPage: React.FC = () => {
   });
 
   return (
-    <div className="bg-gray-50 min-h-screen py-8">
+    <div className="bg-blue-50 min-h-screen py-8">
       <div className="container-custom">
         <h1 className="text-3xl font-bold mb-6">Encuentra Tu Tour Perfecto</h1>
         
         <div className="lg:hidden mb-6">
           <button
             onClick={toggleFilters}
-            className="flex items-center w-full justify-between bg-white p-4 rounded-lg shadow-sm"
+            className="flex items-center w-full justify-between bg-blue-100 p-4 rounded-lg shadow-sm"
           >
             <div className="flex items-center">
               <Filter className="h-5 w-5 text-primary-600 mr-2" />
@@ -172,7 +172,7 @@ const TourCatalogPage: React.FC = () => {
           <div className="hidden lg:block w-full lg:w-1/3 xl:w-1/4">
             <SearchBox initialFilters={initialFilters} />
             
-            <div className="bg-white rounded-lg shadow-md p-4 mt-6">
+            <div className="bg-blue-100 rounded-lg shadow-md p-4 mt-6">
               <h3 className="font-semibold mb-4">Categorías Populares</h3>
               <div className="space-y-2">
                 {categories.map((category) => (
@@ -188,7 +188,7 @@ const TourCatalogPage: React.FC = () => {
               </div>
             </div>
             
-            <div className="bg-white rounded-lg shadow-md p-4 mt-6">
+            <div className="bg-blue-100 rounded-lg shadow-md p-4 mt-6">
               <h3 className="font-semibold mb-4">Destinos Populares</h3>
               <div className="space-y-2">
                 {popularDestinations.length > 0 ? (
@@ -215,7 +215,7 @@ const TourCatalogPage: React.FC = () => {
               </div>
             </div>
             
-            <div className="bg-white rounded-lg shadow-md p-4 mt-6">
+            <div className="bg-blue-100 rounded-lg shadow-md p-4 mt-6">
               <h3 className="font-semibold mb-4">Cuándo Ir</h3>
               <div className="space-y-2">
                 <a
@@ -249,7 +249,7 @@ const TourCatalogPage: React.FC = () => {
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
               </div>
             ) : error ? (
-              <div className="bg-white rounded-lg shadow-md p-6 text-center">
+              <div className="bg-blue-100 rounded-lg shadow-md p-6 text-center">
                 <p className="text-error-600 mb-4">Error: {error}</p>
                 <p className="text-gray-600 mb-6">
                   No se pudieron cargar los tours desde la base de datos.
@@ -262,7 +262,7 @@ const TourCatalogPage: React.FC = () => {
                 </button>
               </div>
             ) : filteredTours.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-md p-6 text-center">
+              <div className="bg-blue-100 rounded-lg shadow-md p-6 text-center">
                 <p className="text-xl mb-4">
                   {tours.length === 0 
                     ? 'No hay tours disponibles' 
@@ -311,7 +311,7 @@ const TourCatalogPage: React.FC = () => {
                 {/* Pagination placeholder */}
                 {filteredTours.length >= 10 && (
                   <div className="mt-8 flex justify-center">
-                    <div className="bg-white rounded-lg shadow-md p-4">
+                    <div className="bg-blue-100 rounded-lg shadow-md p-4">
                       <p className="text-gray-600 text-sm">
                         Mostrando {filteredTours.length} tours. 
                         {tours.length > filteredTours.length && 

@@ -43,9 +43,9 @@ const HomePage: React.FC = () => {
   return (
     <div>
       {/* Hero Section */}
-      <section className="relative bg-gray-900 text-white">
+      <section className="relative bg-blue-900 text-white">
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-gray-900/80 to-gray-900/60"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-900/80 to-blue-900/60"></div>
           <img
             src="https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg"
             alt="Fondo de viaje"
@@ -54,7 +54,7 @@ const HomePage: React.FC = () => {
         </div>
         <div className="relative container-custom py-24 md:py-36">
           <div className="max-w-3xl flex flex-col items-start">
-            <img src="/logo.svg" alt="ToursRed Logo" className="h-20 w-20 mb-6" />
+            <img src="/logo copy.png" alt="ToursRed Logo" className="h-24 w-auto mb-6" />
             <h1 className="text-4xl md:text-5xl font-bold mb-4 animate-fade-in">
               Descubre Tu Próxima<br />Aventura
             </h1>
@@ -62,14 +62,14 @@ const HomePage: React.FC = () => {
               Compara tours de las mejores agencias y encuentra las experiencias perfectas para tu próximo viaje.
             </p>
             <div className="animate-slide-up">
-              <SearchBox className="bg-white/90 backdrop-blur-sm" />
+              <SearchBox className="bg-blue-50/90 backdrop-blur-sm" />
             </div>
           </div>
         </div>
       </section>
 
       {/* Categories Section */}
-      <section className="py-12 bg-gray-50">
+      <section className="py-12 bg-blue-50">
         <div className="container-custom">
           <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center">Explora por Categoría</h2>
           <CategoryList />
@@ -77,7 +77,7 @@ const HomePage: React.FC = () => {
       </section>
 
       {/* Featured Destinations */}
-      <section className="py-12 bg-white">
+      <section className="py-12 bg-blue-100">
         <div className="container-custom">
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-2xl md:text-3xl font-bold">Destinos Populares</h2>
@@ -90,7 +90,7 @@ const HomePage: React.FC = () => {
       </section>
 
       {/* Featured Tours */}
-      <section className="py-12 bg-gray-50">
+      <section className="py-12 bg-blue-50">
         <div className="container-custom">
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-2xl md:text-3xl font-bold">Tours Destacados</h2>
@@ -110,7 +110,7 @@ const HomePage: React.FC = () => {
               ))}
             </div>
           ) : (
-            <div className="bg-white rounded-lg shadow-md p-8 text-center">
+            <div className="bg-blue-100 rounded-lg shadow-md p-8 text-center">
               <h3 className="text-xl font-semibold mb-2">¡Próximamente!</h3>
               <p className="text-gray-600 mb-4">
                 Las agencias están preparando tours increíbles para ti.
@@ -125,7 +125,7 @@ const HomePage: React.FC = () => {
       </section>
 
       {/* How It Works */}
-      <section className="py-12 bg-white">
+      <section className="py-12 bg-blue-100">
         <div className="container-custom">
           <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center">Cómo Funciona</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -162,7 +162,7 @@ const HomePage: React.FC = () => {
 
       {/* Service Charge Section - Only show to authenticated users */}
       {user && (
-        <section className="py-12 bg-primary-50">
+        <section className="py-12 bg-blue-200">
           <div className="container-custom relative">
             <div className="max-w-3xl mx-auto text-center">
               <h2 className="text-2xl md:text-3xl font-bold mb-4">Cómo Funcionan Nuestros Pagos</h2>
@@ -170,7 +170,7 @@ const HomePage: React.FC = () => {
                 En ToursRed, hacemos que reservar tours sea seguro y transparente:
               </p>
               
-              <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+              <div className="bg-blue-50 rounded-lg shadow-lg p-6 mb-8">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
                   <div className="space-y-2">
                     <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 mb-3">
@@ -207,9 +207,9 @@ const HomePage: React.FC = () => {
       )}
 
       {/* Become a Partner */}
-      <section className="py-12 bg-primary-50">
+      <section className="py-12 bg-blue-200">
         <div className="container-custom">
-          <div className="bg-white rounded-lg shadow-lg p-8 md:p-12">
+          <div className="bg-blue-50 rounded-lg shadow-lg p-8 md:p-12">
             <div className="flex flex-col md:flex-row items-center">
               <div className="md:w-2/3 mb-6 md:mb-0 md:pr-8">
                 <h2 className="text-2xl md:text-3xl font-bold mb-4">¿Eres una Agencia de Viajes?</h2>

@@ -62,13 +62,12 @@ const NavBar: React.FC = () => {
   };
 
   return (
-    <nav className="bg-white shadow-sm sticky top-0 z-50">
+    <nav className="bg-blue-50 shadow-sm sticky top-0 z-50">
       <div className="container-custom">
         <div className="flex justify-between h-16">
           <div className="flex">
             <Link to="/" className="flex-shrink-0 flex items-center">
-              <img src="/logo.svg" alt="ToursRed Logo" className="h-10 w-10" />
-              <span className="ml-2 text-xl font-bold text-gray-900">ToursRed</span>
+              <img src="/logo copy.png" alt="ToursRed Logo" className="h-12 w-auto" />
             </Link>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               <Link to="/" className="border-transparent text-gray-500 hover:border-primary-500 hover:text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
@@ -101,7 +100,7 @@ const NavBar: React.FC = () => {
                 <div>
                   <button
                     onClick={toggleProfile}
-                    className="bg-white rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                    className="bg-blue-100 rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                     id="user-menu-button"
                     aria-expanded="false"
                     aria-haspopup="true"
@@ -115,7 +114,7 @@ const NavBar: React.FC = () => {
                 
                 {isProfileOpen && (
                   <div
-                    className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none"
+                    className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-blue-50 ring-1 ring-black ring-opacity-5 focus:outline-none"
                     role="menu"
                     aria-orientation="vertical"
                     aria-labelledby="user-menu-button"
@@ -126,7 +125,7 @@ const NavBar: React.FC = () => {
                       <Link
                         key={item.to}
                         to={item.to}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-100"
                         role="menuitem"
                         onClick={() => setIsProfileOpen(false)}
                       >
@@ -141,7 +140,7 @@ const NavBar: React.FC = () => {
                     
                     <Link 
                       to="/messages" 
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-100"
                       role="menuitem"
                       onClick={() => setIsProfileOpen(false)}
                     >
@@ -150,7 +149,7 @@ const NavBar: React.FC = () => {
                     
                     <Link 
                       to={getProfileLink()} 
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-100"
                       role="menuitem"
                       onClick={() => setIsProfileOpen(false)}
                     >
@@ -158,7 +157,7 @@ const NavBar: React.FC = () => {
                     </Link>
                     <button
                       onClick={handleSignOut}
-                      className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-blue-100"
                       role="menuitem"
                     >
                       Cerrar sesión
@@ -260,7 +259,7 @@ const NavBar: React.FC = () => {
                     <Link
                       key={item.to}
                       to={item.to}
-                      className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                      className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-blue-100"
                       onClick={toggleMenu}
                     >
                       {item.label}
@@ -269,7 +268,7 @@ const NavBar: React.FC = () => {
                   
                   <Link
                     to="/messages"
-                    className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                    className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-blue-100"
                     onClick={toggleMenu}
                   >
                     Mensajes
@@ -277,14 +276,14 @@ const NavBar: React.FC = () => {
                   
                   <Link
                     to={getProfileLink()}
-                    className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                    className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-blue-100"
                     onClick={toggleMenu}
                   >
                     Perfil
                   </Link>
                   <button
                     onClick={handleSignOut}
-                    className="w-full text-left block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                    className="w-full text-left block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-blue-100"
                   >
                     Cerrar sesión
                   </button>
@@ -294,7 +293,7 @@ const NavBar: React.FC = () => {
               <div className="mt-3 space-y-1 px-4">
                 <Link
                   to="/login"
-                  className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                  className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-blue-100"
                   onClick={toggleMenu}
                 >
                   Iniciar sesión

@@ -20,7 +20,7 @@ const CategoryList: React.FC = () => {
         <Link
           key={category.id}
           to={`/tours?category=${category.id}`}
-          className="flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow group"
+          className="flex flex-col items-center justify-center p-4 bg-blue-100 rounded-lg shadow-sm hover:shadow-md transition-shadow group"
         >
           <div className="w-12 h-12 rounded-full bg-primary-50 flex items-center justify-center mb-2 text-primary-600 group-hover:bg-primary-100 transition-colors">
             {category.icon}

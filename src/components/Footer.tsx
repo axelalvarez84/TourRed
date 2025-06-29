@@ -4,13 +4,12 @@ import { Compass, Facebook, Instagram, Twitter, Mail, Phone } from 'lucide-react
 
 const Footer: React.FC = () => {
   return (
-    <footer className="bg-gray-900 text-white pt-12 pb-8">
+    <footer className="bg-blue-900 text-white pt-12 pb-8">
       <div className="container-custom">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
             <div className="flex items-center mb-4">
-              <img src="/logo.svg" alt="ToursRed Logo" className="h-10 w-10" />
-              <span className="ml-2 text-xl font-bold">ToursRed</span>
+              <img src="/logo copy.png" alt="ToursRed Logo" className="h-12 w-auto" />
             </div>
             <p className="text-gray-400 mb-4">
               Descubre destinos extraordinarios y experiencias inolvidables con nuestros socios de viaje de confianza.
@@ -96,7 +95,7 @@ const Footer: React.FC = () => {
           </div>
         </div>
         
-        <div className="border-t border-gray-800 mt-8 pt-6">
+        <div className="border-t border-blue-800 mt-8 pt-6">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400 text-sm">
               &copy; {new Date().getFullYear()} ToursRed. Todos los derechos reservados.

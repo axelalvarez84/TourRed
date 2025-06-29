@@ -25,7 +25,7 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '' }) => {
   };
 
   return (
-    <div className={`card group animate-fade-in ${className}`}>
+    <div className={`bg-blue-100 rounded-lg shadow-md overflow-hidden transition-all hover:shadow-lg group animate-fade-in ${className}`}>
       <div className="relative overflow-hidden aspect-[4/3]">
         <img 
           src={tour.image_url || 'https://images.pexels.com/photos/2245436/pexels-photo-2245436.png'} 
