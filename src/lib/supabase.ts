@@ -390,7 +390,7 @@ export const getAgencyBookings = async (agencyId: string) => {
       .select(`
         *,
         tours(id, name, destination, image_url, start_date, end_date),
-        users(id, first_name, last_name, email)
+        users!bookings_user_id_fkey(id, first_name, last_name, email)
       `)
       .eq('agency_id', agencyId)
       .order('created_at', { ascending: false });
