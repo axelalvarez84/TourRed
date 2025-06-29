@@ -1,217 +1,445 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
-import { Notification } from '../types';
+import { createClient } from '@supabase/supabase-js'
 
-export function useNotifications() {
-  const { user } = useAuth();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-  useEffect(() => {
-    if (user) {
-      fetchNotifications();
-      
-      // Set up real-time subscription for new notifications
-      const channel = supabase
-        .channel('notifications-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'notifications',
-            filter: `user_id=eq.${user.id}`,
-          },
-          (payload) => {
-            console.log('Nueva notificación recibida:', payload);
-            fetchNotifications();
-          }
-        )
-        .subscribe();
-      
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-  }, [user]);
-
-  const fetchNotifications = async (limit = 10) => {
-    if (!user) return;
-    
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // Get unread count
-      const { data: countData, error: countError } = await supabase
-        .rpc('get_unread_notifications_count');
-      
-      if (countError) {
-        console.error('Error fetching unread count:', countError);
-        setError('Error al obtener notificaciones no leídas');
-      } else {
-        setUnreadCount(countData || 0);
-      }
-      
-      // Get recent notifications
-      const { data, error } = await supabase
-        .from('user_notifications')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(limit);
-      
-      if (error) {
-        console.error('Error fetching notifications:', error);
-        setError('Error al cargar notificaciones');
-      } else {
-        setNotifications(data || []);
-      }
-    } catch (err: any) {
-      console.error('Error in fetchNotifications:', err);
-      setError(err.message || 'Error al cargar notificaciones');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const markAsRead = async (notificationId: string) => {
-    try {
-      const { error } = await supabase
-        .rpc('mark_notification_as_read', { notification_id: notificationId });
-      
-      if (error) {
-        console.error('Error marking notification as read:', error);
-        return false;
-      } else {
-        // Update local state
-        setNotifications(prev => 
-          prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
-        );
-        setUnreadCount(prev => Math.max(0, prev - 1));
-        return true;
-      }
-    } catch (err) {
-      console.error('Error in markAsRead:', err);
-      return false;
-    }
-  };
-
-  const markAllAsRead = async () => {
-    try {
-      const { data, error } = await supabase
-        .rpc('mark_all_notifications_as_read');
-      
-      if (error) {
-        console.error('Error marking all notifications as read:', error);
-        return false;
-      } else {
-        // Update local state
-        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-        setUnreadCount(0);
-        return true;
-      }
-    } catch (err) {
-      console.error('Error in markAllAsRead:', err);
-      return false;
-    }
-  };
-
-  const deleteNotification = async (notificationId: string) => {
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('id', notificationId);
-      
-      if (error) {
-        console.error('Error deleting notification:', error);
-        return false;
-      } else {
-        // Update local state
-        setNotifications(prev => prev.filter(n => n.id !== notificationId));
-        // If it was unread, update the count
-        const wasUnread = notifications.find(n => n.id === notificationId && !n.is_read);
-        if (wasUnread) {
-          setUnreadCount(prev => Math.max(0, prev - 1));
-        }
-        return true;
-      }
-    } catch (err) {
-      console.error('Error in deleteNotification:', err);
-      return false;
-    }
-  };
-
-  return {
-    notifications,
-    unreadCount,
-    isLoading,
-    error,
-    fetchNotifications,
-    markAsRead,
-    markAllAsRead,
-    deleteNotification
-  };
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables')
 }
 
-// Safe query wrapper to handle network errors gracefully
-async function safeSupabaseQuery<T>(queryFn: () => Promise<{ data: T | null; error: any }>): Promise<{ data: T | null; error: any }> {
-  try {
-    return await queryFn();
-  } catch (error: any) {
-    console.error('❌ Error en consulta Supabase:', error);
-    
-    // Handle network errors gracefully
-    if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
-      return { 
-        data: null, 
-        error: { 
-          message: 'Error de conexión: No se puede conectar al servidor. Verifica tu conexión a internet.',
-          code: 'NETWORK_ERROR'
-        } 
-      };
-    }
-    
-    return { data: null, error };
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+// Types and Enums
+export enum UserRole {
+  TRAVELER = 'traveler',
+  AGENCY = 'agency',
+  ADMIN = 'admin'
+}
+
+export interface User {
+  id: string
+  email: string
+  first_name?: string
+  last_name?: string
+  role: UserRole
+  created_at: string
+  updated_at: string
+}
+
+export interface Agency {
+  id: string
+  user_id: string
+  name: string
+  description?: string
+  logo?: string
+  contact_email: string
+  contact_phone?: string
+  website?: string
+  rating?: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface Tour {
+  id: string
+  agency_id: string
+  name: string
+  destination: string
+  description: string
+  category: string
+  price: number
+  deposit_percentage: number
+  image_url: string
+  gallery?: string[]
+  start_date: string
+  end_date: string
+  max_travelers?: number
+  is_featured: boolean
+  created_at: string
+  updated_at: string
+  itinerary?: string
+  includes?: string[]
+  excludes?: string[]
+  booking_deadline?: string
+  booking_approval_type?: 'automatic' | 'manual'
+  approval_required?: boolean
+}
+
+export interface Booking {
+  id: string
+  user_id: string
+  tour_id: string
+  agency_id: string
+  deposit_amount: number
+  commission_amount: number
+  total_price: number
+  status: string
+  booking_date: string
+  travelers_count: number
+  created_at: string
+  updated_at: string
+  service_charge?: number
+  user_payment?: number
+  platform_revenue?: number
+  payment_intent_id?: string
+  payment_status?: string
+  payment_method?: string
+  paid_at?: string
+  approval_status?: 'pending' | 'approved' | 'rejected'
+  approval_notes?: string
+  approved_at?: string
+  approved_by?: string
+}
+
+export interface Destination {
+  id: string
+  name: string
+  description?: string
+  main_image_url?: string
+  country?: string
+  region?: string
+  best_time_to_visit?: string
+  average_temperature?: string
+  currency?: string
+  language?: string
+  time_zone?: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  last_updated_by?: string
+  main_image_base64?: string
+  main_image_size?: number
+  main_image_type?: string
+}
+
+export interface Review {
+  id: string
+  user_id: string
+  tour_id: string
+  agency_id: string
+  rating: number
+  comment: string
+  reply?: string
+  is_visible: boolean
+  created_at: string
+  updated_at: string
+}
+
+// Utility functions
+export function parseDateFromDB(dateString: string): Date {
+  return new Date(dateString)
+}
+
+export function formatDateForDB(date: Date): string {
+  return date.toISOString().split('T')[0]
+}
+
+export function getImageSrc(base64Data?: string, imageType?: string, fallbackUrl?: string): string {
+  if (base64Data && imageType) {
+    return `data:${imageType};base64,${base64Data}`
   }
+  return fallbackUrl || '/placeholder-image.jpg'
 }
 
-// Notification functions
-export async function getUserNotifications(limit = 10, offset = 0, includeRead = false) {
-  console.log('🔔 Obteniendo notificaciones del usuario...');
-  
-  return safeSupabaseQuery(() => 
-    supabase.rpc('get_user_notifications', { 
-      limit_count: limit,
-      offset_count: offset,
-      include_read: includeRead
-    })
-  );
+// Auth functions
+export async function signIn(email: string, password: string) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
+  return { data, error }
 }
 
-export async function markNotificationAsRead(notificationId: string) {
-  console.log('✓ Marcando notificación como leída:', notificationId);
-  
-  return safeSupabaseQuery(() => 
-    supabase.rpc('mark_notification_as_read', { notification_id: notificationId })
-  );
+export async function signUp(email: string, password: string, userData: {
+  first_name?: string
+  last_name?: string
+  role: UserRole
+}) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: userData
+    }
+  })
+  return { data, error }
 }
 
-export async function markAllNotificationsAsRead() {
-  console.log('✓ Marcando todas las notificaciones como leídas');
-  
-  return safeSupabaseQuery(() => 
-    supabase.rpc('mark_all_notifications_as_read')
-  );
+export async function signOut() {
+  const { error } = await supabase.auth.signOut()
+  return { error }
 }
 
-export async function getUnreadNotificationCount() {
-  console.log('🔢 Obteniendo conteo de notificaciones no leídas');
+export async function getCurrentUser() {
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error || !user) return { user: null, error }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', user.id)
+    .single()
+
+  return { user: profile, error: profileError }
+}
+
+// Agency functions
+export async function createAgencyProfile(agencyData: Omit<Agency, 'id' | 'created_at' | 'updated_at'>) {
+  const { data, error } = await supabase
+    .from('agencies')
+    .insert([agencyData])
+    .select()
+    .single()
   
-  return safeSupabaseQuery(() => 
-    supabase.rpc('get_unread_notifications_count')
-  );
+  return { data, error }
+}
+
+export async function getAllAgencies() {
+  const { data, error } = await supabase
+    .from('agencies')
+    .select('*')
+    .order('created_at', { ascending: false })
+  
+  return { data, error }
+}
+
+export async function updateAgencyStatus(agencyId: string, isActive: boolean) {
+  const { data, error } = await supabase
+    .from('agencies')
+    .update({ is_active: isActive })
+    .eq('id', agencyId)
+    .select()
+    .single()
+  
+  return { data, error }
+}
+
+// Tour functions
+export async function getTours(filters?: {
+  category?: string
+  destination?: string
+  minPrice?: number
+  maxPrice?: number
+  startDate?: string
+  endDate?: string
+}) {
+  let query = supabase
+    .from('tours')
+    .select(`
+      *,
+      agencies (
+        id,
+        name,
+        rating
+      )
+    `)
+    .order('created_at', { ascending: false })
+
+  if (filters?.category) {
+    query = query.eq('category', filters.category)
+  }
+  if (filters?.destination) {
+    query = query.ilike('destination', `%${filters.destination}%`)
+  }
+  if (filters?.minPrice) {
+    query = query.gte('price', filters.minPrice)
+  }
+  if (filters?.maxPrice) {
+    query = query.lte('price', filters.maxPrice)
+  }
+  if (filters?.startDate) {
+    query = query.gte('start_date', filters.startDate)
+  }
+  if (filters?.endDate) {
+    query = query.lte('end_date', filters.endDate)
+  }
+
+  const { data, error } = await query
+  return { data, error }
+}
+
+export async function getTourById(tourId: string) {
+  const { data, error } = await supabase
+    .from('tours')
+    .select(`
+      *,
+      agencies (
+        id,
+        name,
+        description,
+        contact_email,
+        contact_phone,
+        website,
+        rating
+      )
+    `)
+    .eq('id', tourId)
+    .single()
+  
+  return { data, error }
+}
+
+export async function createTour(tourData: Omit<Tour, 'id' | 'created_at' | 'updated_at'>) {
+  const { data, error } = await supabase
+    .from('tours')
+    .insert([tourData])
+    .select()
+    .single()
+  
+  return { data, error }
+}
+
+export async function updateTour(tourId: string, tourData: Partial<Tour>) {
+  const { data, error } = await supabase
+    .from('tours')
+    .update(tourData)
+    .eq('id', tourId)
+    .select()
+    .single()
+  
+  return { data, error }
+}
+
+export async function deleteTour(tourId: string) {
+  const { data, error } = await supabase
+    .from('tours')
+    .delete()
+    .eq('id', tourId)
+  
+  return { data, error }
+}
+
+// Destination functions
+export async function searchDestinations(query?: string) {
+  let supabaseQuery = supabase
+    .from('destinations')
+    .select('*')
+    .eq('is_active', true)
+    .order('name')
+
+  if (query) {
+    supabaseQuery = supabaseQuery.or(`name.ilike.%${query}%,country.ilike.%${query}%,region.ilike.%${query}%`)
+  }
+
+  const { data, error } = await supabaseQuery
+  return { data, error }
+}
+
+export async function addDestinationImage(imageData: {
+  destination_id: string
+  image_url?: string
+  caption?: string
+  is_featured?: boolean
+  uploaded_by?: string
+  image_base64?: string
+  image_size?: number
+  image_type?: string
+}) {
+  const { data, error } = await supabase
+    .from('destination_images')
+    .insert([imageData])
+    .select()
+    .single()
+  
+  return { data, error }
+}
+
+export async function deleteDestinationImage(imageId: string) {
+  const { data, error } = await supabase
+    .from('destination_images')
+    .delete()
+    .eq('id', imageId)
+  
+  return { data, error }
+}
+
+export async function deleteDestination(destinationId: string) {
+  const { data, error } = await supabase
+    .from('destinations')
+    .delete()
+    .eq('id', destinationId)
+  
+  return { data, error }
+}
+
+// Booking functions
+export async function createBooking(bookingData: Omit<Booking, 'id' | 'created_at' | 'updated_at'>) {
+  const { data, error } = await supabase
+    .from('bookings')
+    .insert([bookingData])
+    .select()
+    .single()
+  
+  return { data, error }
+}
+
+export async function getUserBookings(userId: string) {
+  const { data, error } = await supabase
+    .from('bookings')
+    .select(`
+      *,
+      tours (
+        id,
+        name,
+        destination,
+        image_url,
+        start_date,
+        end_date
+      ),
+      agencies (
+        id,
+        name,
+        contact_email
+      )
+    `)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  
+  return { data, error }
+}
+
+export async function getAgencyBookings(agencyId: string) {
+  const { data, error } = await supabase
+    .from('bookings')
+    .select(`
+      *,
+      tours (
+        id,
+        name,
+        destination,
+        image_url,
+        start_date,
+        end_date
+      ),
+      users (
+        id,
+        first_name,
+        last_name,
+        email
+      )
+    `)
+    .eq('agency_id', agencyId)
+    .order('created_at', { ascending: false })
+  
+  return { data, error }
+}
+
+// Review functions
+export async function getTourReviews(tourId: string) {
+  const { data, error } = await supabase
+    .from('reviews')
+    .select(`
+      *,
+      users (
+        id,
+        first_name,
+        last_name
+      )
+    `)
+    .eq('tour_id', tourId)
+    .eq('is_visible', true)
+    .order('created_at', { ascending: false })
+  
+  return { data, error }
 }
