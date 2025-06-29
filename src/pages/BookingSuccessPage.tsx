@@ -310,7 +310,6 @@ const BookingSuccessPage: React.FC = () => {
         </div>
       </div>
     </div>
-  </div>
   );
 };
 
