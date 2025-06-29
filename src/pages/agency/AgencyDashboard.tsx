@@ -123,7 +123,7 @@ const AgencyDashboard: React.FC = () => {
           .select(`
             *,
             tours(name, destination),
-            users(first_name, last_name, email)
+            users!bookings_user_id_fkey(first_name, last_name, email)
           `)
           .eq('agency_id', agencyData.id),
         
