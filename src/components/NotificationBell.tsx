@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, X, Check, CheckCheck, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
+import { supabase, getUserNotifications, getUnreadNotificationCount, markNotificationAsRead, markAllNotificationsAsRead } from '../lib/supabase';
 import { Notification } from '../types';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
@@ -12,6 +12,7 @@ const NotificationBell: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -60,32 +61,32 @@ const NotificationBell: React.FC = () => {
     if (!user) return;
     
     try {
+      console.log('🔔 Cargando notificaciones...');
       setIsLoading(true);
+      setError(null);
       
       // Get unread count
-      const { data: countData, error: countError } = await supabase
-        .rpc('get_unread_notifications_count');
+      const { data: countData, error: countError } = await getUnreadNotificationCount();
       
       if (countError) {
         console.error('Error fetching unread count:', countError);
+        setError('Error al obtener notificaciones no leídas');
       } else {
         setUnreadCount(countData || 0);
       }
       
       // Get recent notifications
-      const { data, error } = await supabase
-        .from('user_notifications')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(10);
+      const { data, error } = await getUserNotifications(10);
       
       if (error) {
         console.error('Error fetching notifications:', error);
+        setError('Error al cargar notificaciones');
       } else {
         setNotifications(data || []);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error in fetchNotifications:', err);
+      setError(err.message || 'Error al cargar notificaciones');
     } finally {
       setIsLoading(false);
     }
@@ -93,8 +94,7 @@ const NotificationBell: React.FC = () => {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      const { error } = await supabase
-        .rpc('mark_notification_as_read', { notification_id: notificationId });
+      const { error } = await markNotificationAsRead(notificationId);
       
       if (error) {
         console.error('Error marking notification as read:', error);
@@ -112,8 +112,8 @@ const NotificationBell: React.FC = () => {
 
   const markAllAsRead = async () => {
     try {
-      const { data, error } = await supabase
-        .rpc('mark_all_notifications_as_read');
+      const { data, error } = await markAllNotificationsAsRead();
+      
       
       if (error) {
         console.error('Error marking all notifications as read:', error);
@@ -224,6 +224,16 @@ const NotificationBell: React.FC = () => {
               {isLoading ? (
                 <div className="px-4 py-8 text-center">
                   <div className="inline-block animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary-600"></div>
+                </div>
+              ) : error ? (
+                <div className="px-4 py-4 text-center text-red-600 text-sm">
+                  <p>{error}</p>
+                  <button 
+                    onClick={fetchNotifications}
+                    className="mt-2 text-primary-600 hover:text-primary-800 text-xs underline"
+                  >
+                    Reintentar
+                  </button>
                 </div>
               ) : notifications.length === 0 ? (
                 <div className="px-4 py-8 text-center text-gray-500">

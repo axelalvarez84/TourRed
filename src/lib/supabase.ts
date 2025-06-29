@@ -212,18 +212,6 @@ export async function getCurrentUser() {
   console.log('👤 Obteniendo usuario actual...');
   
   try {
-    // Test connection first
-    const { data: connectionTest, error: connectionError } = await supabase
-      .from('users')
-      .select('count')
-      .limit(1)
-      .single();
-    
-    if (connectionError && connectionError.code !== 'PGRST116') {
-      console.error('❌ Error de conexión a Supabase:', connectionError);
-      throw new Error(`Conexión a Supabase falló: ${connectionError.message}`);
-    }
-    
     const { data: { user }, error } = await supabase.auth.getUser();
     
     if (error) {
@@ -259,7 +247,8 @@ export async function getCurrentUser() {
     
     // Check if it's a network error
     if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-      throw new Error('Error de conexión: No se puede conectar al servidor. Verifica tu conexión a internet.');
+      console.error('🌐 Error de red detectado, retornando null');
+      return null;
     }
     
     // Clean up on unexpected errors
