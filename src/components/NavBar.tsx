@@ -195,6 +195,8 @@ const NavBar: React.FC = () => {
                   <NotificationBell />
                 </div>
               </>
+                </div>
+              </>
             )}
             <button
               onClick={toggleMenu}
