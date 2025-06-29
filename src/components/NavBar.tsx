@@ -187,14 +187,14 @@ const NavBar: React.FC = () => {
               <Search className="h-6 w-6" />
             </Link>
             {user && (
-              <>
-                <Link to="/messages" className="ml-3 p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+              <div className="flex items-center">
+                <Link to="/messages" className="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
                   <MessageCircle className="h-6 w-6" />
                 </Link>
                 <div className="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 mr-2">
                   <NotificationBell />
                 </div>
-              </>
+              </div>
             )}
             <button
               onClick={toggleMenu}
