@@ -1,0 +1,294 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Bell, X, Check, CheckCheck, Clock } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
+import { Notification } from '../types';
+import { format } from 'date-fns';
+import { Link } from 'react-router-dom';
+
+const NotificationBell: React.FC = () => {
+  const { user } = useAuth();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (user) {
+      fetchNotifications();
+      
+      // Set up real-time subscription for new notifications
+      const channel = supabase
+        .channel('notifications-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('Nueva notificación recibida:', payload);
+            fetchNotifications();
+          }
+        )
+        .subscribe();
+      
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [user]);
+
+  useEffect(() => {
+    // Close dropdown when clicking outside
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const fetchNotifications = async () => {
+    if (!user) return;
+    
+    try {
+      setIsLoading(true);
+      
+      // Get unread count
+      const { data: countData, error: countError } = await supabase
+        .rpc('get_unread_notifications_count');
+      
+      if (countError) {
+        console.error('Error fetching unread count:', countError);
+      } else {
+        setUnreadCount(countData || 0);
+      }
+      
+      // Get recent notifications
+      const { data, error } = await supabase
+        .from('user_notifications')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      if (error) {
+        console.error('Error fetching notifications:', error);
+      } else {
+        setNotifications(data || []);
+      }
+    } catch (err) {
+      console.error('Error in fetchNotifications:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const markAsRead = async (notificationId: string) => {
+    try {
+      const { error } = await supabase
+        .rpc('mark_notification_as_read', { notification_id: notificationId });
+      
+      if (error) {
+        console.error('Error marking notification as read:', error);
+      } else {
+        // Update local state
+        setNotifications(prev => 
+          prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
+        );
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (err) {
+      console.error('Error in markAsRead:', err);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      const { data, error } = await supabase
+        .rpc('mark_all_notifications_as_read');
+      
+      if (error) {
+        console.error('Error marking all notifications as read:', error);
+      } else {
+        // Update local state
+        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+        setUnreadCount(0);
+      }
+    } catch (err) {
+      console.error('Error in markAllAsRead:', err);
+    }
+  };
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diffInSeconds < 60) {
+      return 'Justo ahora';
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `Hace ${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`;
+    } else if (diffInSeconds < 86400) {
+      const hours = Math.floor(diffInSeconds / 3600);
+      return `Hace ${hours} ${hours === 1 ? 'hora' : 'horas'}`;
+    } else if (diffInSeconds < 604800) {
+      const days = Math.floor(diffInSeconds / 86400);
+      return `Hace ${days} ${days === 1 ? 'día' : 'días'}`;
+    } else {
+      return format(date, 'dd/MM/yyyy');
+    }
+  };
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'booking_pending_approval':
+        return <Clock className="h-5 w-5 text-yellow-500" />;
+      case 'booking_approved':
+        return <Check className="h-5 w-5 text-green-500" />;
+      case 'booking_rejected':
+        return <X className="h-5 w-5 text-red-500" />;
+      case 'booking_confirmed':
+        return <CheckCheck className="h-5 w-5 text-green-500" />;
+      case 'message_received':
+        return <div className="h-5 w-5 flex items-center justify-center text-blue-500">💬</div>;
+      default:
+        return <Bell className="h-5 w-5 text-gray-500" />;
+    }
+  };
+
+  const getNotificationLink = (notification: Notification) => {
+    const data = notification.data || {};
+    
+    switch (notification.type) {
+      case 'booking_pending_approval':
+        return `/agency/bookings`;
+      case 'booking_approved':
+      case 'booking_rejected':
+      case 'booking_confirmed':
+      case 'booking_cancelled':
+        return `/traveler/bookings`;
+      case 'message_received':
+        return `/messages${data.conversation_id ? `?conversation=${data.conversation_id}` : ''}`;
+      case 'tour_updated':
+        return `/tours/${data.tour_id}`;
+      default:
+        return '#';
+    }
+  };
+
+  if (!user) {
+    return null;
+  }
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="relative p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+      >
+        <span className="sr-only">Notificaciones</span>
+        <Bell className="h-6 w-6" />
+        {unreadCount > 0 && (
+          <span className="absolute top-0 right-0 block h-4 w-4 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center transform translate-x-1 -translate-y-1">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {isOpen && (
+        <div className="origin-top-right absolute right-0 mt-2 w-80 md:w-96 rounded-md shadow-lg bg-blue-50 ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+          <div className="py-2">
+            <div className="px-4 py-2 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-sm font-medium text-gray-900">Notificaciones</h3>
+              {unreadCount > 0 && (
+                <button
+                  onClick={markAllAsRead}
+                  className="text-xs text-primary-600 hover:text-primary-800 flex items-center"
+                >
+                  <CheckCheck className="h-3 w-3 mr-1" />
+                  Marcar todas como leídas
+                </button>
+              )}
+            </div>
+            
+            <div className="max-h-96 overflow-y-auto">
+              {isLoading ? (
+                <div className="px-4 py-8 text-center">
+                  <div className="inline-block animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary-600"></div>
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="px-4 py-8 text-center text-gray-500">
+                  <Bell className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                  <p>No tienes notificaciones</p>
+                </div>
+              ) : (
+                notifications.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className={`px-4 py-3 hover:bg-blue-100 ${
+                      !notification.is_read ? 'bg-blue-100' : ''
+                    }`}
+                  >
+                    <Link
+                      to={getNotificationLink(notification)}
+                      onClick={() => {
+                        if (!notification.is_read) {
+                          markAsRead(notification.id);
+                        }
+                        setIsOpen(false);
+                      }}
+                      className="block"
+                    >
+                      <div className="flex">
+                        <div className="flex-shrink-0 mr-3 mt-1">
+                          {getNotificationIcon(notification.type)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium ${!notification.is_read ? 'text-gray-900' : 'text-gray-600'}`}>
+                            {notification.title}
+                          </p>
+                          <p className="text-sm text-gray-500 line-clamp-2">
+                            {notification.message}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {formatTimeAgo(notification.created_at)}
+                          </p>
+                        </div>
+                        {!notification.is_read && (
+                          <div className="ml-2 flex-shrink-0">
+                            <span className="inline-block w-2 h-2 rounded-full bg-primary-600"></span>
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                  </div>
+                ))
+              )}
+            </div>
+            
+            <div className="px-4 py-2 border-t border-gray-200 text-center">
+              <Link
+                to="/notifications"
+                className="text-xs text-primary-600 hover:text-primary-800"
+                onClick={() => setIsOpen(false)}
+              >
+                Ver todas las notificaciones
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default NotificationBell;

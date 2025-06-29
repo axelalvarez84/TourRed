@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Menu, X, User, LogOut, Compass, Search, MessageCircle } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 import { useAuth } from '../context/AuthContext';
 import { signOut } from '../lib/supabase';
 
@@ -88,6 +89,10 @@ const NavBar: React.FC = () => {
             <Link to="/search" className="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
               <Search className="h-6 w-6" />
             </Link>
+            
+            <div className="ml-3 p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+              <NotificationBell />
+            </div>
             
             {user && (
               <Link to="/messages" className="ml-3 p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
@@ -185,6 +190,9 @@ const NavBar: React.FC = () => {
               <Link to="/messages" className="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 mr-2">
                 <MessageCircle className="h-6 w-6" />
               </Link>
+              <div className="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 mr-2">
+                <NotificationBell />
+              </div>
             )}
             <button
               onClick={toggleMenu}
