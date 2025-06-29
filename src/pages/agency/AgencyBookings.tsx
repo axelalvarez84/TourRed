@@ -105,7 +105,7 @@ const AgencyBookings: React.FC = () => {
 
     switch (status) {
       case 'pending':
-        statusText = paymentStatus === 'succeeded' ? 'Confirmando' : 'Pendiente de Pago';
+        statusText = paymentStatus === 'succeeded' ? 'Confirmando' : 'Pendiente';
         statusClass = 'bg-yellow-100 text-yellow-800';
         icon = <AlertCircle className="h-3 w-3 mr-1" />;
         break;
@@ -135,6 +135,80 @@ const AgencyBookings: React.FC = () => {
         {statusText}
       </span>
     );
+  };
+
+  const getApprovalStatusBadge = (approvalStatus?: string) => {
+    if (!approvalStatus) return null;
+
+    let statusText = '';
+    let statusClass = '';
+    let icon = null;
+
+    switch (approvalStatus) {
+      case 'pending':
+        statusText = 'Pendiente Aprobación';
+        statusClass = 'bg-yellow-100 text-yellow-800';
+        icon = <Clock className="h-3 w-3 mr-1" />;
+        break;
+      case 'approved':
+        statusText = 'Aprobada';
+        statusClass = 'bg-green-100 text-green-800';
+        icon = <CheckCircle className="h-3 w-3 mr-1" />;
+        break;
+      case 'rejected':
+        statusText = 'Rechazada';
+        statusClass = 'bg-red-100 text-red-800';
+        icon = <XCircle className="h-3 w-3 mr-1" />;
+        break;
+      default:
+        return null;
+    }
+
+    return (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass} ml-2`}>
+        {icon}
+        {statusText}
+      </span>
+    );
+  };
+
+  const handleApprovalAction = async (bookingId: string, action: 'approve' | 'reject', notes?: string) => {
+    try {
+      const approvalStatus = action === 'approve' ? 'approved' : 'rejected';
+      
+      const { error } = await supabase
+        .from('bookings')
+        .update({ 
+          approval_status: approvalStatus,
+          approval_notes: notes || null,
+          approved_at: action === 'approve' ? new Date().toISOString() : null,
+          approved_by: user?.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', bookingId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Actualizar el estado local
+      setBookings(bookings.map(booking => 
+        booking.id === bookingId 
+          ? { 
+              ...booking, 
+              approval_status: approvalStatus as any,
+              approval_notes: notes || null,
+              approved_at: action === 'approve' ? new Date().toISOString() : null,
+              approved_by: user?.id
+            }
+          : booking
+      ));
+
+      console.log(`✅ Reserva ${bookingId} ${action === 'approve' ? 'aprobada' : 'rechazada'}`);
+    } catch (err: any) {
+      console.error(`❌ Error ${action === 'approve' ? 'aprobando' : 'rechazando'} reserva:`, err);
+      setError(err.message || `Error al ${action === 'approve' ? 'aprobar' : 'rechazar'} la reserva`);
+    }
   };
 
   const getPaymentStatusBadge = (paymentStatus?: string) => {
@@ -360,6 +434,7 @@ const AgencyBookings: React.FC = () => {
                     <div className="absolute top-4 left-4">
                       {getStatusBadge(booking.status, booking.payment_status)}
                       {getPaymentStatusBadge(booking.payment_status)}
+                      {getApprovalStatusBadge(booking.approval_status)}
                     </div>
                   </div>
                 </div>
@@ -466,6 +541,30 @@ const AgencyBookings: React.FC = () => {
                       Contactar Cliente
                     </a>
 
+                    {booking.approval_status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => handleApprovalAction(booking.id, 'approve')}
+                          className="btn btn-primary flex items-center justify-center"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Aprobar Reserva
+                        </button>
+                        <button
+                          onClick={() => {
+                            const notes = prompt('Motivo del rechazo (opcional):');
+                            if (notes !== null) { // null means user cancelled
+                              handleApprovalAction(booking.id, 'reject', notes);
+                            }
+                          }}
+                          className="btn bg-red-600 text-white hover:bg-red-700 flex items-center justify-center"
+                        >
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Rechazar
+                        </button>
+                      </>
+                    )}
+
                     {booking.status === 'pending' && booking.payment_status === 'succeeded' && (
                       <button
                         onClick={() => handleStatusUpdate(booking.id, 'confirmed')}
@@ -488,6 +587,33 @@ const AgencyBookings: React.FC = () => {
                   </div>
 
                   {/* Important Notes */}
+                  {booking.approval_status === 'pending' && (
+                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-sm text-yellow-800">
+                        <strong>Acción requerida:</strong> Esta reserva está pendiente de tu aprobación. El cliente no será cobrado hasta que apruebes la solicitud.
+                      </p>
+                    </div>
+                  )}
+
+                  {booking.approval_status === 'approved' && booking.payment_status !== 'succeeded' && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                      <p className="text-sm text-green-800">
+                        <strong>Reserva aprobada:</strong> El cliente ha sido notificado y puede proceder con el pago.
+                      </p>
+                    </div>
+                  )}
+
+                  {booking.approval_status === 'rejected' && (
+                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                      <p className="text-sm text-red-800">
+                        <strong>Reserva rechazada:</strong> El cliente ha sido notificado del rechazo.
+                        {booking.approval_notes && (
+                          <span className="block mt-1">Motivo: {booking.approval_notes}</span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+
                   {booking.status === 'pending' && booking.payment_status === 'succeeded' && (
                     <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
                       <p className="text-sm text-blue-800">

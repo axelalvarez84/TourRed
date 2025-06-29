@@ -51,11 +51,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
       return;
     }
 
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-
     if (!isTraveler) {
       setError('Solo los viajeros pueden reservar tours.');
       return;
@@ -70,7 +65,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
       setIsSubmitting(true);
       setError('');
 
-      // Crear la reserva temporal (pendiente de pago)
+      // Determinar el estado inicial basado en el tipo de aprobación del tour
+      const initialStatus = tour.booking_approval_type === 'manual' ? 'pending' : 'pending';
+      const initialApprovalStatus = tour.booking_approval_type === 'manual' ? 'pending' : 'approved';
+      const initialPaymentStatus = tour.booking_approval_type === 'manual' ? 'pending' : 'pending';
+
+      // Crear la reserva
       const bookingData = {
         user_id: user.id,
         tour_id: tour.id,
@@ -78,13 +78,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         deposit_amount: depositAmount,
         commission_amount: agencyCommission,
         total_price: totalPrice,
-        status: 'pending',
+        status: initialStatus,
         booking_date: bookingDate,
         travelers_count: travelersCount,
         service_charge: serviceCharge,
         user_payment: userPayment,
         platform_revenue: platformRevenue,
-        payment_status: 'pending',
+        payment_status: initialPaymentStatus,
+        approval_status: initialApprovalStatus,
       };
 
       // Crear la reserva en la base de datos
@@ -94,35 +95,40 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         throw new Error(bookingError.message);
       }
 
-      // Crear sesión de Stripe Checkout
-      const checkoutResult = await createStripeCheckoutSession({
-        amount: userPayment,
-        currency: 'mxn',
-        description: `Depósito para ${tour.name} - ${travelersCount} viajero(s)`,
-        bookingId: booking.id,
-        metadata: {
-          booking_id: booking.id,
-          tour_id: tour.id,
-          agency_id: tour.agency_id,
-          travelers_count: travelersCount.toString(),
-          total_price: totalPrice.toString(),
-          deposit_amount: depositAmount.toString(),
-          service_charge: serviceCharge.toString(),
-          agency_commission: agencyCommission.toString(),
-        }
-      });
-
-      if (!checkoutResult.success) {
-        throw new Error(checkoutResult.error || 'Error creando sesión de pago');
-      }
-
-      // Redirigir a Stripe Checkout
-      if (checkoutResult.url) {
-        window.location.href = checkoutResult.url;
+      // Si el tour requiere aprobación manual, no proceder con el pago
+      if (tour.booking_approval_type === 'manual') {
+        // Redirigir a página de confirmación sin pago
+        navigate(`/booking-pending?booking_id=${booking.id}`);
       } else {
-        throw new Error('No se recibió URL de pago');
-      }
+        // Proceder con el pago normal para reservas automáticas
+        const checkoutResult = await createStripeCheckoutSession({
+          amount: userPayment,
+          currency: 'mxn',
+          description: `Depósito para ${tour.name} - ${travelersCount} viajero(s)`,
+          bookingId: booking.id,
+          metadata: {
+            booking_id: booking.id,
+            tour_id: tour.id,
+            agency_id: tour.agency_id,
+            travelers_count: travelersCount.toString(),
+            total_price: totalPrice.toString(),
+            deposit_amount: depositAmount.toString(),
+            service_charge: serviceCharge.toString(),
+            agency_commission: agencyCommission.toString(),
+          }
+        });
 
+        if (!checkoutResult.success) {
+          throw new Error(checkoutResult.error || 'Error creando sesión de pago');
+        }
+
+        // Redirigir a Stripe Checkout
+        if (checkoutResult.url) {
+          window.location.href = checkoutResult.url;
+        } else {
+          throw new Error('No se recibió URL de pago');
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'Ocurrió un error al procesar la reserva.');
     } finally {
@@ -278,13 +284,24 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           <div className="flex items-start">
             <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
             <div className="text-sm text-blue-800">
-              <span className="font-medium">{error}</span>
-              <ul className="space-y-1 text-xs">
-                <li>• Serás redirigido a una página segura de Stripe para ingresar tus datos de pago</li>
-                <li>• Pagarás ${userPayment.toLocaleString()} ahora (depósito + cargo por servicio)</li>
-                <li>• El saldo restante (${(totalPrice - depositAmount).toLocaleString()}) se paga directamente a la agencia</li>
-                <li>• Recibirás confirmación por email una vez completado el pago</li>
-              </ul>
+              <span className="font-medium">
+                {tour.booking_approval_type === 'manual' ? 'Reserva sujeta a aprobación' : 'Reserva automática'}
+              </span>
+              {tour.booking_approval_type === 'manual' ? (
+                <ul className="space-y-1 text-xs mt-2">
+                  <li>• Tu solicitud de reserva será enviada a la agencia para aprobación</li>
+                  <li>• No se realizará ningún cargo hasta que la agencia apruebe tu reserva</li>
+                  <li>• Recibirás una notificación cuando la agencia responda</li>
+                  <li>• Una vez aprobada, podrás proceder con el pago</li>
+                </ul>
+              ) : (
+                <ul className="space-y-1 text-xs mt-2">
+                  <li>• Serás redirigido a una página segura de Stripe para ingresar tus datos de pago</li>
+                  <li>• Pagarás ${userPayment.toLocaleString()} ahora (depósito + cargo por servicio)</li>
+                  <li>• El saldo restante (${(totalPrice - depositAmount).toLocaleString()}) se paga directamente a la agencia</li>
+                  <li>• Recibirás confirmación por email una vez completado el pago</li>
+                </ul>
+              )}
             </div>
           </div>
         </div>
@@ -320,6 +337,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
             <CreditCard className="h-5 w-5 mr-2" />
           )}
           {user ? `Proceder al Pago - ${userPayment.toLocaleString()} MXN` : 'Inicia Sesión para Reservar'}
+          {user ? (
+            tour.booking_approval_type === 'manual' 
+              ? 'Solicitar Reserva (Sin Cargo)' 
+              : `Proceder al Pago - $${userPayment.toLocaleString()} MXN`
+          ) : 'Inicia Sesión para Reservar'}
         </button>
         
         <p className="text-xs text-gray-500 text-center mt-3">

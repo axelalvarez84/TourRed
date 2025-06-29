@@ -78,6 +78,8 @@ export interface Tour {
   includes?: string[];
   excludes?: string[];
   booking_deadline?: string;
+  booking_approval_type?: 'automatic' | 'manual';
+  approval_required?: boolean;
 }
 
 export interface Booking {
@@ -103,6 +105,25 @@ export interface Booking {
   payment_status?: 'pending' | 'processing' | 'succeeded' | 'failed' | 'canceled';
   payment_method?: string;
   paid_at?: string;
+  // Nuevos campos para aprobación
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  approval_notes?: string;
+  approved_at?: string;
+  approved_by?: string;
+}
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: 'booking_pending_approval' | 'booking_approved' | 'booking_rejected' | 'booking_confirmed' | 'booking_cancelled' | 'message_received' | 'tour_updated' | 'system_announcement';
+  title: string;
+  message: string;
+  data?: any;
+  is_read: boolean;
+  created_at: string;
+  updated_at: string;
+  expires_at?: string;
+  is_expired?: boolean;
 }
 
 export interface PaymentTransaction {

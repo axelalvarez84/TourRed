@@ -31,6 +31,8 @@ const AgencyTours: React.FC = () => {
     end_date: '',
     max_travelers: '',
     booking_deadline: '', // Nueva fecha límite de reserva
+    booking_approval_type: 'automatic',
+    booking_approval_type: 'automatic',
   });
 
   const [includes, setIncludes] = useState<string[]>(['']);
@@ -160,6 +162,7 @@ const AgencyTours: React.FC = () => {
       end_date: tour.end_date,
       max_travelers: tour.max_travelers?.toString() || '',
       booking_deadline: tour.booking_deadline || defaultDeadline.toISOString().split('T')[0],
+      booking_approval_type: tour.booking_approval_type || 'automatic',
     });
     setSelectedDestinations([tour.destination]);
     setIncludes(tour.includes && tour.includes.length > 0 ? tour.includes : ['']);
@@ -280,6 +283,7 @@ const AgencyTours: React.FC = () => {
         includes: filteredIncludes.length > 0 ? filteredIncludes : null,
         excludes: filteredExcludes.length > 0 ? filteredExcludes : null,
         booking_deadline: bookingDeadline,
+        booking_approval_type: formData.booking_approval_type,
       };
 
       if (editingTour) {
@@ -705,6 +709,27 @@ const AgencyTours: React.FC = () => {
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Si no se especifica, será 14 días antes del inicio del tour
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tipo de Reserva *
+                </label>
+                <select
+                  value={formData.booking_approval_type}
+                  onChange={(e) => setFormData({...formData, booking_approval_type: e.target.value as 'automatic' | 'manual'})}
+                  className="input"
+                  required
+                >
+                  <option value="automatic">Automática (pago inmediato)</option>
+                  <option value="manual">Sujeta a aprobación (sin cargo inicial)</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {formData.booking_approval_type === 'automatic' 
+                    ? 'Los usuarios pagarán el depósito inmediatamente al reservar'
+                    : 'Deberás aprobar cada reserva antes de que el usuario pueda pagar'
+                  }
                 </p>
               </div>
 

@@ -29,6 +29,7 @@ import SuccessPage from './pages/SuccessPage';
 import CancelPage from './pages/CancelPage';
 import BookingSuccessPage from './pages/BookingSuccessPage';
 import BookingCancelPage from './pages/BookingCancelPage';
+import BookingPendingPage from './pages/BookingPendingPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
@@ -62,6 +63,7 @@ const App: React.FC = () => {
           <Route path="/cancel" element={<CancelPage />} />
           <Route path="/booking-success" element={<BookingSuccessPage />} />
           <Route path="/booking-cancel" element={<BookingCancelPage />} />
+          <Route path="/booking-pending" element={<BookingPendingPage />} />
 
           {/* Messaging Route - Available to all authenticated users */}
           <Route
