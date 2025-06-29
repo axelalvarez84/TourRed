@@ -149,10 +149,9 @@ const BookingSuccessPage: React.FC = () => {
                 <div className="flex items-center">
                   <MapPin className="h-4 w-4 mr-1" />
                   <span>{tour.destination}</span>
-                    <div className="text-sm text-gray-500">Método de Pago</div>
-                    <div className="font-medium flex items-center">
-                      <CreditCard className="h-4 w-4 mr-1 text-gray-400" />
-                      {booking.payment_method || 'Tarjeta'}
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="p-6">
@@ -191,6 +190,14 @@ const BookingSuccessPage: React.FC = () => {
                     <div>
                       <div className="text-sm text-gray-500">ID de Reserva</div>
                       <div className="font-medium font-mono text-xs break-all">{booking.id}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start">
+                    <CreditCard className="h-5 w-5 text-gray-400 mr-3 mt-1" />
+                    <div>
+                      <div className="text-sm text-gray-500">Método de Pago</div>
+                      <div className="font-medium">{booking.payment_method || 'Tarjeta'}</div>
                     </div>
                   </div>
                 </div>

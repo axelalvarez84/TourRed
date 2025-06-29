@@ -24,8 +24,7 @@ export function useStripe() {
       return { error: 'User must be authenticated' };
     }
 
-    setIsLoading(true);
-
+    try {
     setIsLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       
