@@ -38,6 +38,13 @@ const AgencyProfile: React.FC = () => {
   const [editForm, setEditForm] = useState({
     name: '',
     description: '',
+    rfc: '',
+    razon_social: '',
+    regimen_fiscal: '',
+    domicilio_fiscal: '',
+    banco: '',
+    cuenta_clabe: '',
+    titular_cuenta: '',
     logo: '',
     contact_email: '',
     contact_phone: '',
@@ -104,6 +111,13 @@ const AgencyProfile: React.FC = () => {
       setEditForm({
         name: agencyData.name || '',
         description: agencyData.description || '',
+        rfc: agencyData.rfc || '',
+        razon_social: agencyData.razon_social || '',
+        regimen_fiscal: agencyData.regimen_fiscal || '',
+        domicilio_fiscal: agencyData.domicilio_fiscal || '',
+        banco: agencyData.banco || '',
+        cuenta_clabe: agencyData.cuenta_clabe || '',
+        titular_cuenta: agencyData.titular_cuenta || '',
         logo: agencyData.logo || '',
         contact_email: agencyData.contact_email || '',
         contact_phone: agencyData.contact_phone || '',
@@ -137,6 +151,13 @@ const AgencyProfile: React.FC = () => {
           name: editForm.name,
           description: editForm.description,
           logo: editForm.logo,
+          rfc: editForm.rfc,
+          razon_social: editForm.razon_social,
+          regimen_fiscal: editForm.regimen_fiscal,
+          domicilio_fiscal: editForm.domicilio_fiscal,
+          banco: editForm.banco,
+          cuenta_clabe: editForm.cuenta_clabe,
+          titular_cuenta: editForm.titular_cuenta,
           contact_email: editForm.contact_email,
           contact_phone: editForm.contact_phone,
           website: editForm.website,
@@ -198,6 +219,25 @@ const AgencyProfile: React.FC = () => {
 
   const handleLogoSelect = (base64: string, type: string, size: number) => {
     setEditForm({ ...editForm, logo: base64 });
+  };
+
+  // Helper function to format CLABE with spaces for readability
+  const formatClabe = (clabe: string) => {
+    if (!clabe) return '';
+    // Format as groups of 4 digits
+    return clabe.replace(/(.{4})/g, '$1 ').trim();
+  };
+
+  // Helper function to get the name of the régimen fiscal
+  const getRegimenFiscalName = (regimen: string) => {
+    const regimenes: Record<string, string> = {
+      '601': 'General de Ley',
+      '612': 'Personas Físicas con Actividades Empresariales',
+      '621': 'Incorporación Fiscal',
+      '625': 'Régimen Simplificado de Confianza',
+      '626': 'Régimen Simplificado de Confianza (RESICO)'
+    };
+    return regimenes[regimen] || regimen;
   };
 
   if (isLoading) {
@@ -306,6 +346,216 @@ const AgencyProfile: React.FC = () => {
                 </div>
                 <div className="text-sm text-gray-500">Miembro desde</div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Información Fiscal y Bancaria */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+          {/* Información Fiscal */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Información Fiscal
+              </h2>
+
+              {isEditing ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      RFC *
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.rfc || ''}
+                      onChange={(e) => setEditForm({ ...editForm, rfc: e.target.value })}
+                      className="input"
+                      placeholder="Ej: XAXX010101000"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Razón Social
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.razon_social || ''}
+                      onChange={(e) => setEditForm({ ...editForm, razon_social: e.target.value })}
+                      className="input"
+                      placeholder="Nombre legal de la empresa"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Régimen Fiscal
+                    </label>
+                    <select
+                      value={editForm.regimen_fiscal || ''}
+                      onChange={(e) => setEditForm({ ...editForm, regimen_fiscal: e.target.value })}
+                      className="input"
+                    >
+                      <option value="">Seleccionar régimen fiscal</option>
+                      <option value="601">601 - General de Ley</option>
+                      <option value="612">612 - Personas Físicas con Actividades Empresariales</option>
+                      <option value="621">621 - Incorporación Fiscal</option>
+                      <option value="625">625 - Régimen Simplificado de Confianza</option>
+                      <option value="626">626 - Régimen Simplificado de Confianza (RESICO)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Domicilio Fiscal
+                    </label>
+                    <textarea
+                      value={editForm.domicilio_fiscal || ''}
+                      onChange={(e) => setEditForm({ ...editForm, domicilio_fiscal: e.target.value })}
+                      className="input"
+                      rows={3}
+                      placeholder="Dirección fiscal completa"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3">
+                      <span className="text-sm font-bold">RFC</span>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">RFC</div>
+                      <div className="text-sm text-gray-600">{agency.rfc || 'No especificado'}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3">
+                      <span className="text-sm font-bold">RS</span>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">Razón Social</div>
+                      <div className="text-sm text-gray-600">{agency.razon_social || 'No especificado'}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3">
+                      <span className="text-sm font-bold">RF</span>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">Régimen Fiscal</div>
+                      <div className="text-sm text-gray-600">
+                        {agency.regimen_fiscal 
+                          ? `${agency.regimen_fiscal} - ${getRegimenFiscalName(agency.regimen_fiscal)}` 
+                          : 'No especificado'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {agency.domicilio_fiscal && (
+                    <div className="flex items-start">
+                      <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3 mt-1">
+                        <MapPin className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">Domicilio Fiscal</div>
+                        <div className="text-sm text-gray-600">{agency.domicilio_fiscal}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Información Bancaria */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Información Bancaria
+              </h2>
+
+              {isEditing ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Banco
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.banco || ''}
+                      onChange={(e) => setEditForm({ ...editForm, banco: e.target.value })}
+                      className="input"
+                      placeholder="Ej: BBVA, Santander, etc."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Cuenta CLABE
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.cuenta_clabe || ''}
+                      onChange={(e) => setEditForm({ ...editForm, cuenta_clabe: e.target.value })}
+                      className="input"
+                      placeholder="18 dígitos"
+                      maxLength={18}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Titular de la Cuenta
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.titular_cuenta || ''}
+                      onChange={(e) => setEditForm({ ...editForm, titular_cuenta: e.target.value })}
+                      className="input"
+                      placeholder="Nombre del titular"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 mr-3">
+                      <span className="text-sm font-bold">B</span>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">Banco</div>
+                      <div className="text-sm text-gray-600">{agency.banco || 'No especificado'}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 mr-3">
+                      <span className="text-sm font-bold">C</span>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">Cuenta CLABE</div>
+                      <div className="text-sm text-gray-600">
+                        {agency.cuenta_clabe 
+                          ? formatClabe(agency.cuenta_clabe) 
+                          : 'No especificado'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 mr-3">
+                      <span className="text-sm font-bold">T</span>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">Titular</div>
+                      <div className="text-sm text-gray-600">{agency.titular_cuenta || 'No especificado'}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
