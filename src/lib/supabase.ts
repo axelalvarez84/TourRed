@@ -163,11 +163,23 @@ export async function getCurrentUser() {
     
     const { data: { session }, error } = await supabase.auth.getSession();
     
-    if (error) throw error;
+    if (error) {
+      // Check if the error is related to invalid refresh token
+      if (error.message && error.message.includes('refresh_token_not_found')) {
+        console.log('🔄 Token de actualización inválido, limpiando sesión...');
+        // Clear invalid tokens by signing out
+        await supabase.auth.signOut();
+      }
+      throw error;
+    }
     
     return session?.user || null;
   } catch (error: any) {
     console.error('❌ Error en getCurrentUser:', error);
+    // If it's a refresh token error, we've already handled it above
+    if (error.message && error.message.includes('refresh_token_not_found')) {
+      return null; // Return null to indicate no authenticated user
+    }
     return null;
   }
 }
