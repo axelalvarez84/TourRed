@@ -331,17 +331,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           className="w-full btn btn-primary py-3 flex items-center justify-center"
           disabled={isSubmitting || !user}
         >
-          {isSubmitting ? (
-            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
-          ) : (
-            <CreditCard className="h-5 w-5 mr-2" />
-          )}
-          {user ? `Proceder al Pago - ${userPayment.toLocaleString()} MXN` : 'Inicia Sesión para Reservar'}
           {user ? (
             tour.booking_approval_type === 'manual' 
               ? 'Solicitar Reserva (Sin Cargo)' 
               : `Proceder al Pago - $${userPayment.toLocaleString()} MXN`
           ) : 'Inicia Sesión para Reservar'}
+          {isSubmitting ? (
+            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white ml-2"></div>
+          ) : (
+            <CreditCard className="h-5 w-5 ml-2" />
+          )}
         </button>
         
         <p className="text-xs text-gray-500 text-center mt-3">
