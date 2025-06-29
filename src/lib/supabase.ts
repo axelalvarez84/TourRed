@@ -1,45 +1,66 @@
 import { createClient } from '@supabase/supabase-js';
-import { Booking, Destination, DestinationImage, ImageUploadData, Notification, Review, SearchFilters, Tour } from '../types';
+import { format, parse } from 'date-fns';
+import { Tour, Booking, Destination, DestinationImage, ImageUploadData } from '../types';
 
 // Initialize Supabase client
-export const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL || '',
-  import.meta.env.VITE_SUPABASE_ANON_KEY || ''
-);
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // User roles enum
 export enum UserRole {
   ADMIN = 'admin',
   AGENCY = 'agency',
-  TRAVELER = 'traveler'
+  TRAVELER = 'traveler',
 }
 
-// Authentication functions
-export async function signUp(email: string, password: string, role: UserRole, additionalData: any = {}) {
-  console.log('🔐 Registrando usuario:', email, 'con rol:', role);
-  
+// Date formatting helpers
+export const formatDateForDB = (date: Date): string => {
+  return format(date, 'yyyy-MM-dd');
+};
+
+export const parseDateFromDB = (dateString: string): Date => {
+  return parse(dateString, 'yyyy-MM-dd', new Date());
+};
+
+// Auth functions
+export const signUp = async (
+  email: string,
+  password: string,
+  role: UserRole,
+  profileData: Record<string, any> = {}
+) => {
   try {
+    console.log('🔐 Registrando usuario con email:', email, 'y rol:', role);
+    
     // Check if user already exists
     const { data: existingUser } = await supabase
       .from('users')
-      .select('id, role')
+      .select('id, email')
       .eq('email', email)
       .maybeSingle();
     
+    let isExistingUser = false;
+    
     if (existingUser) {
-      console.log('👤 Usuario ya existe, iniciando sesión:', existingUser);
+      console.log('⚠️ Usuario ya existe en la tabla users:', existingUser);
+      isExistingUser = true;
       
-      // User exists, sign in instead
-      const { data, error } = await signIn(email, password);
+      // Sign in instead
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
       
       if (error) throw error;
       
-      return { 
-        data, 
-        error: null, 
-        isExistingUser: true,
-        profileData: existingUser
-      };
+      // Update user metadata with role
+      await supabase.auth.updateUser({
+        data: { role }
+      });
+      
+      return { data, error: null, profileData: existingUser, isExistingUser };
     }
     
     // Create new user
@@ -47,9 +68,7 @@ export async function signUp(email: string, password: string, role: UserRole, ad
       email,
       password,
       options: {
-        data: {
-          role
-        }
+        data: { role }
       }
     });
     
@@ -59,60 +78,78 @@ export async function signUp(email: string, password: string, role: UserRole, ad
       throw new Error('No se pudo crear el usuario');
     }
     
-    console.log('✅ Usuario creado en Auth:', data.user.id);
-    
     // Create user profile
-    const profileData = {
-      id: data.user.id,
-      email,
-      role,
-      ...additionalData
-    };
-    
-    const { error: profileError, data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('users')
-      .insert(profileData)
+      .insert({
+        id: data.user.id,
+        email: email,
+        role: role,
+        ...profileData
+      })
       .select()
       .single();
     
     if (profileError) {
       console.error('❌ Error creando perfil:', profileError);
-      throw new Error(`Error creating user profile: ${profileError.message}`);
     }
     
-    console.log('✅ Perfil creado en BD:', profile);
-    
-    return { data, error: null, profileData: profile, isExistingUser: false };
-  } catch (err: any) {
-    console.error('❌ Error en signUp:', err);
-    return { data: null, error: err, profileData: null, isExistingUser: false };
+    return { data, error: null, profileData: profile, isExistingUser };
+  } catch (error: any) {
+    console.error('❌ Error en signUp:', error);
+    return { data: null, error, profileData: null, isExistingUser: false };
   }
-}
+};
 
-export async function signIn(email: string, password: string) {
+export const signIn = async (email: string, password: string) => {
   try {
+    console.log('🔐 Iniciando sesión con email:', email);
+    
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
-      password
+      password,
     });
     
-    return { data, error };
-  } catch (err: any) {
-    return { data: null, error: err };
+    if (error) throw error;
+    
+    return { data, error: null };
+  } catch (error: any) {
+    console.error('❌ Error en signIn:', error);
+    return { data: null, error };
   }
-}
+};
 
-export async function signOut() {
-  return await supabase.auth.signOut();
-}
+export const signOut = async () => {
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    return { error: null };
+  } catch (error: any) {
+    console.error('❌ Error en signOut:', error);
+    return { error };
+  }
+};
 
-export async function getCurrentUser() {
-  const { data } = await supabase.auth.getSession();
-  return data.session?.user || null;
-}
+export const getCurrentUser = async () => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return null;
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    return user;
+  } catch (error) {
+    console.error('❌ Error en getCurrentUser:', error);
+    return null;
+  }
+};
 
 // Agency functions
-export async function createAgencyProfile(userId: string, name: string, contactEmail: string, contactPhone: string) {
+export const createAgencyProfile = async (
+  userId: string,
+  name: string,
+  contactEmail: string,
+  contactPhone?: string
+) => {
   try {
     const { data, error } = await supabase
       .from('agencies')
@@ -120,18 +157,20 @@ export async function createAgencyProfile(userId: string, name: string, contactE
         user_id: userId,
         name,
         contact_email: contactEmail,
-        contact_phone: contactPhone
+        contact_phone: contactPhone,
+        is_active: true
       })
       .select()
       .single();
     
     return { data, error };
-  } catch (err: any) {
-    return { data: null, error: err };
+  } catch (error: any) {
+    console.error('❌ Error en createAgencyProfile:', error);
+    return { data: null, error };
   }
-}
+};
 
-export async function updateAgencyStatus(agencyId: string, isActive: boolean) {
+export const updateAgencyStatus = async (agencyId: string, isActive: boolean) => {
   try {
     const { data, error } = await supabase
       .from('agencies')
@@ -141,36 +180,40 @@ export async function updateAgencyStatus(agencyId: string, isActive: boolean) {
       .single();
     
     return { data, error };
-  } catch (err: any) {
-    return { data: null, error: err };
+  } catch (error: any) {
+    console.error('❌ Error en updateAgencyStatus:', error);
+    return { data: null, error };
   }
-}
+};
 
-export async function getAllAgencies() {
+export const getAllAgencies = async () => {
   try {
     const { data, error } = await supabase
       .from('agencies')
-      .select('*, users(first_name, last_name, email)')
+      .select(`
+        *,
+        users(first_name, last_name, email)
+      `)
       .order('created_at', { ascending: false });
     
     return { data, error };
-  } catch (err: any) {
-    return { data: null, error: err };
+  } catch (error: any) {
+    console.error('❌ Error en getAllAgencies:', error);
+    return { data: null, error };
   }
-}
+};
 
 // Tour functions
-export async function getTours(filters: SearchFilters = {}) {
+export const getTours = async (filters: any = {}) => {
   try {
-    console.log('🔍 Buscando tours con filtros:', filters);
+    console.log('🔍 Obteniendo tours con filtros:', filters);
     
     let query = supabase
       .from('tours')
       .select(`
         *,
         agencies(id, name, rating)
-      `)
-      .order('created_at', { ascending: false });
+      `);
     
     // Apply filters
     if (filters.destination) {
@@ -193,32 +236,37 @@ export async function getTours(filters: SearchFilters = {}) {
       query = query.limit(filters.limit);
     }
     
+    // Order by featured first, then created_at
+    query = query.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
+    
     const { data, error } = await query;
     
     return { data, error };
-  } catch (err: any) {
-    return { data: null, error: err };
+  } catch (error: any) {
+    console.error('❌ Error en getTours:', error);
+    return { data: null, error };
   }
-}
+};
 
-export async function getTourById(id: string) {
+export const getTourById = async (id: string) => {
   try {
     const { data, error } = await supabase
       .from('tours')
       .select(`
         *,
-        agencies(id, name, logo, rating, contact_email, description)
+        agencies(id, name, rating, logo, description, contact_email)
       `)
       .eq('id', id)
       .single();
     
     return { data, error };
-  } catch (err: any) {
-    return { data: null, error: err };
+  } catch (error: any) {
+    console.error('❌ Error en getTourById:', error);
+    return { data: null, error };
   }
-}
+};
 
-export async function createTour(tourData: any, destinations: string[], userId: string) {
+export const createTour = async (tourData: any, destinations: string[], userId: string) => {
   try {
     console.log('🏞️ Creando tour con datos:', tourData);
     
@@ -230,11 +278,7 @@ export async function createTour(tourData: any, destinations: string[], userId: 
       .single();
     
     if (agencyError) {
-      throw new Error(`Error getting agency: ${agencyError.message}`);
-    }
-    
-    if (!agencyData) {
-      throw new Error('No agency found for this user');
+      throw new Error('No se encontró la agencia para este usuario');
     }
     
     // Create the tour
@@ -248,66 +292,33 @@ export async function createTour(tourData: any, destinations: string[], userId: 
       .single();
     
     if (tourError) {
-      throw new Error(`Error creating tour: ${tourError.message}`);
+      throw new Error(`Error al crear el tour: ${tourError.message}`);
     }
     
     // Add tour-destination relationships
     if (destinations.length > 0) {
       const tourDestinations = destinations.map(destination => ({
         tour_id: tour.id,
-        destination_name: destination
+        destination_id: destination
       }));
       
-      // First try to find existing destinations
-      for (const dest of destinations) {
-        // Check if destination exists
-        const { data: existingDest } = await supabase
-          .from('destinations')
-          .select('id')
-          .eq('name', dest)
-          .maybeSingle();
-        
-        if (existingDest) {
-          // Add relationship with existing destination
-          await supabase
-            .from('tour_destinations')
-            .insert({
-              tour_id: tour.id,
-              destination_id: existingDest.id
-            });
-        } else {
-          // Create new destination
-          const { data: newDest } = await supabase
-            .from('destinations')
-            .insert({
-              name: dest,
-              is_active: true,
-              last_updated_by: userId
-            })
-            .select('id')
-            .single();
-          
-          if (newDest) {
-            // Add relationship with new destination
-            await supabase
-              .from('tour_destinations')
-              .insert({
-                tour_id: tour.id,
-                destination_id: newDest.id
-              });
-          }
-        }
+      const { error: relationError } = await supabase
+        .from('tour_destinations')
+        .insert(tourDestinations);
+      
+      if (relationError) {
+        console.error('❌ Error al asociar destinos:', relationError);
       }
     }
     
     return { data: tour, error: null };
-  } catch (err: any) {
-    console.error('❌ Error en createTour:', err);
-    return { data: null, error: err };
+  } catch (error: any) {
+    console.error('❌ Error en createTour:', error);
+    return { data: null, error };
   }
-}
+};
 
-export async function updateTour(tourId: string, tourData: any) {
+export const updateTour = async (tourId: string, tourData: any) => {
   try {
     const { data, error } = await supabase
       .from('tours')
@@ -317,12 +328,13 @@ export async function updateTour(tourId: string, tourData: any) {
       .single();
     
     return { data, error };
-  } catch (err: any) {
-    return { data: null, error: err };
+  } catch (error: any) {
+    console.error('❌ Error en updateTour:', error);
+    return { data: null, error };
   }
-}
+};
 
-export async function deleteTour(tourId: string) {
+export const deleteTour = async (tourId: string) => {
   try {
     const { error } = await supabase
       .from('tours')
@@ -330,13 +342,14 @@ export async function deleteTour(tourId: string) {
       .eq('id', tourId);
     
     return { error };
-  } catch (err: any) {
-    return { error: err };
+  } catch (error: any) {
+    console.error('❌ Error en deleteTour:', error);
+    return { error };
   }
-}
+};
 
 // Booking functions
-export async function createBooking(bookingData: any) {
+export const createBooking = async (bookingData: any) => {
   try {
     const { data, error } = await supabase
       .from('bookings')
@@ -345,31 +358,32 @@ export async function createBooking(bookingData: any) {
       .single();
     
     return { data, error };
-  } catch (err: any) {
-    return { data: null, error: err };
+  } catch (error: any) {
+    console.error('❌ Error en createBooking:', error);
+    return { data: null, error };
   }
-}
+};
 
-export async function getUserBookings(userId: string) {
+export const getUserBookings = async (userId: string) => {
   try {
     const { data, error } = await supabase
       .from('bookings')
       .select(`
         *,
         tours(id, name, destination, image_url, start_date, end_date),
-        agencies(id, name, contact_email),
-        users(id, first_name, last_name, email)
+        agencies(id, name, contact_email)
       `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     
     return { data, error };
-  } catch (err: any) {
-    return { data: null, error: err };
+  } catch (error: any) {
+    console.error('❌ Error en getUserBookings:', error);
+    return { data: null, error };
   }
-}
+};
 
-export async function getAgencyBookings(agencyId: string) {
+export const getAgencyBookings = async (agencyId: string) => {
   try {
     const { data, error } = await supabase
       .from('bookings')
@@ -382,117 +396,14 @@ export async function getAgencyBookings(agencyId: string) {
       .order('created_at', { ascending: false });
     
     return { data, error };
-  } catch (err: any) {
-    return { data: null, error: err };
+  } catch (error: any) {
+    console.error('❌ Error en getAgencyBookings:', error);
+    return { data: null, error };
   }
-}
-
-// Destination functions
-export async function getAllDestinations() {
-  try {
-    const { data, error } = await supabase
-      .from('destinations')
-      .select(`
-        *,
-        destination_images(*),
-        tour_destinations(*)
-      `)
-      .order('name');
-    
-    return { data, error };
-  } catch (err: any) {
-    return { data: null, error: err };
-  }
-}
-
-export async function searchDestinations(query: string) {
-  try {
-    const { data, error } = await supabase
-      .from('destinations')
-      .select('id, name')
-      .ilike('name', `%${query}%`)
-      .limit(5);
-    
-    return { data, error };
-  } catch (err: any) {
-    return { data: null, error: err };
-  }
-}
-
-export async function createDestination(destinationData: Partial<Destination>) {
-  try {
-    const { data, error } = await supabase
-      .from('destinations')
-      .insert(destinationData)
-      .select()
-      .single();
-    
-    return { data, error };
-  } catch (err: any) {
-    return { data: null, error: err };
-  }
-}
-
-export async function updateDestination(id: string, destinationData: Partial<Destination>) {
-  try {
-    const { data, error } = await supabase
-      .from('destinations')
-      .update(destinationData)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    return { data, error };
-  } catch (err: any) {
-    return { data: null, error: err };
-  }
-}
-
-export async function deleteDestination(id: string) {
-  try {
-    const { error } = await supabase
-      .from('destinations')
-      .delete()
-      .eq('id', id);
-    
-    return { error };
-  } catch (err: any) {
-    return { error: err };
-  }
-}
-
-export async function addDestinationImage(destinationId: string, imageData: Partial<DestinationImage>) {
-  try {
-    const { data, error } = await supabase
-      .from('destination_images')
-      .insert({
-        destination_id: destinationId,
-        ...imageData
-      })
-      .select()
-      .single();
-    
-    return { data, error };
-  } catch (err: any) {
-    return { data: null, error: err };
-  }
-}
-
-export async function deleteDestinationImage(imageId: string) {
-  try {
-    const { error } = await supabase
-      .from('destination_images')
-      .delete()
-      .eq('id', imageId);
-    
-    return { error };
-  } catch (err: any) {
-    return { error: err };
-  }
-}
+};
 
 // Review functions
-export async function getTourReviews(tourId: string) {
+export const getTourReviews = async (tourId: string) => {
   try {
     const { data, error } = await supabase
       .from('reviews')
@@ -505,15 +416,126 @@ export async function getTourReviews(tourId: string) {
       .order('created_at', { ascending: false });
     
     return { data, error };
-  } catch (err: any) {
-    return { data: null, error: err };
+  } catch (error: any) {
+    console.error('❌ Error en getTourReviews:', error);
+    return { data: null, error };
   }
-}
+};
+
+// Destination functions
+export const getAllDestinations = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('destinations')
+      .select(`
+        *,
+        destination_images(id, image_url, image_base64, caption, is_featured),
+        tour_destinations(tour_id)
+      `)
+      .order('name', { ascending: true });
+    
+    return { data, error };
+  } catch (error: any) {
+    console.error('❌ Error en getAllDestinations:', error);
+    return { data: null, error };
+  }
+};
+
+export const searchDestinations = async (query: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('destinations')
+      .select('id, name')
+      .ilike('name', `%${query}%`)
+      .order('name', { ascending: true })
+      .limit(5);
+    
+    return { data, error };
+  } catch (error: any) {
+    console.error('❌ Error en searchDestinations:', error);
+    return { data: null, error };
+  }
+};
+
+export const createDestination = async (destinationData: any) => {
+  try {
+    const { data, error } = await supabase
+      .from('destinations')
+      .insert(destinationData)
+      .select()
+      .single();
+    
+    return { data, error };
+  } catch (error: any) {
+    console.error('❌ Error en createDestination:', error);
+    return { data: null, error };
+  }
+};
+
+export const updateDestination = async (destinationId: string, destinationData: any) => {
+  try {
+    const { data, error } = await supabase
+      .from('destinations')
+      .update(destinationData)
+      .eq('id', destinationId)
+      .select()
+      .single();
+    
+    return { data, error };
+  } catch (error: any) {
+    console.error('❌ Error en updateDestination:', error);
+    return { data: null, error };
+  }
+};
+
+export const deleteDestination = async (destinationId: string) => {
+  try {
+    const { error } = await supabase
+      .from('destinations')
+      .delete()
+      .eq('id', destinationId);
+    
+    return { error };
+  } catch (error: any) {
+    console.error('❌ Error en deleteDestination:', error);
+    return { error };
+  }
+};
+
+export const addDestinationImage = async (destinationId: string, imageData: any) => {
+  try {
+    const { data, error } = await supabase
+      .from('destination_images')
+      .insert({
+        destination_id: destinationId,
+        ...imageData
+      })
+      .select()
+      .single();
+    
+    return { data, error };
+  } catch (error: any) {
+    console.error('❌ Error en addDestinationImage:', error);
+    return { data: null, error };
+  }
+};
+
+export const deleteDestinationImage = async (imageId: string) => {
+  try {
+    const { error } = await supabase
+      .from('destination_images')
+      .delete()
+      .eq('id', imageId);
+    
+    return { error };
+  } catch (error: any) {
+    console.error('❌ Error en deleteDestinationImage:', error);
+    return { error };
+  }
+};
 
 // Notification functions
-export async function getUserNotifications(limit = 10, offset = 0, includeRead = false) {
-  console.log('🔔 Obteniendo notificaciones del usuario...');
-  
+export const getUserNotifications = async (limit = 10, offset = 0, includeRead = false) => {
   try {
     const { data, error } = await supabase.rpc('get_user_notifications', { 
       limit_count: limit,
@@ -522,76 +544,54 @@ export async function getUserNotifications(limit = 10, offset = 0, includeRead =
     });
     
     return { data, error };
-  } catch (err: any) {
-    console.error('❌ Error en getUserNotifications:', err);
-    return { data: null, error: err };
+  } catch (error: any) {
+    console.error('❌ Error en getUserNotifications:', error);
+    return { data: null, error };
   }
-}
+};
 
-export async function markNotificationAsRead(notificationId: string) {
-  console.log('✓ Marcando notificación como leída:', notificationId);
-  
+export const markNotificationAsRead = async (notificationId: string) => {
   try {
-    const { data, error } = await supabase.rpc('mark_notification_as_read', { notification_id: notificationId });
+    const { data, error } = await supabase.rpc('mark_notification_as_read', { 
+      notification_id: notificationId 
+    });
+    
     return { data, error };
-  } catch (err: any) {
-    console.error('❌ Error en markNotificationAsRead:', err);
-    return { data: null, error: err };
+  } catch (error: any) {
+    console.error('❌ Error en markNotificationAsRead:', error);
+    return { data: null, error };
   }
-}
+};
 
-export async function markAllNotificationsAsRead() {
-  console.log('✓ Marcando todas las notificaciones como leídas');
-  
+export const markAllNotificationsAsRead = async () => {
   try {
     const { data, error } = await supabase.rpc('mark_all_notifications_as_read');
+    
     return { data, error };
-  } catch (err: any) {
-    console.error('❌ Error en markAllNotificationsAsRead:', err);
-    return { data: null, error: err };
+  } catch (error: any) {
+    console.error('❌ Error en markAllNotificationsAsRead:', error);
+    return { data: null, error };
   }
-}
+};
 
-export async function getUnreadNotificationCount() {
-  console.log('🔢 Obteniendo conteo de notificaciones no leídas');
-  
+export const getUnreadNotificationCount = async () => {
   try {
     const { data, error } = await supabase.rpc('get_unread_notifications_count');
+    
     return { data, error };
-  } catch (err: any) {
-    console.error('❌ Error en getUnreadNotificationCount:', err);
-    return { data: null, error: err };
+  } catch (error: any) {
+    console.error('❌ Error en getUnreadNotificationCount:', error);
+    return { data: null, error };
   }
-}
+};
 
-// Helper functions
-export function getImageSrc(base64?: string, url?: string): string {
+// Helper function to get image source (base64 or URL)
+export const getImageSrc = (base64?: string, url?: string): string => {
   if (base64) {
     return base64;
   }
   if (url) {
     return url;
   }
-  return 'https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg';
-}
-
-export function parseDateFromDB(dateString: string): Date {
-  // Handle ISO date format (YYYY-MM-DD)
-  const parts = dateString.split('-');
-  if (parts.length === 3) {
-    const year = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
-    const day = parseInt(parts[2], 10);
-    return new Date(year, month, day);
-  }
-  
-  // Fallback to standard date parsing
-  return new Date(dateString);
-}
-
-export function formatDateForDB(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
+  return 'https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg'; // Default image
+};
