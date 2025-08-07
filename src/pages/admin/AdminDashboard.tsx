@@ -64,7 +64,7 @@ const AdminDashboard: React.FC = () => {
           id,
           created_at,
           status,
-          users(first_name, last_name, email),
+          users!bookings_user_id_fkey(first_name, last_name, email),
           tours(name),
           agencies(name)
         `)
