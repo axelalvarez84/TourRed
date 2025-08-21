@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { createTour, searchDestinations, supabase, updateTour, deleteTour } from '../../lib/supabase';
+import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations } from '../../lib/supabase';
 import { Plus, Search, X, Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload } from 'lucide-react';
-import { Tour } from '../../types';
+import { Tour, Destination } from '../../types';
 import { format } from 'date-fns';
 import ImageUploader from '../../components/ImageUploader';
 
@@ -15,7 +15,8 @@ const AgencyTours: React.FC = () => {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
+  const [selectedDestinations, setSelectedDestinations] = useState<{id: string, name: string}[]>([]);
+  const [allAvailableDestinations, setAllAvailableDestinations] = useState<Destination[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [editingTour, setEditingTour] = useState<Tour | null>(null);
 
@@ -41,6 +42,7 @@ const AgencyTours: React.FC = () => {
 
   useEffect(() => {
     fetchAgencyTours();
+    fetchAllDestinations();
   }, [user]);
 
   useEffect(() => {
@@ -59,6 +61,16 @@ const AgencyTours: React.FC = () => {
 
     return () => clearTimeout(searchDestinationsDebounced);
   }, [searchQuery]);
+
+  const fetchAllDestinations = async () => {
+    try {
+      const { data, error } = await getAllDestinations();
+      if (error) throw error;
+      setAllAvailableDestinations(data || []);
+    } catch (err: any) {
+      console.error('❌ Error cargando destinos:', err);
+    }
+  };
 
   const fetchAgencyTours = async () => {
     if (!user?.id) return;
@@ -128,7 +140,6 @@ const AgencyTours: React.FC = () => {
       start_date: '',
       end_date: '',
       max_travelers: '',
-      booking_deadline: '',
     });
     setSelectedDestinations([]);
     setSearchQuery('');
@@ -150,6 +161,10 @@ const AgencyTours: React.FC = () => {
     const defaultDeadline = new Date(tour.start_date);
     defaultDeadline.setDate(defaultDeadline.getDate() - 14);
     
+    // Buscar el destino en la lista de destinos disponibles
+    const destinationObj = allAvailableDestinations.find(d => d.name === tour.destination);
+    const selectedDest = destinationObj ? [{ id: destinationObj.id, name: destinationObj.name }] : [];
+    
     setFormData({
       name: tour.name,
       category: tour.category,
@@ -164,7 +179,7 @@ const AgencyTours: React.FC = () => {
       booking_deadline: tour.booking_deadline || defaultDeadline.toISOString().split('T')[0],
       booking_approval_type: tour.booking_approval_type || 'automatic',
     });
-    setSelectedDestinations([tour.destination]);
+    setSelectedDestinations(selectedDest);
     setIncludes(tour.includes && tour.includes.length > 0 ? tour.includes : ['']);
     setExcludes(tour.excludes && tour.excludes.length > 0 ? tour.excludes : ['']);
     setTourImageData(null); // Reset image data when editing
@@ -279,7 +294,7 @@ const AgencyTours: React.FC = () => {
         start_date: formData.start_date,
         end_date: formData.end_date,
         max_travelers: formData.max_travelers ? parseInt(formData.max_travelers) : null,
-        destination: selectedDestinations[0], // Use the first selected destination as the primary destination
+        destination: selectedDestinations.length > 0 ? selectedDestinations[0].name : '', // Use the first selected destination name
         includes: filteredIncludes.length > 0 ? filteredIncludes : null,
         excludes: filteredExcludes.length > 0 ? filteredExcludes : null,
         booking_deadline: bookingDeadline,
@@ -293,7 +308,8 @@ const AgencyTours: React.FC = () => {
         console.log('✅ Tour actualizado correctamente');
       } else {
         // Crear nuevo tour
-        const { error } = await createTour(tourData, selectedDestinations, user.id);
+        const destinationIds = selectedDestinations.map(d => d.id);
+        const { error } = await createTour(tourData, destinationIds, user.id);
         if (error) throw error;
         console.log('✅ Tour creado correctamente');
       }
@@ -309,9 +325,11 @@ const AgencyTours: React.FC = () => {
     }
   };
 
-  const addDestination = (destination: string) => {
-    if (!selectedDestinations.includes(destination)) {
-      setSelectedDestinations([...selectedDestinations, destination]);
+  const addDestination = (destinationName: string) => {
+    // Buscar el destino en la lista de destinos disponibles
+    const destinationObj = allAvailableDestinations.find(d => d.name === destinationName);
+    if (destinationObj && !selectedDestinations.find(d => d.id === destinationObj.id)) {
+      setSelectedDestinations([...selectedDestinations, { id: destinationObj.id, name: destinationObj.name }]);
     }
     setSearchQuery('');
     setSearchResults([]);
@@ -319,8 +337,19 @@ const AgencyTours: React.FC = () => {
   };
 
   const addDestinationFromInput = () => {
-    if (searchQuery.trim() && !selectedDestinations.includes(searchQuery.trim())) {
-      setSelectedDestinations([...selectedDestinations, searchQuery.trim()]);
+    if (searchQuery.trim()) {
+      // Buscar el destino en la lista de destinos disponibles
+      const destinationObj = allAvailableDestinations.find(d => 
+        d.name.toLowerCase() === searchQuery.trim().toLowerCase()
+      );
+      
+      if (destinationObj && !selectedDestinations.find(d => d.id === destinationObj.id)) {
+        setSelectedDestinations([...selectedDestinations, { id: destinationObj.id, name: destinationObj.name }]);
+      } else if (!destinationObj) {
+        setError(`El destino "${searchQuery.trim()}" no existe. Solo puedes seleccionar destinos existentes.`);
+        return;
+      }
+      
       setSearchQuery('');
       setSearchResults([]);
       setShowSearchResults(false);
@@ -334,8 +363,8 @@ const AgencyTours: React.FC = () => {
     }
   };
 
-  const removeDestination = (destination: string) => {
-    setSelectedDestinations(selectedDestinations.filter(d => d !== destination));
+  const removeDestination = (destinationId: string) => {
+    setSelectedDestinations(selectedDestinations.filter(d => d.id !== destinationId));
   };
 
   const formatDate = (dateString: string) => {
@@ -592,13 +621,13 @@ const AgencyTours: React.FC = () => {
                 <div className="mb-2 flex flex-wrap gap-2">
                   {selectedDestinations.map((destination) => (
                     <span
-                      key={destination}
+                      key={destination.id}
                       className="inline-flex items-center bg-primary-100 text-primary-800 px-3 py-1 rounded-full text-sm"
                     >
-                      {destination}
+                      {destination.name}
                       <button
                         type="button"
-                        onClick={() => removeDestination(destination)}
+                        onClick={() => removeDestination(destination.id)}
                         className="ml-2 text-primary-600 hover:text-primary-800"
                       >
                         <X className="h-4 w-4" />
