@@ -271,6 +271,32 @@ const AgencyTours: React.FC = () => {
         throw new Error('Debe proporcionar una imagen para el tour');
       }
 
+      // Crear destinos nuevos si es necesario
+      const processedDestinations = [];
+      
+      for (const destination of selectedDestinations) {
+        if (destination.id.startsWith('temp_')) {
+          // Es un destino nuevo, crearlo primero
+          console.log('🌍 Creando nuevo destino:', destination.name);
+          
+          const { data: newDestination, error: destinationError } = await createDestination({
+            name: destination.name,
+            is_active: true,
+            last_updated_by: user.id
+          });
+          
+          if (destinationError) {
+            throw new Error(`Error creando destino "${destination.name}": ${destinationError.message}`);
+          }
+          
+          processedDestinations.push(newDestination.id);
+          console.log('✅ Destino creado:', newDestination);
+        } else {
+          // Es un destino existente
+          processedDestinations.push(destination.id);
+        }
+      }
+
       // Filtrar includes y excludes vacíos
       const filteredIncludes = includes.filter(item => item.trim() !== '');
       const filteredExcludes = excludes.filter(item => item.trim() !== '');
@@ -294,7 +320,7 @@ const AgencyTours: React.FC = () => {
         start_date: formData.start_date,
         end_date: formData.end_date,
         max_travelers: formData.max_travelers ? parseInt(formData.max_travelers) : null,
-        destination: selectedDestinations.length > 0 ? selectedDestinations[0].name : '', // Use the first selected destination name
+        destination: selectedDestinations.length > 0 ? selectedDestinations[0].name : '',
         includes: filteredIncludes.length > 0 ? filteredIncludes : null,
         excludes: filteredExcludes.length > 0 ? filteredExcludes : null,
         booking_deadline: bookingDeadline,
@@ -308,12 +334,14 @@ const AgencyTours: React.FC = () => {
         console.log('✅ Tour actualizado correctamente');
       } else {
         // Crear nuevo tour
-        const destinationIds = selectedDestinations.map(d => d.id);
-        const { error } = await createTour(tourData, destinationIds, user.id);
+        const { error } = await createTour(tourData, processedDestinations, user.id);
         if (error) throw error;
         console.log('✅ Tour creado correctamente');
       }
 
+      // Recargar destinos disponibles después de crear nuevos
+      await fetchAllDestinations();
+      
       // Recargar tours después de crear/actualizar
       await fetchAgencyTours();
       handleCancel();
@@ -338,16 +366,32 @@ const AgencyTours: React.FC = () => {
 
   const addDestinationFromInput = () => {
     if (searchQuery.trim()) {
-      // Buscar el destino en la lista de destinos disponibles
-      const destinationObj = allAvailableDestinations.find(d => 
-        d.name.toLowerCase() === searchQuery.trim().toLowerCase()
+      const destinationName = searchQuery.trim();
+      
+      // Verificar si ya está seleccionado
+      if (selectedDestinations.find(d => d.name.toLowerCase() === destinationName.toLowerCase())) {
+        setError(`El destino "${destinationName}" ya está seleccionado.`);
+        return;
+      }
+      
+      // Buscar si existe en la lista de destinos disponibles
+      const existingDestination = allAvailableDestinations.find(d => 
+        d.name.toLowerCase() === destinationName.toLowerCase()
       );
       
-      if (destinationObj && !selectedDestinations.find(d => d.id === destinationObj.id)) {
-        setSelectedDestinations([...selectedDestinations, { id: destinationObj.id, name: destinationObj.name }]);
-      } else if (!destinationObj) {
-        setError(`El destino "${searchQuery.trim()}" no existe. Solo puedes seleccionar destinos existentes.`);
-        return;
+      if (existingDestination) {
+        // Si existe, agregarlo con su ID real
+        setSelectedDestinations([...selectedDestinations, { 
+          id: existingDestination.id, 
+          name: existingDestination.name 
+        }]);
+      } else {
+        // Si no existe, agregarlo como nuevo destino (se creará al guardar el tour)
+        const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        setSelectedDestinations([...selectedDestinations, { 
+          id: tempId, 
+          name: destinationName 
+        }]);
       }
       
       setSearchQuery('');
@@ -671,6 +715,11 @@ const AgencyTours: React.FC = () => {
                             {result.name}
                           </button>
                         ))}
+                        {searchResults.length === 0 && searchQuery.trim() && (
+                          <div className="px-3 py-2 text-xs text-gray-500">
+                            No se encontraron destinos existentes
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -679,7 +728,7 @@ const AgencyTours: React.FC = () => {
                   <p className="text-sm text-red-500 mt-1">⚠️ Debe seleccionar al menos un destino</p>
                 )}
                 <p className="text-xs text-gray-500 mt-1">
-                  Tip: Escribe el nombre del destino y presiona Enter o haz clic en el botón + para agregarlo
+                  💡 Tip: Escribe el nombre del destino y presiona Enter o haz clic en el botón + para agregarlo. Si el destino no existe, se creará automáticamente.
                 </p>
               </div>
 
