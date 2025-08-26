@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations } from '../../lib/supabase';
+import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination } from '../../lib/supabase';
 import { Plus, Search, X, Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload } from 'lucide-react';
 import { Tour, Destination } from '../../types';
 import { format } from 'date-fns';
