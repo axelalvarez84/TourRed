@@ -38,6 +38,7 @@ const NavBar: React.FC = () => {
         { to: '/admin/dashboard', label: 'Panel Admin' },
         { to: '/admin/agencies', label: 'Agencias' },
         { to: '/admin/users', label: 'Usuarios' },
+        { to: '/admin/destinations', label: 'Destinos' },
         { to: '/admin/reviews', label: 'Reseñas' },
         { to: '/admin/messages', label: 'Mensajes' },
       ];

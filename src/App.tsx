@@ -22,6 +22,7 @@ import AdminAgencies from './pages/admin/AdminAgencies';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminReviews from './pages/admin/AdminReviews';
 import AdminMessages from './pages/admin/AdminMessages';
+import AdminDestinations from './pages/admin/AdminDestinations';
 import AdminProfile from './pages/admin/AdminProfile';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
@@ -183,6 +184,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                 <AdminMessages />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/destinations"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminDestinations />
               </ProtectedRoute>
             }
           />
