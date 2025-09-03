@@ -463,7 +463,15 @@ export const createDestination = async (destinationData: any) => {
       .from('destinations')
       .insert(destinationData)
       .select()
-      .single();
+      .maybeSingle();
+    
+    if (error) {
+      return { data: null, error };
+    }
+    
+    if (!data) {
+      return { data: null, error: new Error('No se pudo crear el destino o recuperar el registro creado.') };
+    }
     
     return { data, error };
   } catch (error: any) {
@@ -479,7 +487,15 @@ export const updateDestination = async (destinationId: string, destinationData: 
       .update(destinationData)
       .eq('id', destinationId)
       .select()
-      .single();
+      .maybeSingle();
+    
+    if (error) {
+      return { data: null, error };
+    }
+    
+    if (!data) {
+      return { data: null, error: new Error('No se encontró el destino para actualizar o no se realizaron cambios.') };
+    }
     
     return { data, error };
   } catch (error: any) {
