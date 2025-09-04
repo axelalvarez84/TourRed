@@ -486,18 +486,17 @@ export const updateDestination = async (destinationId: string, destinationData: 
       .from('destinations')
       .update(destinationData)
       .eq('id', destinationId)
-      .select()
-      .maybeSingle();
+      .select();
     
     if (error) {
       return { data: null, error };
     }
     
-    if (!data) {
+    if (!data || data.length === 0) {
       return { data: null, error: new Error('No se encontró el destino para actualizar o no se realizaron cambios.') };
     }
     
-    return { data, error };
+    return { data: data[0], error: null };
   } catch (error: any) {
     console.error('❌ Error en updateDestination:', error);
     return { data: null, error };
