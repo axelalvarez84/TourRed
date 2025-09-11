@@ -1,16 +1,24 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { signUp, createAgencyProfile } from '../../lib/supabase';
+import { signUp, supabase } from '../../lib/supabase';
 import { UserRole } from '../../lib/supabase';
 
 const AgencySignupPage: React.FC = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    agencyName: '',
+    phoneNumber: '',
     website: '',
     rfc: '',
     razonSocial: '',
     rnt: ''
-  const [error, setError] = useState('');
+  });
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -32,11 +40,24 @@ const AgencySignupPage: React.FC = () => {
       return;
     }
 
+    if (!website.trim()) {
+      setError('El sitio web o página de Facebook es obligatorio');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!rfc.trim()) {
+      setError('El RFC es obligatorio');
+      setIsLoading(false);
+      return;
+    }
+
     if (!razonSocial.trim()) {
       setError('La razón social es obligatoria');
       setIsLoading(false);
       return;
     }
+
     try {
       console.log('🚀 Iniciando registro de agencia...');
       
@@ -99,6 +120,7 @@ const AgencySignupPage: React.FC = () => {
       [field]: value
     }));
   };
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
