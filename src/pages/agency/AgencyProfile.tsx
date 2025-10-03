@@ -45,6 +45,7 @@ const AgencyProfile: React.FC = () => {
     banco: '',
     cuenta_clabe: '',
     titular_cuenta: '',
+    rnt: '',
     logo: '',
     contact_email: '',
     contact_phone: '',
@@ -111,6 +112,7 @@ const AgencyProfile: React.FC = () => {
       setEditForm({
         name: agencyData.name || '',
         description: agencyData.description || '',
+        rnt: agencyData.rnt || '',
         rfc: agencyData.rfc || '',
         razon_social: agencyData.razon_social || '',
         regimen_fiscal: agencyData.regimen_fiscal || '',
@@ -118,6 +120,7 @@ const AgencyProfile: React.FC = () => {
         banco: agencyData.banco || '',
         cuenta_clabe: agencyData.cuenta_clabe || '',
         titular_cuenta: agencyData.titular_cuenta || '',
+        rnt: agencyData.rnt || '',
         logo: agencyData.logo || '',
         contact_email: agencyData.contact_email || '',
         contact_phone: agencyData.contact_phone || '',
@@ -151,6 +154,7 @@ const AgencyProfile: React.FC = () => {
           name: editForm.name,
           description: editForm.description,
           logo: editForm.logo,
+          rnt: editForm.rnt,
           rfc: editForm.rfc,
           razon_social: editForm.razon_social,
           regimen_fiscal: editForm.regimen_fiscal,
@@ -158,6 +162,7 @@ const AgencyProfile: React.FC = () => {
           banco: editForm.banco,
           cuenta_clabe: editForm.cuenta_clabe,
           titular_cuenta: editForm.titular_cuenta,
+          rnt: editForm.rnt,
           contact_email: editForm.contact_email,
           contact_phone: editForm.contact_phone,
           website: editForm.website,
@@ -210,7 +215,8 @@ const AgencyProfile: React.FC = () => {
       contact_phone: agency.contact_phone || '',
       website: agency.website || '',
       first_name: agency.users?.first_name || '',
-      last_name: agency.users?.last_name || ''
+      last_name: agency.users?.last_name || '',
+      rnt: agency.rnt || ''
     });
     setIsEditing(false);
     setError('');
@@ -417,6 +423,22 @@ const AgencyProfile: React.FC = () => {
                       placeholder="Dirección fiscal completa"
                     />
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      RNT (Registro Nacional de Turismo)
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.rnt || ''}
+                      onChange={(e) => setEditForm({ ...editForm, rnt: e.target.value })}
+                      className="input"
+                      placeholder="Ej: 12345678 (opcional)"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Registro Nacional de Turismo (opcional)
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -465,6 +487,16 @@ const AgencyProfile: React.FC = () => {
                       </div>
                     </div>
                   )}
+
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3">
+                      <span className="text-sm font-bold">RNT</span>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">RNT</div>
+                      <div className="text-sm text-gray-600">{agency.rnt || 'No especificado (opcional)'}</div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
