@@ -211,6 +211,7 @@ const AgencyProfile: React.FC = () => {
       name: agency.name || '',
       description: agency.description || '',
       logo: agency.logo || '',
+      rnt: agency.rnt || '',
       contact_email: agency.contact_email || '',
       contact_phone: agency.contact_phone || '',
       website: agency.website || '',
