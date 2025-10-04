@@ -5,6 +5,9 @@ export interface User {
   last_name?: string;
   role: 'traveler' | 'agency' | 'admin';
   created_at: string;
+  curp?: string;
+  passport_number?: string;
+  is_foreign_traveler?: boolean;
 }
 
 export interface Agency {
