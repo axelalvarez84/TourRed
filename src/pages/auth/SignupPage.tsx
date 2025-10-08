@@ -8,20 +8,30 @@ const SignupPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isForeignTraveler, setIsForeignTraveler] = useState(false);
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    curp: '',
+    passportNumber: ''
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
-    const confirmPassword = formData.get('confirmPassword') as string;
-    const firstName = formData.get('firstName') as string;
-    const lastName = formData.get('lastName') as string;
-    const curp = formData.get('curp') as string;
-    const passportNumber = formData.get('passportNumber') as string;
+    const { email, password, confirmPassword, firstName, lastName, curp, passportNumber } = formData;
 
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden');
@@ -121,6 +131,8 @@ const SignupPage: React.FC = () => {
                     id="firstName"
                     name="firstName"
                     type="text"
+                    value={formData.firstName}
+                    onChange={handleInputChange}
                     required
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                   />
@@ -136,6 +148,8 @@ const SignupPage: React.FC = () => {
                     id="lastName"
                     name="lastName"
                     type="text"
+                    value={formData.lastName}
+                    onChange={handleInputChange}
                     required
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                   />
@@ -152,6 +166,8 @@ const SignupPage: React.FC = () => {
                   id="email"
                   name="email"
                   type="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
                   autoComplete="email"
                   required
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
@@ -186,9 +202,10 @@ const SignupPage: React.FC = () => {
                     name="curp"
                     type="text"
                     maxLength={18}
-                    value={formData.get('curp') || ''}
+                    value={formData.curp}
                     onChange={(e) => {
-                      e.target.value = e.target.value.toUpperCase();
+                      const upperValue = e.target.value.toUpperCase();
+                      setFormData(prev => ({ ...prev, curp: upperValue }));
                     }}
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                     placeholder="ABCD123456HEFGHI01"
@@ -210,6 +227,8 @@ const SignupPage: React.FC = () => {
                     name="passportNumber"
                     type="text"
                     maxLength={20}
+                    value={formData.passportNumber}
+                    onChange={handleInputChange}
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                     placeholder="A12345678"
                     required={isForeignTraveler}
@@ -230,6 +249,8 @@ const SignupPage: React.FC = () => {
                   id="password"
                   name="password"
                   type="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
                   autoComplete="new-password"
                   required
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
@@ -246,6 +267,8 @@ const SignupPage: React.FC = () => {
                   id="confirmPassword"
                   name="confirmPassword"
                   type="password"
+                  value={formData.confirmPassword}
+                  onChange={handleInputChange}
                   autoComplete="new-password"
                   required
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
