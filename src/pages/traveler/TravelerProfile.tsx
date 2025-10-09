@@ -29,10 +29,7 @@ const TravelerProfile: React.FC = () => {
 
   const [editForm, setEditForm] = useState({
     first_name: '',
-    last_name: '',
-    curp: '',
-    passport_number: '',
-    is_foreign_traveler: false
+    last_name: ''
   });
 
   useEffect(() => {
@@ -93,10 +90,7 @@ const TravelerProfile: React.FC = () => {
       // Inicializar formulario de edición
       setEditForm({
         first_name: profileData.first_name || '',
-        last_name: profileData.last_name || '',
-        curp: profileData.curp || '',
-        passport_number: profileData.passport_number || '',
-        is_foreign_traveler: profileData.is_foreign_traveler || false
+        last_name: profileData.last_name || ''
       });
 
     } catch (err: any) {
@@ -115,40 +109,13 @@ const TravelerProfile: React.FC = () => {
       setError('');
       setSuccess('');
 
-      // Validaciones
-      if (editForm.is_foreign_traveler) {
-        if (!editForm.passport_number?.trim()) {
-          throw new Error('El número de pasaporte es obligatorio para viajeros extranjeros');
-        }
-        if (editForm.passport_number.trim().length < 6) {
-          throw new Error('El número de pasaporte debe tener al menos 6 caracteres');
-        }
-      } else {
-        if (!editForm.curp?.trim()) {
-          throw new Error('El CURP es obligatorio para viajeros mexicanos');
-        }
-        if (editForm.curp.trim().length !== 18) {
-          throw new Error('El CURP debe tener exactamente 18 caracteres');
-        }
-      }
-
       console.log('💾 Guardando cambios del perfil...');
 
       const updateData: any = {
         first_name: editForm.first_name?.trim() || null,
         last_name: editForm.last_name?.trim() || null,
-        is_foreign_traveler: editForm.is_foreign_traveler,
         updated_at: new Date().toISOString()
       };
-
-      // Agregar CURP o pasaporte según el tipo de viajero
-      if (editForm.is_foreign_traveler) {
-        updateData.passport_number = editForm.passport_number?.trim().toUpperCase() || null;
-        updateData.curp = null; // Limpiar CURP si es extranjero
-      } else {
-        updateData.curp = editForm.curp?.trim().toUpperCase() || null;
-        updateData.passport_number = null; // Limpiar pasaporte si es mexicano
-      }
 
       const { error } = await supabase
         .from('users')
@@ -179,20 +146,11 @@ const TravelerProfile: React.FC = () => {
 
     setEditForm({
       first_name: profile.first_name || '',
-      last_name: profile.last_name || '',
-      curp: profile.curp || '',
-      passport_number: profile.passport_number || '',
-      is_foreign_traveler: profile.is_foreign_traveler || false
+      last_name: profile.last_name || ''
     });
     setIsEditing(false);
     setError('');
     setSuccess('');
-  };
-
-  const formatCurp = (curp: string) => {
-    if (!curp) return '';
-    // Format CURP as ABCD123456HEFGHI01
-    return curp.replace(/(.{4})(.{6})(.{6})(.{2})/, '$1 $2 $3 $4');
   };
 
   if (isLoading) {
@@ -253,7 +211,7 @@ const TravelerProfile: React.FC = () => {
                     }
                   </h1>
                   <p className="text-primary-100">
-                    {profile.is_foreign_traveler ? 'Viajero Internacional' : 'Viajero Nacional'}
+                    Viajero
                   </p>
                   <div className="flex items-center mt-2">
                     <span className="px-2 py-1 rounded-full text-xs font-medium bg-success-100 text-success-800">
@@ -356,59 +314,6 @@ const TravelerProfile: React.FC = () => {
                     </div>
                   </div>
 
-                  <div>
-                    <div className="flex items-center mb-3">
-                      <input
-                        id="isForeignTraveler"
-                        type="checkbox"
-                        checked={editForm.is_foreign_traveler}
-                        onChange={(e) => setEditForm({...editForm, is_foreign_traveler: e.target.checked})}
-                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                      />
-                      <label htmlFor="isForeignTraveler" className="ml-2 block text-sm text-gray-900">
-                        Soy viajero extranjero
-                      </label>
-                    </div>
-                  </div>
-
-                  {!editForm.is_foreign_traveler ? (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        CURP *
-                      </label>
-                      <input
-                        type="text"
-                        maxLength={18}
-                        value={editForm.curp}
-                        onChange={(e) => setEditForm({...editForm, curp: e.target.value.toUpperCase()})}
-                        className="input"
-                        placeholder="ABCD123456HEFGHI01"
-                        required={!editForm.is_foreign_traveler}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Clave Única de Registro de Población (18 caracteres)
-                      </p>
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Número de Pasaporte *
-                      </label>
-                      <input
-                        type="text"
-                        maxLength={20}
-                        value={editForm.passport_number}
-                        onChange={(e) => setEditForm({...editForm, passport_number: e.target.value.toUpperCase()})}
-                        className="input"
-                        placeholder="A12345678"
-                        required={editForm.is_foreign_traveler}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Número de pasaporte válido de tu país de origen
-                      </p>
-                    </div>
-                  )}
-
                   <div className="flex justify-end space-x-4 pt-4">
                     <button
                       onClick={handleCancel}
@@ -453,33 +358,6 @@ const TravelerProfile: React.FC = () => {
                       <div className="flex items-center p-3 bg-gray-50 rounded-md">
                         <Mail className="h-4 w-4 text-gray-400 mr-2" />
                         <span>{profile.email}</span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
-                        Tipo de Viajero
-                      </label>
-                      <div className="flex items-center p-3 bg-gray-50 rounded-md">
-                        <Globe className="h-4 w-4 text-gray-400 mr-2" />
-                        <span>
-                          {profile.is_foreign_traveler ? 'Viajero Internacional' : 'Viajero Nacional'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-1">
-                        {profile.is_foreign_traveler ? 'Número de Pasaporte' : 'CURP'}
-                      </label>
-                      <div className="flex items-center p-3 bg-gray-50 rounded-md">
-                        <CreditCard className="h-4 w-4 text-gray-400 mr-2" />
-                        <span className="font-mono text-sm">
-                          {profile.is_foreign_traveler 
-                            ? (profile.passport_number || 'No especificado')
-                            : (profile.curp ? formatCurp(profile.curp) : 'No especificado')
-                          }
-                        </span>
                       </div>
                     </div>
 
@@ -589,47 +467,6 @@ const TravelerProfile: React.FC = () => {
                 </div>
               </div>
             </div>
-
-            {/* Información de Identificación */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Identificación
-              </h2>
-              <div className="space-y-3">
-                <div className="flex items-center">
-                  <Globe className="h-4 w-4 text-gray-400 mr-3" />
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">Tipo de Viajero</div>
-                    <div className="text-sm text-gray-600">
-                      {profile.is_foreign_traveler ? 'Internacional' : 'Nacional (México)'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center">
-                  <CreditCard className="h-4 w-4 text-gray-400 mr-3" />
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">
-                      {profile.is_foreign_traveler ? 'Pasaporte' : 'CURP'}
-                    </div>
-                    <div className="text-sm text-gray-600 font-mono">
-                      {profile.is_foreign_traveler 
-                        ? (profile.passport_number || 'No especificado')
-                        : (profile.curp ? formatCurp(profile.curp) : 'No especificado')
-                      }
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {(!profile.curp && !profile.passport_number) && (
-                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                  <p className="text-sm text-yellow-800">
-                    <strong>Acción requerida:</strong> Completa tu información de identificación para poder realizar reservas.
-                  </p>
-                </div>
-              )}
-            </div>
           </div>
         </div>
 
@@ -645,7 +482,6 @@ const TravelerProfile: React.FC = () => {
                 <li>• Tus datos están protegidos con encriptación SSL</li>
                 <li>• Solo tú y las agencias con las que reserves pueden ver tu información</li>
                 <li>• Puedes actualizar tu información en cualquier momento</li>
-                <li>• Tu CURP/Pasaporte se usa solo para verificación de identidad</li>
               </ul>
             </div>
             <div>

@@ -13,9 +13,7 @@ const SignupPage: React.FC = () => {
     lastName: '',
     email: '',
     password: '',
-    confirmPassword: '',
-    curp: '',
-    passportNumber: ''
+    confirmPassword: ''
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -31,7 +29,7 @@ const SignupPage: React.FC = () => {
     setIsLoading(true);
     setError('');
 
-    const { email, password, confirmPassword, firstName, lastName, curp, passportNumber } = formData;
+    const { email, password, confirmPassword, firstName, lastName } = formData;
 
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden');
@@ -39,20 +37,6 @@ const SignupPage: React.FC = () => {
       return;
     }
 
-    // Validate CURP or passport based on traveler type
-    if (!isForeignTraveler) {
-      if (!curp || curp.trim().length !== 18) {
-        setError('El CURP debe tener exactamente 18 caracteres');
-        setIsLoading(false);
-        return;
-      }
-    } else {
-      if (!passportNumber || passportNumber.trim().length < 6) {
-        setError('El número de pasaporte debe tener al menos 6 caracteres');
-        setIsLoading(false);
-        return;
-      }
-    }
     try {
       console.log('🚀 Iniciando registro de viajero...');
       
@@ -62,10 +46,7 @@ const SignupPage: React.FC = () => {
         UserRole.TRAVELER,
         { 
           first_name: firstName, 
-          last_name: lastName,
-          is_foreign_traveler: isForeignTraveler,
-          curp: isForeignTraveler ? null : curp.trim().toUpperCase(),
-          passport_number: isForeignTraveler ? passportNumber.trim().toUpperCase() : null
+          last_name: lastName
         }
       );
       
@@ -174,71 +155,6 @@ const SignupPage: React.FC = () => {
                 />
               </div>
             </div>
-
-            <div>
-              <div className="flex items-center mb-3">
-                <input
-                  id="isForeignTraveler"
-                  name="isForeignTraveler"
-                  type="checkbox"
-                  checked={isForeignTraveler}
-                  onChange={(e) => setIsForeignTraveler(e.target.checked)}
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                />
-                <label htmlFor="isForeignTraveler" className="ml-2 block text-sm text-gray-900">
-                  Soy viajero extranjero
-                </label>
-              </div>
-            </div>
-
-            {!isForeignTraveler ? (
-              <div>
-                <label htmlFor="curp" className="block text-sm font-medium text-gray-700">
-                  CURP *
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="curp"
-                    name="curp"
-                    type="text"
-                    maxLength={18}
-                    value={formData.curp}
-                    onChange={(e) => {
-                      const upperValue = e.target.value.toUpperCase();
-                      setFormData(prev => ({ ...prev, curp: upperValue }));
-                    }}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                    placeholder="ABCD123456HEFGHI01"
-                    required={!isForeignTraveler}
-                  />
-                </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  Clave Única de Registro de Población (18 caracteres)
-                </p>
-              </div>
-            ) : (
-              <div>
-                <label htmlFor="passportNumber" className="block text-sm font-medium text-gray-700">
-                  Número de Pasaporte *
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="passportNumber"
-                    name="passportNumber"
-                    type="text"
-                    maxLength={20}
-                    value={formData.passportNumber}
-                    onChange={handleInputChange}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                    placeholder="A12345678"
-                    required={isForeignTraveler}
-                  />
-                </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  Número de pasaporte válido de tu país de origen
-                </p>
-              </div>
-            )}
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
