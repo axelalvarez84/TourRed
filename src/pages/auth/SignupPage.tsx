@@ -13,7 +13,10 @@ const SignupPage: React.FC = () => {
     lastName: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    phoneNumber: '',
+    curp: '',
+    passportNumber: ''
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -29,7 +32,7 @@ const SignupPage: React.FC = () => {
     setIsLoading(true);
     setError('');
 
-    const { email, password, confirmPassword, firstName, lastName } = formData;
+    const { email, password, confirmPassword, firstName, lastName, phoneNumber, curp, passportNumber } = formData;
 
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden');
@@ -37,16 +40,44 @@ const SignupPage: React.FC = () => {
       return;
     }
 
+    if (!phoneNumber.trim()) {
+      setError('El número de celular es requerido');
+      setIsLoading(false);
+      return;
+    }
+
+    if (isForeignTraveler && !passportNumber.trim()) {
+      setError('El número de pasaporte es requerido para viajeros extranjeros');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!isForeignTraveler && !curp.trim()) {
+      setError('La CURP es requerida para viajeros nacionales');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!isForeignTraveler && curp.length !== 18) {
+      setError('La CURP debe tener 18 caracteres');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       console.log('🚀 Iniciando registro de viajero...');
-      
+
       const { data, error, profileData, isExistingUser } = await signUp(
-        email, 
-        password, 
+        email,
+        password,
         UserRole.TRAVELER,
-        { 
-          first_name: firstName, 
-          last_name: lastName
+        {
+          first_name: firstName,
+          last_name: lastName,
+          phone_number: phoneNumber,
+          curp: isForeignTraveler ? null : curp,
+          passport_number: isForeignTraveler ? passportNumber : null,
+          is_foreign_traveler: isForeignTraveler
         }
       );
       
@@ -154,6 +185,87 @@ const SignupPage: React.FC = () => {
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                 />
               </div>
+            </div>
+
+            <div>
+              <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
+                Número de celular
+              </label>
+              <div className="mt-1">
+                <input
+                  id="phoneNumber"
+                  name="phoneNumber"
+                  type="tel"
+                  value={formData.phoneNumber}
+                  onChange={handleInputChange}
+                  placeholder="Ej: +52 55 1234 5678"
+                  required
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center space-x-4">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={!isForeignTraveler}
+                    onChange={() => setIsForeignTraveler(false)}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                  />
+                  <span className="ml-2 text-sm font-medium text-gray-700">Viajero Nacional</span>
+                </label>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={isForeignTraveler}
+                    onChange={() => setIsForeignTraveler(true)}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                  />
+                  <span className="ml-2 text-sm font-medium text-gray-700">Viajero Extranjero</span>
+                </label>
+              </div>
+
+              {!isForeignTraveler ? (
+                <div>
+                  <label htmlFor="curp" className="block text-sm font-medium text-gray-700">
+                    CURP
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="curp"
+                      name="curp"
+                      type="text"
+                      value={formData.curp}
+                      onChange={handleInputChange}
+                      placeholder="Ej: ABCD123456HDFRRL09"
+                      maxLength={18}
+                      required
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm uppercase"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">18 caracteres alfanuméricos</p>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label htmlFor="passportNumber" className="block text-sm font-medium text-gray-700">
+                    Número de Pasaporte
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="passportNumber"
+                      name="passportNumber"
+                      type="text"
+                      value={formData.passportNumber}
+                      onChange={handleInputChange}
+                      placeholder="Ej: A12345678"
+                      required
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm uppercase"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
