@@ -14,6 +14,9 @@ interface TravelerProfile {
   curp?: string;
   passport_number?: string;
   is_foreign_traveler?: boolean;
+  phone_number?: string;
+  date_of_birth?: string;
+  address?: string;
   booking_count?: number;
   total_spent?: number;
 }
@@ -29,7 +32,12 @@ const TravelerProfile: React.FC = () => {
 
   const [editForm, setEditForm] = useState({
     first_name: '',
-    last_name: ''
+    last_name: '',
+    phone_number: '',
+    date_of_birth: '',
+    address: '',
+    curp: '',
+    passport_number: ''
   });
 
   useEffect(() => {
@@ -90,7 +98,12 @@ const TravelerProfile: React.FC = () => {
       // Inicializar formulario de edición
       setEditForm({
         first_name: profileData.first_name || '',
-        last_name: profileData.last_name || ''
+        last_name: profileData.last_name || '',
+        phone_number: profileData.phone_number || '',
+        date_of_birth: profileData.date_of_birth || '',
+        address: profileData.address || '',
+        curp: profileData.curp || '',
+        passport_number: profileData.passport_number || ''
       });
 
     } catch (err: any) {
@@ -114,6 +127,11 @@ const TravelerProfile: React.FC = () => {
       const updateData: any = {
         first_name: editForm.first_name?.trim() || null,
         last_name: editForm.last_name?.trim() || null,
+        phone_number: editForm.phone_number?.trim() || null,
+        date_of_birth: editForm.date_of_birth || null,
+        address: editForm.address?.trim() || null,
+        curp: profile?.is_foreign_traveler ? null : (editForm.curp?.trim() || null),
+        passport_number: profile?.is_foreign_traveler ? (editForm.passport_number?.trim() || null) : null,
         updated_at: new Date().toISOString()
       };
 
@@ -146,7 +164,12 @@ const TravelerProfile: React.FC = () => {
 
     setEditForm({
       first_name: profile.first_name || '',
-      last_name: profile.last_name || ''
+      last_name: profile.last_name || '',
+      phone_number: profile.phone_number || '',
+      date_of_birth: profile.date_of_birth || '',
+      address: profile.address || '',
+      curp: profile.curp || '',
+      passport_number: profile.passport_number || ''
     });
     setIsEditing(false);
     setError('');
@@ -312,6 +335,73 @@ const TravelerProfile: React.FC = () => {
                         placeholder="Tu apellido"
                       />
                     </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Número de Celular
+                      </label>
+                      <input
+                        type="tel"
+                        value={editForm.phone_number}
+                        onChange={(e) => setEditForm({...editForm, phone_number: e.target.value})}
+                        className="input"
+                        placeholder="+52 55 1234 5678"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Fecha de Nacimiento
+                      </label>
+                      <input
+                        type="date"
+                        value={editForm.date_of_birth}
+                        onChange={(e) => setEditForm({...editForm, date_of_birth: e.target.value})}
+                        className="input"
+                      />
+                    </div>
+
+                    {profile?.is_foreign_traveler ? (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Número de Pasaporte
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.passport_number}
+                          onChange={(e) => setEditForm({...editForm, passport_number: e.target.value.toUpperCase()})}
+                          className="input uppercase"
+                          placeholder="A12345678"
+                        />
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          CURP
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.curp}
+                          onChange={(e) => setEditForm({...editForm, curp: e.target.value.toUpperCase()})}
+                          className="input uppercase"
+                          placeholder="ABCD123456HDFRRL09"
+                          maxLength={18}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Domicilio
+                    </label>
+                    <textarea
+                      value={editForm.address}
+                      onChange={(e) => setEditForm({...editForm, address: e.target.value})}
+                      className="input"
+                      placeholder="Calle, número, colonia, ciudad, estado, código postal"
+                      rows={3}
+                    />
                   </div>
 
                   <div className="flex justify-end space-x-4 pt-4">
@@ -358,6 +448,76 @@ const TravelerProfile: React.FC = () => {
                       <div className="flex items-center p-3 bg-gray-50 rounded-md">
                         <Mail className="h-4 w-4 text-gray-400 mr-2" />
                         <span>{profile.email}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        Número de Celular
+                      </label>
+                      <div className="flex items-center p-3 bg-gray-50 rounded-md">
+                        <Phone className="h-4 w-4 text-gray-400 mr-2" />
+                        <span>{profile.phone_number || 'No especificado'}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        Fecha de Nacimiento
+                      </label>
+                      <div className="flex items-center p-3 bg-gray-50 rounded-md">
+                        <Calendar className="h-4 w-4 text-gray-400 mr-2" />
+                        <span>
+                          {profile.date_of_birth
+                            ? new Date(profile.date_of_birth).toLocaleDateString('es-ES', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })
+                            : 'No especificado'
+                          }
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        {profile.is_foreign_traveler ? 'Número de Pasaporte' : 'CURP'}
+                      </label>
+                      <div className="flex items-center p-3 bg-gray-50 rounded-md">
+                        {profile.is_foreign_traveler ? (
+                          <Globe className="h-4 w-4 text-gray-400 mr-2" />
+                        ) : (
+                          <CreditCard className="h-4 w-4 text-gray-400 mr-2" />
+                        )}
+                        <span className="uppercase">
+                          {profile.is_foreign_traveler
+                            ? (profile.passport_number || 'No especificado')
+                            : (profile.curp || 'No especificado')
+                          }
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        Tipo de Viajero
+                      </label>
+                      <div className="flex items-center p-3 bg-gray-50 rounded-md">
+                        <Globe className="h-4 w-4 text-gray-400 mr-2" />
+                        <span>
+                          {profile.is_foreign_traveler ? 'Extranjero' : 'Nacional'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        Domicilio
+                      </label>
+                      <div className="flex items-start p-3 bg-gray-50 rounded-md">
+                        <MapPin className="h-4 w-4 text-gray-400 mr-2 mt-0.5" />
+                        <span>{profile.address || 'No especificado'}</span>
                       </div>
                     </div>
 

@@ -16,10 +16,12 @@ const SignupPage: React.FC = () => {
     confirmPassword: '',
     phoneNumber: '',
     curp: '',
-    passportNumber: ''
+    passportNumber: '',
+    dateOfBirth: '',
+    address: ''
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -32,7 +34,7 @@ const SignupPage: React.FC = () => {
     setIsLoading(true);
     setError('');
 
-    const { email, password, confirmPassword, firstName, lastName, phoneNumber, curp, passportNumber } = formData;
+    const { email, password, confirmPassword, firstName, lastName, phoneNumber, curp, passportNumber, dateOfBirth, address } = formData;
 
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden');
@@ -77,7 +79,9 @@ const SignupPage: React.FC = () => {
           phone_number: phoneNumber,
           curp: isForeignTraveler ? null : curp,
           passport_number: isForeignTraveler ? passportNumber : null,
-          is_foreign_traveler: isForeignTraveler
+          is_foreign_traveler: isForeignTraveler,
+          date_of_birth: dateOfBirth || null,
+          address: address || null
         }
       );
       
@@ -266,6 +270,41 @@ const SignupPage: React.FC = () => {
                   </div>
                 </div>
               )}
+            </div>
+
+            <div>
+              <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700">
+                Fecha de Nacimiento
+              </label>
+              <div className="mt-1">
+                <input
+                  id="dateOfBirth"
+                  name="dateOfBirth"
+                  type="date"
+                  value={formData.dateOfBirth}
+                  onChange={handleInputChange}
+                  required
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="address" className="block text-sm font-medium text-gray-700">
+                Domicilio
+              </label>
+              <div className="mt-1">
+                <textarea
+                  id="address"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  placeholder="Calle, número, colonia, ciudad, estado, código postal"
+                  required
+                  rows={3}
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                />
+              </div>
             </div>
 
             <div>
