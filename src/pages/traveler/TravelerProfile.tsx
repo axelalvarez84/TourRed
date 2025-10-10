@@ -469,11 +469,15 @@ const TravelerProfile: React.FC = () => {
                         <Calendar className="h-4 w-4 text-gray-400 mr-2" />
                         <span>
                           {profile.date_of_birth
-                            ? new Date(profile.date_of_birth).toLocaleDateString('es-ES', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric'
-                              })
+                            ? (() => {
+                                const [year, month, day] = profile.date_of_birth.split('-');
+                                const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                                return date.toLocaleDateString('es-ES', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric'
+                                });
+                              })()
                             : 'No especificado'
                           }
                         </span>
