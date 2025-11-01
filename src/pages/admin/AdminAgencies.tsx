@@ -172,8 +172,14 @@ const AdminAgencies: React.FC = () => {
       setIsUpdating(selectedAgency.id);
       setError('');
 
+      console.log('🔄 Actualizando agencia:', {
+        id: selectedAgency.id,
+        commission_rate: editForm.commission_rate,
+        commission_percentage: (editForm.commission_rate * 100).toFixed(1)
+      });
+
       // Actualizar datos de la agencia
-      const { error: agencyError } = await supabase
+      const { data: updateData, error: agencyError } = await supabase
         .from('agencies')
         .update({
           name: editForm.name,
@@ -191,11 +197,14 @@ const AdminAgencies: React.FC = () => {
           titular_cuenta: editForm.titular_cuenta || null,
           updated_at: new Date().toISOString()
         })
-        .eq('id', selectedAgency.id);
+        .eq('id', selectedAgency.id)
+        .select();
 
       if (agencyError) {
         throw new Error(`Error actualizando agencia: ${agencyError.message}`);
       }
+
+      console.log('✅ Agencia actualizada en BD:', updateData);
 
       // Actualizar datos del usuario propietario
       const { error: userError } = await supabase
