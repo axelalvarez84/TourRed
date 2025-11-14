@@ -25,7 +25,7 @@ const BookingSuccessPage: React.FC = () => {
   const fetchBookingDetails = async (bookingId: string) => {
     try {
       setIsLoading(true);
-      
+
       // Fetch booking with tour details
       const { data: bookingData, error: bookingError } = await supabase
         .from('bookings')
@@ -51,14 +51,15 @@ const BookingSuccessPage: React.FC = () => {
       setBooking(bookingData);
       setTour(bookingData.tours);
 
-      // Update booking status to confirmed if payment was successful
-      if (bookingData.payment_status === 'processing') {
+      // Update booking status to confirmed if payment was pending
+      if (bookingData.payment_status === 'pending' || bookingData.payment_status === 'processing') {
         const { error: updateError } = await supabase
-          .rpc('update_booking_payment_status', {
-            p_booking_id: bookingId,
-            p_status: 'confirmed',
-            p_payment_status: 'succeeded'
-          });
+          .from('bookings')
+          .update({
+            payment_status: 'paid',
+            status: 'confirmed'
+          })
+          .eq('id', bookingId);
 
         if (updateError) {
           console.error('Error updating booking status:', updateError);

@@ -2,17 +2,45 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle, ArrowRight, Home, CreditCard } from 'lucide-react';
 import { getProductById } from '../stripe-config';
+import { supabase } from '../lib/supabase';
 
 const SuccessPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [product, setProduct] = useState<any>(null);
+  const [isUpdating, setIsUpdating] = useState(true);
 
   useEffect(() => {
-    const productId = searchParams.get('product');
-    if (productId) {
-      const foundProduct = getProductById(productId);
-      setProduct(foundProduct);
-    }
+    const updateBookingStatus = async () => {
+      try {
+        const bookingId = searchParams.get('booking_id');
+        const productId = searchParams.get('product');
+
+        if (productId) {
+          const foundProduct = getProductById(productId);
+          setProduct(foundProduct);
+        }
+
+        if (bookingId) {
+          const { error } = await supabase
+            .from('bookings')
+            .update({
+              payment_status: 'paid',
+              status: 'confirmed'
+            })
+            .eq('id', bookingId);
+
+          if (error) {
+            console.error('Error updating booking:', error);
+          }
+        }
+      } catch (err) {
+        console.error('Error in success page:', err);
+      } finally {
+        setIsUpdating(false);
+      }
+    };
+
+    updateBookingStatus();
   }, [searchParams]);
 
   return (
