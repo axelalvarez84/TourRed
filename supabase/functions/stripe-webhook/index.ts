@@ -72,7 +72,7 @@ serve(async (req) => {
         const { error: bookingError } = await supabase
           .from('bookings')
           .update({
-            payment_status: 'succeeded',
+            payment_status: 'paid',
             payment_intent_id: session.payment_intent,
             paid_at: new Date().toISOString(),
             status: 'confirmed'
@@ -81,6 +81,8 @@ serve(async (req) => {
 
         if (bookingError) {
           console.error(`Error updating booking: ${bookingError.message}`);
+        } else {
+          console.log(`Successfully updated booking ${bookingId} to paid status`);
         }
 
         // Create a payment transaction record
@@ -111,7 +113,7 @@ serve(async (req) => {
             amount_subtotal: session.amount_subtotal / 100, // Convert from cents
             amount_total: session.amount_total / 100, // Convert from cents
             currency: session.currency,
-            payment_status: 'succeeded',
+            payment_status: 'paid',
             status: 'completed'
           })
           .on_conflict(['checkout_session_id'])
