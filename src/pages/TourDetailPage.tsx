@@ -177,33 +177,36 @@ const TourDetailPage: React.FC = () => {
   // Helper function to format dates consistently
   const formatDate = (dateString: string) => {
     try {
-      // Parse the date from database format (YYYY-MM-DD)
-      const date = parseDateFromDB(dateString);
-      return format(date, 'MMM d, yyyy');
+      // Parse the date string in YYYY-MM-DD format
+      const [year, month, day] = dateString.split('-').map(Number);
+      // Create date at midnight UTC
+      const date = new Date(Date.UTC(year, month - 1, day));
+      // Format using UTC to avoid timezone conversion
+      const monthName = date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+      const dayNum = date.toLocaleString('en-US', { day: 'numeric', timeZone: 'UTC' });
+      const yearNum = date.toLocaleString('en-US', { year: 'numeric', timeZone: 'UTC' });
+      return `${monthName} ${dayNum}, ${yearNum}`;
     } catch (error) {
       console.error('Error formatting date:', dateString, error);
-      // Fallback to original format
-      return format(new Date(dateString), 'MMM d, yyyy');
+      return dateString;
     }
   };
 
   const calculateDuration = () => {
     try {
-      const start = parseDateFromDB(tour.start_date);
-      const end = parseDateFromDB(tour.end_date);
+      // Parse dates in UTC
+      const [startYear, startMonth, startDay] = tour.start_date.split('-').map(Number);
+      const [endYear, endMonth, endDay] = tour.end_date.split('-').map(Number);
+
+      const start = new Date(Date.UTC(startYear, startMonth - 1, startDay));
+      const end = new Date(Date.UTC(endYear, endMonth - 1, endDay));
       const diffTime = Math.abs(end.getTime() - start.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      // Si es el mismo día, mostrar 1 día
+
       return diffDays === 0 ? 1 : diffDays + 1;
     } catch (error) {
       console.error('Error calculating duration:', error);
-      // Fallback calculation
-      const start = new Date(tour.start_date);
-      const end = new Date(tour.end_date);
-      const diffTime = Math.abs(end.getTime() - start.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays === 0 ? 1 : diffDays + 1;
+      return 1;
     }
   };
 

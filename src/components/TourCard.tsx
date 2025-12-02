@@ -2,8 +2,6 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Calendar, Star, Users } from 'lucide-react';
 import { Tour } from '../types';
-import { parseDateFromDB } from '../lib/supabase';
-import { format } from 'date-fns';
 
 interface TourCardProps {
   tour: Tour;
@@ -14,13 +12,18 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '' }) => {
   // Helper function to format dates consistently
   const formatDate = (dateString: string) => {
     try {
-      // Parse the date from database format (YYYY-MM-DD)
-      const date = parseDateFromDB(dateString);
-      return format(date, 'MMM d, yyyy');
+      // Parse the date string in YYYY-MM-DD format
+      const [year, month, day] = dateString.split('-').map(Number);
+      // Create date at midnight UTC
+      const date = new Date(Date.UTC(year, month - 1, day));
+      // Format using UTC to avoid timezone conversion
+      const monthName = date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+      const dayNum = date.toLocaleString('en-US', { day: 'numeric', timeZone: 'UTC' });
+      const yearNum = date.toLocaleString('en-US', { year: 'numeric', timeZone: 'UTC' });
+      return `${monthName} ${dayNum}, ${yearNum}`;
     } catch (error) {
       console.error('Error formatting date:', dateString, error);
-      // Fallback to original format
-      return format(new Date(dateString), 'MMM d, yyyy');
+      return dateString;
     }
   };
 

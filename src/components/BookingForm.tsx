@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings } from 'lucide-react';
 import { Tour } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { createBooking, parseDateFromDB, formatDateForDB, supabase } from '../lib/supabase';
-import { format } from 'date-fns';
+import { createBooking, formatDateForDB, supabase } from '../lib/supabase';
 
 interface BookingFormProps {
   tour: Tour;
@@ -20,11 +19,15 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
   const formatDate = (dateString: string) => {
     try {
-      const date = parseDateFromDB(dateString);
-      return format(date, 'MMM d, yyyy');
+      const [year, month, day] = dateString.split('-').map(Number);
+      const date = new Date(Date.UTC(year, month - 1, day));
+      const monthName = date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+      const dayNum = date.toLocaleString('en-US', { day: 'numeric', timeZone: 'UTC' });
+      const yearNum = date.toLocaleString('en-US', { year: 'numeric', timeZone: 'UTC' });
+      return `${monthName} ${dayNum}, ${yearNum}`;
     } catch (error) {
       console.error('Error formatting date:', dateString, error);
-      return format(new Date(dateString), 'MMM d, yyyy');
+      return dateString;
     }
   };
 
