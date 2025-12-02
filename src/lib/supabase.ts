@@ -21,7 +21,10 @@ export const formatDateForDB = (date: Date): string => {
 };
 
 export const parseDateFromDB = (dateString: string): Date => {
-  return parse(dateString, 'yyyy-MM-dd', new Date());
+  // Parse the date string and set it to midnight UTC
+  const [year, month, day] = dateString.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date;
 };
 
 // Auth functions
