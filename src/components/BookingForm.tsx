@@ -31,18 +31,35 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     }
   };
 
+  const isBookingDeadlinePassed = () => {
+    if (!tour.booking_deadline) return false;
+
+    try {
+      const deadline = new Date(tour.booking_deadline);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      return deadline < today;
+    } catch (error) {
+      console.error('Error checking booking deadline:', error);
+      return false;
+    }
+  };
+
+  const bookingDeadlinePassed = isBookingDeadlinePassed();
+
   // Cálculos de precios y comisiones
   const totalPrice = tour.price * travelersCount;
   const depositAmount = totalPrice * (tour.deposit_percentage / 100);
-  
+
   // Comisiones según el esquema solicitado
   const agencyCommission = totalPrice * 0.10; // 10% del costo total para la agencia
   const serviceCharge = totalPrice * 0.03; // 3% del costo total como cargo por servicio
   const platformRevenue = agencyCommission + serviceCharge; // Total que va a la plataforma (13%)
-  
+
   // Lo que paga el usuario: depósito + cargo por servicio
   const userPayment = depositAmount + serviceCharge;
-  
+
   // Lo que recibe la agencia: depósito - comisión de agencia
   const agencyReceives = depositAmount - agencyCommission;
 
@@ -309,6 +326,18 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           </div>
         </div>
         
+        {bookingDeadlinePassed && (
+          <div className="mb-4 bg-red-50 text-red-700 p-4 rounded-md text-sm border border-red-200">
+            <div className="flex items-start">
+              <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
+              <div>
+                <span className="font-semibold">YA NO ES POSIBLE RESERVAR</span>
+                <p className="mt-1 text-xs">La fecha límite de reserva para este tour fue el {formatDate(tour.booking_deadline)}. Las reservas ya no están disponibles.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="mb-4 bg-error-50 text-error-700 p-3 rounded-md text-sm">
             <div className="flex items-start">
@@ -328,23 +357,29 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
             </div>
           </div>
         )}
-        
-        <button
-          type="submit"
-          className="w-full btn btn-primary py-3 flex items-center justify-center"
-          disabled={isSubmitting || !user}
-        >
-          {user ? (
-            tour.booking_approval_type === 'manual' 
-              ? 'Solicitar Reserva (Sin Cargo)' 
-              : `Proceder al Pago - $${userPayment.toLocaleString()} MXN`
-          ) : 'Inicia Sesión para Reservar'}
-          {isSubmitting ? (
-            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white ml-2"></div>
-          ) : (
-            <CreditCard className="h-5 w-5 ml-2" />
-          )}
-        </button>
+
+        {bookingDeadlinePassed ? (
+          <div className="w-full py-3 px-4 bg-gray-100 text-gray-500 rounded-md text-center font-medium cursor-not-allowed">
+            Reservas Cerradas
+          </div>
+        ) : (
+          <button
+            type="submit"
+            className="w-full btn btn-primary py-3 flex items-center justify-center"
+            disabled={isSubmitting || !user}
+          >
+            {user ? (
+              tour.booking_approval_type === 'manual'
+                ? 'Solicitar Reserva (Sin Cargo)'
+                : `Proceder al Pago - $${userPayment.toLocaleString()} MXN`
+            ) : 'Inicia Sesión para Reservar'}
+            {isSubmitting ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white ml-2"></div>
+            ) : (
+              <CreditCard className="h-5 w-5 ml-2" />
+            )}
+          </button>
+        )}
         
         <p className="text-xs text-gray-500 text-center mt-3">
           <DollarSign className="h-3 w-3 inline mr-1" />
