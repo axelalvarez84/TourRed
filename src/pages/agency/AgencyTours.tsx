@@ -413,12 +413,21 @@ const AgencyTours: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     try {
-      const [year, month, day] = dateString.split('-').map(Number);
-      const date = new Date(Date.UTC(year, month - 1, day));
-      const monthName = date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
-      const dayNum = date.toLocaleString('en-US', { day: 'numeric', timeZone: 'UTC' });
-      const yearNum = date.toLocaleString('en-US', { year: 'numeric', timeZone: 'UTC' });
-      return `${monthName} ${dayNum}, ${yearNum}`;
+      if (dateString.includes(' ') || dateString.includes('T')) {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) throw new Error('Invalid date');
+        const monthName = date.toLocaleString('en-US', { month: 'short' });
+        const dayNum = date.toLocaleString('en-US', { day: 'numeric' });
+        const yearNum = date.toLocaleString('en-US', { year: 'numeric' });
+        return `${monthName} ${dayNum}, ${yearNum}`;
+      } else {
+        const [year, month, day] = dateString.split('-').map(Number);
+        const date = new Date(Date.UTC(year, month - 1, day));
+        const monthName = date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+        const dayNum = date.toLocaleString('en-US', { day: 'numeric', timeZone: 'UTC' });
+        const yearNum = date.toLocaleString('en-US', { year: 'numeric', timeZone: 'UTC' });
+        return `${monthName} ${dayNum}, ${yearNum}`;
+      }
     } catch (error) {
       console.error('Error formatting date:', dateString, error);
       return dateString;
