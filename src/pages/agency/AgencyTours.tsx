@@ -412,7 +412,17 @@ const AgencyTours: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'MMM d, yyyy');
+    try {
+      const [year, month, day] = dateString.split('-').map(Number);
+      const date = new Date(Date.UTC(year, month - 1, day));
+      const monthName = date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+      const dayNum = date.toLocaleString('en-US', { day: 'numeric', timeZone: 'UTC' });
+      const yearNum = date.toLocaleString('en-US', { year: 'numeric', timeZone: 'UTC' });
+      return `${monthName} ${dayNum}, ${yearNum}`;
+    } catch (error) {
+      console.error('Error formatting date:', dateString, error);
+      return dateString;
+    }
   };
 
   const getCategoryName = (category: string) => {
