@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination } from '../../lib/supabase';
-import { Plus, Search, X, Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload } from 'lucide-react';
+import { Plus, Search, X, Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy } from 'lucide-react';
 import { Tour, Destination } from '../../types';
 import { format } from 'date-fns';
 import ImageUploader from '../../components/ImageUploader';
@@ -19,6 +19,13 @@ const AgencyTours: React.FC = () => {
   const [allAvailableDestinations, setAllAvailableDestinations] = useState<Destination[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [editingTour, setEditingTour] = useState<Tour | null>(null);
+  const [duplicatingTour, setDuplicatingTour] = useState<Tour | null>(null);
+  const [duplicateFormData, setDuplicateFormData] = useState({
+    name: '',
+    start_date: '',
+    end_date: '',
+    booking_deadline: '',
+  });
 
   const [formData, setFormData] = useState({
     name: '',
@@ -201,7 +208,7 @@ const AgencyTours: React.FC = () => {
 
     try {
       setIsSubmitting(true);
-      
+
       const { error } = await deleteTour(tourId);
       if (error) throw error;
 
@@ -209,6 +216,84 @@ const AgencyTours: React.FC = () => {
       console.log('✅ Tour eliminado correctamente');
     } catch (err: any) {
       setError(err.message || 'Error al eliminar el tour');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDuplicate = (tour: Tour) => {
+    setDuplicatingTour(tour);
+    setDuplicateFormData({
+      name: `${tour.name} (Copia)`,
+      start_date: tour.start_date,
+      end_date: tour.end_date,
+      booking_deadline: tour.booking_deadline || '',
+    });
+  };
+
+  const handleDuplicateCancel = () => {
+    setDuplicatingTour(null);
+    setDuplicateFormData({
+      name: '',
+      start_date: '',
+      end_date: '',
+      booking_deadline: '',
+    });
+  };
+
+  const handleDuplicateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!duplicatingTour || !user?.id) return;
+
+    try {
+      setIsSubmitting(true);
+      setError('');
+
+      // Calcular fecha límite por defecto si no se especifica
+      let bookingDeadline = duplicateFormData.booking_deadline;
+      if (!bookingDeadline && duplicateFormData.start_date) {
+        const deadline = new Date(duplicateFormData.start_date);
+        deadline.setDate(deadline.getDate() - 14);
+        bookingDeadline = deadline.toISOString().split('T')[0];
+      }
+
+      const tourData = {
+        name: duplicateFormData.name,
+        category: duplicatingTour.category,
+        description: duplicatingTour.description,
+        itinerary: duplicatingTour.itinerary,
+        price: duplicatingTour.price,
+        deposit_percentage: duplicatingTour.deposit_percentage,
+        image_url: duplicatingTour.image_url,
+        start_date: duplicateFormData.start_date,
+        end_date: duplicateFormData.end_date,
+        max_travelers: duplicatingTour.max_travelers,
+        destination: duplicatingTour.destination,
+        includes: duplicatingTour.includes,
+        excludes: duplicatingTour.excludes,
+        booking_deadline: bookingDeadline,
+        booking_approval_type: duplicatingTour.booking_approval_type,
+      };
+
+      // Obtener la agencia ID
+      const { data: agencyData, error: agencyError } = await supabase
+        .from('agencies')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (agencyError) throw agencyError;
+
+      // Crear el nuevo tour
+      const { error } = await createTour(tourData, [], user.id);
+      if (error) throw error;
+
+      await fetchAgencyTours();
+      handleDuplicateCancel();
+      console.log('✅ Tour duplicado correctamente');
+    } catch (err: any) {
+      setError(err.message || 'Error al duplicar el tour');
     } finally {
       setIsSubmitting(false);
     }
@@ -888,6 +973,90 @@ const AgencyTours: React.FC = () => {
         </div>
       )}
 
+      {/* Modal de Duplicar Tour */}
+      {duplicatingTour && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
+            <h2 className="text-xl font-semibold mb-4">Duplicar Tour</h2>
+
+            <form onSubmit={handleDuplicateSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nombre del Tour *
+                </label>
+                <input
+                  type="text"
+                  value={duplicateFormData.name}
+                  onChange={(e) => setDuplicateFormData({ ...duplicateFormData, name: e.target.value })}
+                  className="input"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Fecha de Inicio *
+                </label>
+                <input
+                  type="date"
+                  value={duplicateFormData.start_date}
+                  onChange={(e) => setDuplicateFormData({ ...duplicateFormData, start_date: e.target.value })}
+                  className="input"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Fecha de Fin *
+                </label>
+                <input
+                  type="date"
+                  value={duplicateFormData.end_date}
+                  onChange={(e) => setDuplicateFormData({ ...duplicateFormData, end_date: e.target.value })}
+                  className="input"
+                  min={duplicateFormData.start_date}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Fecha Límite de Reserva
+                </label>
+                <input
+                  type="date"
+                  value={duplicateFormData.booking_deadline}
+                  onChange={(e) => setDuplicateFormData({ ...duplicateFormData, booking_deadline: e.target.value })}
+                  className="input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Si no se especifica, será 14 días antes del inicio
+                </p>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={handleDuplicateCancel}
+                  className="btn btn-outline"
+                  disabled={isSubmitting}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="btn btn-primary"
+                >
+                  {isSubmitting ? 'Duplicando...' : 'Duplicar Tour'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Lista de Tours */}
       {tours.length === 0 && !isLoading ? (
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
@@ -979,15 +1148,23 @@ const AgencyTours: React.FC = () => {
                       onClick={() => handleEdit(tour)}
                       className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
                       title="Editar tour"
-                      disabled={isSubmitting || isCreating || editingTour}
+                      disabled={isSubmitting || isCreating || editingTour || duplicatingTour}
                     >
                       <Edit className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDuplicate(tour)}
+                      className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
+                      title="Duplicar tour"
+                      disabled={isSubmitting || isCreating || editingTour || duplicatingTour}
+                    >
+                      <Copy className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(tour.id, tour.name)}
                       className="p-2 text-gray-400 hover:text-error-600 transition-colors"
                       title="Eliminar tour"
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || duplicatingTour}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
