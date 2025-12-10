@@ -210,40 +210,46 @@ export const getAllAgencies = async () => {
 export const getTours = async (filters: any = {}) => {
   try {
     console.log('🔍 Obteniendo tours con filtros:', filters);
-    
+
     let query = supabase
       .from('tours')
       .select(`
         *,
         agencies(id, name, rating)
       `);
-    
+
+    // Only show tours that haven't ended yet (unless explicitly disabled)
+    if (filters.includeExpired !== true) {
+      const today = formatDateForDB(new Date());
+      query = query.gte('end_date', today);
+    }
+
     // Apply filters
     if (filters.destination) {
       query = query.ilike('destination', `%${filters.destination}%`);
     }
-    
+
     if (filters.category) {
       query = query.eq('category', filters.category);
     }
-    
+
     if (filters.startDate) {
       query = query.gte('start_date', filters.startDate);
     }
-    
+
     if (filters.endDate) {
       query = query.lte('end_date', filters.endDate);
     }
-    
+
     if (filters.limit) {
       query = query.limit(filters.limit);
     }
-    
+
     // Order by featured first, then created_at
     query = query.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
-    
+
     const { data, error } = await query;
-    
+
     return { data, error };
   } catch (error: any) {
     console.error('❌ Error en getTours:', error);
