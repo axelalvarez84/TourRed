@@ -58,6 +58,21 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    if (booking.confirmation_email_sent) {
+      console.log("Emails de confirmación ya fueron enviados para esta reserva");
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Los emails de confirmación ya fueron enviados previamente",
+          already_sent: true
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const [emailSettingsResult, platformSettingsResult] = await Promise.all([
       supabase.from("email_settings").select("*").maybeSingle(),
       supabase.from("platform_settings").select("*").maybeSingle()
@@ -533,7 +548,7 @@ Deno.serve(async (req: Request) => {
       const emailPayload = {
         api_key: emailSettings.smtp_api_key,
         to: [email.to],
-        sender: "no-reply@toursred.com",
+        sender: "contacto@toursred.com",
         subject: email.subject,
         html_body: email.html,
       };
@@ -560,6 +575,15 @@ Deno.serve(async (req: Request) => {
     }
 
     const allSuccess = emailResults.every(r => r.success);
+
+    if (allSuccess) {
+      await supabase
+        .from("bookings")
+        .update({ confirmation_email_sent: true })
+        .eq("id", booking_id);
+      
+      console.log("Marked confirmation_email_sent as true for booking:", booking_id);
+    }
 
     return new Response(
       JSON.stringify({

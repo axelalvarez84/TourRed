@@ -12,7 +12,6 @@ const BookingSuccessPage: React.FC = () => {
   const [tour, setTour] = useState<Tour | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [emailsSent, setEmailsSent] = useState(false);
 
   useEffect(() => {
     const bookingId = searchParams.get('booking_id');
@@ -25,11 +24,6 @@ const BookingSuccessPage: React.FC = () => {
   }, [searchParams]);
 
   const sendBookingConfirmationEmails = async (bookingId: string) => {
-    if (emailsSent) {
-      console.log('Emails ya enviados, omitiendo...');
-      return;
-    }
-
     try {
       console.log('Iniciando envío de emails de confirmación para booking:', bookingId);
 
@@ -67,7 +61,6 @@ const BookingSuccessPage: React.FC = () => {
 
       if (result.success) {
         console.log('✅ Emails de confirmación enviados exitosamente:', result.results);
-        setEmailsSent(true);
       } else {
         console.error('❌ Error enviando emails de confirmación:', result);
       }
