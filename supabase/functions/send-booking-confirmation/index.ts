@@ -548,7 +548,10 @@ Deno.serve(async (req: Request) => {
       const emailPayload = {
         api_key: emailSettings.smtp_api_key,
         to: [email.to],
-        sender: "contacto@toursred.com",
+        from: {
+          name: "ToursRed",
+          email: emailSettings.contact_email
+        },
         subject: email.subject,
         html_body: email.html,
       };
