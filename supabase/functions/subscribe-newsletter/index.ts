@@ -1,0 +1,243 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.39.6";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+};
+
+interface SubscribeRequest {
+  email: string;
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders,
+    });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { email }: SubscribeRequest = await req.json();
+
+    if (!email) {
+      return new Response(
+        JSON.stringify({ error: "El email es requerido" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Validar formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return new Response(
+        JSON.stringify({ error: "El formato del email no es válido" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Verificar si el email ya existe
+    const { data: existingSubscription } = await supabase
+      .from("newsletter_subscriptions")
+      .select("email, active")
+      .eq("email", email.toLowerCase())
+      .maybeSingle();
+
+    if (existingSubscription) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Este email ya está suscrito a nuestro boletín",
+          already_subscribed: true 
+        }),
+        {
+          status: 409,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Insertar la suscripción
+    const { error: insertError } = await supabase
+      .from("newsletter_subscriptions")
+      .insert({
+        email: email.toLowerCase(),
+        active: true,
+      });
+
+    if (insertError) {
+      console.error("Error inserting subscription:", insertError);
+      throw new Error("Error al guardar la suscripción");
+    }
+
+    // Obtener configuración de email
+    const { data: emailSettings, error: settingsError } = await supabase
+      .from("email_settings")
+      .select("*")
+      .maybeSingle();
+
+    if (settingsError || !emailSettings) {
+      console.error("Error fetching email settings:", settingsError);
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: "Suscripción guardada pero no se pudo enviar el email de confirmación" 
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    if (!emailSettings.smtp_api_key) {
+      console.error("SMTP API key not configured");
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: "Suscripción guardada pero no se pudo enviar el email de confirmación" 
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Enviar email de confirmación
+    const textContent = `
+¡Bienvenido a ToursRed!
+
+Gracias por suscribirte a nuestro boletín. A partir de ahora recibirás las últimas novedades sobre destinos, ofertas especiales y consejos de viaje directamente en tu correo.
+
+Estamos emocionados de tenerte con nosotros y esperamos ayudarte a descubrir experiencias increíbles.
+
+¡Felices viajes!
+El equipo de ToursRed
+
+---
+Si no te suscribiste a este boletín, puedes ignorar este mensaje.
+    `;
+
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: #1e40af; color: white; padding: 30px 20px; text-align: center; }
+    .content { background-color: #f9fafb; padding: 30px 20px; border: 1px solid #e5e7eb; }
+    .welcome { font-size: 24px; font-weight: bold; color: #1e40af; margin-bottom: 20px; }
+    .message { margin-bottom: 20px; }
+    .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
+    .highlight { background-color: white; padding: 15px; border-left: 4px solid #1e40af; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>¡Bienvenido a ToursRed!</h1>
+    </div>
+    <div class="content">
+      <div class="welcome">¡Gracias por suscribirte!</div>
+      
+      <div class="message">
+        <p>Estamos emocionados de tenerte en nuestra comunidad de viajeros. A partir de ahora recibirás:</p>
+      </div>
+      
+      <div class="highlight">
+        <ul style="margin: 0; padding-left: 20px;">
+          <li>Las últimas novedades sobre destinos increíbles</li>
+          <li>Ofertas especiales y descuentos exclusivos</li>
+          <li>Consejos de viaje y recomendaciones</li>
+          <li>Historias inspiradoras de otros viajeros</li>
+        </ul>
+      </div>
+      
+      <div class="message">
+        <p>¡Prepárate para descubrir experiencias inolvidables!</p>
+        <p><strong>¡Felices viajes!</strong><br>El equipo de ToursRed</p>
+      </div>
+    </div>
+    <div class="footer">
+      <p>Si no te suscribiste a este boletín, puedes ignorar este mensaje.</p>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+
+    const emailPayload = {
+      api_key: emailSettings.smtp_api_key,
+      to: [email.toLowerCase()],
+      sender: `no-reply@toursred.com`,
+      subject: `¡Bienvenido al boletín de ToursRed!`,
+      text_body: textContent,
+      html_body: htmlContent,
+    };
+
+    console.log("Sending welcome email via SMTP2GO API...");
+
+    const response = await fetch("https://api.smtp2go.com/v3/email/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(emailPayload),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || result.data?.error) {
+      console.error("SMTP2GO API Error:", result);
+      // No lanzamos error, la suscripción ya está guardada
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: "¡Gracias por suscribirte! Sin embargo, hubo un problema al enviar el email de confirmación." 
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    console.log("Welcome email sent successfully:", result);
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: "¡Gracias por suscribirte! Revisa tu correo para confirmar tu suscripción." 
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    console.error("Error in newsletter subscription:", error);
+    return new Response(
+      JSON.stringify({ 
+        error: "Error al procesar la suscripción", 
+        details: error.message 
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
+});

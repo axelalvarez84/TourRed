@@ -1,8 +1,53 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Compass, Facebook, Instagram, Twitter, Mail, Phone } from 'lucide-react';
 
 const Footer: React.FC = () => {
+  const [email, setEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!email.trim()) {
+      setMessage({ type: 'error', text: 'Por favor ingresa tu email' });
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/subscribe-newsletter`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email: email.trim() }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage({ type: 'success', text: data.message || '¡Gracias por suscribirte!' });
+        setEmail('');
+      } else if (response.status === 409) {
+        setMessage({ type: 'error', text: 'Este email ya está suscrito a nuestro boletín' });
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Error al procesar la suscripción' });
+      }
+    } catch (error) {
+      console.error('Error subscribing to newsletter:', error);
+      setMessage({ type: 'error', text: 'Error de conexión. Intenta nuevamente.' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <footer className="bg-blue-900 text-white pt-12 pb-8">
       <div className="container-custom">
@@ -29,7 +74,7 @@ const Footer: React.FC = () => {
               </a>
             </div>
           </div>
-          
+
           <div>
             <h3 className="text-lg font-semibold mb-4">Enlaces Rápidos</h3>
             <ul className="space-y-2">
@@ -47,7 +92,7 @@ const Footer: React.FC = () => {
               </li>
             </ul>
           </div>
-          
+
           <div>
             <h3 className="text-lg font-semibold mb-4">Para Viajeros</h3>
             <ul className="space-y-2">
@@ -65,7 +110,7 @@ const Footer: React.FC = () => {
               </li>
             </ul>
           </div>
-          
+
           <div>
             <h3 className="text-lg font-semibold mb-4">Contáctanos</h3>
             <ul className="space-y-2">
@@ -84,16 +129,30 @@ const Footer: React.FC = () => {
             </ul>
             <div className="mt-4">
               <h4 className="text-sm font-semibold mb-2">Suscríbete a nuestro boletín</h4>
-              <div className="flex">
-                <input
-                  type="email"
-                  placeholder="Tu correo"
-                  className="px-3 py-2 rounded-l-md w-full text-gray-900 text-sm"
-                />
-                <button className="bg-primary-600 px-3 py-2 rounded-r-md text-white font-medium text-sm hover:bg-primary-700 transition-colors">
-                  Suscribirse
-                </button>
-              </div>
+              <form onSubmit={handleSubscribe}>
+                <div className="flex">
+                  <input
+                    type="email"
+                    placeholder="Tu correo"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
+                    className="px-3 py-2 rounded-l-md w-full text-gray-900 text-sm disabled:opacity-50"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="bg-primary-600 px-3 py-2 rounded-r-md text-white font-medium text-sm hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? 'Enviando...' : 'Suscribirse'}
+                  </button>
+                </div>
+                {message && (
+                  <p className={`text-xs mt-2 ${message.type === 'success' ? 'text-green-300' : 'text-red-300'}`}>
+                    {message.text}
+                  </p>
+                )}
+              </form>
             </div>
           </div>
         </div>
