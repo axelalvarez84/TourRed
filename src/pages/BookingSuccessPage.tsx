@@ -114,15 +114,14 @@ const BookingSuccessPage: React.FC = () => {
           console.error('User ID mismatch! Auth user:', user?.id, 'Booking user:', bookingData.user_id);
         }
 
-        const { data: updateData, error: updateError } = await supabase
+        const { error: updateError } = await supabase
           .from('bookings')
           .update({
             payment_status: 'succeeded',
             status: 'confirmed',
             paid_at: new Date().toISOString()
           })
-          .eq('id', bookingId)
-          .select();
+          .eq('id', bookingId);
 
         if (updateError) {
           console.error('Error updating booking status:', {
@@ -132,7 +131,7 @@ const BookingSuccessPage: React.FC = () => {
             code: updateError.code
           });
         } else {
-          console.log('Booking updated successfully:', updateData);
+          console.log('Booking updated successfully!');
           sendBookingConfirmationEmails(bookingId);
         }
       } else if (bookingData.payment_status === 'succeeded') {
