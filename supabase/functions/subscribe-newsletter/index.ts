@@ -144,7 +144,7 @@ Si no te suscribiste a este boletín, puedes ignorar este mensaje.
 <body>
   <div class="container">
     <div class="header">
-      <img src="https://www.toursred.com/logofinal.jpg" alt="ToursRed Logo" class="logo" />
+      <img src="https://www.toursred.com/logo.png" alt="ToursRed Logo" class="logo" />
       <h1 style="margin: 0; color: #1e40af;">¡Bienvenido a ToursRed!</h1>
     </div>
     <div class="content">
