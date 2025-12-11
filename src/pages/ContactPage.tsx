@@ -47,15 +47,15 @@ const ContactPage: React.FC = () => {
             <div className="space-y-4">
               <div className="flex items-center space-x-3">
                 <Mail className="w-5 h-5 text-primary-600" />
-                <span className="text-gray-600">soporte@tourred.com</span>
+                <span className="text-gray-600">contacto@toursred.com</span>
               </div>
               <div className="flex items-center space-x-3">
                 <Phone className="w-5 h-5 text-primary-600" />
-                <span className="text-gray-600">+52 (55) 1234-5678</span>
+                <span className="text-gray-600">+52 55 47127668</span>
               </div>
               <div className="flex items-center space-x-3">
                 <MapPin className="w-5 h-5 text-primary-600" />
-                <span className="text-gray-600">Calle Viajes 123, Ciudad de México</span>
+                <span className="text-gray-600">Av. Homero 229-501, Polanco</span>
               </div>
             </div>
           </div>

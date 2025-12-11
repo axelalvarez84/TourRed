@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Compass, Facebook, Instagram, Twitter, Mail, Phone } from 'lucide-react';
+import { Compass, Facebook, Instagram, Twitter, Mail, Phone, Music } from 'lucide-react';
 
 const Footer: React.FC = () => {
   return (
@@ -15,13 +15,16 @@ const Footer: React.FC = () => {
               Descubre destinos extraordinarios y experiencias inolvidables con nuestros socios de viaje de confianza.
             </p>
             <div className="flex space-x-4">
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
+              <a href="https://www.facebook.com/ToursRedMX" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
                 <Facebook className="h-5 w-5" />
               </a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
+              <a href="https://www.instagram.com/toursredmx" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
                 <Instagram className="h-5 w-5" />
               </a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
+              <a href="https://www.tiktok.com/@toursredmx" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
+                <Music className="h-5 w-5" />
+              </a>
+              <a href="https://x.com/ToursRedMX" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
                 <Twitter className="h-5 w-5" />
               </a>
             </div>
@@ -68,14 +71,14 @@ const Footer: React.FC = () => {
             <ul className="space-y-2">
               <li className="flex items-center">
                 <Mail className="h-5 w-5 text-gray-400 mr-2" />
-                <a href="mailto:info@tourred.com" className="text-gray-400 hover:text-white transition-colors">
-                  info@tourred.com
+                <a href="mailto:contacto@toursred.com" className="text-gray-400 hover:text-white transition-colors">
+                  contacto@toursred.com
                 </a>
               </li>
               <li className="flex items-center">
                 <Phone className="h-5 w-5 text-gray-400 mr-2" />
-                <a href="tel:+1234567890" className="text-gray-400 hover:text-white transition-colors">
-                  +52 (55) 1234-5678
+                <a href="tel:+525547127668" className="text-gray-400 hover:text-white transition-colors">
+                  +52 55 47127668
                 </a>
               </li>
             </ul>
