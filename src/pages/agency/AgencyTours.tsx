@@ -38,8 +38,8 @@ const AgencyTours: React.FC = () => {
     start_date: '',
     end_date: '',
     max_travelers: '',
+    available_spots: '',
     booking_deadline: '', // Nueva fecha límite de reserva
-    booking_approval_type: 'automatic',
     booking_approval_type: 'automatic',
   });
 
@@ -147,6 +147,9 @@ const AgencyTours: React.FC = () => {
       start_date: '',
       end_date: '',
       max_travelers: '',
+      available_spots: '',
+      booking_deadline: '',
+      booking_approval_type: 'automatic',
     });
     setSelectedDestinations([]);
     setSearchQuery('');
@@ -183,6 +186,7 @@ const AgencyTours: React.FC = () => {
       start_date: tour.start_date,
       end_date: tour.end_date,
       max_travelers: tour.max_travelers?.toString() || '',
+      available_spots: tour.available_spots?.toString() || '',
       booking_deadline: tour.booking_deadline || defaultDeadline.toISOString().split('T')[0],
       booking_approval_type: tour.booking_approval_type || 'automatic',
     });
@@ -405,6 +409,7 @@ const AgencyTours: React.FC = () => {
         start_date: formData.start_date,
         end_date: formData.end_date,
         max_travelers: formData.max_travelers ? parseInt(formData.max_travelers) : null,
+        available_spots: formData.available_spots ? parseInt(formData.available_spots) : null,
         destination: selectedDestinations.length > 0 ? selectedDestinations[0].name : '',
         includes: filteredIncludes.length > 0 ? filteredIncludes : null,
         excludes: filteredExcludes.length > 0 ? filteredExcludes : null,
@@ -868,7 +873,7 @@ const AgencyTours: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Máximo de Viajeros
+                  Tamaño Máximo del Grupo
                 </label>
                 <input
                   type="number"
@@ -876,7 +881,29 @@ const AgencyTours: React.FC = () => {
                   onChange={(e) => setFormData({...formData, max_travelers: e.target.value})}
                   className="input"
                   min="1"
+                  placeholder="Ej: 15"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Capacidad máxima teórica del tour
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Lugares Disponibles para Reserva
+                </label>
+                <input
+                  type="number"
+                  value={formData.available_spots}
+                  onChange={(e) => setFormData({...formData, available_spots: e.target.value})}
+                  className="input"
+                  min="0"
+                  max={formData.max_travelers || undefined}
+                  placeholder="Opcional - Deja vacío para usar el máximo"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Controla cuántos lugares están realmente disponibles para reservar (considerando logística, alojamiento, transporte, etc.)
+                </p>
               </div>
 
               <div>

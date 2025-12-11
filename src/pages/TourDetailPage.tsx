@@ -20,6 +20,8 @@ const TourDetailPage: React.FC = () => {
   const [isOwner, setIsOwner] = useState(false);
   const [agencyUserId, setAgencyUserId] = useState<string | null>(null);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
+  const [availableSpots, setAvailableSpots] = useState<number | null>(null);
+  const [totalCapacity, setTotalCapacity] = useState<number>(0);
 
   useEffect(() => {
     const fetchTour = async () => {
@@ -71,6 +73,41 @@ const TourDetailPage: React.FC = () => {
 
     fetchTour();
   }, [id, user, isAgency]);
+
+  useEffect(() => {
+    const fetchAvailability = async () => {
+      if (!tour) return;
+
+      try {
+        const { data: bookings, error } = await supabase
+          .from('bookings')
+          .select('travelers_count, status')
+          .eq('tour_id', tour.id)
+          .in('status', ['confirmed', 'pending']);
+
+        if (error) {
+          console.error('Error fetching bookings:', error);
+          return;
+        }
+
+        const totalBooked = bookings?.reduce((sum, booking) => sum + booking.travelers_count, 0) || 0;
+
+        const maxCapacity = tour.available_spots !== null && tour.available_spots !== undefined
+          ? tour.available_spots
+          : (tour.max_travelers || 10);
+
+        const available = Math.max(0, maxCapacity - totalBooked);
+
+        setTotalCapacity(maxCapacity);
+        setAvailableSpots(available);
+
+      } catch (err) {
+        console.error('Error loading availability:', err);
+      }
+    };
+
+    fetchAvailability();
+  }, [tour]);
 
   const handleContactAgency = async () => {
     if (!user) {
@@ -540,7 +577,7 @@ const TourDetailPage: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-start">
                   <Calendar className="h-5 w-5 text-primary-600 mr-3 mt-0.5" />
                   <div>
@@ -550,12 +587,17 @@ const TourDetailPage: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-start">
                   <Users className="h-5 w-5 text-primary-600 mr-3 mt-0.5" />
                   <div>
-                    <h4 className="font-medium">Tamaño del Grupo</h4>
-                    <p className="text-gray-600">Máx {tour.max_travelers || 'Sin límite'} viajeros</p>
+                    <h4 className="font-medium">Capacidad del Grupo</h4>
+                    <p className="text-gray-600">
+                      {tour.available_spots !== null && tour.available_spots !== undefined
+                        ? `Hasta ${tour.available_spots} viajeros`
+                        : `Máx ${tour.max_travelers || 'Sin límite'} viajeros`
+                      }
+                    </p>
                   </div>
                 </div>
                 
@@ -589,6 +631,62 @@ const TourDetailPage: React.FC = () => {
           </div>
           
           <div className="w-full lg:w-1/3">
+            {/* Availability Info - Visible para todos los usuarios excepto el propietario */}
+            {!isOwner && availableSpots !== null && (
+              <div className={`rounded-lg p-4 mb-6 ${
+                availableSpots === 0
+                  ? 'bg-red-50 border-2 border-red-200'
+                  : availableSpots <= 3
+                    ? 'bg-orange-50 border-2 border-orange-200'
+                    : 'bg-green-50 border-2 border-green-200'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Users className={`h-5 w-5 mr-2 ${
+                      availableSpots === 0
+                        ? 'text-red-600'
+                        : availableSpots <= 3
+                          ? 'text-orange-600'
+                          : 'text-green-600'
+                    }`} />
+                    <div>
+                      <p className={`font-semibold ${
+                        availableSpots === 0
+                          ? 'text-red-900'
+                          : availableSpots <= 3
+                            ? 'text-orange-900'
+                            : 'text-green-900'
+                      }`}>
+                        {availableSpots === 0
+                          ? 'Sin lugares disponibles'
+                          : availableSpots === 1
+                            ? '¡Último lugar disponible!'
+                            : availableSpots <= 3
+                              ? `¡Solo ${availableSpots} lugares disponibles!`
+                              : `${availableSpots} lugares disponibles`
+                        }
+                      </p>
+                      <p className={`text-xs ${
+                        availableSpots === 0
+                          ? 'text-red-700'
+                          : availableSpots <= 3
+                            ? 'text-orange-700'
+                            : 'text-green-700'
+                      }`}>
+                        de {totalCapacity} {totalCapacity === 1 ? 'lugar' : 'lugares'} en total
+                      </p>
+                    </div>
+                  </div>
+                  {availableSpots > 0 && availableSpots <= 3 && (
+                    <span className="text-orange-600 text-2xl animate-pulse">⚠️</span>
+                  )}
+                  {availableSpots === 0 && (
+                    <span className="text-red-600 text-2xl">🚫</span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Booking Form - Solo mostrar si NO es el propietario */}
             {!isOwner && <BookingForm tour={tour} />}
             

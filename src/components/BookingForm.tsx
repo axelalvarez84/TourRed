@@ -63,10 +63,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         }
 
         const totalBooked = bookings?.reduce((sum, booking) => sum + booking.travelers_count, 0) || 0;
-        const maxTravelers = tour.max_travelers || 10;
-        const available = Math.max(0, maxTravelers - totalBooked);
 
-        console.log(`📊 Disponibilidad del tour: ${available} de ${maxTravelers} lugares disponibles (${totalBooked} reservados)`);
+        // Si la agencia configuró lugares disponibles personalizados, usar ese valor
+        // De lo contrario, usar max_travelers
+        const maxCapacity = tour.available_spots !== null && tour.available_spots !== undefined
+          ? tour.available_spots
+          : (tour.max_travelers || 10);
+
+        const available = Math.max(0, maxCapacity - totalBooked);
+
+        console.log(`📊 Disponibilidad del tour: ${available} de ${maxCapacity} lugares disponibles (${totalBooked} reservados)${tour.available_spots ? ' [Personalizado por agencia]' : ''}`);
         setAvailableSpots(available);
 
       } catch (err) {

@@ -106,7 +106,8 @@ serve(async (req) => {
         travelers_count,
         tours (
           id,
-          max_travelers
+          max_travelers,
+          available_spots
         )
       `)
       .eq("id", bookingId)
@@ -139,10 +140,16 @@ serve(async (req) => {
     }
 
     const totalBooked = existingBookings?.reduce((sum, b) => sum + b.travelers_count, 0) || 0;
-    const maxTravelers = booking.tours?.max_travelers || 10;
-    const availableSpots = maxTravelers - totalBooked;
 
-    console.log(`🔍 Validando disponibilidad - Tour: ${booking.tour_id}, Solicitados: ${booking.travelers_count}, Disponibles: ${availableSpots}, Total permitido: ${maxTravelers}`);
+    // Si la agencia configuró lugares disponibles personalizados, usar ese valor
+    // De lo contrario, usar max_travelers
+    const maxCapacity = booking.tours?.available_spots !== null && booking.tours?.available_spots !== undefined
+      ? booking.tours.available_spots
+      : (booking.tours?.max_travelers || 10);
+
+    const availableSpots = maxCapacity - totalBooked;
+
+    console.log(`🔍 Validando disponibilidad - Tour: ${booking.tour_id}, Solicitados: ${booking.travelers_count}, Disponibles: ${availableSpots}, Total permitido: ${maxCapacity}${booking.tours?.available_spots ? ' [Personalizado]' : ''}`);
 
     if (booking.travelers_count > availableSpots) {
       console.error(`❌ No hay suficiente disponibilidad - Solicitados: ${booking.travelers_count}, Disponibles: ${availableSpots}`);

@@ -74,6 +74,7 @@ export interface Tour {
   start_date: string;
   end_date: string;
   max_travelers?: number;
+  available_spots?: number;
   is_featured?: boolean;
   created_at: string;
   agencies?: Agency;
