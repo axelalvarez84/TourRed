@@ -41,7 +41,7 @@ Deno.serve(async (req: Request) => {
       .select(`
         *,
         tour:tours(*),
-        traveler:users!bookings_user_id_fkey(id, first_name, last_name, email),
+        traveler:users!bookings_user_id_fkey(id, first_name, last_name, email, phone_number),
         agency:agencies(*)
       `)
       .eq("id", booking_id)
@@ -332,6 +332,12 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">Email:</span>
           <span class="info-value">${booking.traveler.email}</span>
         </div>
+        ${booking.traveler.phone_number ? `
+        <div class="info-row">
+          <span class="info-label">Teléfono:</span>
+          <span class="info-value">${booking.traveler.phone_number}</span>
+        </div>
+        ` : ''}
       </div>
 
       <div class="highlight">
@@ -446,6 +452,12 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">Email:</span>
           <span class="info-value">${booking.traveler.email}</span>
         </div>
+        ${booking.traveler.phone_number ? `
+        <div class="info-row">
+          <span class="info-label">Teléfono:</span>
+          <span class="info-value">${booking.traveler.phone_number}</span>
+        </div>
+        ` : ''}
       </div>
 
       <div class="section">
@@ -462,6 +474,24 @@ Deno.serve(async (req: Request) => {
         <div class="info-row">
           <span class="info-label">Teléfono:</span>
           <span class="info-value">${booking.agency.contact_phone}</span>
+        </div>
+        ` : ''}
+        ${booking.agency.cuenta_clabe ? `
+        <div class="info-row">
+          <span class="info-label">Cuenta CLABE:</span>
+          <span class="info-value">${booking.agency.cuenta_clabe}</span>
+        </div>
+        ` : ''}
+        ${booking.agency.banco ? `
+        <div class="info-row">
+          <span class="info-label">Banco:</span>
+          <span class="info-value">${booking.agency.banco}</span>
+        </div>
+        ` : ''}
+        ${booking.agency.titular_cuenta ? `
+        <div class="info-row">
+          <span class="info-label">Titular:</span>
+          <span class="info-value">${booking.agency.titular_cuenta}</span>
         </div>
         ` : ''}
       </div>

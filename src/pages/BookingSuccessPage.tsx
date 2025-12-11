@@ -12,6 +12,7 @@ const BookingSuccessPage: React.FC = () => {
   const [tour, setTour] = useState<Tour | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [emailsSent, setEmailsSent] = useState(false);
 
   useEffect(() => {
     const bookingId = searchParams.get('booking_id');
@@ -24,6 +25,11 @@ const BookingSuccessPage: React.FC = () => {
   }, [searchParams]);
 
   const sendBookingConfirmationEmails = async (bookingId: string) => {
+    if (emailsSent) {
+      console.log('Emails ya enviados, omitiendo...');
+      return;
+    }
+
     try {
       console.log('Iniciando envío de emails de confirmación para booking:', bookingId);
 
@@ -61,6 +67,7 @@ const BookingSuccessPage: React.FC = () => {
 
       if (result.success) {
         console.log('✅ Emails de confirmación enviados exitosamente:', result.results);
+        setEmailsSent(true);
       } else {
         console.error('❌ Error enviando emails de confirmación:', result);
       }
@@ -149,13 +156,12 @@ const BookingSuccessPage: React.FC = () => {
   // Helper function to format dates consistently
   const formatDate = (dateString: string) => {
     try {
-      // Parse the date from database format (YYYY-MM-DD)
       const date = parseDateFromDB(dateString);
       return format(date, 'EEEE, d \'de\' MMMM \'de\' yyyy', { locale: es });
     } catch (error) {
       console.error('Error formatting date:', dateString, error);
-      // Fallback to simple format
-      return format(new Date(dateString), 'dd/MM/yyyy');
+      const date = parseDateFromDB(dateString);
+      return format(date, 'dd/MM/yyyy');
     }
   };
 
@@ -165,7 +171,8 @@ const BookingSuccessPage: React.FC = () => {
       return format(date, 'd \'de\' MMMM', { locale: es });
     } catch (error) {
       console.error('Error formatting short date:', dateString, error);
-      return format(new Date(dateString), 'dd/MM');
+      const date = parseDateFromDB(dateString);
+      return format(date, 'dd/MM');
     }
   };
 
