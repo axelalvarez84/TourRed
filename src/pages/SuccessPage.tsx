@@ -24,8 +24,9 @@ const SuccessPage: React.FC = () => {
           const { error } = await supabase
             .from('bookings')
             .update({
-              payment_status: 'paid',
-              status: 'confirmed'
+              payment_status: 'succeeded',
+              status: 'confirmed',
+              paid_at: new Date().toISOString()
             })
             .eq('id', bookingId);
 

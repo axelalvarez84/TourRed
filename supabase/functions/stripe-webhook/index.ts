@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
         const { error: bookingError } = await supabase
           .from('bookings')
           .update({
-            payment_status: 'paid',
+            payment_status: 'succeeded',
             payment_intent_id: session.payment_intent,
             paid_at: new Date().toISOString(),
             status: 'confirmed'
@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
             amount_subtotal: session.amount_subtotal / 100, // Convert from cents
             amount_total: session.amount_total / 100, // Convert from cents
             currency: session.currency,
-            payment_status: 'paid',
+            payment_status: 'succeeded',
             status: 'completed'
           })
           .on_conflict(['checkout_session_id'])

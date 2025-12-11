@@ -99,21 +99,33 @@ const BookingSuccessPage: React.FC = () => {
       setTour(bookingData.tours);
 
       // Update booking status to confirmed if payment was pending
+      console.log('Current booking status:', bookingData.payment_status, 'Status:', bookingData.status);
+
       if (bookingData.payment_status === 'pending' || bookingData.payment_status === 'processing') {
-        const { error: updateError } = await supabase
+        console.log('Attempting to update booking status...');
+        const { data: updateData, error: updateError } = await supabase
           .from('bookings')
           .update({
-            payment_status: 'paid',
-            status: 'confirmed'
+            payment_status: 'succeeded',
+            status: 'confirmed',
+            paid_at: new Date().toISOString()
           })
-          .eq('id', bookingId);
+          .eq('id', bookingId)
+          .select();
 
         if (updateError) {
-          console.error('Error updating booking status:', updateError);
+          console.error('Error updating booking status:', {
+            message: updateError.message,
+            details: updateError.details,
+            hint: updateError.hint,
+            code: updateError.code
+          });
         } else {
+          console.log('Booking updated successfully:', updateData);
           sendBookingConfirmationEmails(bookingId);
         }
-      } else if (bookingData.payment_status === 'paid') {
+      } else if (bookingData.payment_status === 'succeeded') {
+        console.log('Booking already paid, sending confirmation emails...');
         sendBookingConfirmationEmails(bookingId);
       }
 
