@@ -36,7 +36,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Validar formato de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return new Response(
@@ -48,7 +47,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Verificar si el email ya existe
     const { data: existingSubscription } = await supabase
       .from("newsletter_subscriptions")
       .select("email, active")
@@ -68,7 +66,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Insertar la suscripción
     const { error: insertError } = await supabase
       .from("newsletter_subscriptions")
       .insert({
@@ -81,7 +78,6 @@ Deno.serve(async (req: Request) => {
       throw new Error("Error al guardar la suscripción");
     }
 
-    // Obtener configuración de email
     const { data: emailSettings, error: settingsError } = await supabase
       .from("email_settings")
       .select("*")
@@ -115,7 +111,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Enviar email de confirmación
     const textContent = `
 ¡Bienvenido a ToursRed!
 
@@ -202,7 +197,6 @@ Si no te suscribiste a este boletín, puedes ignorar este mensaje.
 
     if (!response.ok || result.data?.error) {
       console.error("SMTP2GO API Error:", result);
-      // No lanzamos error, la suscripción ya está guardada
       return new Response(
         JSON.stringify({ 
           success: true, 
