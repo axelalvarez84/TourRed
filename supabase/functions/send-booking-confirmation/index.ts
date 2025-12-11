@@ -554,7 +554,6 @@ Deno.serve(async (req: Request) => {
       };
 
       console.log(`Sending email to ${email.recipient}:`, email.to);
-      console.log(`Email payload:`, JSON.stringify(emailPayload, null, 2));
 
       const response = await fetch("https://api.smtp2go.com/v3/email/send", {
         method: "POST",
@@ -565,7 +564,6 @@ Deno.serve(async (req: Request) => {
       });
 
       const result = await response.json();
-      console.log(`Response from SMTP2GO for ${email.recipient}:`, JSON.stringify(result, null, 2));
 
       if (!response.ok || result.data?.error) {
         console.error(`Error sending email to ${email.recipient}:`, result);
