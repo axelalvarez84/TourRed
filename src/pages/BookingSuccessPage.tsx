@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle, Calendar, MapPin, Users, DollarSign, ArrowRight, CreditCard, Mail } from 'lucide-react';
 import { supabase, parseDateFromDB } from '../lib/supabase';
@@ -12,6 +12,7 @@ const BookingSuccessPage: React.FC = () => {
   const [tour, setTour] = useState<Tour | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const emailSendAttempted = useRef(false);
 
   useEffect(() => {
     const bookingId = searchParams.get('booking_id');
@@ -24,6 +25,13 @@ const BookingSuccessPage: React.FC = () => {
   }, [searchParams]);
 
   const sendBookingConfirmationEmails = async (bookingId: string) => {
+    if (emailSendAttempted.current) {
+      console.log('Ya se intentó enviar emails para esta sesión, omitiendo...');
+      return;
+    }
+
+    emailSendAttempted.current = true;
+
     try {
       console.log('Iniciando envío de emails de confirmación para booking:', bookingId);
 
@@ -63,9 +71,11 @@ const BookingSuccessPage: React.FC = () => {
         console.log('✅ Emails de confirmación enviados exitosamente:', result.results);
       } else {
         console.error('❌ Error enviando emails de confirmación:', result);
+        emailSendAttempted.current = false;
       }
     } catch (error) {
       console.error('❌ Error al llamar a send-booking-confirmation:', error);
+      emailSendAttempted.current = false;
     }
   };
 
