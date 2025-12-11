@@ -100,9 +100,20 @@ const BookingSuccessPage: React.FC = () => {
 
       // Update booking status to confirmed if payment was pending
       console.log('Current booking status:', bookingData.payment_status, 'Status:', bookingData.status);
+      console.log('Booking user_id:', bookingData.user_id);
+
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('Current auth user id:', user?.id);
 
       if (bookingData.payment_status === 'pending' || bookingData.payment_status === 'processing') {
         console.log('Attempting to update booking status...');
+
+        // Verify user owns this booking
+        if (user?.id !== bookingData.user_id) {
+          console.error('User ID mismatch! Auth user:', user?.id, 'Booking user:', bookingData.user_id);
+        }
+
         const { data: updateData, error: updateError } = await supabase
           .from('bookings')
           .update({
