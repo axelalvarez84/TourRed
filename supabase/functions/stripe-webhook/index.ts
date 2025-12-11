@@ -1,8 +1,20 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.6";
 import Stripe from "npm:stripe@12.18.0";
 
-serve(async (req) => {
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders,
+    });
+  }
   try {
     // Get the Stripe secret key and webhook secret from environment variables
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
@@ -12,7 +24,10 @@ serve(async (req) => {
       console.error("Stripe secret key is not set");
       return new Response(
         JSON.stringify({ success: false, error: "Stripe configuration is incomplete" }),
-        { status: 500 }
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
       );
     }
 
@@ -26,7 +41,10 @@ serve(async (req) => {
     if (!signature) {
       return new Response(
         JSON.stringify({ success: false, error: "No signature header" }),
-        { status: 400 }
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
       );
     }
 
@@ -47,7 +65,10 @@ serve(async (req) => {
       console.error(`Webhook signature verification failed: ${err.message}`);
       return new Response(
         JSON.stringify({ success: false, error: `Webhook Error: ${err.message}` }),
-        { status: 400 }
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
       );
     }
 
@@ -83,6 +104,27 @@ serve(async (req) => {
           console.error(`Error updating booking: ${bookingError.message}`);
         } else {
           console.log(`Successfully updated booking ${bookingId} to paid status`);
+
+          try {
+            const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-booking-confirmation`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${supabaseServiceKey}`,
+              },
+              body: JSON.stringify({ booking_id: bookingId }),
+            });
+
+            const emailResult = await emailResponse.json();
+
+            if (emailResult.success) {
+              console.log('Booking confirmation emails sent successfully');
+            } else {
+              console.error('Error sending booking confirmation emails:', emailResult);
+            }
+          } catch (emailError) {
+            console.error('Error calling booking confirmation function:', emailError);
+          }
         }
 
         // Create a payment transaction record
@@ -161,13 +203,19 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({ received: true }),
-      { status: 200 }
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      }
     );
   } catch (error) {
     console.error(`Webhook error: ${error.message}`);
     return new Response(
       JSON.stringify({ success: false, error: error.message || "An unexpected error occurred" }),
-      { status: 500 }
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      }
     );
   }
 });
