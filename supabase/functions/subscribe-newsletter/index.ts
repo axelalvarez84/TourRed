@@ -132,7 +132,8 @@ Si no te suscribiste a este boletín, puedes ignorar este mensaje.
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background-color: #1e40af; color: white; padding: 30px 20px; text-align: center; }
+    .header { background-color: #b8dfe6; color: white; padding: 30px 20px; text-align: center; }
+    .logo { max-width: 200px; height: auto; margin-bottom: 10px; }
     .content { background-color: #f9fafb; padding: 30px 20px; border: 1px solid #e5e7eb; }
     .welcome { font-size: 24px; font-weight: bold; color: #1e40af; margin-bottom: 20px; }
     .message { margin-bottom: 20px; }
@@ -143,15 +144,16 @@ Si no te suscribiste a este boletín, puedes ignorar este mensaje.
 <body>
   <div class="container">
     <div class="header">
-      <h1>¡Bienvenido a ToursRed!</h1>
+      <img src="https://www.toursred.com/logofinal.jpg" alt="ToursRed Logo" class="logo" />
+      <h1 style="margin: 0; color: #1e40af;">¡Bienvenido a ToursRed!</h1>
     </div>
     <div class="content">
       <div class="welcome">¡Gracias por suscribirte!</div>
-      
+
       <div class="message">
         <p>Estamos emocionados de tenerte en nuestra comunidad de viajeros. A partir de ahora recibirás:</p>
       </div>
-      
+
       <div class="highlight">
         <ul style="margin: 0; padding-left: 20px;">
           <li>Las últimas novedades sobre destinos increíbles</li>
@@ -160,7 +162,7 @@ Si no te suscribiste a este boletín, puedes ignorar este mensaje.
           <li>Historias inspiradoras de otros viajeros</li>
         </ul>
       </div>
-      
+
       <div class="message">
         <p>¡Prepárate para descubrir experiencias inolvidables!</p>
         <p><strong>¡Felices viajes!</strong><br>El equipo de ToursRed</p>
