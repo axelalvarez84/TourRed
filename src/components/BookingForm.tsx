@@ -13,7 +13,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const { user, isTraveler } = useAuth();
   const navigate = useNavigate();
   const [travelersCount, setTravelersCount] = useState(1);
-  const [bookingDate, setBookingDate] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [serviceChargePercentage, setServiceChargePercentage] = useState(5);
@@ -103,11 +102,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
       return;
     }
 
-    if (!bookingDate) {
-      setError('Por favor selecciona una fecha de reserva.');
-      return;
-    }
-
     try {
       setIsSubmitting(true);
       setError('');
@@ -126,7 +120,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         commission_amount: agencyCommission,
         total_price: totalPrice,
         status: initialStatus,
-        booking_date: bookingDate,
+        booking_date: tour.start_date,
         travelers_count: travelersCount,
         service_charge: serviceCharge,
         user_payment: userPayment,
