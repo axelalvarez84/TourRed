@@ -4,6 +4,7 @@ import { CheckCircle, Calendar, MapPin, Users, DollarSign, ArrowRight, CreditCar
 import { supabase, parseDateFromDB } from '../lib/supabase';
 import { Booking, Tour } from '../types';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 const BookingSuccessPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -128,7 +129,7 @@ const BookingSuccessPage: React.FC = () => {
     try {
       // Parse the date from database format (YYYY-MM-DD)
       const date = parseDateFromDB(dateString);
-      return format(date, 'EEEE, d \'de\' MMMM \'de\' yyyy', { locale: require('date-fns/locale/es') });
+      return format(date, 'EEEE, d \'de\' MMMM \'de\' yyyy', { locale: es });
     } catch (error) {
       console.error('Error formatting date:', dateString, error);
       // Fallback to simple format
@@ -139,7 +140,7 @@ const BookingSuccessPage: React.FC = () => {
   const formatShortDate = (dateString: string) => {
     try {
       const date = parseDateFromDB(dateString);
-      return format(date, 'd \'de\' MMMM', { locale: require('date-fns/locale/es') });
+      return format(date, 'd \'de\' MMMM', { locale: es });
     } catch (error) {
       console.error('Error formatting short date:', dateString, error);
       return format(new Date(dateString), 'dd/MM');
