@@ -24,6 +24,8 @@ const BookingSuccessPage: React.FC = () => {
 
   const sendBookingConfirmationEmails = async (bookingId: string) => {
     try {
+      console.log('Iniciando envío de emails de confirmación para booking:', bookingId);
+
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session?.access_token) {
@@ -31,7 +33,12 @@ const BookingSuccessPage: React.FC = () => {
         return;
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-confirmation`, {
+      console.log('Sesión válida encontrada, llamando a send-booking-confirmation...');
+
+      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-confirmation`;
+      console.log('URL de función:', functionUrl);
+
+      const response = await fetch(functionUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -40,15 +47,24 @@ const BookingSuccessPage: React.FC = () => {
         body: JSON.stringify({ booking_id: bookingId }),
       });
 
+      console.log('Respuesta de la función:', response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error en respuesta:', errorText);
+        return;
+      }
+
       const result = await response.json();
+      console.log('Resultado completo:', result);
 
       if (result.success) {
-        console.log('Emails de confirmación enviados exitosamente');
+        console.log('✅ Emails de confirmación enviados exitosamente:', result.results);
       } else {
-        console.error('Error enviando emails de confirmación:', result);
+        console.error('❌ Error enviando emails de confirmación:', result);
       }
     } catch (error) {
-      console.error('Error al llamar a send-booking-confirmation:', error);
+      console.error('❌ Error al llamar a send-booking-confirmation:', error);
     }
   };
 
