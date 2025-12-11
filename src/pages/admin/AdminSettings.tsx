@@ -9,6 +9,7 @@ interface EmailSettings {
   smtp_port: number;
   smtp_user: string;
   smtp_password: string;
+  smtp_api_key: string;
 }
 
 const AdminSettings: React.FC = () => {
@@ -19,6 +20,7 @@ const AdminSettings: React.FC = () => {
     smtp_port: 2525,
     smtp_user: '',
     smtp_password: '',
+    smtp_api_key: '',
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -69,6 +71,7 @@ const AdminSettings: React.FC = () => {
           smtp_port: settings.smtp_port,
           smtp_user: settings.smtp_user,
           smtp_password: settings.smtp_password,
+          smtp_api_key: settings.smtp_api_key,
           updated_at: new Date().toISOString(),
         })
         .eq('id', settings.id);
@@ -234,6 +237,24 @@ const AdminSettings: React.FC = () => {
                 onChange={handleChange}
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="smtp_api_key" className="block text-sm font-medium text-gray-700 mb-1">
+                API Key SMTP2GO
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                El API key se usa para enviar emails a través de SMTP2GO
+              </p>
+              <input
+                type="text"
+                id="smtp_api_key"
+                name="smtp_api_key"
+                value={settings.smtp_api_key}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
               />
             </div>
           </div>

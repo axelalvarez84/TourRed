@@ -1,6 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.6";
-import nodemailer from "npm:nodemailer@6.9.7";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -55,15 +54,16 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const transporter = nodemailer.createTransport({
-      host: emailSettings.smtp_host,
-      port: emailSettings.smtp_port,
-      secure: false,
-      auth: {
-        user: emailSettings.smtp_user,
-        pass: emailSettings.smtp_password,
-      },
-    });
+    if (!emailSettings.smtp_api_key) {
+      console.error("SMTP API key not configured");
+      return new Response(
+        JSON.stringify({ error: "API key de SMTP no configurada" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     const textContent = `
 Has recibido un nuevo mensaje desde el formulario de contacto de ToursRed:
@@ -124,14 +124,39 @@ Este mensaje fue enviado desde el formulario de contacto de ToursRed.
 </html>
     `;
 
-    await transporter.sendMail({
-      from: `\"ToursRed\" <${emailSettings.smtp_user}@smtp2go.com>`,
-      to: emailSettings.contact_email,
-      replyTo: email,
+    const emailPayload = {
+      api_key: emailSettings.smtp_api_key,
+      to: [emailSettings.contact_email],
+      sender: `contacto@toursred.com`,
       subject: `Nuevo mensaje de contacto de ${name}`,
-      text: textContent,
-      html: htmlContent,
+      text_body: textContent,
+      html_body: htmlContent,
+      custom_headers: [
+        {
+          header: "Reply-To",
+          value: email
+        }
+      ]
+    };
+
+    console.log("Sending email via SMTP2GO API...");
+
+    const response = await fetch("https://api.smtp2go.com/v3/email/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(emailPayload),
     });
+
+    const result = await response.json();
+
+    if (!response.ok || result.data?.error) {
+      console.error("SMTP2GO API Error:", result);
+      throw new Error(result.data?.error || `SMTP2GO API Error: ${response.status}`);
+    }
+
+    console.log("Email sent successfully:", result);
 
     return new Response(
       JSON.stringify({ success: true, message: "Email enviado correctamente" }),
