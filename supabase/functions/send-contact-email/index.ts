@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.6";
+import nodemailer from "npm:nodemailer@6.9.7";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,44 +12,6 @@ interface ContactFormData {
   name: string;
   email: string;
   message: string;
-}
-
-async function sendSMTPEmail(
-  smtpHost: string,
-  smtpPort: number,
-  smtpUser: string,
-  smtpPassword: string,
-  to: string,
-  subject: string,
-  htmlContent: string,
-  textContent: string
-) {
-  const authString = btoa(`${smtpUser}:${smtpPassword}`);
-  
-  const emailData = {
-    api_key: smtpPassword,
-    to: [to],
-    sender: `${smtpUser}@toursred.com`,
-    subject: subject,
-    text_body: textContent,
-    html_body: htmlContent,
-  };
-
-  const response = await fetch(`https://api.smtp2go.com/v3/email/send`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Smtp2go-Api-Key": smtpPassword,
-    },
-    body: JSON.stringify(emailData),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`SMTP2GO API Error: ${response.status} - ${errorText}`);
-  }
-
-  return await response.json();
 }
 
 Deno.serve(async (req: Request) => {
@@ -84,13 +47,23 @@ Deno.serve(async (req: Request) => {
     if (settingsError || !emailSettings) {
       console.error("Error fetching email settings:", settingsError);
       return new Response(
-        JSON.stringify({ error: "Error al obtener configuración de email" }),
+        JSON.stringify({ error: "Error al obtener configuraci\u00f3n de email" }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
+
+    const transporter = nodemailer.createTransport({
+      host: emailSettings.smtp_host,
+      port: emailSettings.smtp_port,
+      secure: false,
+      auth: {
+        user: emailSettings.smtp_user,
+        pass: emailSettings.smtp_password,
+      },
+    });
 
     const textContent = `
 Has recibido un nuevo mensaje desde el formulario de contacto de ToursRed:
@@ -151,16 +124,14 @@ Este mensaje fue enviado desde el formulario de contacto de ToursRed.
 </html>
     `;
 
-    await sendSMTPEmail(
-      emailSettings.smtp_host,
-      emailSettings.smtp_port,
-      emailSettings.smtp_user,
-      emailSettings.smtp_password,
-      emailSettings.contact_email,
-      `Nuevo mensaje de contacto de ${name}`,
-      htmlContent,
-      textContent
-    );
+    await transporter.sendMail({
+      from: `\"ToursRed\" <${emailSettings.smtp_user}@smtp2go.com>`,
+      to: emailSettings.contact_email,
+      replyTo: email,
+      subject: `Nuevo mensaje de contacto de ${name}`,
+      text: textContent,
+      html: htmlContent,
+    });
 
     return new Response(
       JSON.stringify({ success: true, message: "Email enviado correctamente" }),
