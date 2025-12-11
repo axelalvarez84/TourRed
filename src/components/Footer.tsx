@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Compass, Facebook, Instagram, Twitter, Mail, Phone, Music } from 'lucide-react';
+import { Compass, Facebook, Instagram, Twitter, Mail, Phone } from 'lucide-react';
 
 const Footer: React.FC = () => {
   return (
@@ -22,7 +22,7 @@ const Footer: React.FC = () => {
                 <Instagram className="h-5 w-5" />
               </a>
               <a href="https://www.tiktok.com/@toursredmx" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
-                <Music className="h-5 w-5" />
+                <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/tiktok.svg" alt="TikTok" className="h-5 w-5" />
               </a>
               <a href="https://x.com/ToursRedMX" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
                 <Twitter className="h-5 w-5" />
