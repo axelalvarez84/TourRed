@@ -58,13 +58,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: emailSettings, error: settingsError } = await supabase
-      .from("email_settings")
-      .select("*")
-      .maybeSingle();
+    const [emailSettingsResult, platformSettingsResult] = await Promise.all([
+      supabase.from("email_settings").select("*").maybeSingle(),
+      supabase.from("platform_settings").select("*").maybeSingle()
+    ]);
 
-    if (settingsError || !emailSettings || !emailSettings.smtp_api_key) {
-      console.error("Email settings not configured:", settingsError);
+    if (emailSettingsResult.error || !emailSettingsResult.data || !emailSettingsResult.data.smtp_api_key) {
+      console.error("Email settings not configured:", emailSettingsResult.error);
       return new Response(
         JSON.stringify({
           success: false,
@@ -77,14 +77,33 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    if (platformSettingsResult.error || !platformSettingsResult.data) {
+      console.error("Platform settings not configured:", platformSettingsResult.error);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "Configuración de plataforma no disponible"
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const emailSettings = emailSettingsResult.data;
+    const platformSettings = platformSettingsResult.data;
+
     const totalPrice = booking.total_price;
     const depositAmount = booking.deposit_amount;
     const depositPercentage = booking.tour.deposit_percentage;
-    const serviceCharge = booking.service_charge || (totalPrice * 0.05);
+    const serviceChargePercentage = platformSettings.service_charge_percentage;
+    const agencyCommissionPercentage = platformSettings.agency_commission_percentage;
+    const serviceCharge = booking.service_charge || (totalPrice * (serviceChargePercentage / 100));
     const userPayment = depositAmount + serviceCharge;
     const remainingAmount = totalPrice - depositAmount;
 
-    const agencyCommission = totalPrice * 0.15;
+    const agencyCommission = totalPrice * (agencyCommissionPercentage / 100);
     const agencyReceives = depositAmount - agencyCommission;
 
     const formatDate = (dateString: string) => {
@@ -171,7 +190,7 @@ Deno.serve(async (req: Request) => {
           <span class="info-value">${formatCurrency(depositAmount)}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Cargo por uso de plataforma (5%):</span>
+          <span class="info-label">Cargo por uso de plataforma (${serviceChargePercentage}%):</span>
           <span class="info-value">${formatCurrency(serviceCharge)}</span>
         </div>
         <div class="total-box">
@@ -288,7 +307,7 @@ Deno.serve(async (req: Request) => {
           <span class="info-value">${formatCurrency(depositAmount)}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Comisión de plataforma (15% del total):</span>
+          <span class="info-label">Comisión de plataforma (${agencyCommissionPercentage}% del total):</span>
           <span class="info-value" style="color: #dc2626;">-${formatCurrency(agencyCommission)}</span>
         </div>
         <div class="total-box">
@@ -398,11 +417,11 @@ Deno.serve(async (req: Request) => {
           <span class="info-value">${formatCurrency(depositAmount)}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">- Cargo por plataforma (5%):</span>
+          <span class="info-label">- Cargo por plataforma (${serviceChargePercentage}%):</span>
           <span class="info-value">${formatCurrency(serviceCharge)}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Comisión descontada a la agencia (15%):</span>
+          <span class="info-label">Comisión descontada a la agencia (${agencyCommissionPercentage}%):</span>
           <span class="info-value" style="color: #16a34a;">${formatCurrency(agencyCommission)}</span>
         </div>
         <div class="highlight">

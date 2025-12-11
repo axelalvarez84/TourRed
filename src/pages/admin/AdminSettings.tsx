@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Server, Save, Loader, CheckCircle, AlertCircle } from 'lucide-react';
+import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface EmailSettings {
@@ -12,6 +12,12 @@ interface EmailSettings {
   smtp_api_key: string;
 }
 
+interface PlatformSettings {
+  id: string;
+  service_charge_percentage: number;
+  agency_commission_percentage: number;
+}
+
 const AdminSettings: React.FC = () => {
   const [settings, setSettings] = useState<EmailSettings>({
     id: '',
@@ -21,6 +27,11 @@ const AdminSettings: React.FC = () => {
     smtp_user: '',
     smtp_password: '',
     smtp_api_key: '',
+  });
+  const [platformSettings, setPlatformSettings] = useState<PlatformSettings>({
+    id: '',
+    service_charge_percentage: 5,
+    agency_commission_percentage: 15,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -36,15 +47,21 @@ const AdminSettings: React.FC = () => {
   const fetchSettings = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('email_settings')
-        .select('*')
-        .maybeSingle();
 
-      if (error) throw error;
+      const [emailResult, platformResult] = await Promise.all([
+        supabase.from('email_settings').select('*').maybeSingle(),
+        supabase.from('platform_settings').select('*').maybeSingle()
+      ]);
 
-      if (data) {
-        setSettings(data);
+      if (emailResult.error) throw emailResult.error;
+      if (platformResult.error) throw platformResult.error;
+
+      if (emailResult.data) {
+        setSettings(emailResult.data);
+      }
+
+      if (platformResult.data) {
+        setPlatformSettings(platformResult.data);
       }
     } catch (error: any) {
       console.error('Error fetching settings:', error);
@@ -63,20 +80,34 @@ const AdminSettings: React.FC = () => {
     setMessage({ type: null, text: '' });
 
     try {
-      const { error } = await supabase
-        .from('email_settings')
-        .update({
-          contact_email: settings.contact_email,
-          smtp_host: settings.smtp_host,
-          smtp_port: settings.smtp_port,
-          smtp_user: settings.smtp_user,
-          smtp_password: settings.smtp_password,
-          smtp_api_key: settings.smtp_api_key,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', settings.id);
+      const { data: { user } } = await supabase.auth.getUser();
 
-      if (error) throw error;
+      const [emailResult, platformResult] = await Promise.all([
+        supabase
+          .from('email_settings')
+          .update({
+            contact_email: settings.contact_email,
+            smtp_host: settings.smtp_host,
+            smtp_port: settings.smtp_port,
+            smtp_user: settings.smtp_user,
+            smtp_password: settings.smtp_password,
+            smtp_api_key: settings.smtp_api_key,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', settings.id),
+        supabase
+          .from('platform_settings')
+          .update({
+            service_charge_percentage: platformSettings.service_charge_percentage,
+            agency_commission_percentage: platformSettings.agency_commission_percentage,
+            updated_at: new Date().toISOString(),
+            updated_by: user?.id
+          })
+          .eq('id', platformSettings.id)
+      ]);
+
+      if (emailResult.error) throw emailResult.error;
+      if (platformResult.error) throw platformResult.error;
 
       setMessage({
         type: 'success',
@@ -102,6 +133,14 @@ const AdminSettings: React.FC = () => {
     setSettings(prev => ({
       ...prev,
       [name]: name === 'smtp_port' ? parseInt(value) || 0 : value,
+    }));
+  };
+
+  const handlePlatformChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setPlatformSettings(prev => ({
+      ...prev,
+      [name]: parseFloat(value) || 0,
     }));
   };
 
@@ -142,6 +181,92 @@ const AdminSettings: React.FC = () => {
       )}
 
       <form onSubmit={handleSave} className="space-y-6">
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <DollarSign className="w-6 h-6 text-primary-600" />
+            <h2 className="text-xl font-semibold text-gray-900">
+              Configuración de Comisiones y Cargos
+            </h2>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-4">
+            <div className="flex items-start">
+              <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
+              <div className="text-sm text-blue-800">
+                <p className="font-medium mb-2">Información importante sobre los porcentajes:</p>
+                <ul className="space-y-1 text-xs">
+                  <li>• <strong>Cargo por Servicio:</strong> Se cobra al viajero adicional al anticipo del tour</li>
+                  <li>• <strong>Comisión de Agencia:</strong> Se descuenta del anticipo pagado por el viajero antes de transferir a la agencia</li>
+                  <li>• Estos porcentajes se aplican automáticamente a todas las nuevas reservas</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="service_charge_percentage" className="block text-sm font-medium text-gray-700 mb-1">
+                Cargo por Servicio (%)
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                Porcentaje adicional que se cobra al viajero por el uso de la plataforma
+              </p>
+              <div className="relative">
+                <input
+                  type="number"
+                  id="service_charge_percentage"
+                  name="service_charge_percentage"
+                  value={platformSettings.service_charge_percentage}
+                  onChange={handlePlatformChange}
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 pr-10"
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <Percent className="w-4 h-4 text-gray-400" />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Ejemplo: Si el anticipo es $1,000 y el cargo es {platformSettings.service_charge_percentage}%,
+                el viajero pagará ${(1000 + (1000 * platformSettings.service_charge_percentage / 100)).toFixed(2)}
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="agency_commission_percentage" className="block text-sm font-medium text-gray-700 mb-1">
+                Comisión de Agencia (%)
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                Porcentaje que se descuenta del total del tour como comisión para la plataforma
+              </p>
+              <div className="relative">
+                <input
+                  type="number"
+                  id="agency_commission_percentage"
+                  name="agency_commission_percentage"
+                  value={platformSettings.agency_commission_percentage}
+                  onChange={handlePlatformChange}
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 pr-10"
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <Percent className="w-4 h-4 text-gray-400" />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Ejemplo: Tour de $5,000 con anticipo de $1,000. Comisión {platformSettings.agency_commission_percentage}% = $
+                {(5000 * platformSettings.agency_commission_percentage / 100).toFixed(2)}.
+                La agencia recibe ${(1000 - (5000 * platformSettings.agency_commission_percentage / 100)).toFixed(2)} del anticipo
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center space-x-3 mb-4">
             <Mail className="w-6 h-6 text-primary-600" />

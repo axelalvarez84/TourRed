@@ -16,6 +16,33 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [bookingDate, setBookingDate] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [serviceChargePercentage, setServiceChargePercentage] = useState(5);
+  const [agencyCommissionPercentage, setAgencyCommissionPercentage] = useState(15);
+
+  React.useEffect(() => {
+    const fetchPlatformSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('platform_settings')
+          .select('service_charge_percentage, agency_commission_percentage')
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error fetching platform settings:', error);
+          return;
+        }
+
+        if (data) {
+          setServiceChargePercentage(data.service_charge_percentage);
+          setAgencyCommissionPercentage(data.agency_commission_percentage);
+        }
+      } catch (err) {
+        console.error('Error loading platform settings:', err);
+      }
+    };
+
+    fetchPlatformSettings();
+  }, []);
 
   const formatDate = (dateString: string) => {
     try {
@@ -52,10 +79,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const totalPrice = tour.price * travelersCount;
   const depositAmount = totalPrice * (tour.deposit_percentage / 100);
 
-  // Comisiones según el esquema solicitado
-  const agencyCommission = totalPrice * 0.10; // 10% del costo total para la agencia
-  const serviceCharge = totalPrice * 0.03; // 3% del costo total como cargo por servicio
-  const platformRevenue = agencyCommission + serviceCharge; // Total que va a la plataforma (13%)
+  // Comisiones según el esquema solicitado con valores configurables
+  const agencyCommission = totalPrice * (agencyCommissionPercentage / 100);
+  const serviceCharge = totalPrice * (serviceChargePercentage / 100);
+  const platformRevenue = agencyCommission + serviceCharge;
 
   // Lo que paga el usuario: depósito + cargo por servicio
   const userPayment = depositAmount + serviceCharge;
@@ -260,7 +287,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
             </div>
             
             <div className="flex justify-between">
-              <span className="text-gray-600">Cargo por Servicio (3%):</span>
+              <span className="text-gray-600">Cargo por Servicio ({serviceChargePercentage}%):</span>
               <span className="font-medium text-orange-600">+${serviceCharge.toLocaleString()}</span>
             </div>
             
