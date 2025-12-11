@@ -24,6 +24,7 @@ import AdminReviews from './pages/admin/AdminReviews';
 import AdminMessages from './pages/admin/AdminMessages';
 import AdminDestinations from './pages/admin/AdminDestinations';
 import AdminProfile from './pages/admin/AdminProfile';
+import AdminSettings from './pages/admin/AdminSettings';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import SuccessPage from './pages/SuccessPage';
@@ -203,7 +204,15 @@ const App: React.FC = () => {
               </ProtectedRoute>
             }
           />
-          
+          <Route
+            path="/admin/settings"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminSettings />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Redirects based on role */}
           <Route
             path="/profile"
