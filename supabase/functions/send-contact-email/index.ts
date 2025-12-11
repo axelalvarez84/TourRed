@@ -127,7 +127,7 @@ Este mensaje fue enviado desde el formulario de contacto de ToursRed.
     const emailPayload = {
       api_key: emailSettings.smtp_api_key,
       to: [emailSettings.contact_email],
-      sender: `contacto@toursred.com`,
+      sender: `no-reply@toursred.com`,
       subject: `Nuevo mensaje de contacto de ${name}`,
       text_body: textContent,
       html_body: htmlContent,
