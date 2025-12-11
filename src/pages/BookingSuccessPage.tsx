@@ -22,6 +22,36 @@ const BookingSuccessPage: React.FC = () => {
     }
   }, [searchParams]);
 
+  const sendBookingConfirmationEmails = async (bookingId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        console.error('No hay sesión válida para enviar emails');
+        return;
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-confirmation`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('Emails de confirmación enviados exitosamente');
+      } else {
+        console.error('Error enviando emails de confirmación:', result);
+      }
+    } catch (error) {
+      console.error('Error al llamar a send-booking-confirmation:', error);
+    }
+  };
+
   const fetchBookingDetails = async (bookingId: string) => {
     try {
       setIsLoading(true);
@@ -63,7 +93,11 @@ const BookingSuccessPage: React.FC = () => {
 
         if (updateError) {
           console.error('Error updating booking status:', updateError);
+        } else {
+          sendBookingConfirmationEmails(bookingId);
         }
+      } else if (bookingData.payment_status === 'paid') {
+        sendBookingConfirmationEmails(bookingId);
       }
 
     } catch (err: any) {
