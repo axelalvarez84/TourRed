@@ -17,6 +17,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [error, setError] = useState('');
   const [serviceChargePercentage, setServiceChargePercentage] = useState(5);
   const [agencyCommissionPercentage, setAgencyCommissionPercentage] = useState(15);
+  const [availableSpots, setAvailableSpots] = useState<number | null>(null);
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(true);
 
   React.useEffect(() => {
     const fetchPlatformSettings = async () => {
@@ -42,6 +44,41 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
     fetchPlatformSettings();
   }, []);
+
+  React.useEffect(() => {
+    const fetchAvailability = async () => {
+      try {
+        setIsLoadingAvailability(true);
+
+        const { data: bookings, error } = await supabase
+          .from('bookings')
+          .select('travelers_count, status')
+          .eq('tour_id', tour.id)
+          .in('status', ['confirmed', 'pending']);
+
+        if (error) {
+          console.error('Error fetching bookings:', error);
+          setAvailableSpots(tour.max_travelers || 10);
+          return;
+        }
+
+        const totalBooked = bookings?.reduce((sum, booking) => sum + booking.travelers_count, 0) || 0;
+        const maxTravelers = tour.max_travelers || 10;
+        const available = Math.max(0, maxTravelers - totalBooked);
+
+        console.log(`📊 Disponibilidad del tour: ${available} de ${maxTravelers} lugares disponibles (${totalBooked} reservados)`);
+        setAvailableSpots(available);
+
+      } catch (err) {
+        console.error('Error loading availability:', err);
+        setAvailableSpots(tour.max_travelers || 10);
+      } finally {
+        setIsLoadingAvailability(false);
+      }
+    };
+
+    fetchAvailability();
+  }, [tour.id, tour.max_travelers]);
 
   const formatDate = (dateString: string) => {
     try {
@@ -99,6 +136,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
     if (!isTraveler) {
       setError('Solo los viajeros pueden reservar tours.');
+      return;
+    }
+
+    if (availableSpots !== null && travelersCount > availableSpots) {
+      setError(`Solo hay ${availableSpots} lugar${availableSpots !== 1 ? 'es' : ''} disponible${availableSpots !== 1 ? 's' : ''} para este tour.`);
       return;
     }
 
@@ -246,23 +288,40 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           <label htmlFor="travelersCount" className="block text-sm font-medium text-gray-700 mb-1">
             Número de Viajeros
           </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Users className="h-5 w-5 text-gray-400" />
+          {isLoadingAvailability ? (
+            <div className="flex items-center justify-center py-2 text-gray-500">
+              <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary-600 mr-2"></div>
+              <span className="text-sm">Verificando disponibilidad...</span>
             </div>
-            <select
-              id="travelersCount"
-              value={travelersCount}
-              onChange={(e) => setTravelersCount(Number(e.target.value))}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-            >
-              {[...Array(tour.max_travelers || 10)].map((_, i) => (
-                <option key={i + 1} value={i + 1}>
-                  {i + 1} {i === 0 ? 'Viajero' : 'Viajeros'}
-                </option>
-              ))}
-            </select>
-          </div>
+          ) : availableSpots === 0 ? (
+            <div className="bg-red-50 border border-red-200 rounded-md p-3 text-red-800 text-sm">
+              No hay lugares disponibles para este tour en este momento.
+            </div>
+          ) : (
+            <>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Users className="h-5 w-5 text-gray-400" />
+                </div>
+                <select
+                  id="travelersCount"
+                  value={travelersCount}
+                  onChange={(e) => setTravelersCount(Number(e.target.value))}
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                  disabled={availableSpots === null || availableSpots === 0}
+                >
+                  {[...Array(availableSpots || 0)].map((_, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      {i + 1} {i === 0 ? 'Viajero' : 'Viajeros'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="mt-1 text-xs text-gray-500">
+                {availableSpots} {availableSpots === 1 ? 'lugar disponible' : 'lugares disponibles'}
+              </div>
+            </>
+          )}
         </div>
         
         {/* Desglose de Costos */}
@@ -362,11 +421,15 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           <div className="w-full py-3 px-4 bg-gray-100 text-gray-500 rounded-md text-center font-medium cursor-not-allowed">
             Reservas Cerradas
           </div>
+        ) : availableSpots === 0 ? (
+          <div className="w-full py-3 px-4 bg-gray-100 text-gray-500 rounded-md text-center font-medium cursor-not-allowed">
+            Sin Lugares Disponibles
+          </div>
         ) : (
           <button
             type="submit"
             className="w-full btn btn-primary py-3 flex items-center justify-center"
-            disabled={isSubmitting || !user}
+            disabled={isSubmitting || !user || isLoadingAvailability || availableSpots === 0}
           >
             {user ? (
               tour.booking_approval_type === 'manual'
