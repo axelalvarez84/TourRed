@@ -21,9 +21,9 @@ export const formatDateForDB = (date: Date): string => {
 };
 
 export const parseDateFromDB = (dateString: string): Date => {
-  // Parse the date string and set it to midnight UTC
+  // Parse the date string and set it to midnight in local timezone
   const [year, month, day] = dateString.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
+  const date = new Date(year, month - 1, day);
   return date;
 };
 

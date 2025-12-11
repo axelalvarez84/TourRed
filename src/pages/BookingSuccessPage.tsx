@@ -141,9 +141,8 @@ const BookingSuccessPage: React.FC = () => {
           console.log('Booking updated successfully!');
           sendBookingConfirmationEmails(bookingId);
         }
-      } else if (bookingData.payment_status === 'succeeded') {
-        console.log('Booking already paid, sending confirmation emails...');
-        sendBookingConfirmationEmails(bookingId);
+      } else {
+        console.log('Booking already paid, emails already sent');
       }
 
     } catch (err: any) {
