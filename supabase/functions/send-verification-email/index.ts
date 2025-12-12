@@ -73,25 +73,24 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Obtener configuración de email desde la tabla de settings
+    // Obtener configuración de email desde email_settings
     const { data: emailSettings, error: settingsError } = await supabase
-      .from("settings")
-      .select("value")
-      .eq("key", "email_api_key")
+      .from("email_settings")
+      .select("smtp_api_key, contact_email")
       .maybeSingle();
 
     if (settingsError) {
       console.error("Error obteniendo configuración de email:", settingsError);
     }
 
-    const resendApiKey = emailSettings?.value || Deno.env.get("RESEND_API_KEY");
+    const smtpApiKey = emailSettings?.smtp_api_key;
 
-    if (!resendApiKey) {
-      console.error("API key de Resend no configurada");
+    if (!smtpApiKey) {
+      console.error("API key de SMTP2GO no configurada");
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Configuración de correo no disponible" 
+        JSON.stringify({
+          success: false,
+          error: "Configuración de correo no disponible"
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -100,29 +99,22 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Obtener configuración de email del remitente
-    const { data: fromEmailSettings } = await supabase
-      .from("settings")
-      .select("value")
-      .eq("key", "email_from")
-      .maybeSingle();
-
-    const fromEmail = fromEmailSettings?.value || "onboarding@resend.dev";
+    const fromEmail = emailSettings?.contact_email || "contacto@toursred.com";
 
     const displayName = userName || `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || 'Usuario';
 
-    // Enviar correo usando Resend
-    const emailResponse = await fetch("https://api.resend.com/emails", {
+    // Enviar correo usando SMTP2GO
+    const emailResponse = await fetch("https://api.smtp2go.com/v3/email/send", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${resendApiKey}`,
+        "X-Smtp2go-Api-Key": smtpApiKey,
       },
       body: JSON.stringify({
-        from: fromEmail,
-        to: userData.email,
+        sender: fromEmail,
+        to: [userData.email],
         subject: "Bienvenido - Verifica tu correo electrónico",
-        html: `
+        html_body: `
           <!DOCTYPE html>
           <html>
             <head>
@@ -174,13 +166,14 @@ Deno.serve(async (req: Request) => {
       }),
     });
 
-    if (!emailResponse.ok) {
-      const errorText = await emailResponse.text();
-      console.error("Error enviando correo:", errorText);
+    const emailData = await emailResponse.json();
+
+    if (!emailResponse.ok || emailData.data?.error) {
+      console.error("Error enviando correo:", emailData);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "No se pudo enviar el correo de verificación" 
+        JSON.stringify({
+          success: false,
+          error: emailData.data?.error || "No se pudo enviar el correo de verificación"
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -189,7 +182,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const emailData = await emailResponse.json();
     console.log("Correo de verificación enviado:", emailData);
 
     return new Response(
