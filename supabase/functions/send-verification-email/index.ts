@@ -123,7 +123,8 @@ Deno.serve(async (req: Request) => {
             </head>
             <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
               <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-                <h1 style="color: white; margin: 0; font-size: 28px;">¡Bienvenido a nuestra plataforma!</h1>
+                <img src="https://huzsedewwzjywcpbkjkm.supabase.co/storage/v1/object/public/assets/LogoFinal.jpg" alt="ToursRed Logo" style="max-width: 200px; height: auto; margin-bottom: 20px; background: white; padding: 10px; border-radius: 8px;" />
+                <h1 style="color: white; margin: 0; font-size: 28px;">¡Bienvenido a ToursRed!</h1>
               </div>
               
               <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
