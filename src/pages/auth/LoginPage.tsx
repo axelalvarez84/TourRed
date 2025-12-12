@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { signIn } from '../../lib/supabase';
+import { signIn, supabase } from '../../lib/supabase';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -26,8 +26,23 @@ const LoginPage: React.FC = () => {
       }
       
       if (data.user) {
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('email_verified')
+          .eq('id', data.user.id)
+          .single();
+
+        if (userError) {
+          console.error('Error verificando estado de email:', userError);
+        }
+
+        if (!userData?.email_verified) {
+          navigate('/verify-email');
+          return;
+        }
+
         const role = data.user.user_metadata?.role;
-        
+
         if (role === 'admin') {
           navigate('/admin/dashboard');
         } else if (role === 'agency') {

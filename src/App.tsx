@@ -9,6 +9,7 @@ import MessagingPage from './pages/MessagingPage';
 import LoginPage from './pages/auth/LoginPage';
 import SignupPage from './pages/auth/SignupPage';
 import AgencySignupPage from './pages/auth/AgencySignupPage';
+import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import TravelerDashboard from './pages/traveler/TravelerDashboard';
 import TravelerBookings from './pages/traveler/TravelerBookings';
 import TravelerProfile from './pages/traveler/TravelerProfile';
@@ -62,6 +63,7 @@ const App: React.FC = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/agency-signup" element={<AgencySignupPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/success" element={<SuccessPage />} />
           <Route path="/cancel" element={<CancelPage />} />
           <Route path="/booking-success" element={<BookingSuccessPage />} />

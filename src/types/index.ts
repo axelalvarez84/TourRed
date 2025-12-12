@@ -8,6 +8,10 @@ export interface User {
   curp?: string;
   passport_number?: string;
   is_foreign_traveler?: boolean;
+  email_verified?: boolean;
+  verification_code?: string;
+  verification_code_expires_at?: string;
+  verification_code_attempts?: number;
 }
 
 export interface Agency {

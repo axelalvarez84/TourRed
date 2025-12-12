@@ -98,13 +98,53 @@ const AgencySignupPage: React.FC = () => {
       }
 
       console.log('✅ Agencia creada:', agencyData);
-      
+
       if (isExistingUser) {
         setError('Usuario ya registrado. Se ha iniciado sesión automáticamente y se creó el perfil de agencia.');
-        // Wait a moment to show the message, then redirect
         setTimeout(() => navigate('/dashboard'), 2000);
       } else {
-        navigate('/dashboard');
+        const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 24);
+
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({
+            verification_code: verificationCode,
+            verification_code_expires_at: expiresAt.toISOString(),
+            verification_code_attempts: 0,
+          })
+          .eq('id', data.user.id);
+
+        if (updateError) {
+          console.error('Error actualizando código de verificación:', updateError);
+        }
+
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+
+          if (session) {
+            await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-verification-email`,
+              {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${session.access_token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  userId: data.user.id,
+                  verificationCode: verificationCode,
+                  userName: formData.agencyName,
+                }),
+              }
+            );
+          }
+        } catch (emailError) {
+          console.error('Error enviando correo de verificación:', emailError);
+        }
+
+        navigate('/verify-email');
       }
     } catch (err: any) {
       console.error('❌ Error en registro de agencia:', err);
