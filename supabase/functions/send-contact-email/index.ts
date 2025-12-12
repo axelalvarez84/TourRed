@@ -46,7 +46,7 @@ Deno.serve(async (req: Request) => {
     if (settingsError || !emailSettings) {
       console.error("Error fetching email settings:", settingsError);
       return new Response(
-        JSON.stringify({ error: "Error al obtener configuraci\u00f3n de email" }),
+        JSON.stringify({ error: "Error al obtener configuración de email" }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -86,6 +86,7 @@ Este mensaje fue enviado desde el formulario de contacto de ToursRed.
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
     .header { background-color: #1e40af; color: white; padding: 20px; text-align: center; }
+    .logo { max-width: 200px; height: auto; margin-bottom: 10px; }
     .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
     .field { margin-bottom: 15px; }
     .label { font-weight: bold; color: #1e40af; }
@@ -96,6 +97,7 @@ Este mensaje fue enviado desde el formulario de contacto de ToursRed.
 <body>
   <div class="container">
     <div class="header">
+      <img src="https://www.toursred.com/logo.png" alt="ToursRed Logo" class="logo" />
       <h1>Nuevo Mensaje de Contacto</h1>
     </div>
     <div class="content">
