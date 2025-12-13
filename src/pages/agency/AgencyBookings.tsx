@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter } from 'lucide-react';
+import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter, Star, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getAgencyBookings, supabase, parseDateFromDB } from '../../lib/supabase';
 import { Booking } from '../../types';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
+import ReviewForm from '../../components/ReviewForm';
 
 const AgencyBookings: React.FC = () => {
   const { user } = useAuth();
@@ -14,6 +15,11 @@ const AgencyBookings: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'completed' | 'cancelled'>('all');
   const [agencyId, setAgencyId] = useState<string | null>(null);
+  const [reviewModal, setReviewModal] = useState<{
+    open: boolean;
+    booking: Booking | null;
+    existingReview: any;
+  }>({ open: false, booking: null, existingReview: null });
 
   useEffect(() => {
     if (user?.id) {
@@ -275,6 +281,40 @@ const AgencyBookings: React.FC = () => {
       console.error('❌ Error actualizando estado de reserva:', err);
       setError(err.message || 'Error al actualizar el estado de la reserva');
     }
+  };
+
+  const handleOpenReviewModal = async (booking: Booking) => {
+    if (!agencyId) return;
+
+    try {
+      const { data: existingReview } = await supabase
+        .from('traveler_reviews')
+        .select('*')
+        .eq('booking_id', booking.id)
+        .maybeSingle();
+
+      setReviewModal({
+        open: true,
+        booking,
+        existingReview
+      });
+    } catch (err) {
+      console.error('Error checking for existing review:', err);
+      setReviewModal({
+        open: true,
+        booking,
+        existingReview: null
+      });
+    }
+  };
+
+  const handleCloseReviewModal = () => {
+    setReviewModal({ open: false, booking: null, existingReview: null });
+  };
+
+  const handleReviewSuccess = () => {
+    handleCloseReviewModal();
+    fetchAgencyData();
   };
 
   // Filtrar reservas
@@ -576,13 +616,22 @@ const AgencyBookings: React.FC = () => {
                     )}
 
                     {booking.status === 'confirmed' && (
-                      <button
-                        onClick={() => handleStatusUpdate(booking.id, 'completed')}
-                        className="btn btn-primary flex items-center justify-center"
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Marcar Completada
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleStatusUpdate(booking.id, 'completed')}
+                          className="btn btn-primary flex items-center justify-center"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Marcar Completada
+                        </button>
+                        <button
+                          onClick={() => handleOpenReviewModal(booking)}
+                          className="btn btn-outline flex items-center justify-center"
+                        >
+                          <Star className="h-4 w-4 mr-2" />
+                          Calificar Viajero
+                        </button>
+                      </>
                     )}
                   </div>
 
@@ -641,6 +690,43 @@ const AgencyBookings: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Review Modal */}
+      {reviewModal.open && reviewModal.booking && agencyId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h2 className="text-2xl font-bold mb-2">
+                    {reviewModal.existingReview ? 'Editar Calificación' : 'Calificar Viajero'}
+                  </h2>
+                  <p className="text-gray-600">
+                    {reviewModal.booking.users?.first_name} {reviewModal.booking.users?.last_name}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {reviewModal.booking.tours?.name}
+                  </p>
+                </div>
+                <button
+                  onClick={handleCloseReviewModal}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+              <ReviewForm
+                bookingId={reviewModal.booking.id}
+                revieweeId={reviewModal.booking.user_id!}
+                reviewType="traveler"
+                onSuccess={handleReviewSuccess}
+                onCancel={handleCloseReviewModal}
+                existingReview={reviewModal.existingReview}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>

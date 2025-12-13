@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Mail, Calendar, Save, CreditCard as Edit, X, MapPin, CreditCard, Globe, Phone } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import TravelerReviewsDisplay from '../../components/TravelerReviewsDisplay';
 
 interface TravelerProfile {
   id: string;
@@ -632,6 +633,11 @@ const TravelerProfile: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Calificaciones del Viajero */}
+        <div className="mt-6">
+          <TravelerReviewsDisplay travelerId={profile.id} />
         </div>
 
         {/* Información Adicional */}

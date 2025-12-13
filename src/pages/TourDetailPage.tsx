@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { MapPin, Calendar, Users, Building, Star, Clock, Globe, MessageCircle, ChevronLeft, ChevronRight, Edit } from 'lucide-react';
 import BookingForm from '../components/BookingForm';
-import ReviewList from '../components/ReviewList';
+import AgencyReviews from '../components/AgencyReviews';
 import { Tour } from '../types';
 import { getTourById, supabase, parseDateFromDB } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -558,8 +558,8 @@ const TourDetailPage: React.FC = () => {
                   </div>
                 )}
                 
-                {activeTab === 'reviews' && (
-                  <ReviewList tourId={tour.id} />
+                {activeTab === 'reviews' && tour.agency_id && (
+                  <AgencyReviews agencyId={tour.agency_id} />
                 )}
               </div>
             </div>

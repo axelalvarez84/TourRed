@@ -1,16 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle } from 'lucide-react';
+import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { getUserBookings, parseDateFromDB } from '../../lib/supabase';
+import { getUserBookings, parseDateFromDB, supabase } from '../../lib/supabase';
 import { Booking } from '../../types';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
+import ReviewForm from '../../components/ReviewForm';
 
 const TravelerBookings: React.FC = () => {
   const { user } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [reviewModal, setReviewModal] = useState<{
+    open: boolean;
+    booking: Booking | null;
+    existingReview: any;
+  }>({ open: false, booking: null, existingReview: null });
 
   useEffect(() => {
     if (user?.id) {
@@ -24,24 +30,56 @@ const TravelerBookings: React.FC = () => {
     try {
       setIsLoading(true);
       setError('');
-      
+
       console.log('🔍 Cargando reservas para usuario:', user.id);
-      
+
       const { data, error } = await getUserBookings(user.id);
-      
+
       if (error) {
         throw new Error(error.message);
       }
-      
+
       console.log('✅ Reservas cargadas:', data);
       setBookings(data || []);
-      
+
     } catch (err: any) {
       console.error('❌ Error cargando reservas:', err);
       setError(err.message || 'Error al cargar las reservas');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleOpenReviewModal = async (booking: Booking) => {
+    try {
+      const { data: existingReview } = await supabase
+        .from('agency_reviews')
+        .select('*')
+        .eq('booking_id', booking.id)
+        .maybeSingle();
+
+      setReviewModal({
+        open: true,
+        booking,
+        existingReview
+      });
+    } catch (err) {
+      console.error('Error checking for existing review:', err);
+      setReviewModal({
+        open: true,
+        booking,
+        existingReview: null
+      });
+    }
+  };
+
+  const handleCloseReviewModal = () => {
+    setReviewModal({ open: false, booking: null, existingReview: null });
+  };
+
+  const handleReviewSuccess = () => {
+    handleCloseReviewModal();
+    fetchBookings();
   };
 
   // Helper function to format dates consistently
@@ -310,6 +348,16 @@ const TravelerBookings: React.FC = () => {
                       </Link>
                     )}
 
+                    {booking.status === 'confirmed' && (
+                      <button
+                        onClick={() => handleOpenReviewModal(booking)}
+                        className="btn btn-primary flex items-center justify-center"
+                      >
+                        <Star className="h-4 w-4 mr-2" />
+                        Dejar Reseña
+                      </button>
+                    )}
+
                     {booking.agencies?.name && (
                       <div className="text-sm text-gray-600 flex items-center">
                         <span>Operado por: <strong>{booking.agencies.name}</strong></span>
@@ -345,6 +393,40 @@ const TravelerBookings: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Review Modal */}
+      {reviewModal.open && reviewModal.booking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h2 className="text-2xl font-bold mb-2">
+                    {reviewModal.existingReview ? 'Editar Reseña' : 'Dejar Reseña'}
+                  </h2>
+                  <p className="text-gray-600">
+                    {reviewModal.booking.tours?.name} - {reviewModal.booking.agencies?.name}
+                  </p>
+                </div>
+                <button
+                  onClick={handleCloseReviewModal}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+              <ReviewForm
+                bookingId={reviewModal.booking.id}
+                revieweeId={reviewModal.booking.agency_id!}
+                reviewType="agency"
+                onSuccess={handleReviewSuccess}
+                onCancel={handleCloseReviewModal}
+                existingReview={reviewModal.existingReview}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
