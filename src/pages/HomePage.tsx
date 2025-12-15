@@ -5,7 +5,6 @@ import SearchBox from '../components/SearchBox';
 import CategoryList from '../components/CategoryList';
 import FeaturedDestinations from '../components/FeaturedDestinations';
 import TourCard from '../components/TourCard';
-import StripeCheckout from '../components/StripeCheckout';
 import { Tour } from '../types';
 import { getTours } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -185,7 +184,7 @@ const HomePage: React.FC = () => {
                       <span className="font-bold">2</span>
                     </div>
                     <h3 className="font-semibold">Cargo por Servicio</h3>
-                    <p className="text-sm text-gray-600">Aplicamos un pequeño cargo del 3% para mantener la plataforma y garantizar seguridad</p>
+                    <p className="text-sm text-gray-600">Aplicamos un pequeño cargo del 5% en cada reserva para mantener la plataforma y garantizar seguridad</p>
                   </div>
                   
                   <div className="space-y-2">
@@ -196,10 +195,6 @@ const HomePage: React.FC = () => {
                     <p className="text-sm text-gray-600">El saldo restante se paga directamente a la agencia según sus políticas</p>
                   </div>
                 </div>
-              </div>
-              
-              <div className="max-w-md mx-auto">
-                <StripeCheckout />
               </div>
             </div>
           </div>
