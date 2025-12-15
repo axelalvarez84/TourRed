@@ -29,6 +29,8 @@ export default function AgencyReviews({ agencyId }: AgencyReviewsProps) {
 
   const fetchReviews = async () => {
     try {
+      console.log('🔍 [AgencyReviews] Fetching reviews for agency:', agencyId);
+
       const { data, error } = await supabase
         .from('agency_reviews')
         .select(`
@@ -44,18 +46,25 @@ export default function AgencyReviews({ agencyId }: AgencyReviewsProps) {
         .eq('agency_id', agencyId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      console.log('📊 [AgencyReviews] Query result:', { data, error });
+
+      if (error) {
+        console.error('❌ [AgencyReviews] Error fetching reviews:', error);
+        throw error;
+      }
 
       const reviewsData = data || [];
+      console.log('✅ [AgencyReviews] Reviews data:', reviewsData);
       setReviews(reviewsData);
       setTotalReviews(reviewsData.length);
 
       if (reviewsData.length > 0) {
         const avg = reviewsData.reduce((sum, review) => sum + review.rating, 0) / reviewsData.length;
         setAverageRating(avg);
+        console.log('⭐ [AgencyReviews] Average rating:', avg);
       }
     } catch (error) {
-      console.error('Error fetching reviews:', error);
+      console.error('❌ [AgencyReviews] Exception:', error);
     } finally {
       setLoading(false);
     }
@@ -96,7 +105,7 @@ export default function AgencyReviews({ agencyId }: AgencyReviewsProps) {
   return (
     <div className="space-y-6">
       {totalReviews > 0 && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-100">
+        <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-6 rounded-lg border border-blue-100">
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-3 mb-2">
@@ -127,7 +136,7 @@ export default function AgencyReviews({ agencyId }: AgencyReviewsProps) {
             >
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-full flex items-center justify-center">
                     <User className="w-6 h-6 text-white" />
                   </div>
                 </div>

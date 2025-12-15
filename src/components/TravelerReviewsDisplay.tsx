@@ -33,6 +33,8 @@ export default function TravelerReviewsDisplay({ travelerId }: TravelerReviewsDi
 
   const fetchReviews = async () => {
     try {
+      console.log('🔍 [TravelerReviews] Fetching reviews for traveler:', travelerId);
+
       const { data, error } = await supabase
         .from('traveler_reviews')
         .select(`
@@ -51,17 +53,24 @@ export default function TravelerReviewsDisplay({ travelerId }: TravelerReviewsDi
         .eq('traveler_id', travelerId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      console.log('📊 [TravelerReviews] Query result:', { data, error });
+
+      if (error) {
+        console.error('❌ [TravelerReviews] Error fetching reviews:', error);
+        throw error;
+      }
 
       const reviewsData = data || [];
+      console.log('✅ [TravelerReviews] Reviews data:', reviewsData);
       setReviews(reviewsData);
 
       if (reviewsData.length > 0) {
         const avg = reviewsData.reduce((sum, review) => sum + review.rating, 0) / reviewsData.length;
         setAverageRating(avg);
+        console.log('⭐ [TravelerReviews] Average rating:', avg);
       }
     } catch (error) {
-      console.error('Error fetching traveler reviews:', error);
+      console.error('❌ [TravelerReviews] Exception:', error);
     } finally {
       setLoading(false);
     }
@@ -105,7 +114,7 @@ export default function TravelerReviewsDisplay({ travelerId }: TravelerReviewsDi
       </h2>
 
       {reviews.length > 0 && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-100 mb-6">
+        <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-4 rounded-lg border border-blue-100 mb-6">
           <div className="flex items-center gap-3">
             <span className="text-3xl font-bold text-gray-900">
               {averageRating.toFixed(1)}
@@ -144,7 +153,7 @@ export default function TravelerReviewsDisplay({ travelerId }: TravelerReviewsDi
                       className="w-12 h-12 rounded-full object-cover"
                     />
                   ) : (
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-full flex items-center justify-center">
                       <Building className="w-6 h-6 text-white" />
                     </div>
                   )}
