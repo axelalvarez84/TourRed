@@ -5,15 +5,18 @@ import { format } from 'date-fns';
 
 interface AdminReview {
   id: string;
-  user_id: string;
-  tour_id: string;
+  user_id?: string;
+  tour_id?: string;
   agency_id: string;
+  traveler_id?: string;
+  booking_id?: string;
   rating: number;
   comment: string;
   reply?: string;
   is_visible: boolean;
   created_at: string;
   updated_at: string;
+  review_type: 'tour' | 'agency' | 'traveler';
   users?: {
     first_name?: string;
     last_name?: string;
@@ -26,6 +29,11 @@ interface AdminReview {
   };
   agencies?: {
     name: string;
+  };
+  traveler?: {
+    first_name?: string;
+    last_name?: string;
+    email: string;
   };
 }
 
@@ -50,24 +58,108 @@ const AdminReviews: React.FC = () => {
       setIsLoading(true);
       setError('');
 
-      console.log('⭐ Cargando reseñas desde la BD...');
+      console.log('⭐ Cargando todas las reseñas desde la BD...');
 
-      const { data: reviewsData, error: reviewsError } = await supabase
+      // Cargar reseñas de tours
+      const { data: tourReviews, error: tourReviewsError } = await supabase
         .from('reviews')
         .select(`
           *,
-          users(first_name, last_name, email),
-          tours(name, destination, image_url),
-          agencies(name)
+          users:user_id(first_name, last_name, email),
+          tours:tour_id(name, destination, image_url),
+          agencies:agency_id(name)
         `)
         .order('created_at', { ascending: false });
 
-      if (reviewsError) {
-        throw new Error(reviewsError.message);
+      if (tourReviewsError) {
+        console.error('❌ Error cargando reseñas de tours:', tourReviewsError);
       }
 
-      console.log('✅ Reseñas cargadas:', reviewsData);
-      setReviews(reviewsData || []);
+      // Cargar reseñas de agencias
+      const { data: agencyReviews, error: agencyReviewsError } = await supabase
+        .from('agency_reviews')
+        .select(`
+          *,
+          users:traveler_id(first_name, last_name, email),
+          agencies:agency_id(name),
+          bookings:booking_id(tours:tour_id(name, destination, image_url))
+        `)
+        .order('created_at', { ascending: false });
+
+      if (agencyReviewsError) {
+        console.error('❌ Error cargando reseñas de agencias:', agencyReviewsError);
+      }
+
+      // Cargar reseñas de viajeros
+      const { data: travelerReviews, error: travelerReviewsError } = await supabase
+        .from('traveler_reviews')
+        .select(`
+          *,
+          traveler:traveler_id(first_name, last_name, email),
+          agencies:agency_id(name),
+          bookings:booking_id(tours:tour_id(name, destination, image_url))
+        `)
+        .order('created_at', { ascending: false });
+
+      if (travelerReviewsError) {
+        console.error('❌ Error cargando reseñas de viajeros:', travelerReviewsError);
+      }
+
+      // Combinar y formatear todas las reseñas
+      const allReviews: AdminReview[] = [];
+
+      // Formatear reseñas de tours
+      if (tourReviews) {
+        tourReviews.forEach((review: any) => {
+          allReviews.push({
+            ...review,
+            review_type: 'tour',
+            users: review.users,
+            tours: review.tours,
+            agencies: review.agencies,
+          });
+        });
+      }
+
+      // Formatear reseñas de agencias
+      if (agencyReviews) {
+        agencyReviews.forEach((review: any) => {
+          allReviews.push({
+            ...review,
+            review_type: 'agency',
+            users: review.users,
+            tours: review.bookings?.tours,
+            agencies: review.agencies,
+          });
+        });
+      }
+
+      // Formatear reseñas de viajeros
+      if (travelerReviews) {
+        travelerReviews.forEach((review: any) => {
+          allReviews.push({
+            ...review,
+            review_type: 'traveler',
+            traveler: review.traveler,
+            tours: review.bookings?.tours,
+            agencies: review.agencies,
+          });
+        });
+      }
+
+      // Ordenar por fecha
+      allReviews.sort((a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      console.log('✅ Reseñas cargadas:', {
+        tours: tourReviews?.length || 0,
+        agencies: agencyReviews?.length || 0,
+        travelers: travelerReviews?.length || 0,
+        total: allReviews.length
+      });
+
+      setReviews(allReviews);
     } catch (err: any) {
       console.error('❌ Error cargando reseñas:', err);
       setError(err.message || 'Error al cargar las reseñas');
@@ -76,14 +168,18 @@ const AdminReviews: React.FC = () => {
     }
   };
 
-  const handleToggleVisibility = async (reviewId: string, currentVisibility: boolean) => {
+  const handleToggleVisibility = async (reviewId: string, currentVisibility: boolean, reviewType: 'tour' | 'agency' | 'traveler') => {
     try {
       setIsUpdating(reviewId);
       setError('');
 
+      const tableName = reviewType === 'tour' ? 'reviews' :
+                       reviewType === 'agency' ? 'agency_reviews' :
+                       'traveler_reviews';
+
       const { error } = await supabase
-        .from('reviews')
-        .update({ 
+        .from(tableName)
+        .update({
           is_visible: !currentVisibility,
           updated_at: new Date().toISOString()
         })
@@ -94,8 +190,8 @@ const AdminReviews: React.FC = () => {
       }
 
       // Actualizar estado local
-      setReviews(reviews.map(review => 
-        review.id === reviewId 
+      setReviews(reviews.map(review =>
+        review.id === reviewId
           ? { ...review, is_visible: !currentVisibility }
           : review
       ));
@@ -110,7 +206,10 @@ const AdminReviews: React.FC = () => {
   };
 
   const handleDeleteReview = async (review: AdminReview) => {
-    if (!confirm(`¿Estás seguro de que quieres eliminar esta reseña?\n\nReseña de: ${getUserDisplayName(review)}\nTour: ${review.tours?.name}\nCalificación: ${review.rating} estrellas\n\nEsta acción NO se puede deshacer.`)) {
+    const reviewTypeLabel = review.review_type === 'tour' ? 'Tour' :
+                           review.review_type === 'agency' ? 'Agencia' : 'Viajero';
+
+    if (!confirm(`¿Estás seguro de que quieres eliminar esta reseña?\n\nTipo: Reseña de ${reviewTypeLabel}\nDe: ${getUserDisplayName(review)}\nCalificación: ${review.rating} estrellas\n\nEsta acción NO se puede deshacer.`)) {
       return;
     }
 
@@ -118,8 +217,12 @@ const AdminReviews: React.FC = () => {
       setIsUpdating(review.id);
       setError('');
 
+      const tableName = review.review_type === 'tour' ? 'reviews' :
+                       review.review_type === 'agency' ? 'agency_reviews' :
+                       'traveler_reviews';
+
       const { error } = await supabase
-        .from('reviews')
+        .from(tableName)
         .delete()
         .eq('id', review.id);
 
@@ -138,7 +241,7 @@ const AdminReviews: React.FC = () => {
     }
   };
 
-  const handleAddReply = async (reviewId: string) => {
+  const handleAddReply = async (reviewId: string, reviewType: 'tour' | 'agency' | 'traveler') => {
     if (!replyText.trim()) {
       setError('La respuesta no puede estar vacía');
       return;
@@ -148,9 +251,19 @@ const AdminReviews: React.FC = () => {
       setIsUpdating(reviewId);
       setError('');
 
+      const tableName = reviewType === 'tour' ? 'reviews' :
+                       reviewType === 'agency' ? 'agency_reviews' :
+                       'traveler_reviews';
+
+      // Solo reviews y agency_reviews tienen reply
+      if (reviewType === 'traveler') {
+        setError('Las reseñas de viajeros no soportan respuestas');
+        return;
+      }
+
       const { error } = await supabase
-        .from('reviews')
-        .update({ 
+        .from(tableName)
+        .update({
           reply: replyText.trim(),
           updated_at: new Date().toISOString()
         })
@@ -161,8 +274,8 @@ const AdminReviews: React.FC = () => {
       }
 
       // Actualizar estado local
-      setReviews(reviews.map(review => 
-        review.id === reviewId 
+      setReviews(reviews.map(review =>
+        review.id === reviewId
           ? { ...review, reply: replyText.trim() }
           : review
       ));
@@ -179,10 +292,44 @@ const AdminReviews: React.FC = () => {
   };
 
   const getUserDisplayName = (review: AdminReview) => {
-    if (review.users?.first_name || review.users?.last_name) {
-      return `${review.users.first_name || ''} ${review.users.last_name || ''}`.trim();
+    // Para reseñas de viajeros, la agencia es el autor
+    if (review.review_type === 'traveler') {
+      return review.agencies?.name || 'Agencia';
     }
-    return review.users?.email || 'Usuario';
+
+    // Para otras reseñas, el usuario/viajero es el autor
+    const user = review.users || review.traveler;
+    if (user?.first_name || user?.last_name) {
+      return `${user.first_name || ''} ${user.last_name || ''}`.trim();
+    }
+    return user?.email || 'Usuario';
+  };
+
+  const getReviewTypeLabel = (reviewType: 'tour' | 'agency' | 'traveler') => {
+    switch (reviewType) {
+      case 'tour':
+        return 'Reseña de Tour';
+      case 'agency':
+        return 'Reseña de Agencia';
+      case 'traveler':
+        return 'Reseña de Viajero';
+      default:
+        return 'Reseña';
+    }
+  };
+
+  const getReviewTypeBadge = (reviewType: 'tour' | 'agency' | 'traveler') => {
+    const colors = {
+      tour: 'bg-blue-100 text-blue-800',
+      agency: 'bg-green-100 text-green-800',
+      traveler: 'bg-purple-100 text-purple-800'
+    };
+
+    return (
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${colors[reviewType]}`}>
+        {getReviewTypeLabel(reviewType)}
+      </span>
+    );
   };
 
   const renderStars = (rating: number) => {
@@ -389,8 +536,11 @@ const AdminReviews: React.FC = () => {
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-2">
                         <h3 className="text-lg font-semibold text-gray-900">
-                          {review.tours?.name || 'Tour sin nombre'}
+                          {review.review_type === 'traveler'
+                            ? `Reseña sobre ${review.traveler?.first_name || 'Viajero'}`
+                            : review.tours?.name || 'Sin nombre'}
                         </h3>
+                        {getReviewTypeBadge(review.review_type)}
                         {getVisibilityBadge(review.is_visible)}
                       </div>
                       
@@ -421,7 +571,7 @@ const AdminReviews: React.FC = () => {
                   {/* Actions */}
                   <div className="flex items-center space-x-2">
                     <button
-                      onClick={() => handleToggleVisibility(review.id, review.is_visible)}
+                      onClick={() => handleToggleVisibility(review.id, review.is_visible, review.review_type)}
                       disabled={isUpdating === review.id}
                       className={`inline-flex items-center px-3 py-1 rounded-md text-xs font-medium ${
                         review.is_visible
@@ -508,9 +658,9 @@ const AdminReviews: React.FC = () => {
                             Cancelar
                           </button>
                           <button
-                            onClick={() => handleAddReply(review.id)}
+                            onClick={() => handleAddReply(review.id, review.review_type)}
                             className="btn btn-primary btn-sm"
-                            disabled={isUpdating === review.id || !replyText.trim()}
+                            disabled={isUpdating === review.id || !replyText.trim() || review.review_type === 'traveler'}
                           >
                             {isUpdating === review.id ? (
                               <>
@@ -526,7 +676,7 @@ const AdminReviews: React.FC = () => {
                           </button>
                         </div>
                       </div>
-                    ) : (
+                    ) : review.review_type !== 'traveler' ? (
                       <button
                         onClick={() => setIsReplying(review.id)}
                         className="text-primary-600 hover:text-primary-800 text-sm font-medium flex items-center"
@@ -534,6 +684,10 @@ const AdminReviews: React.FC = () => {
                         <MessageSquare className="h-4 w-4 mr-1" />
                         Agregar respuesta
                       </button>
+                    ) : (
+                      <p className="text-sm text-gray-500 italic">
+                        Las reseñas de viajeros no soportan respuestas
+                      </p>
                     )}
                   </div>
                 )}
@@ -543,7 +697,11 @@ const AdminReviews: React.FC = () => {
                   <div className="flex items-center justify-between text-xs text-gray-500">
                     <div className="flex items-center space-x-4">
                       <span>ID: {review.id.slice(0, 8)}...</span>
-                      <span>Usuario: {review.users?.email}</span>
+                      <span>
+                        {review.review_type === 'traveler'
+                          ? `Agencia: ${review.agencies?.name}`
+                          : `Usuario: ${(review.users || review.traveler)?.email}`}
+                      </span>
                       {review.updated_at !== review.created_at && (
                         <span>Editado: {format(new Date(review.updated_at), 'dd/MM/yyyy HH:mm')}</span>
                       )}
