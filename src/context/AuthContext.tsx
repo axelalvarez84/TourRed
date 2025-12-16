@@ -26,7 +26,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const determineUserRole = async (authUser: any): Promise<UserRole | null> => {
+  const getCachedRole = (userId: string): UserRole | null => {
+    try {
+      const cached = localStorage.getItem(`user_role_${userId}`);
+      if (cached && Object.values(UserRole).includes(cached as UserRole)) {
+        return cached as UserRole;
+      }
+    } catch (err) {
+      console.error('Error leyendo cache de rol:', err);
+    }
+    return null;
+  };
+
+  const setCachedRole = (userId: string, role: UserRole) => {
+    try {
+      localStorage.setItem(`user_role_${userId}`, role);
+    } catch (err) {
+      console.error('Error guardando cache de rol:', err);
+    }
+  };
+
+  const determineUserRole = async (authUser: any, forceRefresh: boolean = false): Promise<UserRole | null> => {
     if (!authUser) {
       console.log('ℹ️ No hay usuario autenticado');
       return null;
@@ -37,7 +57,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // VERIFICACIÓN ESPECIAL PARA ADMIN PRIMERO
     if (authUser.email === 'tourredmx@gmail.com') {
       console.log('👑 Usuario administrador detectado por email - FORZANDO ADMIN');
+      setCachedRole(authUser.id, UserRole.ADMIN);
       return UserRole.ADMIN;
+    }
+
+    // Verificar cache primero si no se fuerza refresco
+    if (!forceRefresh) {
+      const cachedRole = getCachedRole(authUser.id);
+      if (cachedRole) {
+        console.log('✅ Usando rol del cache:', cachedRole);
+        return cachedRole;
+      }
     }
 
     // Verificar metadata
@@ -46,6 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (metadataRole && Object.values(UserRole).includes(metadataRole as UserRole)) {
       console.log('✅ Usando rol de metadata:', metadataRole);
+      setCachedRole(authUser.id, metadataRole as UserRole);
       return metadataRole as UserRole;
     }
 
@@ -69,6 +100,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('❌ Error consultando perfil:', error);
       } else if (profile) {
         console.log('✅ Perfil encontrado en BD:', profile);
+        setCachedRole(authUser.id, profile.role as UserRole);
         return profile.role as UserRole;
       } else {
         console.log('⚠️ No se encontró perfil en BD');
@@ -79,36 +111,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Por defecto, traveler
     console.log('🎒 Asignando rol por defecto: traveler');
+    setCachedRole(authUser.id, UserRole.TRAVELER);
     return UserRole.TRAVELER;
   };
 
-  const updateAuthState = async (authUser: any) => {
-    console.log('🔄 Actualizando estado de autenticación...');
-    
+  const updateAuthState = async (authUser: any, forceRefresh: boolean = false) => {
+    console.log('🔄 Actualizando estado de autenticación...', { forceRefresh });
+
     try {
       setUser(authUser);
-      
+
       if (authUser) {
-        const role = await determineUserRole(authUser);
+        const role = await determineUserRole(authUser, forceRefresh);
         console.log('🎭 Rol determinado:', role);
         setUserRole(role);
       } else {
         setUserRole(null);
+        try {
+          localStorage.clear();
+        } catch (err) {
+          console.error('Error limpiando cache:', err);
+        }
       }
     } catch (err: any) {
       console.error('❌ Error determinando rol:', err);
-      // En caso de error, asignar rol por defecto
       if (authUser) {
         if (authUser.email === 'tourredmx@gmail.com') {
           setUserRole(UserRole.ADMIN);
         } else {
-          setUserRole(UserRole.TRAVELER);
+          const cachedRole = getCachedRole(authUser.id);
+          if (cachedRole) {
+            console.log('⚠️ Usando rol cacheado debido a error:', cachedRole);
+            setUserRole(cachedRole);
+          } else {
+            setUserRole(UserRole.TRAVELER);
+          }
         }
       } else {
         setUserRole(null);
       }
     } finally {
-      // IMPORTANTE: SIEMPRE establecer isLoading en false
       console.log('✅ Finalizando carga - estableciendo isLoading: false');
       setIsLoading(false);
     }
@@ -155,11 +197,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Configurar listener de cambios de auth
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔔 Cambio de estado de auth:', event);
-      
+
       if (!mounted) return;
 
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        await updateAuthState(session?.user || null);
+      if (event === 'SIGNED_IN') {
+        await updateAuthState(session?.user || null, true);
+      } else if (event === 'TOKEN_REFRESHED') {
+        if (session?.user && user && session.user.id === user.id) {
+          console.log('♻️ Token refrescado - manteniendo sesión actual');
+          setUser(session.user);
+        } else {
+          await updateAuthState(session?.user || null, false);
+        }
       } else if (event === 'SIGNED_OUT') {
         console.log('👋 Usuario cerró sesión');
         setUser(null);
