@@ -44,21 +44,7 @@ export default function AgencyReviews({ agencyId, agencyName }: AgencyReviewsPro
   const fetchReviews = async () => {
     try {
       const { data, error } = await supabase
-        .from('agency_reviews')
-        .select(`
-          id,
-          rating,
-          comment,
-          reply,
-          created_at,
-          traveler:users!agency_reviews_traveler_id_fkey(
-            first_name,
-            last_name
-          )
-        `)
-        .eq('agency_id', agencyId)
-        .eq('is_visible', true)
-        .order('created_at', { ascending: false });
+        .rpc('get_agency_reviews_with_users', { p_agency_id: agencyId });
 
       if (error) {
         console.error('Error en query de reseñas:', error);
@@ -66,13 +52,24 @@ export default function AgencyReviews({ agencyId, agencyName }: AgencyReviewsPro
       }
 
       const reviewsData = data || [];
-      const validReviews = reviewsData.filter(review => review && review.traveler);
 
-      setReviews(validReviews);
-      setTotalReviews(validReviews.length);
+      const reviewsWithTravelers = reviewsData.map(review => ({
+        id: review.id,
+        rating: review.rating,
+        comment: review.comment,
+        reply: review.reply,
+        created_at: review.created_at,
+        traveler: {
+          first_name: review.traveler_first_name || 'Usuario',
+          last_name: review.traveler_last_name || ''
+        }
+      }));
 
-      if (validReviews.length > 0) {
-        const avg = validReviews.reduce((sum, review) => sum + review.rating, 0) / validReviews.length;
+      setReviews(reviewsWithTravelers);
+      setTotalReviews(reviewsWithTravelers.length);
+
+      if (reviewsWithTravelers.length > 0) {
+        const avg = reviewsWithTravelers.reduce((sum, review) => sum + review.rating, 0) / reviewsWithTravelers.length;
         setAverageRating(avg);
       } else {
         setAverageRating(0);
