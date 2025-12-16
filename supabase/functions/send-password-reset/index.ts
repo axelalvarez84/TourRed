@@ -38,7 +38,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: userData, error: userError } = await supabase
       .from("users")
-      .select("id, email, phone_number, first_name, last_name")
+      .select("id, email, phone_number, first_name, last_name, role")
       .eq("email", email)
       .maybeSingle();
 
@@ -63,7 +63,32 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (userData.phone_number !== phoneNumber) {
+    let userPhoneNumber = userData.phone_number;
+
+    if (userData.role === 'agency') {
+      const { data: agencyData, error: agencyError } = await supabase
+        .from("agencies")
+        .select("contact_phone")
+        .eq("user_id", userData.id)
+        .maybeSingle();
+
+      if (agencyError) {
+        console.error("Error buscando datos de agencia:", agencyError);
+        return new Response(
+          JSON.stringify({ success: false, error: "Error al buscar información de la agencia" }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 500,
+          }
+        );
+      }
+
+      if (agencyData) {
+        userPhoneNumber = agencyData.contact_phone;
+      }
+    }
+
+    if (!userPhoneNumber || userPhoneNumber !== phoneNumber) {
       return new Response(
         JSON.stringify({ success: false, error: "El correo y número de teléfono no coinciden" }),
         {
