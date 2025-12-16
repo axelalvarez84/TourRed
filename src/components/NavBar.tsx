@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { signOut } from '../lib/supabase';
 
 const NavBar: React.FC = () => {
-  const { user, isAdmin, isAgency, isTraveler } = useAuth();
+  const { user, isAdmin, isAgency, isTraveler, isEmailVerified } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const navigate = useNavigate();
@@ -91,15 +91,17 @@ const NavBar: React.FC = () => {
             <Link to="/search" className="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
               <Search className="h-6 w-6" />
             </Link>
-            
-            <div className="ml-3 p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-              <NotificationBell />
-            </div>
-            
-            {user && (
-              <Link to="/messages" className="ml-3 p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                <MessageCircle className="h-6 w-6" />
-              </Link>
+
+            {user && isEmailVerified && (
+              <>
+                <div className="ml-3 p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                  <NotificationBell />
+                </div>
+
+                <Link to="/messages" className="ml-3 p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                  <MessageCircle className="h-6 w-6" />
+                </Link>
+              </>
             )}
             
             {user ? (
@@ -127,41 +129,57 @@ const NavBar: React.FC = () => {
                     aria-labelledby="user-menu-button"
                     tabIndex={-1}
                   >
-                    {/* Role-specific menu items */}
-                    {getRoleSpecificMenuItems().map((item) => (
-                      <Link
-                        key={item.to}
-                        to={item.to}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-100"
-                        role="menuitem"
-                        onClick={() => setIsProfileOpen(false)}
-                      >
-                        {item.label}
-                      </Link>
-                    ))}
-                    
-                    {/* Separator if there are role-specific items */}
-                    {getRoleSpecificMenuItems().length > 0 && (
-                      <div className="border-t border-gray-100 my-1"></div>
+                    {!isEmailVerified ? (
+                      <>
+                        <Link
+                          to="/verify-email"
+                          className="block px-4 py-2 text-sm text-orange-600 hover:bg-blue-100 font-medium"
+                          role="menuitem"
+                          onClick={() => setIsProfileOpen(false)}
+                        >
+                          Verificar Email
+                        </Link>
+                        <div className="border-t border-gray-100 my-1"></div>
+                      </>
+                    ) : (
+                      <>
+                        {/* Role-specific menu items */}
+                        {getRoleSpecificMenuItems().map((item) => (
+                          <Link
+                            key={item.to}
+                            to={item.to}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-100"
+                            role="menuitem"
+                            onClick={() => setIsProfileOpen(false)}
+                          >
+                            {item.label}
+                          </Link>
+                        ))}
+
+                        {/* Separator if there are role-specific items */}
+                        {getRoleSpecificMenuItems().length > 0 && (
+                          <div className="border-t border-gray-100 my-1"></div>
+                        )}
+
+                        <Link
+                          to="/messages"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-100"
+                          role="menuitem"
+                          onClick={() => setIsProfileOpen(false)}
+                        >
+                          Mensajes
+                        </Link>
+
+                        <Link
+                          to={getProfileLink()}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-100"
+                          role="menuitem"
+                          onClick={() => setIsProfileOpen(false)}
+                        >
+                          Perfil
+                        </Link>
+                      </>
                     )}
-                    
-                    <Link 
-                      to="/messages" 
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-100"
-                      role="menuitem"
-                      onClick={() => setIsProfileOpen(false)}
-                    >
-                      Mensajes
-                    </Link>
-                    
-                    <Link 
-                      to={getProfileLink()} 
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-100"
-                      role="menuitem"
-                      onClick={() => setIsProfileOpen(false)}
-                    >
-                      Perfil
-                    </Link>
                     <button
                       onClick={handleSignOut}
                       className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-blue-100"

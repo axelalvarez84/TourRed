@@ -8,6 +8,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isAgency: boolean;
   isTraveler: boolean;
+  isEmailVerified: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   isAdmin: false,
   isAgency: false,
   isTraveler: false,
+  isEmailVerified: false,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -24,6 +26,7 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<any | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const getCachedRole = (userId: string): UserRole | null => {
@@ -90,7 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const queryPromise = supabase
         .from('users')
-        .select('role, email')
+        .select('role, email, email_verified')
         .eq('id', authUser.id)
         .maybeSingle();
 
@@ -125,8 +128,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const role = await determineUserRole(authUser, forceRefresh);
         console.log('🎭 Rol determinado:', role);
         setUserRole(role);
+
+        try {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('email_verified')
+            .eq('id', authUser.id)
+            .maybeSingle();
+
+          const verified = userData?.email_verified || false;
+          console.log('📧 Email verificado:', verified);
+          setIsEmailVerified(verified);
+        } catch (err) {
+          console.error('Error verificando email:', err);
+          setIsEmailVerified(false);
+        }
       } else {
         setUserRole(null);
+        setIsEmailVerified(false);
         try {
           localStorage.clear();
         } catch (err) {
@@ -149,6 +168,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else {
         setUserRole(null);
+        setIsEmailVerified(false);
       }
     } finally {
       console.log('✅ Finalizando carga - estableciendo isLoading: false');
@@ -229,24 +249,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Log del estado actual cada vez que cambia
   useEffect(() => {
-    console.log('🎭 Estado del contexto actualizado:', { 
-      userEmail: user?.email, 
-      userRole, 
-      isAdmin, 
-      isAgency, 
+    console.log('🎭 Estado del contexto actualizado:', {
+      userEmail: user?.email,
+      userRole,
+      isAdmin,
+      isAgency,
       isTraveler,
-      isLoading 
+      isEmailVerified,
+      isLoading
     });
-  }, [user, userRole, isLoading, isAdmin, isAgency, isTraveler]);
+  }, [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isEmailVerified]);
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      userRole, 
+    <AuthContext.Provider value={{
+      user,
+      userRole,
       isLoading,
       isAdmin,
       isAgency,
-      isTraveler
+      isTraveler,
+      isEmailVerified
     }}>
       {children}
     </AuthContext.Provider>

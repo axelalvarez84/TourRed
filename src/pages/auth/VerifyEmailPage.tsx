@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { supabase, signOut } from '../../lib/supabase';
 import { Mail, ArrowLeft, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 const VerifyEmailPage: React.FC = () => {
@@ -32,12 +32,19 @@ const VerifyEmailPage: React.FC = () => {
         .from('users')
         .select('email_verified')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
       if (data?.email_verified) {
-        navigate('/');
+        const role = user.user_metadata?.role;
+        if (role === 'admin') {
+          navigate('/admin/dashboard');
+        } else if (role === 'agency') {
+          navigate('/agency/dashboard');
+        } else {
+          navigate('/traveler/dashboard');
+        }
       }
     } catch (err) {
       console.error('Error checking verification status:', err);
@@ -223,15 +230,20 @@ const VerifyEmailPage: React.FC = () => {
     );
   }
 
+  const handleBackToLogin = async () => {
+    await signOut();
+    navigate('/login');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
         <button
-          onClick={() => navigate('/login')}
+          onClick={handleBackToLogin}
           className="flex items-center text-primary-600 hover:text-primary-700 mb-6 transition-colors"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver al inicio de sesión
+          Cerrar sesión
         </button>
 
         <div className="text-center mb-8">

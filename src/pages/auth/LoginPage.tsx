@@ -30,7 +30,7 @@ const LoginPage: React.FC = () => {
           .from('users')
           .select('email_verified')
           .eq('id', data.user.id)
-          .single();
+          .maybeSingle();
 
         if (userError) {
           console.error('Error verificando estado de email:', userError);
