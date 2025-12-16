@@ -75,8 +75,7 @@ const AdminReviews: React.FC = () => {
         console.error('❌ Error cargando reseñas de tours:', tourReviewsError);
       }
 
-      // Cargar reseñas de agencias con información completa
-      let agencyReviewsProcessed: any[] = [];
+      // Cargar reseñas de agencias
       const { data: agencyReviews, error: agencyReviewsError } = await supabase
         .from('agency_reviews')
         .select(`
@@ -90,31 +89,7 @@ const AdminReviews: React.FC = () => {
         console.error('❌ Error cargando reseñas de agencias:', agencyReviewsError);
       }
 
-      // Cargar bookings con tour info para agency reviews
-      if (agencyReviews && agencyReviews.length > 0) {
-        const bookingIds = agencyReviews.map(r => r.booking_id).filter(Boolean);
-        if (bookingIds.length > 0) {
-          const { data: bookingsData } = await supabase
-            .from('bookings')
-            .select('id, tour_id, tours:tour_id(id, name, destination, image_url)')
-            .in('id', bookingIds);
-
-          const bookingsMap = new Map();
-          if (bookingsData) {
-            bookingsData.forEach(b => bookingsMap.set(b.id, b));
-          }
-
-          agencyReviewsProcessed = agencyReviews.map((review: any) => ({
-            ...review,
-            tours: bookingsMap.get(review.booking_id)?.tours || null
-          }));
-        } else {
-          agencyReviewsProcessed = agencyReviews;
-        }
-      }
-
-      // Cargar reseñas de viajeros con información completa
-      let travelerReviewsProcessed: any[] = [];
+      // Cargar reseñas de viajeros
       const { data: travelerReviews, error: travelerReviewsError } = await supabase
         .from('traveler_reviews')
         .select(`
@@ -128,26 +103,39 @@ const AdminReviews: React.FC = () => {
         console.error('❌ Error cargando reseñas de viajeros:', travelerReviewsError);
       }
 
-      // Cargar bookings con tour info para traveler reviews
-      if (travelerReviews && travelerReviews.length > 0) {
-        const bookingIds = travelerReviews.map(r => r.booking_id).filter(Boolean);
-        if (bookingIds.length > 0) {
-          const { data: bookingsData } = await supabase
-            .from('bookings')
-            .select('id, tour_id, tours:tour_id(id, name, destination, image_url)')
-            .in('id', bookingIds);
+      // Obtener todos los booking_ids
+      const allBookingIds = new Set<string>();
+      if (agencyReviews) {
+        agencyReviews.forEach(r => r.booking_id && allBookingIds.add(r.booking_id));
+      }
+      if (travelerReviews) {
+        travelerReviews.forEach(r => r.booking_id && allBookingIds.add(r.booking_id));
+      }
 
-          const bookingsMap = new Map();
-          if (bookingsData) {
-            bookingsData.forEach(b => bookingsMap.set(b.id, b));
-          }
+      // Cargar bookings con sus tour_ids
+      const bookingToTourMap = new Map<string, string>();
+      if (allBookingIds.size > 0) {
+        const { data: bookings } = await supabase
+          .from('bookings')
+          .select('id, tour_id')
+          .in('id', Array.from(allBookingIds));
 
-          travelerReviewsProcessed = travelerReviews.map((review: any) => ({
-            ...review,
-            tours: bookingsMap.get(review.booking_id)?.tours || null
-          }));
-        } else {
-          travelerReviewsProcessed = travelerReviews;
+        if (bookings) {
+          bookings.forEach(b => bookingToTourMap.set(b.id, b.tour_id));
+        }
+      }
+
+      // Cargar información de tours
+      const tourIds = Array.from(new Set(Array.from(bookingToTourMap.values())));
+      const toursMap = new Map<string, any>();
+      if (tourIds.length > 0) {
+        const { data: tours } = await supabase
+          .from('tours')
+          .select('id, name, destination, image_url')
+          .in('id', tourIds);
+
+        if (tours) {
+          tours.forEach(t => toursMap.set(t.id, t));
         }
       }
 
@@ -168,26 +156,32 @@ const AdminReviews: React.FC = () => {
       }
 
       // Formatear reseñas de agencias
-      if (agencyReviewsProcessed && agencyReviewsProcessed.length > 0) {
-        agencyReviewsProcessed.forEach((review: any) => {
+      if (agencyReviews) {
+        agencyReviews.forEach((review: any) => {
+          const tourId = review.booking_id ? bookingToTourMap.get(review.booking_id) : null;
+          const tourInfo = tourId ? toursMap.get(tourId) : null;
+
           allReviews.push({
             ...review,
             review_type: 'agency',
             users: review.users,
-            tours: review.tours,
+            tours: tourInfo,
             agencies: review.agencies,
           });
         });
       }
 
       // Formatear reseñas de viajeros
-      if (travelerReviewsProcessed && travelerReviewsProcessed.length > 0) {
-        travelerReviewsProcessed.forEach((review: any) => {
+      if (travelerReviews) {
+        travelerReviews.forEach((review: any) => {
+          const tourId = review.booking_id ? bookingToTourMap.get(review.booking_id) : null;
+          const tourInfo = tourId ? toursMap.get(tourId) : null;
+
           allReviews.push({
             ...review,
             review_type: 'traveler',
             traveler: review.traveler,
-            tours: review.tours,
+            tours: tourInfo,
             agencies: review.agencies,
           });
         });
@@ -200,8 +194,8 @@ const AdminReviews: React.FC = () => {
 
       console.log('✅ Reseñas cargadas:', {
         tours: tourReviews?.length || 0,
-        agencies: agencyReviewsProcessed?.length || 0,
-        travelers: travelerReviewsProcessed?.length || 0,
+        agencies: agencyReviews?.length || 0,
+        travelers: travelerReviews?.length || 0,
         total: allReviews.length
       });
 
@@ -605,7 +599,7 @@ const AdminReviews: React.FC = () => {
                       <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
                         <div className="flex items-center">
                           <MapPin className="h-4 w-4 mr-1" />
-                          <span>{review.tours?.name || review.tours?.destination || 'Destino no especificado'}</span>
+                          <span>{review.tours?.destination || 'Destino no especificado'}</span>
                         </div>
                         <div className="flex items-center">
                           <Building className="h-4 w-4 mr-1" />
