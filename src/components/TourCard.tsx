@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Star, Users } from 'lucide-react';
+import { MapPin, Calendar, Star, Users, Building } from 'lucide-react';
 import { Tour } from '../types';
 
 interface TourCardProps {
@@ -57,7 +57,20 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '' }) => {
           <MapPin className="w-4 h-4 mr-1" />
           <span>{tour.destination}</span>
         </div>
-        
+
+        {tour.agencies && (
+          <div className="flex items-center text-gray-600 text-sm mb-2">
+            <Building className="w-4 h-4 mr-1" />
+            <Link
+              to={`/agencies/${tour.agency_id}`}
+              className="hover:text-blue-600 hover:underline transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {tour.agencies.name}
+            </Link>
+          </div>
+        )}
+
         <div className="flex items-center text-gray-500 text-sm mb-3">
           <Calendar className="w-4 h-4 mr-1" />
           <span>{formatDate(tour.start_date)} - {formatDate(tour.end_date)}</span>

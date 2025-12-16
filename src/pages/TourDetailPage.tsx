@@ -578,7 +578,7 @@ const TourDetailPage: React.FC = () => {
                 )}
                 
                 {activeTab === 'reviews' && tour.agency_id && (
-                  <AgencyReviews agencyId={tour.agency_id} />
+                  <AgencyReviews agencyId={tour.agency_id} agencyName={tour.agencies?.name || 'la agencia'} />
                 )}
               </div>
             </div>
@@ -745,7 +745,12 @@ const TourDetailPage: React.FC = () => {
                   )}
                 </div>
                 <div className="ml-4">
-                  <h3 className="text-lg font-semibold">{tour.agencies?.name}</h3>
+                  <Link
+                    to={`/agencies/${tour.agency_id}`}
+                    className="text-lg font-semibold hover:text-blue-600 transition-colors"
+                  >
+                    {tour.agencies?.name}
+                  </Link>
                   <div className="flex items-center">
                     <Star className="h-4 w-4 text-yellow-400 fill-current" />
                     <span className="ml-1 text-sm text-gray-600">
@@ -754,19 +759,31 @@ const TourDetailPage: React.FC = () => {
                   </div>
                 </div>
               </div>
-              
+
               <p className="mt-4 text-gray-700">
                 {tour.agencies?.description || 'Información de la agencia no disponible.'}
               </p>
-              
+
               <div className="mt-6 space-y-2">
-                <a
-                  href="#"
+                <Link
+                  to={`/agencies/${tour.agency_id}`}
                   className="flex items-center text-primary-600 hover:text-primary-700"
                 >
-                  <Globe className="h-5 w-5 mr-2" />
-                  <span>Visitar sitio web</span>
-                </a>
+                  <Building className="h-5 w-5 mr-2" />
+                  <span>Ver perfil de la agencia</span>
+                </Link>
+
+                {tour.agencies?.website && (
+                  <a
+                    href={tour.agencies.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center text-primary-600 hover:text-primary-700"
+                  >
+                    <Globe className="h-5 w-5 mr-2" />
+                    <span>Visitar sitio web</span>
+                  </a>
+                )}
                 
                 {/* Botón de contactar agencia - Solo mostrar si NO es el propietario */}
                 {!isOwner && (

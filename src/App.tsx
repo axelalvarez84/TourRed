@@ -34,6 +34,7 @@ import BookingSuccessPage from './pages/BookingSuccessPage';
 import BookingCancelPage from './pages/BookingCancelPage';
 import BookingPendingPage from './pages/BookingPendingPage';
 import NotificationsPage from './pages/NotificationsPage';
+import AgencyPublicProfile from './pages/AgencyPublicProfile';
 import NotFoundPage from './pages/NotFoundPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
@@ -58,6 +59,7 @@ const App: React.FC = () => {
           <Route path="/" element={<HomePage />} />
           <Route path="/tours" element={<TourCatalogPage />} />
           <Route path="/tours/:id" element={<TourDetailPage />} />
+          <Route path="/agencies/:agencyId" element={<AgencyPublicProfile />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/login" element={<LoginPage />} />
