@@ -36,7 +36,7 @@ export default function AgencyReviews({ agencyId, agencyName }: AgencyReviewsPro
 
   useEffect(() => {
     fetchReviews();
-    if (user) {
+    if (user && user.role === 'traveler') {
       checkCanReview();
     }
   }, [agencyId, user]);
@@ -238,7 +238,7 @@ export default function AgencyReviews({ agencyId, agencyName }: AgencyReviewsPro
           </div>
         </div>
 
-        {user && canReview && !hasReviewed && (
+        {user && user.role === 'traveler' && canReview && !hasReviewed && (
           <div className="border-t pt-6">
             {!showReviewForm ? (
               <button
@@ -306,7 +306,7 @@ export default function AgencyReviews({ agencyId, agencyName }: AgencyReviewsPro
           </div>
         )}
 
-        {user && hasReviewed && (
+        {user && user.role === 'traveler' && hasReviewed && (
           <div className="border-t pt-6">
             <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded">
               Ya has dejado una reseña para esta agencia
@@ -320,7 +320,7 @@ export default function AgencyReviews({ agencyId, agencyName }: AgencyReviewsPro
               <a href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
                 Inicia sesión
               </a>{' '}
-              para dejar una reseña
+              como viajero para dejar una reseña
             </div>
           </div>
         )}
