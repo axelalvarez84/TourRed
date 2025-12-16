@@ -17,24 +17,13 @@ interface AdminReview {
   created_at: string;
   updated_at: string;
   review_type: 'tour' | 'agency' | 'traveler';
-  users?: {
-    first_name?: string;
-    last_name?: string;
-    email: string;
-  };
-  tours?: {
-    name: string;
-    destination: string;
-    image_url: string;
-  };
-  agencies?: {
-    name: string;
-  };
-  traveler?: {
-    first_name?: string;
-    last_name?: string;
-    email: string;
-  };
+  user_first_name?: string;
+  user_last_name?: string;
+  user_email?: string;
+  tour_name?: string;
+  tour_destination?: string;
+  tour_image_url?: string;
+  agency_name?: string;
 }
 
 const AdminReviews: React.FC = () => {
@@ -58,101 +47,16 @@ const AdminReviews: React.FC = () => {
       setIsLoading(true);
       setError('');
 
-      console.log('⭐ Cargando todas las reseñas desde la BD...');
-
-      // Cargar reseñas de tours con todos los joins
-      const { data: tourReviews, error: tourReviewsError } = await supabase
-        .from('reviews')
-        .select(`
-          *,
-          users:user_id(first_name, last_name, email),
-          tours:tour_id(name, destination, image_url),
-          agencies:agency_id(name)
-        `)
+      const { data, error } = await supabase
+        .from('admin_reviews_view')
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (tourReviewsError) {
-        console.error('❌ Error cargando reseñas de tours:', tourReviewsError);
+      if (error) {
+        throw error;
       }
 
-      // Cargar reseñas de agencias con todos los joins
-      const { data: agencyReviews, error: agencyReviewsError } = await supabase
-        .from('agency_reviews')
-        .select(`
-          *,
-          users:traveler_id(first_name, last_name, email),
-          agencies:agency_id(name),
-          bookings:booking_id(tour_id, tours(name, destination, image_url))
-        `)
-        .order('created_at', { ascending: false });
-
-      if (agencyReviewsError) {
-        console.error('❌ Error cargando reseñas de agencias:', agencyReviewsError);
-      }
-
-      // Cargar reseñas de viajeros con todos los joins
-      const { data: travelerReviews, error: travelerReviewsError } = await supabase
-        .from('traveler_reviews')
-        .select(`
-          *,
-          traveler:traveler_id(first_name, last_name, email),
-          agencies:agency_id(name),
-          bookings:booking_id(tour_id, tours(name, destination, image_url))
-        `)
-        .order('created_at', { ascending: false });
-
-      if (travelerReviewsError) {
-        console.error('❌ Error cargando reseñas de viajeros:', travelerReviewsError);
-      }
-
-      // Combinar y formatear todas las reseñas
-      const allReviews: AdminReview[] = [];
-
-      // Formatear reseñas de tours
-      if (tourReviews) {
-        tourReviews.forEach((review: any) => {
-          allReviews.push({
-            ...review,
-            review_type: 'tour',
-          });
-        });
-      }
-
-      // Formatear reseñas de agencias
-      if (agencyReviews) {
-        agencyReviews.forEach((review: any) => {
-          allReviews.push({
-            ...review,
-            review_type: 'agency',
-            tours: review.bookings?.tours || null,
-          });
-        });
-      }
-
-      // Formatear reseñas de viajeros
-      if (travelerReviews) {
-        travelerReviews.forEach((review: any) => {
-          allReviews.push({
-            ...review,
-            review_type: 'traveler',
-            tours: review.bookings?.tours || null,
-          });
-        });
-      }
-
-      // Ordenar por fecha
-      allReviews.sort((a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-
-      console.log('✅ Reseñas cargadas:', {
-        tours: tourReviews?.length || 0,
-        agencies: agencyReviews?.length || 0,
-        travelers: travelerReviews?.length || 0,
-        total: allReviews.length
-      });
-
-      setReviews(allReviews);
+      setReviews(data || []);
     } catch (err: any) {
       console.error('❌ Error cargando reseñas:', err);
       setError(err.message || 'Error al cargar las reseñas');
@@ -285,19 +189,16 @@ const AdminReviews: React.FC = () => {
   };
 
   const getUserDisplayName = (review: AdminReview) => {
-    // Para reseñas de viajeros, la agencia es el autor
     if (review.review_type === 'traveler') {
-      return review.agencies?.name || 'Agencia';
+      return review.agency_name || 'Agencia';
     }
 
-    // Para reseñas de agencia y tour, el usuario/viajero es el autor
-    const user = review.review_type === 'traveler' ? review.traveler : review.users;
-
-    if (user?.first_name || user?.last_name) {
-      return `${user.first_name || ''} ${user.last_name || ''}`.trim();
+    if (review.user_first_name || review.user_last_name) {
+      return `${review.user_first_name || ''} ${review.user_last_name || ''}`.trim();
     }
-    if (user?.email) {
-      return user.email;
+
+    if (review.user_email) {
+      return review.user_email;
     }
 
     return 'Usuario';
@@ -366,16 +267,16 @@ const AdminReviews: React.FC = () => {
   };
 
   const filteredReviews = reviews.filter(review => {
-    const matchesSearch = 
+    const matchesSearch =
       getUserDisplayName(review).toLowerCase().includes(searchTerm.toLowerCase()) ||
       review.comment.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      review.tours?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      review.tours?.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      review.agencies?.name.toLowerCase().includes(searchTerm.toLowerCase());
+      (review.tour_name && review.tour_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (review.tour_destination && review.tour_destination.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (review.agency_name && review.agency_name.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesRating = ratingFilter === 'all' || review.rating.toString() === ratingFilter;
-    
-    const matchesVisibility = 
+
+    const matchesVisibility =
       visibilityFilter === 'all' ||
       (visibilityFilter === 'visible' && review.is_visible) ||
       (visibilityFilter === 'hidden' && !review.is_visible);
@@ -524,17 +425,17 @@ const AdminReviews: React.FC = () => {
                     {/* Tour Image */}
                     <div className="flex-shrink-0">
                       <img
-                        src={review.tours?.image_url || 'https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg'}
-                        alt={review.tours?.name || 'Tour'}
+                        src={review.tour_image_url || 'https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg'}
+                        alt={review.tour_name || 'Tour'}
                         className="w-16 h-16 rounded-lg object-cover"
                       />
                     </div>
-                    
+
                     {/* Review Info */}
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-2">
                         <h3 className="text-lg font-semibold text-gray-900">
-                          {review.tours?.name || 'Sin nombre'}
+                          {review.tour_name || 'Sin nombre'}
                         </h3>
                         {getReviewTypeBadge(review.review_type)}
                         {getVisibilityBadge(review.is_visible)}
@@ -543,11 +444,11 @@ const AdminReviews: React.FC = () => {
                       <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
                         <div className="flex items-center">
                           <MapPin className="h-4 w-4 mr-1" />
-                          <span>{review.tours?.destination || 'Destino no especificado'}</span>
+                          <span>{review.tour_destination || 'Destino no especificado'}</span>
                         </div>
                         <div className="flex items-center">
                           <Building className="h-4 w-4 mr-1" />
-                          <span>{review.agencies?.name || 'Agencia no especificada'}</span>
+                          <span>{review.agency_name || 'Agencia no especificada'}</span>
                         </div>
                       </div>
                       
@@ -622,7 +523,7 @@ const AdminReviews: React.FC = () => {
                     <div className="flex items-center mb-2">
                       <MessageSquare className="h-4 w-4 text-blue-600 mr-2" />
                       <span className="text-sm font-medium text-blue-900">
-                        Respuesta de {review.agencies?.name}:
+                        Respuesta de {review.agency_name}:
                       </span>
                     </div>
                     <p className="text-blue-800 text-sm whitespace-pre-wrap">{review.reply}</p>
@@ -695,8 +596,8 @@ const AdminReviews: React.FC = () => {
                       <span>ID: {review.id.slice(0, 8)}...</span>
                       <span>
                         {review.review_type === 'traveler'
-                          ? `Agencia: ${review.agencies?.name}`
-                          : `Usuario: ${(review.users || review.traveler)?.email}`}
+                          ? `Agencia: ${review.agency_name}`
+                          : `Usuario: ${review.user_email}`}
                       </span>
                       {review.updated_at !== review.created_at && (
                         <span>Actualizado: {format(new Date(review.updated_at), 'dd/MM/yyyy HH:mm')}</span>
@@ -737,16 +638,16 @@ const AdminReviews: React.FC = () => {
                 <div>
                   <span className="font-medium text-gray-700">Usuario:</span>
                   <div className="text-gray-600">{getUserDisplayName(selectedReview)}</div>
-                  <div className="text-gray-500">{selectedReview.users?.email}</div>
+                  <div className="text-gray-500">{selectedReview.user_email}</div>
                 </div>
                 <div>
                   <span className="font-medium text-gray-700">Tour:</span>
-                  <div className="text-gray-600">{selectedReview.tours?.name}</div>
-                  <div className="text-gray-500">{selectedReview.tours?.destination}</div>
+                  <div className="text-gray-600">{selectedReview.tour_name}</div>
+                  <div className="text-gray-500">{selectedReview.tour_destination}</div>
                 </div>
                 <div>
                   <span className="font-medium text-gray-700">Agencia:</span>
-                  <div className="text-gray-600">{selectedReview.agencies?.name}</div>
+                  <div className="text-gray-600">{selectedReview.agency_name}</div>
                 </div>
                 <div>
                   <span className="font-medium text-gray-700">Fecha:</span>
