@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter, Star, X } from 'lucide-react';
+import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter, Star, X, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getAgencyBookings, supabase, parseDateFromDB } from '../../lib/supabase';
 import { Booking } from '../../types';
@@ -505,23 +505,38 @@ const AgencyBookings: React.FC = () => {
 
                   {/* Customer Info */}
                   <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                    <h4 className="font-medium mb-2">Información del Cliente</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <div className="text-gray-500">Nombre:</div>
-                        <div className="font-medium">
-                          {booking.users?.first_name} {booking.users?.last_name}
+                    <h4 className="font-medium mb-3">Información del Cliente</h4>
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0">
+                        <div className="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                          {booking.users?.profile_picture_url ? (
+                            <img
+                              src={booking.users.profile_picture_url}
+                              alt={`${booking.users.first_name} ${booking.users.last_name}`}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <User className="h-8 w-8 text-gray-400" />
+                          )}
                         </div>
                       </div>
-                      <div>
-                        <div className="text-gray-500">Email:</div>
-                        <div className="font-medium">
-                          <a 
-                            href={`mailto:${booking.users?.email}`}
-                            className="text-primary-600 hover:text-primary-700"
-                          >
-                            {booking.users?.email}
-                          </a>
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <div className="text-gray-500">Nombre:</div>
+                          <div className="font-medium">
+                            {booking.users?.first_name} {booking.users?.last_name}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500">Email:</div>
+                          <div className="font-medium">
+                            <a
+                              href={`mailto:${booking.users?.email}`}
+                              className="text-primary-600 hover:text-primary-700"
+                            >
+                              {booking.users?.email}
+                            </a>
+                          </div>
                         </div>
                       </div>
                     </div>

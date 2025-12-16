@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Calendar, Save, CreditCard as Edit, X, MapPin, CreditCard, Globe, Phone } from 'lucide-react';
+import { User, Mail, Calendar, Save, CreditCard as Edit, X, MapPin, CreditCard, Globe, Phone, Camera } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import TravelerReviewsDisplay from '../../components/TravelerReviewsDisplay';
+import ImageUploader from '../../components/ImageUploader';
 
 interface TravelerProfile {
   id: string;
@@ -20,6 +21,7 @@ interface TravelerProfile {
   address?: string;
   booking_count?: number;
   total_spent?: number;
+  profile_picture_url?: string;
 }
 
 const TravelerProfile: React.FC = () => {
@@ -177,6 +179,28 @@ const TravelerProfile: React.FC = () => {
     setSuccess('');
   };
 
+  const handleProfilePictureChange = async (url: string) => {
+    if (!user?.id) return;
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          profile_picture_url: url,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setProfile(prev => prev ? { ...prev, profile_picture_url: url } : null);
+      setSuccess('Foto de perfil actualizada correctamente');
+    } catch (err: any) {
+      console.error('Error updating profile picture:', err);
+      setError('Error al actualizar la foto de perfil');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -223,9 +247,31 @@ const TravelerProfile: React.FC = () => {
         <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
           <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-8">
             <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="h-20 w-20 rounded-full bg-white/20 flex items-center justify-center">
-                  <User className="h-10 w-10 text-white" />
+              <div className="flex items-center gap-4">
+                <div className="relative group">
+                  <div className="h-20 w-20 rounded-full bg-white/20 flex items-center justify-center overflow-hidden">
+                    {profile.profile_picture_url ? (
+                      <img
+                        src={profile.profile_picture_url}
+                        alt={`${profile.first_name} ${profile.last_name}`}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="h-10 w-10 text-white" />
+                    )}
+                  </div>
+                  <div className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <ImageUploader
+                      currentImage={profile.profile_picture_url}
+                      onImageChange={handleProfilePictureChange}
+                      folder="profile-pictures"
+                      customTrigger={
+                        <button className="text-white p-2 hover:bg-white/20 rounded-full transition-colors">
+                          <Camera className="h-6 w-6" />
+                        </button>
+                      }
+                    />
+                  </div>
                 </div>
                 <div className="ml-6">
                   <h1 className="text-2xl font-bold text-white">

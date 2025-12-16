@@ -1,18 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Menu, X, User, LogOut, Compass, Search, MessageCircle } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import { useAuth } from '../context/AuthContext';
-import { signOut } from '../lib/supabase';
+import { signOut, supabase } from '../lib/supabase';
 
 const NavBar: React.FC = () => {
   const { user, isAdmin, isAgency, isTraveler, isEmailVerified } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const toggleProfile = () => setIsProfileOpen(!isProfileOpen);
+
+  useEffect(() => {
+    const fetchProfilePicture = async () => {
+      if (user?.id) {
+        const { data } = await supabase
+          .from('users')
+          .select('profile_picture_url')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (data?.profile_picture_url) {
+          setProfilePicture(data.profile_picture_url);
+        }
+      } else {
+        setProfilePicture(null);
+      }
+    };
+
+    fetchProfilePicture();
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -115,8 +136,16 @@ const NavBar: React.FC = () => {
                     aria-haspopup="true"
                   >
                     <span className="sr-only">Abrir menú de usuario</span>
-                    <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700">
-                      <User className="h-5 w-5" />
+                    <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 overflow-hidden">
+                      {profilePicture ? (
+                        <img
+                          src={profilePicture}
+                          alt="Perfil"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User className="h-5 w-5" />
+                      )}
                     </div>
                   </button>
                 </div>
