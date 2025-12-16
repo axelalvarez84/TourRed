@@ -26,27 +26,14 @@ const LoginPage: React.FC = () => {
       }
       
       if (data.user) {
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('email_verified')
-          .eq('id', data.user.id)
-          .maybeSingle();
-
-        if (userError) {
-          console.error('Error verificando estado de email:', userError);
-        }
-
-        if (!userData?.email_verified) {
-          navigate('/verify-email');
-          return;
-        }
-
         const role = data.user.user_metadata?.role;
 
         if (role === 'admin') {
           navigate('/admin/dashboard');
         } else if (role === 'agency') {
           navigate('/agency/dashboard');
+        } else if (role === 'traveler') {
+          navigate('/traveler/dashboard');
         } else {
           navigate(from, { replace: true });
         }
