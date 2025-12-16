@@ -64,7 +64,7 @@ const TravelerDashboard: React.FC = () => {
         .from('bookings')
         .select(`
           *,
-          tours (
+          tours!inner (
             id,
             name,
             destination,
@@ -77,11 +77,24 @@ const TravelerDashboard: React.FC = () => {
         .eq('user_id', user.id)
         .eq('status', 'confirmed')
         .gte('tours.start_date', today)
-        .order('tours.start_date', { ascending: true })
-        .limit(5);
+        .order('booking_date', { ascending: false });
 
       if (bookingsError) throw bookingsError;
-      setUpcomingBookings(bookingsData || []);
+
+      const filteredBookings = (bookingsData || [])
+        .filter(booking => {
+          const tourStartDate = new Date(booking.tours.start_date);
+          const todayDate = new Date(today);
+          return tourStartDate >= todayDate;
+        })
+        .sort((a, b) => {
+          const dateA = new Date(a.tours.start_date);
+          const dateB = new Date(b.tours.start_date);
+          return dateA.getTime() - dateB.getTime();
+        })
+        .slice(0, 5);
+
+      setUpcomingBookings(filteredBookings);
 
       const { data: savedData, error: savedError } = await supabase
         .from('saved_tours')
