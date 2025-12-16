@@ -82,7 +82,7 @@ const AdminReviews: React.FC = () => {
           *,
           users:traveler_id(first_name, last_name, email),
           agencies:agency_id(name),
-          bookings:booking_id(tours:tour_id(name, destination, image_url))
+          bookings:booking_id(tour_id)
         `)
         .order('created_at', { ascending: false });
 
@@ -97,12 +97,44 @@ const AdminReviews: React.FC = () => {
           *,
           traveler:traveler_id(first_name, last_name, email),
           agencies:agency_id(name),
-          bookings:booking_id(tours:tour_id(name, destination, image_url))
+          bookings:booking_id(tour_id)
         `)
         .order('created_at', { ascending: false });
 
       if (travelerReviewsError) {
         console.error('❌ Error cargando reseñas de viajeros:', travelerReviewsError);
+      }
+
+      // Obtener IDs de tours para cargar información
+      const tourIds = new Set<string>();
+      if (agencyReviews) {
+        agencyReviews.forEach((review: any) => {
+          if (review.bookings?.tour_id) {
+            tourIds.add(review.bookings.tour_id);
+          }
+        });
+      }
+      if (travelerReviews) {
+        travelerReviews.forEach((review: any) => {
+          if (review.bookings?.tour_id) {
+            tourIds.add(review.bookings.tour_id);
+          }
+        });
+      }
+
+      // Cargar información de tours si hay IDs
+      let toursMap: Map<string, any> = new Map();
+      if (tourIds.size > 0) {
+        const { data: toursData, error: toursError } = await supabase
+          .from('tours')
+          .select('id, name, destination, image_url')
+          .in('id', Array.from(tourIds));
+
+        if (!toursError && toursData) {
+          toursData.forEach(tour => {
+            toursMap.set(tour.id, tour);
+          });
+        }
       }
 
       // Combinar y formatear todas las reseñas
@@ -124,11 +156,14 @@ const AdminReviews: React.FC = () => {
       // Formatear reseñas de agencias
       if (agencyReviews) {
         agencyReviews.forEach((review: any) => {
+          const tourId = review.bookings?.tour_id;
+          const tourInfo = tourId ? toursMap.get(tourId) : null;
+
           allReviews.push({
             ...review,
             review_type: 'agency',
             users: review.users,
-            tours: review.bookings?.tours,
+            tours: tourInfo,
             agencies: review.agencies,
           });
         });
@@ -137,11 +172,14 @@ const AdminReviews: React.FC = () => {
       // Formatear reseñas de viajeros
       if (travelerReviews) {
         travelerReviews.forEach((review: any) => {
+          const tourId = review.bookings?.tour_id;
+          const tourInfo = tourId ? toursMap.get(tourId) : null;
+
           allReviews.push({
             ...review,
             review_type: 'traveler',
             traveler: review.traveler,
-            tours: review.bookings?.tours,
+            tours: tourInfo,
             agencies: review.agencies,
           });
         });
