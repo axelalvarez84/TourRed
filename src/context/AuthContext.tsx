@@ -49,15 +49,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return metadataRole as UserRole;
     }
 
-    // Verificar en la base de datos
+    // Verificar en la base de datos con timeout
     try {
       console.log('🔍 Consultando perfil en BD para:', authUser.id);
-      
-      const { data: profile, error } = await supabase
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout')), 5000)
+      );
+
+      const queryPromise = supabase
         .from('users')
         .select('role, email')
         .eq('id', authUser.id)
         .maybeSingle();
+
+      const { data: profile, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
 
       if (error) {
         console.error('❌ Error consultando perfil:', error);
@@ -68,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('⚠️ No se encontró perfil en BD');
       }
     } catch (err: any) {
-      console.error('❌ Error en consulta de BD:', err);
+      console.error('❌ Error en consulta de BD (puede ser timeout):', err.message);
     }
 
     // Por defecto, traveler
@@ -113,12 +119,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const initializeAuth = async () => {
       console.log('🚀 Inicializando autenticación...');
-      
+
       try {
-        // Obtener usuario actual
-        const currentUser = await getCurrentUser();
+        // Obtener usuario actual con timeout
+        const timeoutPromise = new Promise<null>((resolve) =>
+          setTimeout(() => {
+            console.log('⏱️ Timeout en getCurrentUser, continuando sin usuario');
+            resolve(null);
+          }, 5000)
+        );
+
+        const currentUser = await Promise.race([
+          getCurrentUser(),
+          timeoutPromise
+        ]);
+
         console.log('👤 Usuario actual:', currentUser?.email || 'ninguno');
-        
+
         if (mounted) {
           await updateAuthState(currentUser);
         }
