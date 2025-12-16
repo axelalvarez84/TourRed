@@ -120,23 +120,24 @@ const TourCatalogPage: React.FC = () => {
   // Filter tours based on search params (client-side filtering as backup)
   const filteredTours = tours.filter(tour => {
     let matches = true;
-    
+
     if (initialFilters.destination) {
       matches = matches && tour.destination.toLowerCase().includes(initialFilters.destination.toLowerCase());
     }
-    
+
     if (initialFilters.category) {
-      matches = matches && tour.category === initialFilters.category;
+      const tourCategories = Array.isArray(tour.category) ? tour.category : [tour.category];
+      matches = matches && tourCategories.includes(initialFilters.category);
     }
-    
+
     if (initialFilters.startDate) {
       matches = matches && new Date(tour.start_date) >= new Date(initialFilters.startDate);
     }
-    
+
     if (initialFilters.endDate) {
       matches = matches && new Date(tour.end_date) <= new Date(initialFilters.endDate);
     }
-    
+
     return matches;
   });
 

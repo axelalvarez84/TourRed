@@ -23,6 +23,25 @@ const TourDetailPage: React.FC = () => {
   const [availableSpots, setAvailableSpots] = useState<number | null>(null);
   const [totalCapacity, setTotalCapacity] = useState<number>(0);
 
+  // Helper function to get category name
+  const getCategoryName = (category: string) => {
+    const categories: { [key: string]: string } = {
+      adventure: 'Aventura',
+      nature: 'Naturaleza',
+      cultural: 'Cultural',
+      beach: 'Playa',
+      urban: 'Urbano',
+      wellness: 'Bienestar'
+    };
+    return categories[category] || category;
+  };
+
+  // Helper function to format categories array
+  const formatCategories = (categories: string | string[]) => {
+    const categoryArray = Array.isArray(categories) ? categories : [categories];
+    return categoryArray.map(cat => getCategoryName(cat)).join(', ');
+  };
+
   useEffect(() => {
     const fetchTour = async () => {
       if (!id) return;
@@ -612,8 +631,8 @@ const TourDetailPage: React.FC = () => {
                 <div className="flex items-start">
                   <span className="h-5 w-5 text-primary-600 mr-3 mt-0.5 text-sm font-bold">🏷️</span>
                   <div>
-                    <h4 className="font-medium">Categoría</h4>
-                    <p className="text-gray-600 capitalize">{tour.category}</p>
+                    <h4 className="font-medium">Categorías</h4>
+                    <p className="text-gray-600">{formatCategories(tour.category)}</p>
                   </div>
                 </div>
                 

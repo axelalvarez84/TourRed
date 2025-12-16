@@ -70,7 +70,7 @@ export interface Tour {
   name: string;
   destination: string;
   description: string;
-  category: string;
+  category: string | string[];
   price: number;
   deposit_percentage: number;
   image_url: string;

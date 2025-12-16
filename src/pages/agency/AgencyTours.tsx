@@ -29,7 +29,7 @@ const AgencyTours: React.FC = () => {
 
   const [formData, setFormData] = useState({
     name: '',
-    category: 'adventure',
+    category: ['adventure'] as string[],
     description: '',
     itinerary: '',
     price: '',
@@ -138,7 +138,7 @@ const AgencyTours: React.FC = () => {
   const resetForm = () => {
     setFormData({
       name: '',
-      category: 'adventure',
+      category: ['adventure'],
       description: '',
       itinerary: '',
       price: '',
@@ -170,14 +170,17 @@ const AgencyTours: React.FC = () => {
     // Calcular fecha límite por defecto (14 días antes del inicio)
     const defaultDeadline = new Date(tour.start_date);
     defaultDeadline.setDate(defaultDeadline.getDate() - 14);
-    
+
     // Buscar el destino en la lista de destinos disponibles
     const destinationObj = allAvailableDestinations.find(d => d.name === tour.destination);
     const selectedDest = destinationObj ? [{ id: destinationObj.id, name: destinationObj.name }] : [];
-    
+
+    // Asegurar que category sea un array
+    const categoryArray = Array.isArray(tour.category) ? tour.category : [tour.category];
+
     setFormData({
       name: tour.name,
-      category: tour.category,
+      category: categoryArray,
       description: tour.description,
       itinerary: tour.itinerary || '',
       price: tour.price.toString(),
@@ -300,6 +303,25 @@ const AgencyTours: React.FC = () => {
       setError(err.message || 'Error al duplicar el tour');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCategoryToggle = (category: string) => {
+    const currentCategories = formData.category;
+    if (currentCategories.includes(category)) {
+      // Remover la categoría si ya está seleccionada (pero mantener al menos una)
+      if (currentCategories.length > 1) {
+        setFormData({
+          ...formData,
+          category: currentCategories.filter(c => c !== category)
+        });
+      }
+    } else {
+      // Agregar la categoría
+      setFormData({
+        ...formData,
+        category: [...currentCategories, category]
+      });
     }
   };
 
@@ -536,6 +558,11 @@ const AgencyTours: React.FC = () => {
     return categories[category] || category;
   };
 
+  const getCategoryNames = (categories: string | string[]) => {
+    const categoryArray = Array.isArray(categories) ? categories : [categories];
+    return categoryArray.map(cat => getCategoryName(cat)).join(', ');
+  };
+
   const getStatusBadge = (tour: Tour) => {
     const today = new Date();
     const startDate = new Date(tour.start_date);
@@ -611,22 +638,32 @@ const AgencyTours: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Categoría *
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Categorías * <span className="text-xs text-gray-500">(Selecciona al menos una)</span>
                 </label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({...formData, category: e.target.value})}
-                  className="input"
-                  required
-                >
-                  <option value="adventure">Aventura</option>
-                  <option value="nature">Naturaleza</option>
-                  <option value="cultural">Cultural</option>
-                  <option value="beach">Playa</option>
-                  <option value="urban">Urbano</option>
-                  <option value="wellness">Bienestar</option>
-                </select>
+                <div className="space-y-2">
+                  {[
+                    { value: 'adventure', label: 'Aventura' },
+                    { value: 'nature', label: 'Naturaleza' },
+                    { value: 'cultural', label: 'Cultural' },
+                    { value: 'beach', label: 'Playa' },
+                    { value: 'urban', label: 'Urbano' },
+                    { value: 'wellness', label: 'Bienestar' }
+                  ].map((cat) => (
+                    <label key={cat.value} className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.category.includes(cat.value)}
+                        onChange={() => handleCategoryToggle(cat.value)}
+                        className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                      />
+                      <span className="text-sm text-gray-700">{cat.label}</span>
+                    </label>
+                  ))}
+                </div>
+                {formData.category.length === 0 && (
+                  <p className="text-sm text-red-500 mt-1">⚠️ Debes seleccionar al menos una categoría</p>
+                )}
               </div>
 
               <div className="md:col-span-2">
@@ -1122,7 +1159,7 @@ const AgencyTours: React.FC = () => {
                 </div>
                 <div className="absolute top-2 left-2">
                   <span className="px-2 py-1 text-xs font-medium bg-black/60 text-white rounded">
-                    {getCategoryName(tour.category)}
+                    {getCategoryNames(tour.category)}
                   </span>
                 </div>
               </div>
