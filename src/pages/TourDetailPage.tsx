@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Users, Building, Star, Clock, Globe, MessageCircle, ChevronLeft, ChevronRight, Edit } from 'lucide-react';
+import { MapPin, Calendar, Users, Building, Star, Clock, Globe, MessageCircle, ChevronLeft, ChevronRight, Edit, Heart } from 'lucide-react';
 import BookingForm from '../components/BookingForm';
 import AgencyReviews from '../components/AgencyReviews';
 import { Tour } from '../types';
@@ -22,6 +22,8 @@ const TourDetailPage: React.FC = () => {
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [availableSpots, setAvailableSpots] = useState<number | null>(null);
   const [totalCapacity, setTotalCapacity] = useState<number>(0);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Helper function to get category name
   const getCategoryName = (category: string) => {
@@ -92,6 +94,64 @@ const TourDetailPage: React.FC = () => {
 
     fetchTour();
   }, [id, user, isAgency]);
+
+  useEffect(() => {
+    if (user && tour) {
+      checkIfSaved();
+    }
+  }, [user, tour]);
+
+  const checkIfSaved = async () => {
+    if (!user || !tour) return;
+
+    const { data } = await supabase
+      .from('saved_tours')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('tour_id', tour.id)
+      .maybeSingle();
+
+    setIsSaved(!!data);
+  };
+
+  const handleSaveToggle = async () => {
+    if (!user) {
+      alert('Debes iniciar sesión para guardar tours');
+      return;
+    }
+
+    if (!tour) return;
+
+    setIsSaving(true);
+
+    try {
+      if (isSaved) {
+        const { error } = await supabase
+          .from('saved_tours')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('tour_id', tour.id);
+
+        if (error) throw error;
+        setIsSaved(false);
+      } else {
+        const { error } = await supabase
+          .from('saved_tours')
+          .insert({
+            user_id: user.id,
+            tour_id: tour.id
+          });
+
+        if (error) throw error;
+        setIsSaved(true);
+      }
+    } catch (error) {
+      console.error('Error saving tour:', error);
+      alert('Error al guardar el tour');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   useEffect(() => {
     const fetchAvailability = async () => {
@@ -377,12 +437,28 @@ const TourDetailPage: React.FC = () => {
       <div className="container-custom -mt-10 relative z-10">
         <div className="bg-white rounded-t-lg shadow-md p-6">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between">
-            <div>
+            <div className="flex-1">
               <div className="flex items-center text-sm text-gray-500 mb-2">
                 <MapPin className="h-4 w-4 mr-1" />
                 <span>{tour.destination}</span>
               </div>
-              <h1 className="text-2xl md:text-3xl font-bold mb-2">{tour.name}</h1>
+              <div className="flex items-start justify-between gap-4">
+                <h1 className="text-2xl md:text-3xl font-bold mb-2 flex-1">{tour.name}</h1>
+                {user && !isOwner && (
+                  <button
+                    onClick={handleSaveToggle}
+                    disabled={isSaving}
+                    className="flex-shrink-0 p-2 hover:bg-gray-100 rounded-full transition-all disabled:opacity-50"
+                    title={isSaved ? 'Quitar de guardados' : 'Guardar tour'}
+                  >
+                    <Heart
+                      className={`w-7 h-7 transition-all ${
+                        isSaved ? 'fill-red-500 text-red-500' : 'text-gray-400 hover:text-red-500'
+                      }`}
+                    />
+                  </button>
+                )}
+              </div>
               <div className="flex items-center mb-4">
                 <div className="flex">
                   {[1, 2, 3, 4, 5].map((star) => (
