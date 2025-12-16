@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Star, Users, Building } from 'lucide-react';
+import { MapPin, Calendar, Star, Users, Building, Heart } from 'lucide-react';
 import { Tour } from '../types';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 
 interface TourCardProps {
   tour: Tour;
@@ -9,6 +11,68 @@ interface TourCardProps {
 }
 
 const TourCard: React.FC<TourCardProps> = ({ tour, className = '' }) => {
+  const { user } = useAuth();
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      checkIfSaved();
+    }
+  }, [user, tour.id]);
+
+  const checkIfSaved = async () => {
+    if (!user) return;
+
+    const { data } = await supabase
+      .from('saved_tours')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('tour_id', tour.id)
+      .maybeSingle();
+
+    setIsSaved(!!data);
+  };
+
+  const handleSaveToggle = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!user) {
+      alert('Debes iniciar sesión para guardar tours');
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      if (isSaved) {
+        const { error } = await supabase
+          .from('saved_tours')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('tour_id', tour.id);
+
+        if (error) throw error;
+        setIsSaved(false);
+      } else {
+        const { error } = await supabase
+          .from('saved_tours')
+          .insert({
+            user_id: user.id,
+            tour_id: tour.id
+          });
+
+        if (error) throw error;
+        setIsSaved(true);
+      }
+    } catch (error) {
+      console.error('Error saving tour:', error);
+      alert('Error al guardar el tour');
+    } finally {
+      setIsSaving(false);
+    }
+  };
   // Helper function to format dates consistently
   const formatDate = (dateString: string) => {
     try {
@@ -30,8 +94,8 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '' }) => {
   return (
     <div className={`bg-blue-100 rounded-lg shadow-md overflow-hidden transition-all hover:shadow-lg group animate-fade-in ${className}`}>
       <div className="relative overflow-hidden aspect-[4/3]">
-        <img 
-          src={tour.image_url || 'https://images.pexels.com/photos/2245436/pexels-photo-2245436.png'} 
+        <img
+          src={tour.image_url || 'https://images.pexels.com/photos/2245436/pexels-photo-2245436.png'}
           alt={tour.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
@@ -39,6 +103,20 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '' }) => {
           <div className="absolute top-2 left-2 bg-accent-500 text-white text-xs font-semibold px-2 py-1 rounded">
             Destacado
           </div>
+        )}
+        {user && (
+          <button
+            onClick={handleSaveToggle}
+            disabled={isSaving}
+            className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+            title={isSaved ? 'Quitar de guardados' : 'Guardar tour'}
+          >
+            <Heart
+              className={`w-5 h-5 transition-all ${
+                isSaved ? 'fill-red-500 text-red-500' : 'text-gray-600 hover:text-red-500'
+              }`}
+            />
+          </button>
         )}
       </div>
       
