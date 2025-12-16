@@ -60,6 +60,8 @@ const ResetPasswordPage: React.FC = () => {
       );
 
       const data = await response.json();
+      console.log('Response data:', data);
+      console.log('Response status:', response.status);
 
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Error al restablecer la contraseña');
@@ -70,7 +72,8 @@ const ResetPasswordPage: React.FC = () => {
         navigate('/login');
       }, 3000);
     } catch (err: any) {
-      console.error('Error:', err);
+      console.error('Error completo:', err);
+      console.error('Error message:', err.message);
       setError(err.message || 'Error al restablecer la contraseña');
     } finally {
       setIsLoading(false);

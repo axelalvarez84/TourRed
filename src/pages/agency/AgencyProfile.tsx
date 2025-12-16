@@ -120,7 +120,6 @@ const AgencyProfile: React.FC = () => {
         banco: agencyData.banco || '',
         cuenta_clabe: agencyData.cuenta_clabe || '',
         titular_cuenta: agencyData.titular_cuenta || '',
-        rnt: agencyData.rnt || '',
         logo: agencyData.logo || '',
         contact_email: agencyData.contact_email || '',
         contact_phone: agencyData.contact_phone || '',
@@ -162,7 +161,6 @@ const AgencyProfile: React.FC = () => {
           banco: editForm.banco,
           cuenta_clabe: editForm.cuenta_clabe,
           titular_cuenta: editForm.titular_cuenta,
-          rnt: editForm.rnt,
           contact_email: editForm.contact_email,
           contact_phone: editForm.contact_phone,
           website: editForm.website,
@@ -216,8 +214,7 @@ const AgencyProfile: React.FC = () => {
       contact_phone: agency.contact_phone || '',
       website: agency.website || '',
       first_name: agency.users?.first_name || '',
-      last_name: agency.users?.last_name || '',
-      rnt: agency.rnt || ''
+      last_name: agency.users?.last_name || ''
     });
     setIsEditing(false);
     setError('');
