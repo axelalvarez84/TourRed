@@ -37,7 +37,10 @@ const ForgotPasswordPage: React.FC = () => {
       }
 
       navigate('/reset-password', {
-        state: { email: email.trim() }
+        state: {
+          email: email.trim(),
+          phoneNumber: phoneNumber.trim()
+        }
       });
     } catch (err: any) {
       console.error('Error:', err);

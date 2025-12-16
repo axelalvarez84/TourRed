@@ -6,6 +6,7 @@ const ResetPasswordPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const email = location.state?.email || '';
+  const phoneNumber = location.state?.phoneNumber || '';
 
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -13,8 +14,10 @@ const ResetPasswordPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState('');
 
   React.useEffect(() => {
     if (!email) {
@@ -81,6 +84,43 @@ const ResetPasswordPage: React.FC = () => {
     }
   };
 
+  const handleResendCode = async () => {
+    setError('');
+    setResendSuccess('');
+    setIsResending(true);
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-password-reset`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            email,
+            phoneNumber,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Error al reenviar el código');
+      }
+
+      setResendSuccess('Código reenviado exitosamente. Revisa tu correo.');
+      setTimeout(() => setResendSuccess(''), 5000);
+    } catch (err: any) {
+      console.error('Error reenviando código:', err);
+      setError(err.message || 'Error al reenviar el código');
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   if (success) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -123,6 +163,12 @@ const ResetPasswordPage: React.FC = () => {
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg">
               {error}
+            </div>
+          )}
+
+          {resendSuccess && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg">
+              {resendSuccess}
             </div>
           )}
 
@@ -209,12 +255,14 @@ const ResetPasswordPage: React.FC = () => {
           </form>
 
           <div className="mt-6 text-center">
-            <Link
-              to="/forgot-password"
-              className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+            <button
+              type="button"
+              onClick={handleResendCode}
+              disabled={isResending}
+              className="text-blue-600 hover:text-blue-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              ¿No recibiste el código? Solicitar otro
-            </Link>
+              {isResending ? 'Reenviando código...' : '¿No recibiste el código? Solicitar otro'}
+            </button>
           </div>
         </div>
 
