@@ -60,18 +60,26 @@ export default function AgencyReviews({ agencyId, agencyName }: AgencyReviewsPro
         .eq('is_visible', true)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error en query de reseñas:', error);
+        throw error;
+      }
 
       const reviewsData = data || [];
-      setReviews(reviewsData);
-      setTotalReviews(reviewsData.length);
+      const validReviews = reviewsData.filter(review => review && review.traveler);
 
-      if (reviewsData.length > 0) {
-        const avg = reviewsData.reduce((sum, review) => sum + review.rating, 0) / reviewsData.length;
+      setReviews(validReviews);
+      setTotalReviews(validReviews.length);
+
+      if (validReviews.length > 0) {
+        const avg = validReviews.reduce((sum, review) => sum + review.rating, 0) / validReviews.length;
         setAverageRating(avg);
+      } else {
+        setAverageRating(0);
       }
     } catch (error) {
       console.error('Error cargando reseñas:', error);
+      setError('Error al cargar las reseñas');
     } finally {
       setLoading(false);
     }
@@ -204,6 +212,15 @@ export default function AgencyReviews({ agencyId, agencyName }: AgencyReviewsPro
     );
   }
 
+  if (error && reviews.length === 0) {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg">
+        <p className="font-medium">Error al cargar las reseñas</p>
+        <p className="text-sm mt-1">Por favor, intenta recargar la página</p>
+      </div>
+    );
+  }
+
   const ratingDistribution = getRatingDistribution();
 
   return (
@@ -328,7 +345,7 @@ export default function AgencyReviews({ agencyId, agencyName }: AgencyReviewsPro
 
       <div className="space-y-4">
         {reviews.length > 0 ? (
-          reviews.map((review) => (
+          reviews.filter(review => review.traveler).map((review) => (
             <div key={review.id} className="bg-white rounded-lg shadow p-6">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-start space-x-3">
@@ -337,7 +354,7 @@ export default function AgencyReviews({ agencyId, agencyName }: AgencyReviewsPro
                   </div>
                   <div>
                     <h4 className="font-semibold text-gray-900">
-                      {review.traveler.first_name} {review.traveler.last_name}
+                      {review.traveler?.first_name || 'Usuario'} {review.traveler?.last_name || ''}
                     </h4>
                     <div className="flex items-center text-sm text-gray-600 mt-1">
                       <Calendar className="h-4 w-4 mr-1" />
