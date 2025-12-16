@@ -49,10 +49,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const determineUserRole = async (authUser: any, forceRefresh: boolean = false): Promise<UserRole | null> => {
+  const determineUserRole = async (authUser: any, forceRefresh: boolean = false): Promise<{ role: UserRole; emailVerified: boolean }> => {
     if (!authUser) {
       console.log('ℹ️ No hay usuario autenticado');
-      return null;
+      return { role: UserRole.TRAVELER, emailVerified: false };
     }
 
     console.log('🔍 Determinando rol para usuario:', authUser.email);
@@ -61,7 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (authUser.email === 'tourredmx@gmail.com') {
       console.log('👑 Usuario administrador detectado por email - FORZANDO ADMIN');
       setCachedRole(authUser.id, UserRole.ADMIN);
-      return UserRole.ADMIN;
+      return { role: UserRole.ADMIN, emailVerified: true };
     }
 
     // Verificar cache primero si no se fuerza refresco
@@ -69,19 +69,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const cachedRole = getCachedRole(authUser.id);
       if (cachedRole) {
         console.log('✅ Usando rol del cache:', cachedRole);
-        return cachedRole;
       }
     }
 
     // Verificar metadata
     const metadataRole = authUser.user_metadata?.role;
     console.log('📋 Rol en metadata:', metadataRole);
-
-    if (metadataRole && Object.values(UserRole).includes(metadataRole as UserRole)) {
-      console.log('✅ Usando rol de metadata:', metadataRole);
-      setCachedRole(authUser.id, metadataRole as UserRole);
-      return metadataRole as UserRole;
-    }
 
     // Verificar en la base de datos con timeout
     try {
@@ -93,7 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const queryPromise = supabase
         .from('users')
-        .select('role, email, email_verified')
+        .select('role, email_verified')
         .eq('id', authUser.id)
         .maybeSingle();
 
@@ -103,8 +96,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('❌ Error consultando perfil:', error);
       } else if (profile) {
         console.log('✅ Perfil encontrado en BD:', profile);
-        setCachedRole(authUser.id, profile.role as UserRole);
-        return profile.role as UserRole;
+        const role = profile.role as UserRole;
+        const emailVerified = profile.email_verified || false;
+        setCachedRole(authUser.id, role);
+        return { role, emailVerified };
       } else {
         console.log('⚠️ No se encontró perfil en BD');
       }
@@ -112,10 +107,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('❌ Error en consulta de BD (puede ser timeout):', err.message);
     }
 
+    // Si hay metadata, usar eso
+    if (metadataRole && Object.values(UserRole).includes(metadataRole as UserRole)) {
+      console.log('✅ Usando rol de metadata:', metadataRole);
+      setCachedRole(authUser.id, metadataRole as UserRole);
+      return { role: metadataRole as UserRole, emailVerified: true };
+    }
+
     // Por defecto, traveler
     console.log('🎒 Asignando rol por defecto: traveler');
     setCachedRole(authUser.id, UserRole.TRAVELER);
-    return UserRole.TRAVELER;
+    return { role: UserRole.TRAVELER, emailVerified: true };
   };
 
   const updateAuthState = async (authUser: any, forceRefresh: boolean = false) => {
@@ -125,24 +127,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(authUser);
 
       if (authUser) {
-        const role = await determineUserRole(authUser, forceRefresh);
-        console.log('🎭 Rol determinado:', role);
+        const { role, emailVerified } = await determineUserRole(authUser, forceRefresh);
+        console.log('🎭 Rol determinado:', role, 'Email verificado:', emailVerified);
         setUserRole(role);
-
-        try {
-          const { data: userData } = await supabase
-            .from('users')
-            .select('email_verified')
-            .eq('id', authUser.id)
-            .maybeSingle();
-
-          const verified = userData?.email_verified || false;
-          console.log('📧 Email verificado:', verified);
-          setIsEmailVerified(verified);
-        } catch (err) {
-          console.error('Error verificando email:', err);
-          setIsEmailVerified(false);
-        }
+        setIsEmailVerified(emailVerified);
       } else {
         setUserRole(null);
         setIsEmailVerified(false);
@@ -157,13 +145,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (authUser) {
         if (authUser.email === 'tourredmx@gmail.com') {
           setUserRole(UserRole.ADMIN);
+          setIsEmailVerified(true);
         } else {
           const cachedRole = getCachedRole(authUser.id);
           if (cachedRole) {
             console.log('⚠️ Usando rol cacheado debido a error:', cachedRole);
             setUserRole(cachedRole);
+            setIsEmailVerified(true);
           } else {
             setUserRole(UserRole.TRAVELER);
+            setIsEmailVerified(true);
           }
         }
       } else {
