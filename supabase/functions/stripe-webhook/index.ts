@@ -45,14 +45,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    const body = await req.text();
-    
+    const rawBody = await req.text();
+
     let event;
     try {
       if (endpointSecret) {
-        event = await stripe.webhooks.constructEventAsync(body, signature, endpointSecret);
+        const encoder = new TextEncoder();
+        const bodyBytes = encoder.encode(rawBody);
+        event = await stripe.webhooks.constructEventAsync(bodyBytes, signature, endpointSecret);
       } else {
-        event = JSON.parse(body);
+        event = JSON.parse(rawBody);
         console.warn("No webhook secret set - webhook signature not verified");
       }
     } catch (err) {
