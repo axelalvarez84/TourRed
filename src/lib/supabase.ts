@@ -379,12 +379,12 @@ export const getUserBookings = async (userId: string) => {
       .from('bookings')
       .select(`
         *,
-        tours(id, name, destination, image_url, start_date, end_date),
-        agencies(id, name, contact_email)
+        tours:tour_id(id, name, destination, image_url, start_date, end_date),
+        agencies:agency_id(id, name, contact_email)
       `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
-    
+
     return { data, error };
   } catch (error: any) {
     console.error('❌ Error en getUserBookings:', error);
@@ -398,8 +398,8 @@ export const getAgencyBookings = async (agencyId: string) => {
       .from('bookings')
       .select(`
         *,
-        tours(id, name, destination, image_url, start_date, end_date),
-        users!bookings_user_id_fkey(id, first_name, last_name, email, profile_picture_url)
+        tours:tour_id(id, name, destination, image_url, start_date, end_date),
+        users:user_id(id, first_name, last_name, email, profile_picture_url)
       `)
       .eq('agency_id', agencyId)
       .order('created_at', { ascending: false });
