@@ -8,7 +8,6 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, {
       headers: {
@@ -19,7 +18,6 @@ serve(async (req) => {
   }
 
   try {
-    // Get the request body
     const { 
       amount, 
       currency = 'mxn', 
@@ -30,7 +28,6 @@ serve(async (req) => {
       cancel_url
     } = await req.json();
 
-    // Validate required parameters
     if (!amount || !bookingId) {
       return new Response(
         JSON.stringify({ 
@@ -44,7 +41,6 @@ serve(async (req) => {
       );
     }
 
-    // Get the Stripe secret key from environment variables
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeSecretKey) {
       console.error("Stripe secret key is not set");
@@ -61,12 +57,10 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Stripe
     const stripe = new Stripe(stripeSecretKey, {
       apiVersion: "2023-10-16",
     });
 
-    // Get the user from the authorization header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -78,12 +72,10 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get the user from the JWT
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
@@ -97,7 +89,6 @@ serve(async (req) => {
       );
     }
 
-    // Validate availability before creating checkout session
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")
       .select(`
@@ -127,7 +118,6 @@ serve(async (req) => {
       );
     }
 
-    // Get all confirmed and pending bookings for this tour
     const { data: existingBookings, error: existingError } = await supabase
       .from("bookings")
       .select("travelers_count, status")
@@ -141,8 +131,6 @@ serve(async (req) => {
 
     const totalBooked = existingBookings?.reduce((sum, b) => sum + b.travelers_count, 0) || 0;
 
-    // Si la agencia configuró lugares disponibles personalizados, usar ese valor
-    // De lo contrario, usar max_travelers
     const maxCapacity = booking.tours?.available_spots !== null && booking.tours?.available_spots !== undefined
       ? booking.tours.available_spots
       : (booking.tours?.max_travelers || 10);
@@ -154,7 +142,6 @@ serve(async (req) => {
     if (booking.travelers_count > availableSpots) {
       console.error(`❌ No hay suficiente disponibilidad - Solicitados: ${booking.travelers_count}, Disponibles: ${availableSpots}`);
 
-      // Delete the booking since it can't be fulfilled
       await supabase
         .from("bookings")
         .delete()
@@ -175,7 +162,6 @@ serve(async (req) => {
 
     console.log(`✅ Disponibilidad confirmada para la reserva ${bookingId}`);
 
-    // Check if the user already has a Stripe customer
     let { data: customers, error: customerError } = await supabase
       .from("stripe_customers")
       .select("customer_id")
@@ -188,16 +174,13 @@ serve(async (req) => {
 
     let customerId;
     
-    // If the user doesn't have a Stripe customer, create one
     if (!customers) {
-      // Get user details for the customer
       const { data: userProfile } = await supabase
         .from("users")
         .select("first_name, last_name, email")
         .eq("id", user.id)
         .single();
 
-      // Create a new customer in Stripe
       const customer = await stripe.customers.create({
         email: user.email,
         name: userProfile ? `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() : undefined,
@@ -208,7 +191,6 @@ serve(async (req) => {
 
       customerId = customer.id;
 
-      // Save the customer ID in the database
       const { error: insertError } = await supabase
         .from("stripe_customers")
         .insert({
@@ -223,10 +205,9 @@ serve(async (req) => {
       customerId = customers.customer_id;
     }
 
-    // Create a checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'oxxo'],
       line_items: [
         {
           price_data: {
@@ -234,7 +215,7 @@ serve(async (req) => {
             product_data: {
               name: description || "Reserva de Tour",
             },
-            unit_amount: Math.round(amount * 100), // Convert to cents
+            unit_amount: Math.round(amount * 100),
           },
           quantity: 1,
         },
@@ -246,9 +227,14 @@ serve(async (req) => {
         booking_id: bookingId,
         ...metadata,
       },
+      payment_intent_data: {
+        metadata: {
+          booking_id: bookingId,
+          ...metadata,
+        },
+      },
     });
 
-    // Return the session ID and URL
     return new Response(
       JSON.stringify({
         success: true,

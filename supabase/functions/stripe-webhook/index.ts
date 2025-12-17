@@ -16,7 +16,6 @@ Deno.serve(async (req) => {
     });
   }
   try {
-    // Get the Stripe secret key and webhook secret from environment variables
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
     const endpointSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
     
@@ -31,12 +30,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Initialize Stripe
     const stripe = new Stripe(stripeSecretKey, {
       apiVersion: "2023-10-16",
     });
 
-    // Get the signature from the headers
     const signature = req.headers.get("stripe-signature");
     if (!signature) {
       return new Response(
@@ -48,16 +45,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get the raw body
     const body = await req.text();
     
-    // Verify the webhook signature
     let event;
     try {
       if (endpointSecret) {
         event = stripe.webhooks.constructEvent(body, signature, endpointSecret);
       } else {
-        // If no webhook secret is set, just parse the event (less secure, but works for testing)
         event = JSON.parse(body);
         console.warn("No webhook secret set - webhook signature not verified");
       }
@@ -72,12 +66,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Log the webhook event for debugging
     await supabase.from('webhook_logs').insert({
       event_type: event.type,
       event_id: event.id,
@@ -85,57 +77,73 @@ Deno.serve(async (req) => {
       payload: event
     });
 
-    // Handle the event
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object;
-        
-        // Get the booking ID from the metadata
+
         const bookingId = session.metadata?.booking_id;
         if (!bookingId) {
           console.error("No booking ID in session metadata");
           break;
         }
 
-        // Update the booking status
-        const { error: bookingError } = await supabase
-          .from('bookings')
-          .update({
-            payment_status: 'succeeded',
-            payment_intent_id: session.payment_intent,
-            paid_at: new Date().toISOString(),
-            status: 'confirmed'
-          })
-          .eq('id', bookingId);
+        const paymentStatus = session.payment_status;
+        console.log(`Checkout session completed for booking ${bookingId}, payment status: ${paymentStatus}`);
 
-        if (bookingError) {
-          console.error(`Error updating booking: ${bookingError.message}`);
-        } else {
-          console.log(`Successfully updated booking ${bookingId} to paid status`);
+        if (paymentStatus === 'paid') {
+          const { error: bookingError } = await supabase
+            .from('bookings')
+            .update({
+              payment_status: 'succeeded',
+              payment_intent_id: session.payment_intent,
+              paid_at: new Date().toISOString(),
+              status: 'confirmed'
+            })
+            .eq('id', bookingId);
 
-          try {
-            const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-booking-confirmation`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${supabaseServiceKey}`,
-              },
-              body: JSON.stringify({ booking_id: bookingId }),
-            });
+          if (bookingError) {
+            console.error(`Error updating booking: ${bookingError.message}`);
+          } else {
+            console.log(`Successfully updated booking ${bookingId} to paid status`);
 
-            const emailResult = await emailResponse.json();
+            try {
+              const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-booking-confirmation`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${supabaseServiceKey}`,
+                },
+                body: JSON.stringify({ booking_id: bookingId }),
+              });
 
-            if (emailResult.success) {
-              console.log('Booking confirmation emails sent successfully');
-            } else {
-              console.error('Error sending booking confirmation emails:', emailResult);
+              const emailResult = await emailResponse.json();
+
+              if (emailResult.success) {
+                console.log('Booking confirmation emails sent successfully');
+              } else {
+                console.error('Error sending booking confirmation emails:', emailResult);
+              }
+            } catch (emailError) {
+              console.error('Error calling booking confirmation function:', emailError);
             }
-          } catch (emailError) {
-            console.error('Error calling booking confirmation function:', emailError);
+          }
+        } else if (paymentStatus === 'unpaid') {
+          const { error: bookingError } = await supabase
+            .from('bookings')
+            .update({
+              payment_status: 'processing',
+              payment_intent_id: session.payment_intent,
+              status: 'pending'
+            })
+            .eq('id', bookingId);
+
+          if (bookingError) {
+            console.error(`Error updating booking: ${bookingError.message}`);
+          } else {
+            console.log(`Booking ${bookingId} marked as processing (awaiting OXXO payment)`);
           }
         }
 
-        // Create a payment transaction record
         const { error: transactionError } = await supabase
           .from('payment_transactions')
           .insert({
@@ -153,7 +161,6 @@ Deno.serve(async (req) => {
           console.error(`Error creating transaction record: ${transactionError.message}`);
         }
 
-        // Create or update Stripe order record
         const { error: orderError } = await supabase
           .from('stripe_orders')
           .insert({
@@ -178,7 +185,74 @@ Deno.serve(async (req) => {
       
       case 'payment_intent.succeeded': {
         const paymentIntent = event.data.object;
+        const bookingId = paymentIntent.metadata?.booking_id;
+
         console.log(`Payment intent succeeded: ${paymentIntent.id}`);
+
+        if (bookingId) {
+          const { error: bookingError } = await supabase
+            .from('bookings')
+            .update({
+              payment_status: 'succeeded',
+              payment_intent_id: paymentIntent.id,
+              paid_at: new Date().toISOString(),
+              status: 'confirmed'
+            })
+            .eq('id', bookingId);
+
+          if (bookingError) {
+            console.error(`Error updating booking: ${bookingError.message}`);
+          } else {
+            console.log(`Successfully confirmed booking ${bookingId} after payment`);
+
+            try {
+              const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-booking-confirmation`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${supabaseServiceKey}`,
+                },
+                body: JSON.stringify({ booking_id: bookingId }),
+              });
+
+              const emailResult = await emailResponse.json();
+
+              if (emailResult.success) {
+                console.log('Booking confirmation emails sent successfully');
+              } else {
+                console.error('Error sending booking confirmation emails:', emailResult);
+              }
+            } catch (emailError) {
+              console.error('Error calling booking confirmation function:', emailError);
+            }
+          }
+
+          const { data: existingTransaction } = await supabase
+            .from('payment_transactions')
+            .select('id')
+            .eq('stripe_payment_intent_id', paymentIntent.id)
+            .maybeSingle();
+
+          if (!existingTransaction) {
+            const { error: transactionError } = await supabase
+              .from('payment_transactions')
+              .insert({
+                booking_id: bookingId,
+                stripe_payment_intent_id: paymentIntent.id,
+                amount: paymentIntent.amount / 100,
+                currency: paymentIntent.currency,
+                status: 'succeeded',
+                payment_method_type: paymentIntent.payment_method_types?.[0] || 'unknown',
+                net_amount: paymentIntent.amount / 100,
+                metadata: paymentIntent
+              });
+
+            if (transactionError) {
+              console.error(`Error creating transaction record: ${transactionError.message}`);
+            }
+          }
+        }
+
         break;
       }
       
@@ -187,7 +261,6 @@ Deno.serve(async (req) => {
         const bookingId = paymentIntent.metadata?.booking_id;
         
         if (bookingId) {
-          // Update the booking status
           const { error } = await supabase
             .from('bookings')
             .update({
