@@ -1,37 +1,40 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle, ArrowRight, Home, CreditCard } from 'lucide-react';
-import { getProductById } from '../stripe-config';
 import { supabase } from '../lib/supabase';
 
 const SuccessPage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const [product, setProduct] = useState<any>(null);
+  const [bookingDetails, setBookingDetails] = useState<any>(null);
   const [isUpdating, setIsUpdating] = useState(true);
 
   useEffect(() => {
     const updateBookingStatus = async () => {
       try {
         const bookingId = searchParams.get('booking_id');
-        const productId = searchParams.get('product');
-
-        if (productId) {
-          const foundProduct = getProductById(productId);
-          setProduct(foundProduct);
-        }
 
         if (bookingId) {
-          const { error } = await supabase
+          const { data: booking, error: fetchError } = await supabase
             .from('bookings')
-            .update({
-              payment_status: 'succeeded',
-              status: 'confirmed',
-              paid_at: new Date().toISOString()
-            })
-            .eq('id', bookingId);
+            .select('*, tours(name)')
+            .eq('id', bookingId)
+            .single();
 
-          if (error) {
-            console.error('Error updating booking:', error);
+          if (!fetchError && booking) {
+            setBookingDetails(booking);
+
+            const { error } = await supabase
+              .from('bookings')
+              .update({
+                payment_status: 'succeeded',
+                status: 'confirmed',
+                paid_at: new Date().toISOString()
+              })
+              .eq('id', bookingId);
+
+            if (error) {
+              console.error('Error updating booking:', error);
+            }
           }
         }
       } catch (err) {
@@ -60,22 +63,24 @@ const SuccessPage: React.FC = () => {
             Gracias por tu compra. Tu pago ha sido procesado exitosamente.
           </p>
 
-          {product && (
+          {bookingDetails && (
             <div className="bg-white rounded-lg shadow-md p-6 mb-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-2 flex items-center">
                 <CreditCard className="h-5 w-5 mr-2 text-primary-600" />
-                Detalles de la Compra
+                Detalles de la Reserva
               </h3>
               <div className="text-left space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Producto:</span>
-                  <span className="font-medium">{product.name}</span>
+                  <span className="text-gray-600">Tour:</span>
+                  <span className="font-medium">{bookingDetails.tours?.name || 'Tour'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Tipo:</span>
-                  <span className="font-medium capitalize">
-                    {product.mode === 'payment' ? 'Pago único' : 'Suscripción'}
-                  </span>
+                  <span className="text-gray-600">Viajeros:</span>
+                  <span className="font-medium">{bookingDetails.travelers_count}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Total Pagado:</span>
+                  <span className="font-medium">${bookingDetails.user_payment?.toFixed(2) || '0.00'} MXN</span>
                 </div>
               </div>
             </div>
