@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Calendar, Save, CreditCard as Edit, X, MapPin, CreditCard, Globe, Phone, Camera } from 'lucide-react';
+import { User, Mail, Calendar, Save, CreditCard as Edit, X, MapPin, CreditCard, Globe, Phone } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import TravelerReviewsDisplay from '../../components/TravelerReviewsDisplay';
-import ImageUploader from '../../components/ImageUploader';
+import ProfilePictureUploader from '../../components/ProfilePictureUploader';
 
 interface TravelerProfile {
   id: string;
@@ -261,15 +261,10 @@ const TravelerProfile: React.FC = () => {
                     )}
                   </div>
                   <div className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <ImageUploader
+                    <ProfilePictureUploader
                       currentImage={profile.profile_picture_url}
                       onImageChange={handleProfilePictureChange}
-                      folder="profile-pictures"
-                      customTrigger={
-                        <button className="text-white p-2 hover:bg-white/20 rounded-full transition-colors">
-                          <Camera className="h-6 w-6" />
-                        </button>
-                      }
+                      userId={user.id}
                     />
                   </div>
                 </div>

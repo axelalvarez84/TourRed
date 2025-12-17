@@ -26,6 +26,8 @@ const NavBar: React.FC = () => {
 
         if (data?.profile_picture_url) {
           setProfilePicture(data.profile_picture_url);
+        } else {
+          setProfilePicture(null);
         }
       } else {
         setProfilePicture(null);
@@ -33,6 +35,30 @@ const NavBar: React.FC = () => {
     };
 
     fetchProfilePicture();
+
+    if (user?.id) {
+      const channel = supabase
+        .channel('profile-picture-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'users',
+            filter: `id=eq.${user.id}`
+          },
+          (payload) => {
+            if (payload.new?.profile_picture_url) {
+              setProfilePicture(payload.new.profile_picture_url);
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
   }, [user]);
 
   const handleSignOut = async () => {
