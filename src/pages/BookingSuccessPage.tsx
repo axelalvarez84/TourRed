@@ -97,7 +97,7 @@ const BookingSuccessPage: React.FC = () => {
             end_date,
             agencies(name)
           ),
-          users(email)
+          users!bookings_user_id_fkey(email)
         `)
         .eq('id', bookingId)
         .maybeSingle();
