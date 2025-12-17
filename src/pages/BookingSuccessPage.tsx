@@ -79,9 +79,24 @@ const BookingSuccessPage: React.FC = () => {
     }
   };
 
-  const fetchBookingDetails = async (bookingId: string) => {
+  const fetchBookingDetails = async (bookingId: string, retryCount = 0) => {
     try {
       setIsLoading(true);
+
+      // Wait a bit for session to be restored if this is a retry
+      if (retryCount > 0) {
+        console.log(`⏱️ Esperando ${retryCount} segundos antes de reintentar...`);
+        await new Promise(resolve => setTimeout(resolve, retryCount * 1000));
+      }
+
+      // Check if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('🔍 Estado de sesión:', session ? 'activa' : 'no activa');
+
+      if (!session && retryCount < 3) {
+        console.log('⚠️ No hay sesión, esperando y reintentando...');
+        return fetchBookingDetails(bookingId, retryCount + 1);
+      }
 
       // Fetch booking with tour details
       const { data: bookingData, error: bookingError } = await supabase
@@ -103,10 +118,19 @@ const BookingSuccessPage: React.FC = () => {
         .maybeSingle();
 
       if (bookingError) {
+        console.error('❌ Error al cargar la reserva:', bookingError);
+        if (retryCount < 3) {
+          console.log('⚠️ Reintentando después del error...');
+          return fetchBookingDetails(bookingId, retryCount + 1);
+        }
         throw new Error(bookingError.message);
       }
 
       if (!bookingData) {
+        if (retryCount < 3) {
+          console.log('⚠️ Reserva no encontrada, reintentando...');
+          return fetchBookingDetails(bookingId, retryCount + 1);
+        }
         throw new Error('Reserva no encontrada');
       }
 

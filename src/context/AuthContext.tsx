@@ -76,12 +76,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const metadataRole = authUser.user_metadata?.role;
     console.log('📋 Rol en metadata:', metadataRole);
 
-    // Verificar en la base de datos con timeout
+    // Verificar en la base de datos con timeout más largo
     try {
       console.log('🔍 Consultando perfil en BD para:', authUser.id);
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout')), 5000)
+        setTimeout(() => reject(new Error('Timeout')), 15000)
       );
 
       const queryPromise = supabase
@@ -94,6 +94,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('❌ Error consultando perfil:', error);
+        // Intentar usar metadata como fallback
+        if (metadataRole && Object.values(UserRole).includes(metadataRole as UserRole)) {
+          console.log('⚠️ Usando rol de metadata debido a error en BD:', metadataRole);
+          setCachedRole(authUser.id, metadataRole as UserRole);
+          return { role: metadataRole as UserRole, emailVerified: true };
+        }
       } else if (profile) {
         console.log('✅ Perfil encontrado en BD:', profile);
         const role = profile.role as UserRole;
@@ -105,6 +111,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (err: any) {
       console.error('❌ Error en consulta de BD (puede ser timeout):', err.message);
+      // Intentar usar metadata como fallback
+      if (metadataRole && Object.values(UserRole).includes(metadataRole as UserRole)) {
+        console.log('⚠️ Usando rol de metadata debido a timeout:', metadataRole);
+        setCachedRole(authUser.id, metadataRole as UserRole);
+        return { role: metadataRole as UserRole, emailVerified: true };
+      }
     }
 
     // Si hay metadata, usar eso
@@ -179,7 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setTimeout(() => {
             console.log('⏱️ Timeout en getCurrentUser, continuando sin usuario');
             resolve(null);
-          }, 5000)
+          }, 15000)
         );
 
         const currentUser = await Promise.race([
