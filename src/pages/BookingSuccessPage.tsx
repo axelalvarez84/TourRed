@@ -96,13 +96,18 @@ const BookingSuccessPage: React.FC = () => {
             start_date,
             end_date,
             agencies(name)
-          )
+          ),
+          users(email)
         `)
         .eq('id', bookingId)
-        .single();
+        .maybeSingle();
 
       if (bookingError) {
         throw new Error(bookingError.message);
+      }
+
+      if (!bookingData) {
+        throw new Error('Reserva no encontrada');
       }
 
       setBooking(bookingData);
