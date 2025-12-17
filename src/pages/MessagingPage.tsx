@@ -10,12 +10,17 @@ const MessagingPage: React.FC = () => {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [conversationTitle, setConversationTitle] = useState<string>('');
+  const [preselectedUserId, setPreselectedUserId] = useState<string | null>(null);
 
-  // Verificar si hay una conversación preseleccionada en la URL
   useEffect(() => {
     const conversationFromUrl = searchParams.get('conversation');
+    const newConversationUserId = searchParams.get('newConversation');
+
     if (conversationFromUrl) {
       setSelectedConversationId(conversationFromUrl);
+    } else if (newConversationUserId) {
+      setPreselectedUserId(newConversationUserId);
+      setIsCreateModalOpen(true);
     }
   }, [searchParams]);
 
@@ -69,8 +74,12 @@ const MessagingPage: React.FC = () => {
       {/* Create Conversation Modal */}
       <CreateConversationModal
         isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          setPreselectedUserId(null);
+        }}
         onConversationCreated={handleConversationCreated}
+        preselectedUserId={preselectedUserId || undefined}
       />
     </div>
   );

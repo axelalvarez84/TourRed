@@ -12,6 +12,8 @@ export interface User {
   verification_code?: string;
   verification_code_expires_at?: string;
   verification_code_attempts?: number;
+  phone_number?: string;
+  profile_picture_url?: string;
 }
 
 export interface Agency {

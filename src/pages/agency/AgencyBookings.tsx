@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter, Star, X, User } from 'lucide-react';
+import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter, Star, X, User, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getAgencyBookings, supabase, parseDateFromDB } from '../../lib/supabase';
 import { Booking } from '../../types';
 import { format } from 'date-fns';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import ReviewForm from '../../components/ReviewForm';
 
 const AgencyBookings: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -20,6 +21,10 @@ const AgencyBookings: React.FC = () => {
     booking: Booking | null;
     existingReview: any;
   }>({ open: false, booking: null, existingReview: null });
+  const [contactModal, setContactModal] = useState<{
+    open: boolean;
+    booking: Booking | null;
+  }>({ open: false, booking: null });
 
   useEffect(() => {
     if (user?.id) {
@@ -317,6 +322,31 @@ const AgencyBookings: React.FC = () => {
     fetchAgencyData();
   };
 
+  const handleOpenContactModal = (booking: Booking) => {
+    setContactModal({ open: true, booking });
+  };
+
+  const handleCloseContactModal = () => {
+    setContactModal({ open: false, booking: null });
+  };
+
+  const handleSendMessage = async (booking: Booking) => {
+    if (!booking.users?.id || !agencyId) return;
+
+    const { data: existingConversation } = await supabase
+      .from('conversations')
+      .select('id')
+      .or(`and(user1_id.eq.${agencyId},user2_id.eq.${booking.users.id}),and(user1_id.eq.${booking.users.id},user2_id.eq.${agencyId})`)
+      .maybeSingle();
+
+    if (existingConversation) {
+      navigate(`/messages?conversation=${existingConversation.id}`);
+    } else {
+      navigate(`/messages?newConversation=${booking.users.id}`);
+    }
+    handleCloseContactModal();
+  };
+
   // Filtrar reservas
   const filteredBookings = bookings.filter(booking => {
     const matchesSearch = 
@@ -588,13 +618,13 @@ const AgencyBookings: React.FC = () => {
                       Ver Tour
                     </Link>
 
-                    <a
-                      href={`mailto:${booking.users?.email}?subject=Reserva ${booking.id} - ${booking.tours?.name}`}
+                    <button
+                      onClick={() => handleOpenContactModal(booking)}
                       className="btn btn-outline flex items-center justify-center"
                     >
                       <Mail className="h-4 w-4 mr-2" />
                       Contactar Cliente
-                    </a>
+                    </button>
 
                     {booking.approval_status === 'pending' && (
                       <>
@@ -705,6 +735,103 @@ const AgencyBookings: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Contact Modal */}
+      {contactModal.open && contactModal.booking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <h2 className="text-2xl font-bold">Contactar Cliente</h2>
+                <button
+                  onClick={handleCloseContactModal}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="mb-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {contactModal.booking.users?.profile_picture_url ? (
+                      <img
+                        src={contactModal.booking.users.profile_picture_url}
+                        alt={`${contactModal.booking.users.first_name} ${contactModal.booking.users.last_name}`}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="h-8 w-8 text-gray-400" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">
+                      {contactModal.booking.users?.first_name} {contactModal.booking.users?.last_name}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      Reserva: {contactModal.booking.tours?.name}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3 bg-gray-50 rounded-lg p-4">
+                  {contactModal.booking.users?.email && (
+                    <div className="flex items-start gap-3">
+                      <Mail className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-gray-500 mb-1">Email</div>
+                        <a
+                          href={`mailto:${contactModal.booking.users.email}?subject=Reserva ${contactModal.booking.id} - ${contactModal.booking.tours?.name}`}
+                          className="text-primary-600 hover:text-primary-700 break-all"
+                        >
+                          {contactModal.booking.users.email}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {contactModal.booking.users?.phone_number && (
+                    <div className="flex items-start gap-3">
+                      <Phone className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <div className="text-sm text-gray-500 mb-1">Teléfono</div>
+                        <a
+                          href={`tel:${contactModal.booking.users.phone_number}`}
+                          className="text-primary-600 hover:text-primary-700"
+                        >
+                          {contactModal.booking.users.phone_number}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {!contactModal.booking.users?.phone_number && !contactModal.booking.users?.email && (
+                    <div className="text-center text-gray-500 py-2">
+                      No hay información de contacto disponible
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleSendMessage(contactModal.booking!)}
+                  className="btn btn-primary flex-1 flex items-center justify-center"
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Enviar Mensaje
+                </button>
+                <button
+                  onClick={handleCloseContactModal}
+                  className="btn btn-outline"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
