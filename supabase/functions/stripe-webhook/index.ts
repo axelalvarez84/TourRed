@@ -77,6 +77,14 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Log the webhook event for debugging
+    await supabase.from('webhook_logs').insert({
+      event_type: event.type,
+      event_id: event.id,
+      booking_id: event.data.object?.metadata?.booking_id || null,
+      payload: event
+    });
+
     // Handle the event
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -133,11 +141,11 @@ Deno.serve(async (req) => {
           .insert({
             booking_id: bookingId,
             stripe_payment_intent_id: session.payment_intent,
-            amount: session.amount_total / 100, // Convert from cents
+            amount: session.amount_total / 100,
             currency: session.currency,
             status: 'succeeded',
             payment_method_type: session.payment_method_types?.[0] || 'card',
-            net_amount: session.amount_total / 100, // Simplified, should calculate fees
+            net_amount: session.amount_total / 100,
             metadata: session
           });
 
@@ -152,8 +160,8 @@ Deno.serve(async (req) => {
             checkout_session_id: session.id,
             payment_intent_id: session.payment_intent,
             customer_id: session.customer,
-            amount_subtotal: session.amount_subtotal / 100, // Convert from cents
-            amount_total: session.amount_total / 100, // Convert from cents
+            amount_subtotal: session.amount_subtotal / 100,
+            amount_total: session.amount_total / 100,
             currency: session.currency,
             payment_status: 'succeeded',
             status: 'completed'
