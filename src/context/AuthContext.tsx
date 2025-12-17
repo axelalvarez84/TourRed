@@ -76,12 +76,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const metadataRole = authUser.user_metadata?.role;
     console.log('📋 Rol en metadata:', metadataRole);
 
-    // Verificar en la base de datos con timeout más largo
+    // Verificar en la base de datos con timeout
     try {
       console.log('🔍 Consultando perfil en BD para:', authUser.id);
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout')), 15000)
+        setTimeout(() => reject(new Error('Timeout')), 3000)
       );
 
       const queryPromise = supabase
@@ -191,7 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setTimeout(() => {
             console.log('⏱️ Timeout en getCurrentUser, continuando sin usuario');
             resolve(null);
-          }, 15000)
+          }, 5000)
         );
 
         const currentUser = await Promise.race([
@@ -218,19 +218,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initializeAuth();
 
     // Configurar listener de cambios de auth
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('🔔 Cambio de estado de auth:', event);
 
       if (!mounted) return;
 
       if (event === 'SIGNED_IN') {
-        await updateAuthState(session?.user || null, true);
+        // No bloquear el callback, ejecutar en background
+        updateAuthState(session?.user || null, true).catch(err => {
+          console.error('Error en updateAuthState:', err);
+        });
       } else if (event === 'TOKEN_REFRESHED') {
-        if (session?.user && user && session.user.id === user.id) {
-          console.log('♻️ Token refrescado - manteniendo sesión actual');
+        if (session?.user) {
+          console.log('♻️ Token refrescado - actualizando usuario sin revalidar rol');
           setUser(session.user);
-        } else {
-          await updateAuthState(session?.user || null, false);
+          // No revalidar el rol en refresh, usar el cache
+          const cachedRole = getCachedRole(session.user.id);
+          if (cachedRole) {
+            setUserRole(cachedRole);
+          }
         }
       } else if (event === 'SIGNED_OUT') {
         console.log('👋 Usuario cerró sesión');

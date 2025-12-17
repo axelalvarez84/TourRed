@@ -5,6 +5,7 @@ import { supabase, parseDateFromDB } from '../lib/supabase';
 import { Booking, Tour } from '../types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useAuth } from '../context/AuthContext';
 
 const BookingSuccessPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -13,8 +14,15 @@ const BookingSuccessPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const emailSendAttempted = useRef(false);
+  const { user, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
+    // Esperar a que la autenticación termine antes de cargar la reserva
+    if (authLoading) {
+      console.log('⏳ Esperando a que termine la autenticación...');
+      return;
+    }
+
     const bookingId = searchParams.get('booking_id');
     if (bookingId) {
       fetchBookingDetails(bookingId);
@@ -22,7 +30,7 @@ const BookingSuccessPage: React.FC = () => {
       setError('ID de reserva no encontrado');
       setIsLoading(false);
     }
-  }, [searchParams]);
+  }, [searchParams, authLoading]);
 
   const sendBookingConfirmationEmails = async (bookingId: string) => {
     if (emailSendAttempted.current) {
@@ -79,23 +87,17 @@ const BookingSuccessPage: React.FC = () => {
     }
   };
 
-  const fetchBookingDetails = async (bookingId: string, retryCount = 0) => {
+  const fetchBookingDetails = async (bookingId: string) => {
     try {
       setIsLoading(true);
-
-      // Wait a bit for session to be restored if this is a retry
-      if (retryCount > 0) {
-        console.log(`⏱️ Esperando ${retryCount} segundos antes de reintentar...`);
-        await new Promise(resolve => setTimeout(resolve, retryCount * 1000));
-      }
+      console.log('📋 Cargando detalles de la reserva:', bookingId);
 
       // Check if user is authenticated
       const { data: { session } } = await supabase.auth.getSession();
       console.log('🔍 Estado de sesión:', session ? 'activa' : 'no activa');
 
-      if (!session && retryCount < 3) {
-        console.log('⚠️ No hay sesión, esperando y reintentando...');
-        return fetchBookingDetails(bookingId, retryCount + 1);
+      if (!session) {
+        throw new Error('No hay sesión activa. Por favor inicia sesión nuevamente.');
       }
 
       // Fetch booking with tour details
@@ -119,18 +121,10 @@ const BookingSuccessPage: React.FC = () => {
 
       if (bookingError) {
         console.error('❌ Error al cargar la reserva:', bookingError);
-        if (retryCount < 3) {
-          console.log('⚠️ Reintentando después del error...');
-          return fetchBookingDetails(bookingId, retryCount + 1);
-        }
         throw new Error(bookingError.message);
       }
 
       if (!bookingData) {
-        if (retryCount < 3) {
-          console.log('⚠️ Reserva no encontrada, reintentando...');
-          return fetchBookingDetails(bookingId, retryCount + 1);
-        }
         throw new Error('Reserva no encontrada');
       }
 
