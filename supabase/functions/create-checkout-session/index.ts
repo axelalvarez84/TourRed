@@ -207,7 +207,15 @@ serve(async (req) => {
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      payment_method_types: ['card', 'oxxo'],
+      payment_method_types: ['card', 'oxxo', 'customer_balance'],
+      payment_method_options: {
+        customer_balance: {
+          funding_type: 'bank_transfer',
+          bank_transfer: {
+            type: 'mx_bank_transfer',
+          },
+        },
+      },
       line_items: [
         {
           price_data: {
