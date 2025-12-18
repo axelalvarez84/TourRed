@@ -84,15 +84,37 @@ Deno.serve(async (req) => {
       payload: event
     });
 
-    const getPaymentMethodType = (session: any): string => {
-      const paymentMethodType = session.payment_method_types?.[0] || 'unknown';
-      console.log(`Payment method detected: ${paymentMethodType}`);
+    const getPaymentMethodType = async (session: any): Promise<string> => {
+      try {
+        if (session.payment_intent) {
+          const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent as string);
 
-      if (paymentMethodType === 'oxxo') return 'OXXO';
-      if (paymentMethodType === 'customer_balance') return 'Transferencia Bancaria';
-      if (paymentMethodType === 'card') return 'Tarjeta';
+          if (paymentIntent.payment_method) {
+            const paymentMethod = await stripe.paymentMethods.retrieve(paymentIntent.payment_method as string);
+            const actualType = paymentMethod.type;
 
-      return paymentMethodType;
+            console.log(`Actual payment method used: ${actualType}`);
+
+            if (actualType === 'oxxo') return 'OXXO';
+            if (actualType === 'customer_balance') return 'Transferencia Bancaria';
+            if (actualType === 'card') return 'Tarjeta';
+
+            return actualType;
+          }
+        }
+
+        const paymentMethodType = session.payment_method_types?.[0] || 'unknown';
+        console.log(`Fallback to session payment method types: ${paymentMethodType}`);
+
+        if (paymentMethodType === 'oxxo') return 'OXXO';
+        if (paymentMethodType === 'customer_balance') return 'Transferencia Bancaria';
+        if (paymentMethodType === 'card') return 'Tarjeta';
+
+        return paymentMethodType;
+      } catch (error) {
+        console.error(`Error retrieving payment method: ${error.message}`);
+        return 'unknown';
+      }
     };
 
     switch (event.type) {
@@ -106,7 +128,7 @@ Deno.serve(async (req) => {
         }
 
         const paymentStatus = session.payment_status;
-        const paymentMethod = getPaymentMethodType(session);
+        const paymentMethod = await getPaymentMethodType(session);
         console.log(`Checkout session completed for booking ${bookingId}, payment status: ${paymentStatus}, method: ${paymentMethod}`);
 
         if (paymentStatus === 'paid') {
@@ -116,7 +138,8 @@ Deno.serve(async (req) => {
               payment_status: 'succeeded',
               payment_intent_id: session.payment_intent,
               paid_at: new Date().toISOString(),
-              status: 'confirmed'
+              status: 'confirmed',
+              payment_method: paymentMethod
             })
             .eq('id', bookingId);
 
@@ -152,7 +175,8 @@ Deno.serve(async (req) => {
             .update({
               payment_status: 'processing',
               payment_intent_id: session.payment_intent,
-              status: 'pending'
+              status: 'pending',
+              payment_method: paymentMethod
             })
             .eq('id', bookingId);
 
@@ -208,6 +232,29 @@ Deno.serve(async (req) => {
 
         console.log(`Payment intent succeeded: ${paymentIntent.id}`);
 
+        let paymentMethodType = 'unknown';
+        try {
+          if (paymentIntent.payment_method) {
+            const paymentMethod = await stripe.paymentMethods.retrieve(paymentIntent.payment_method as string);
+            const actualType = paymentMethod.type;
+
+            console.log(`Actual payment method used in payment_intent: ${actualType}`);
+
+            if (actualType === 'oxxo') paymentMethodType = 'OXXO';
+            else if (actualType === 'customer_balance') paymentMethodType = 'Transferencia Bancaria';
+            else if (actualType === 'card') paymentMethodType = 'Tarjeta';
+            else paymentMethodType = actualType;
+          } else if (paymentIntent.payment_method_types && paymentIntent.payment_method_types.length > 0) {
+            const rawType = paymentIntent.payment_method_types[0];
+            if (rawType === 'oxxo') paymentMethodType = 'OXXO';
+            else if (rawType === 'customer_balance') paymentMethodType = 'Transferencia Bancaria';
+            else if (rawType === 'card') paymentMethodType = 'Tarjeta';
+            else paymentMethodType = rawType;
+          }
+        } catch (error) {
+          console.error(`Error retrieving payment method: ${error.message}`);
+        }
+
         if (bookingId) {
           const { error: bookingError } = await supabase
             .from('bookings')
@@ -215,7 +262,8 @@ Deno.serve(async (req) => {
               payment_status: 'succeeded',
               payment_intent_id: paymentIntent.id,
               paid_at: new Date().toISOString(),
-              status: 'confirmed'
+              status: 'confirmed',
+              payment_method: paymentMethodType
             })
             .eq('id', bookingId);
 
@@ -253,16 +301,6 @@ Deno.serve(async (req) => {
             .maybeSingle();
 
           if (!existingTransaction) {
-            let paymentMethodType = 'unknown';
-
-            if (paymentIntent.payment_method_types && paymentIntent.payment_method_types.length > 0) {
-              const rawType = paymentIntent.payment_method_types[0];
-              if (rawType === 'oxxo') paymentMethodType = 'OXXO';
-              else if (rawType === 'customer_balance') paymentMethodType = 'Transferencia Bancaria';
-              else if (rawType === 'card') paymentMethodType = 'Tarjeta';
-              else paymentMethodType = rawType;
-            }
-
             const { error: transactionError } = await supabase
               .from('payment_transactions')
               .insert({
