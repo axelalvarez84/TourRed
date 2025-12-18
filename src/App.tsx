@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import NavBar from './components/NavBar';
 import Footer from './components/Footer';
+import ScrollToTop from './components/ScrollToTop';
 import HomePage from './pages/HomePage';
 import TourCatalogPage from './pages/TourCatalogPage';
 import TourDetailPage from './pages/TourDetailPage';
@@ -55,6 +56,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen">
+      <ScrollToTop />
       <NavBar />
       <main className="flex-grow">
         <Routes>
