@@ -431,17 +431,24 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           <div className="w-full py-3 px-4 bg-gray-100 text-gray-500 rounded-md text-center font-medium cursor-not-allowed">
             Sin Lugares Disponibles
           </div>
+        ) : !user ? (
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className="w-full btn btn-primary py-3 flex items-center justify-center"
+          >
+            Inicia Sesión para Reservar
+            <CreditCard className="h-5 w-5 ml-2" />
+          </button>
         ) : (
           <button
             type="submit"
             className="w-full btn btn-primary py-3 flex items-center justify-center"
-            disabled={isSubmitting || !user || isLoadingAvailability || availableSpots === 0}
+            disabled={isSubmitting || isLoadingAvailability || availableSpots === 0}
           >
-            {user ? (
-              tour.booking_approval_type === 'manual'
-                ? 'Solicitar Reserva (Sin Cargo)'
-                : `Proceder al Pago - $${userPayment.toLocaleString()} MXN`
-            ) : 'Inicia Sesión para Reservar'}
+            {tour.booking_approval_type === 'manual'
+              ? 'Solicitar Reserva (Sin Cargo)'
+              : `Proceder al Pago - $${userPayment.toLocaleString()} MXN`}
             {isSubmitting ? (
               <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white ml-2"></div>
             ) : (
