@@ -58,6 +58,16 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const { data: paymentTransaction } = await supabase
+      .from("payment_transactions")
+      .select("payment_method_type")
+      .eq("booking_id", booking_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const paymentMethod = paymentTransaction?.payment_method_type || 'No especificado';
+
     if (booking.confirmation_email_sent) {
       console.log("Emails de confirmación ya fueron enviados para esta reserva");
       return new Response(
@@ -208,6 +218,10 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">Cargo por uso de plataforma (${serviceChargePercentage}%):</span>
           <span class="info-value">${formatCurrency(serviceCharge)}</span>
         </div>
+        <div class="info-row">
+          <span class="info-label">Método de pago:</span>
+          <span class="info-value">${paymentMethod}</span>
+        </div>
         <div class="total-box">
           <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: bold;">
             <span>Total pagado:</span>
@@ -320,6 +334,10 @@ Deno.serve(async (req: Request) => {
         <div class="info-row">
           <span class="info-label">Anticipo pagado por el viajero (${depositPercentage}%):</span>
           <span class="info-value">${formatCurrency(depositAmount)}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Método de pago utilizado:</span>
+          <span class="info-value">${paymentMethod}</span>
         </div>
         <div class="info-row">
           <span class="info-label">Comisión de plataforma (${agencyCommissionPercentage}% del total):</span>
@@ -440,6 +458,10 @@ Deno.serve(async (req: Request) => {
         <div class="info-row">
           <span class="info-label">- Cargo por plataforma (${serviceChargePercentage}%):</span>
           <span class="info-value">${formatCurrency(serviceCharge)}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Método de pago:</span>
+          <span class="info-value">${paymentMethod}</span>
         </div>
         <div class="info-row">
           <span class="info-label">Comisión descontada a la agencia (${agencyCommissionPercentage}%):</span>

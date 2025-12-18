@@ -572,7 +572,7 @@ const AgencyBookings: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
                     <div className="flex items-center">
                       <Users className="h-4 w-4 text-gray-400 mr-2" />
                       <div>
@@ -604,6 +604,14 @@ const AgencyBookings: React.FC = () => {
                       <div>
                         <div className="text-sm text-gray-500">Fecha de Reserva</div>
                         <div className="font-medium">{formatDate(booking.created_at)}</div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center">
+                      <DollarSign className="h-4 w-4 text-gray-400 mr-2" />
+                      <div>
+                        <div className="text-sm text-gray-500">Método de Pago</div>
+                        <div className="font-medium">{(booking as any).payment_method || 'N/A'}</div>
                       </div>
                     </div>
                   </div>

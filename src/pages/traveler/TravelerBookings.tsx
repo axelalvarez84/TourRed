@@ -275,7 +275,7 @@ const TravelerBookings: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                     <div className="flex items-center">
                       <Users className="h-4 w-4 text-gray-400 mr-2" />
                       <div>
@@ -299,6 +299,14 @@ const TravelerBookings: React.FC = () => {
                         <div className="font-medium">{formatDate(booking.created_at)}</div>
                       </div>
                     </div>
+
+                    <div className="flex items-center">
+                      <DollarSign className="h-4 w-4 text-gray-400 mr-2" />
+                      <div>
+                        <div className="text-sm text-gray-500">Método de Pago</div>
+                        <div className="font-medium">{(booking as any).payment_method || 'N/A'}</div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Payment Summary */}
@@ -319,6 +327,10 @@ const TravelerBookings: React.FC = () => {
                           <div className="font-medium">${booking.service_charge.toLocaleString()}</div>
                         </div>
                       )}
+                      <div>
+                        <div className="text-gray-500">Método de Pago:</div>
+                        <div className="font-medium">{(booking as any).payment_method || 'N/A'}</div>
+                      </div>
                       <div>
                         <div className="text-gray-500">Saldo Restante:</div>
                         <div className="font-medium">

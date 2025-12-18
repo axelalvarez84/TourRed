@@ -382,7 +382,7 @@ export const createBooking = async (bookingData: any) => {
 
 export const getUserBookings = async (userId: string) => {
   try {
-    const { data, error } = await supabase
+    const { data: bookings, error } = await supabase
       .from('bookings')
       .select(`
         *,
@@ -392,7 +392,28 @@ export const getUserBookings = async (userId: string) => {
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
-    return { data, error };
+    if (error || !bookings) {
+      return { data: bookings, error };
+    }
+
+    const bookingsWithPaymentMethod = await Promise.all(
+      bookings.map(async (booking) => {
+        const { data: transaction } = await supabase
+          .from('payment_transactions')
+          .select('payment_method_type')
+          .eq('booking_id', booking.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        return {
+          ...booking,
+          payment_method: transaction?.payment_method_type || null
+        };
+      })
+    );
+
+    return { data: bookingsWithPaymentMethod, error: null };
   } catch (error: any) {
     console.error('❌ Error en getUserBookings:', error);
     return { data: null, error };
@@ -401,7 +422,7 @@ export const getUserBookings = async (userId: string) => {
 
 export const getAgencyBookings = async (agencyId: string) => {
   try {
-    const { data, error } = await supabase
+    const { data: bookings, error } = await supabase
       .from('bookings')
       .select(`
         *,
@@ -411,7 +432,28 @@ export const getAgencyBookings = async (agencyId: string) => {
       .eq('agency_id', agencyId)
       .order('created_at', { ascending: false });
 
-    return { data, error };
+    if (error || !bookings) {
+      return { data: bookings, error };
+    }
+
+    const bookingsWithPaymentMethod = await Promise.all(
+      bookings.map(async (booking) => {
+        const { data: transaction } = await supabase
+          .from('payment_transactions')
+          .select('payment_method_type')
+          .eq('booking_id', booking.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        return {
+          ...booking,
+          payment_method: transaction?.payment_method_type || null
+        };
+      })
+    );
+
+    return { data: bookingsWithPaymentMethod, error: null };
   } catch (error: any) {
     console.error('❌ Error en getAgencyBookings:', error);
     return { data: null, error };
