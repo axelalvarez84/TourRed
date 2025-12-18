@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
   try {
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
     const endpointSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
-    
+
     if (!stripeSecretKey) {
       console.error("Stripe secret key is not set");
       return new Response(
@@ -34,8 +34,16 @@ Deno.serve(async (req) => {
       apiVersion: "2023-10-16",
     });
 
+    const body = await req.text();
     const signature = req.headers.get("stripe-signature");
-    if (!signature) {
+
+    let event;
+
+    if (!endpointSecret) {
+      console.warn("⚠️ No STRIPE_WEBHOOK_SECRET configured - skipping signature verification");
+      event = JSON.parse(body);
+    } else if (!signature) {
+      console.error("❌ No stripe-signature header found");
       return new Response(
         JSON.stringify({ success: false, error: "No signature header" }),
         {
@@ -43,29 +51,26 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         }
       );
-    }
-
-    const rawBody = await req.text();
-
-    let event;
-    try {
-      if (endpointSecret) {
-        const encoder = new TextEncoder();
-        const bodyBytes = encoder.encode(rawBody);
-        event = await stripe.webhooks.constructEventAsync(bodyBytes, signature, endpointSecret);
-      } else {
-        event = JSON.parse(rawBody);
-        console.warn("No webhook secret set - webhook signature not verified");
+    } else {
+      try {
+        console.log("🔍 Verifying webhook signature...");
+        event = await stripe.webhooks.constructEventAsync(body, signature, endpointSecret);
+        console.log("✅ Webhook signature verified successfully");
+      } catch (err) {
+        console.error(`❌ Webhook signature verification failed: ${err.message}`);
+        console.log("💡 Tip: Make sure STRIPE_WEBHOOK_SECRET matches the secret from your Stripe dashboard");
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `Webhook Error: ${err.message}`,
+            hint: "Check that STRIPE_WEBHOOK_SECRET is correctly configured"
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          }
+        );
       }
-    } catch (err) {
-      console.error(`Webhook signature verification failed: ${err.message}`);
-      return new Response(
-        JSON.stringify({ success: false, error: `Webhook Error: ${err.message}` }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        }
-      );
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
