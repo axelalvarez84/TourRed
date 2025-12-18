@@ -91,6 +91,14 @@ export interface Tour {
   booking_approval_type?: 'automatic' | 'manual';
   approval_required?: boolean;
   pet_friendly?: boolean;
+  precio_adulto?: number;
+  precio_nino?: number;
+  precio_infante?: number;
+  precio_adulto_mayor?: number;
+  admite_infantes?: boolean;
+  admite_ninos?: boolean;
+  admite_adultos?: boolean;
+  admite_adultos_mayores?: boolean;
 }
 
 export interface Booking {
@@ -209,4 +217,33 @@ export interface PaymentBreakdown {
   userPayment: number;
   platformRevenue: number;
   agencyReceives: number;
+}
+
+export interface FrequentCompanion {
+  id: string;
+  user_id: string;
+  nombre: string;
+  email: string;
+  telefono?: string;
+  fecha_nacimiento: string;
+  created_at: string;
+}
+
+export interface BookingTraveler {
+  id: string;
+  booking_id: string;
+  categoria_viajero: 'infante' | 'nino' | 'adulto' | 'adulto_mayor';
+  nombre: string;
+  email: string;
+  telefono?: string;
+  fecha_nacimiento: string;
+  precio_aplicado: number;
+  frequent_companion_id?: string;
+  created_at: string;
+}
+
+export interface TravelerCategory {
+  categoria: 'infante' | 'nino' | 'adulto' | 'adulto_mayor';
+  cantidad: number;
+  precio: number;
 }

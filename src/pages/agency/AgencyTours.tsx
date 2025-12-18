@@ -39,9 +39,17 @@ const AgencyTours: React.FC = () => {
     end_date: '',
     max_travelers: '',
     available_spots: '',
-    booking_deadline: '', // Nueva fecha límite de reserva
+    booking_deadline: '',
     booking_approval_type: 'automatic',
     pet_friendly: false,
+    precio_adulto: '',
+    precio_nino: '',
+    precio_infante: '',
+    precio_adulto_mayor: '',
+    admite_infantes: true,
+    admite_ninos: true,
+    admite_adultos: true,
+    admite_adultos_mayores: true,
   });
 
   const [includes, setIncludes] = useState<string[]>(['']);
@@ -152,6 +160,14 @@ const AgencyTours: React.FC = () => {
       booking_deadline: '',
       booking_approval_type: 'automatic',
       pet_friendly: false,
+      precio_adulto: '',
+      precio_nino: '',
+      precio_infante: '',
+      precio_adulto_mayor: '',
+      admite_infantes: true,
+      admite_ninos: true,
+      admite_adultos: true,
+      admite_adultos_mayores: true,
     });
     setSelectedDestinations([]);
     setSearchQuery('');
@@ -195,6 +211,14 @@ const AgencyTours: React.FC = () => {
       booking_deadline: tour.booking_deadline || defaultDeadline.toISOString().split('T')[0],
       booking_approval_type: tour.booking_approval_type || 'automatic',
       pet_friendly: tour.pet_friendly || false,
+      precio_adulto: tour.precio_adulto?.toString() || '',
+      precio_nino: tour.precio_nino?.toString() || '',
+      precio_infante: tour.precio_infante?.toString() || '',
+      precio_adulto_mayor: tour.precio_adulto_mayor?.toString() || '',
+      admite_infantes: tour.admite_infantes !== undefined ? tour.admite_infantes : true,
+      admite_ninos: tour.admite_ninos !== undefined ? tour.admite_ninos : true,
+      admite_adultos: tour.admite_adultos !== undefined ? tour.admite_adultos : true,
+      admite_adultos_mayores: tour.admite_adultos_mayores !== undefined ? tour.admite_adultos_mayores : true,
     });
     setSelectedDestinations(selectedDest);
     setIncludes(tour.includes && tour.includes.length > 0 ? tour.includes : ['']);
@@ -285,6 +309,14 @@ const AgencyTours: React.FC = () => {
         booking_deadline: bookingDeadline,
         booking_approval_type: duplicatingTour.booking_approval_type,
         pet_friendly: duplicatingTour.pet_friendly || false,
+        precio_adulto: duplicatingTour.precio_adulto || null,
+        precio_nino: duplicatingTour.precio_nino || null,
+        precio_infante: duplicatingTour.precio_infante || null,
+        precio_adulto_mayor: duplicatingTour.precio_adulto_mayor || null,
+        admite_infantes: duplicatingTour.admite_infantes !== undefined ? duplicatingTour.admite_infantes : true,
+        admite_ninos: duplicatingTour.admite_ninos !== undefined ? duplicatingTour.admite_ninos : true,
+        admite_adultos: duplicatingTour.admite_adultos !== undefined ? duplicatingTour.admite_adultos : true,
+        admite_adultos_mayores: duplicatingTour.admite_adultos_mayores !== undefined ? duplicatingTour.admite_adultos_mayores : true,
       };
 
       // Obtener la agencia ID
@@ -442,6 +474,14 @@ const AgencyTours: React.FC = () => {
         booking_deadline: bookingDeadline,
         booking_approval_type: formData.booking_approval_type,
         pet_friendly: formData.pet_friendly,
+        precio_adulto: formData.precio_adulto ? parseFloat(formData.precio_adulto) : null,
+        precio_nino: formData.precio_nino ? parseFloat(formData.precio_nino) : null,
+        precio_infante: formData.precio_infante ? parseFloat(formData.precio_infante) : null,
+        precio_adulto_mayor: formData.precio_adulto_mayor ? parseFloat(formData.precio_adulto_mayor) : null,
+        admite_infantes: formData.admite_infantes,
+        admite_ninos: formData.admite_ninos,
+        admite_adultos: formData.admite_adultos,
+        admite_adultos_mayores: formData.admite_adultos_mayores,
       };
 
       if (editingTour) {
@@ -923,6 +963,114 @@ const AgencyTours: React.FC = () => {
                   max="100"
                   required
                 />
+              </div>
+
+              <div className="md:col-span-2 border-t pt-4">
+                <h3 className="text-md font-semibold text-gray-800 mb-4">Precios por Categoría de Viajero</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={formData.admite_adultos}
+                          onChange={(e) => setFormData({...formData, admite_adultos: e.target.checked})}
+                          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Admite Adultos (13-59 años)</span>
+                      </label>
+                    </div>
+                    {formData.admite_adultos && (
+                      <input
+                        type="number"
+                        value={formData.precio_adulto}
+                        onChange={(e) => setFormData({...formData, precio_adulto: e.target.value})}
+                        className="input"
+                        min="0"
+                        step="0.01"
+                        placeholder="Precio por adulto"
+                      />
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={formData.admite_ninos}
+                          onChange={(e) => setFormData({...formData, admite_ninos: e.target.checked})}
+                          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Admite Niños (3-12 años)</span>
+                      </label>
+                    </div>
+                    {formData.admite_ninos && (
+                      <input
+                        type="number"
+                        value={formData.precio_nino}
+                        onChange={(e) => setFormData({...formData, precio_nino: e.target.value})}
+                        className="input"
+                        min="0"
+                        step="0.01"
+                        placeholder="Precio por niño"
+                      />
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={formData.admite_infantes}
+                          onChange={(e) => setFormData({...formData, admite_infantes: e.target.checked})}
+                          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Admite Infantes (0-2 años)</span>
+                      </label>
+                    </div>
+                    {formData.admite_infantes && (
+                      <input
+                        type="number"
+                        value={formData.precio_infante}
+                        onChange={(e) => setFormData({...formData, precio_infante: e.target.value})}
+                        className="input"
+                        min="0"
+                        step="0.01"
+                        placeholder="Precio por infante"
+                      />
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={formData.admite_adultos_mayores}
+                          onChange={(e) => setFormData({...formData, admite_adultos_mayores: e.target.checked})}
+                          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Admite Adultos Mayores (60+ con INAPAM)</span>
+                      </label>
+                    </div>
+                    {formData.admite_adultos_mayores && (
+                      <input
+                        type="number"
+                        value={formData.precio_adulto_mayor}
+                        onChange={(e) => setFormData({...formData, precio_adulto_mayor: e.target.value})}
+                        className="input"
+                        min="0"
+                        step="0.01"
+                        placeholder="Precio por adulto mayor"
+                      />
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  💡 Configura precios diferenciados por categoría. Si no especificas un precio, se usará el precio total como referencia.
+                </p>
               </div>
 
               <div>
