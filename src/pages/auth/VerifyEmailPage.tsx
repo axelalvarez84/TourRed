@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, signOut } from '../../lib/supabase';
 import { Mail, ArrowLeft, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 const VerifyEmailPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -14,6 +15,9 @@ const VerifyEmailPage: React.FC = () => {
   const [isResending, setIsResending] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  const searchParams = new URLSearchParams(location.search);
+  const redirectUrl = searchParams.get('redirect');
 
   useEffect(() => {
     if (!user) {
@@ -37,13 +41,17 @@ const VerifyEmailPage: React.FC = () => {
       if (error) throw error;
 
       if (data?.email_verified) {
-        const role = user.user_metadata?.role;
-        if (role === 'admin') {
-          navigate('/admin/dashboard');
-        } else if (role === 'agency') {
-          navigate('/agency/dashboard');
+        if (redirectUrl) {
+          navigate(redirectUrl);
         } else {
-          navigate('/traveler/dashboard');
+          const role = user.user_metadata?.role;
+          if (role === 'admin') {
+            navigate('/admin/dashboard');
+          } else if (role === 'agency') {
+            navigate('/agency/dashboard');
+          } else {
+            navigate('/traveler/dashboard');
+          }
         }
       }
     } catch (err) {
@@ -127,7 +135,11 @@ const VerifyEmailPage: React.FC = () => {
 
       setSuccess(true);
       setTimeout(() => {
-        navigate('/');
+        if (redirectUrl) {
+          navigate(redirectUrl);
+        } else {
+          navigate('/');
+        }
       }, 2000);
 
     } catch (err: any) {

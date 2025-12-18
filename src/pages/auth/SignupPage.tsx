@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { signUp, supabase, UserRole } from '../../lib/supabase';
 
 const SignupPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isForeignTraveler, setIsForeignTraveler] = useState(false);
+
+  const searchParams = new URLSearchParams(location.search);
+  const redirectUrl = searchParams.get('redirect');
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -139,7 +143,11 @@ const SignupPage: React.FC = () => {
           console.error('Error enviando correo de verificación:', emailError);
         }
 
-        navigate('/verify-email');
+        if (redirectUrl) {
+          navigate(`/verify-email?redirect=${encodeURIComponent(redirectUrl)}`);
+        } else {
+          navigate('/verify-email');
+        }
       }
     } catch (err: any) {
       console.error('❌ Error en registro:', err);

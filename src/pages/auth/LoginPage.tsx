@@ -10,25 +10,29 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const searchParams = new URLSearchParams(location.search);
+  const redirectUrl = searchParams.get('redirect');
   const from = location.state?.from?.pathname || '/';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       setIsLoading(true);
       setError('');
-      
+
       const { data, error } = await signIn(email, password);
-      
+
       if (error) {
         throw new Error(error.message);
       }
-      
+
       if (data.user) {
         const role = data.user.user_metadata?.role;
 
-        if (role === 'admin') {
+        if (redirectUrl) {
+          navigate(redirectUrl, { replace: true });
+        } else if (role === 'admin') {
           navigate('/admin/dashboard');
         } else if (role === 'agency') {
           navigate('/agency/dashboard');
@@ -53,7 +57,10 @@ const LoginPage: React.FC = () => {
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
           ¿No tienes una cuenta?{' '}
-          <Link to="/signup" className="font-medium text-primary-600 hover:text-primary-500">
+          <Link
+            to={redirectUrl ? `/signup?redirect=${encodeURIComponent(redirectUrl)}` : "/signup"}
+            className="font-medium text-primary-600 hover:text-primary-500"
+          >
             Regístrate aquí
           </Link>
         </p>
@@ -151,13 +158,13 @@ const LoginPage: React.FC = () => {
 
             <div className="mt-6 grid grid-cols-2 gap-3">
               <Link
-                to="/agency-signup"
+                to={redirectUrl ? `/agency-signup?redirect=${encodeURIComponent(redirectUrl)}` : "/agency-signup"}
                 className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 ¿Eres una agencia?
               </Link>
               <Link
-                to="/signup"
+                to={redirectUrl ? `/signup?redirect=${encodeURIComponent(redirectUrl)}` : "/signup"}
                 className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Registrarse como viajero

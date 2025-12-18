@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { signUp, supabase } from '../../lib/supabase';
 import { UserRole } from '../../lib/supabase';
 
 const AgencySignupPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const searchParams = new URLSearchParams(location.search);
+  const redirectUrl = searchParams.get('redirect');
 
   const [formData, setFormData] = useState({
     email: '',
@@ -144,7 +148,11 @@ const AgencySignupPage: React.FC = () => {
           console.error('Error enviando correo de verificación:', emailError);
         }
 
-        navigate('/verify-email');
+        if (redirectUrl) {
+          navigate(`/verify-email?redirect=${encodeURIComponent(redirectUrl)}`);
+        } else {
+          navigate('/verify-email');
+        }
       }
     } catch (err: any) {
       console.error('❌ Error en registro de agencia:', err);

@@ -434,7 +434,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         ) : !user ? (
           <button
             type="button"
-            onClick={() => navigate('/login')}
+            onClick={() => navigate(`/login?redirect=${encodeURIComponent(window.location.pathname)}`)}
             className="w-full btn btn-primary py-3 flex items-center justify-center"
           >
             Inicia Sesión para Reservar
