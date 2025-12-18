@@ -84,6 +84,17 @@ Deno.serve(async (req) => {
       payload: event
     });
 
+    const getPaymentMethodType = (session: any): string => {
+      const paymentMethodType = session.payment_method_types?.[0] || 'unknown';
+      console.log(`Payment method detected: ${paymentMethodType}`);
+
+      if (paymentMethodType === 'oxxo') return 'OXXO';
+      if (paymentMethodType === 'customer_balance') return 'Transferencia Bancaria';
+      if (paymentMethodType === 'card') return 'Tarjeta';
+
+      return paymentMethodType;
+    };
+
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object;
@@ -95,7 +106,8 @@ Deno.serve(async (req) => {
         }
 
         const paymentStatus = session.payment_status;
-        console.log(`Checkout session completed for booking ${bookingId}, payment status: ${paymentStatus}`);
+        const paymentMethod = getPaymentMethodType(session);
+        console.log(`Checkout session completed for booking ${bookingId}, payment status: ${paymentStatus}, method: ${paymentMethod}`);
 
         if (paymentStatus === 'paid') {
           const { error: bookingError } = await supabase
@@ -159,7 +171,7 @@ Deno.serve(async (req) => {
             amount: session.amount_total / 100,
             currency: session.currency,
             status: 'succeeded',
-            payment_method_type: session.payment_method_types?.[0] || 'card',
+            payment_method_type: paymentMethod,
             net_amount: session.amount_total / 100,
             metadata: session
           });
@@ -241,6 +253,16 @@ Deno.serve(async (req) => {
             .maybeSingle();
 
           if (!existingTransaction) {
+            let paymentMethodType = 'unknown';
+
+            if (paymentIntent.payment_method_types && paymentIntent.payment_method_types.length > 0) {
+              const rawType = paymentIntent.payment_method_types[0];
+              if (rawType === 'oxxo') paymentMethodType = 'OXXO';
+              else if (rawType === 'customer_balance') paymentMethodType = 'Transferencia Bancaria';
+              else if (rawType === 'card') paymentMethodType = 'Tarjeta';
+              else paymentMethodType = rawType;
+            }
+
             const { error: transactionError } = await supabase
               .from('payment_transactions')
               .insert({
@@ -249,7 +271,7 @@ Deno.serve(async (req) => {
                 amount: paymentIntent.amount / 100,
                 currency: paymentIntent.currency,
                 status: 'succeeded',
-                payment_method_type: paymentIntent.payment_method_types?.[0] || 'unknown',
+                payment_method_type: paymentMethodType,
                 net_amount: paymentIntent.amount / 100,
                 metadata: paymentIntent
               });
