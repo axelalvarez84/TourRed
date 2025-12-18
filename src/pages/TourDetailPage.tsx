@@ -711,7 +711,15 @@ const TourDetailPage: React.FC = () => {
                     <p className="text-gray-600">{formatCategories(tour.category)}</p>
                   </div>
                 </div>
-                
+
+                <div className="flex items-start">
+                  <span className="h-5 w-5 text-primary-600 mr-3 mt-0.5 text-sm font-bold">🐾</span>
+                  <div>
+                    <h4 className="font-medium">Pet Friendly</h4>
+                    <p className="text-gray-600">{tour.pet_friendly ? 'Sí' : 'No'}</p>
+                  </div>
+                </div>
+
                 <div className="flex items-start">
                   <Clock className="h-5 w-5 text-primary-600 mr-3 mt-0.5" />
                   <div>

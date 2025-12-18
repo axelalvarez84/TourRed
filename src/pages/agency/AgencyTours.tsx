@@ -41,6 +41,7 @@ const AgencyTours: React.FC = () => {
     available_spots: '',
     booking_deadline: '', // Nueva fecha límite de reserva
     booking_approval_type: 'automatic',
+    pet_friendly: false,
   });
 
   const [includes, setIncludes] = useState<string[]>(['']);
@@ -150,6 +151,7 @@ const AgencyTours: React.FC = () => {
       available_spots: '',
       booking_deadline: '',
       booking_approval_type: 'automatic',
+      pet_friendly: false,
     });
     setSelectedDestinations([]);
     setSearchQuery('');
@@ -192,6 +194,7 @@ const AgencyTours: React.FC = () => {
       available_spots: tour.available_spots?.toString() || '',
       booking_deadline: tour.booking_deadline || defaultDeadline.toISOString().split('T')[0],
       booking_approval_type: tour.booking_approval_type || 'automatic',
+      pet_friendly: tour.pet_friendly || false,
     });
     setSelectedDestinations(selectedDest);
     setIncludes(tour.includes && tour.includes.length > 0 ? tour.includes : ['']);
@@ -281,6 +284,7 @@ const AgencyTours: React.FC = () => {
         excludes: duplicatingTour.excludes,
         booking_deadline: bookingDeadline,
         booking_approval_type: duplicatingTour.booking_approval_type,
+        pet_friendly: duplicatingTour.pet_friendly || false,
       };
 
       // Obtener la agencia ID
@@ -437,6 +441,7 @@ const AgencyTours: React.FC = () => {
         excludes: filteredExcludes.length > 0 ? filteredExcludes : null,
         booking_deadline: bookingDeadline,
         booking_approval_type: formData.booking_approval_type,
+        pet_friendly: formData.pet_friendly,
       };
 
       if (editingTour) {
@@ -664,6 +669,18 @@ const AgencyTours: React.FC = () => {
                 {formData.category.length === 0 && (
                   <p className="text-sm text-red-500 mt-1">⚠️ Debes seleccionar al menos una categoría</p>
                 )}
+              </div>
+
+              <div>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.pet_friendly}
+                    onChange={(e) => setFormData({...formData, pet_friendly: e.target.checked})}
+                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Pet Friendly (Admite mascotas)</span>
+                </label>
               </div>
 
               <div className="md:col-span-2">

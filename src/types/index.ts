@@ -90,6 +90,7 @@ export interface Tour {
   booking_deadline?: string;
   booking_approval_type?: 'automatic' | 'manual';
   approval_required?: boolean;
+  pet_friendly?: boolean;
 }
 
 export interface Booking {
