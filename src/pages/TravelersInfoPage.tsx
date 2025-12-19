@@ -290,7 +290,13 @@ const TravelersInfoPage: React.FC = () => {
         }
       }
 
-      if (tour?.booking_approval_type === 'manual') {
+      const isEditingExisting = booking?.payment_status === 'succeeded' ||
+                                booking?.status === 'confirmed' ||
+                                booking?.status === 'completed';
+
+      if (isEditingExisting) {
+        navigate('/traveler/bookings');
+      } else if (tour?.booking_approval_type === 'manual') {
         navigate(`/booking-pending/${bookingId}`);
       } else {
         proceedToPayment();
@@ -592,7 +598,11 @@ const TravelersInfoPage: React.FC = () => {
               ) : (
                 <>
                   <Save className="w-5 h-5 mr-2" />
-                  Continuar al Pago
+                  {(booking?.payment_status === 'succeeded' ||
+                    booking?.status === 'confirmed' ||
+                    booking?.status === 'completed')
+                    ? 'Guardar Cambios'
+                    : 'Continuar al Pago'}
                 </>
               )}
             </button>
