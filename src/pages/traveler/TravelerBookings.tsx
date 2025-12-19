@@ -118,7 +118,7 @@ const TravelerBookings: React.FC = () => {
   };
 
   const handleEditTravelers = (bookingId: string) => {
-    navigate(`/travelers-info/${bookingId}`);
+    navigate(`/booking-travelers/${bookingId}`);
   };
 
   const getCategoryLabel = (categoria: string): string => {
