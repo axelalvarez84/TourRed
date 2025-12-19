@@ -145,7 +145,14 @@ const ContactPage: React.FC = () => {
               </div>
               <div className="flex items-center space-x-3">
                 <Phone className="w-5 h-5 text-primary-600" />
-                <span className="text-gray-600">+52 55 47127668</span>
+                <a
+                  href="https://wa.me/525547127668"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-gray-600 hover:text-primary-600 transition-colors"
+                >
+                  +52 55 47127668
+                </a>
               </div>
               <div className="flex items-center space-x-3">
                 <MapPin className="w-5 h-5 text-primary-600" />
