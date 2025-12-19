@@ -256,17 +256,20 @@ const TravelersInfoPage: React.FC = () => {
         nombre: traveler.nombre,
         email: traveler.email,
         telefono: traveler.telefono || null,
-        fecha_nacimiento: traveler.fecha_nacimiento,
+        fecha_nacimiento: traveler.fecha_nacimiento || null,
         precio_aplicado: traveler.precio_aplicado,
         frequent_companion_id: traveler.selectedCompanionId || null,
       }));
+
+      console.log('Datos a insertar:', travelersToInsert);
 
       const { error: insertError } = await supabase
         .from('booking_travelers')
         .insert(travelersToInsert);
 
       if (insertError) {
-        throw new Error('Error al guardar los datos de viajeros');
+        console.error('Error de inserción:', insertError);
+        throw new Error(`Error al guardar los datos de viajeros: ${insertError.message}`);
       }
 
       for (const traveler of travelers) {
