@@ -95,6 +95,7 @@ export interface Tour {
   precio_nino?: number;
   precio_infante?: number;
   precio_adulto_mayor?: number;
+  precio_mascota?: number;
   admite_infantes?: boolean;
   admite_ninos?: boolean;
   admite_adultos?: boolean;

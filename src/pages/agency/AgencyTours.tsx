@@ -46,6 +46,7 @@ const AgencyTours: React.FC = () => {
     precio_nino: '',
     precio_infante: '',
     precio_adulto_mayor: '',
+    precio_mascota: '',
     admite_infantes: true,
     admite_ninos: true,
     admite_adultos: true,
@@ -164,6 +165,7 @@ const AgencyTours: React.FC = () => {
       precio_nino: '',
       precio_infante: '',
       precio_adulto_mayor: '',
+      precio_mascota: '',
       admite_infantes: true,
       admite_ninos: true,
       admite_adultos: true,
@@ -215,6 +217,7 @@ const AgencyTours: React.FC = () => {
       precio_nino: tour.precio_nino?.toString() || '',
       precio_infante: tour.precio_infante?.toString() || '',
       precio_adulto_mayor: tour.precio_adulto_mayor?.toString() || '',
+      precio_mascota: tour.precio_mascota?.toString() || '',
       admite_infantes: tour.admite_infantes !== undefined ? tour.admite_infantes : true,
       admite_ninos: tour.admite_ninos !== undefined ? tour.admite_ninos : true,
       admite_adultos: tour.admite_adultos !== undefined ? tour.admite_adultos : true,
@@ -313,6 +316,7 @@ const AgencyTours: React.FC = () => {
         precio_nino: duplicatingTour.precio_nino || null,
         precio_infante: duplicatingTour.precio_infante || null,
         precio_adulto_mayor: duplicatingTour.precio_adulto_mayor || null,
+        precio_mascota: duplicatingTour.precio_mascota || null,
         admite_infantes: duplicatingTour.admite_infantes !== undefined ? duplicatingTour.admite_infantes : true,
         admite_ninos: duplicatingTour.admite_ninos !== undefined ? duplicatingTour.admite_ninos : true,
         admite_adultos: duplicatingTour.admite_adultos !== undefined ? duplicatingTour.admite_adultos : true,
@@ -478,6 +482,7 @@ const AgencyTours: React.FC = () => {
         precio_nino: formData.precio_nino ? parseFloat(formData.precio_nino) : null,
         precio_infante: formData.precio_infante ? parseFloat(formData.precio_infante) : null,
         precio_adulto_mayor: formData.precio_adulto_mayor ? parseFloat(formData.precio_adulto_mayor) : null,
+        precio_mascota: formData.precio_mascota ? parseFloat(formData.precio_mascota) : null,
         admite_infantes: formData.admite_infantes,
         admite_ninos: formData.admite_ninos,
         admite_adultos: formData.admite_adultos,
@@ -711,7 +716,7 @@ const AgencyTours: React.FC = () => {
                 )}
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <label className="flex items-center space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -721,6 +726,17 @@ const AgencyTours: React.FC = () => {
                   />
                   <span className="text-sm font-medium text-gray-700">Pet Friendly (Admite mascotas)</span>
                 </label>
+                {formData.pet_friendly && (
+                  <input
+                    type="number"
+                    value={formData.precio_mascota}
+                    onChange={(e) => setFormData({...formData, precio_mascota: e.target.value})}
+                    className="input"
+                    min="0"
+                    step="0.01"
+                    placeholder="Precio por mascota"
+                  />
+                )}
               </div>
 
               <div className="md:col-span-2">
