@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X } from 'lucide-react';
+import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X, Edit, UserCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getUserBookings, parseDateFromDB, supabase } from '../../lib/supabase';
 import { Booking } from '../../types';
 import { format } from 'date-fns';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import ReviewForm from '../../components/ReviewForm';
 
 const TravelerBookings: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -17,6 +18,11 @@ const TravelerBookings: React.FC = () => {
     booking: Booking | null;
     existingReview: any;
   }>({ open: false, booking: null, existingReview: null });
+  const [travelersModal, setTravelersModal] = useState<{
+    open: boolean;
+    booking: Booking | null;
+    travelers: any[];
+  }>({ open: false, booking: null, travelers: [] });
 
   useEffect(() => {
     if (user?.id) {
@@ -80,6 +86,50 @@ const TravelerBookings: React.FC = () => {
   const handleReviewSuccess = () => {
     handleCloseReviewModal();
     fetchBookings();
+  };
+
+  const handleOpenTravelersModal = async (booking: Booking) => {
+    try {
+      const { data: travelers, error } = await supabase
+        .from('booking_travelers')
+        .select('*')
+        .eq('booking_id', booking.id)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      setTravelersModal({
+        open: true,
+        booking,
+        travelers: travelers || []
+      });
+    } catch (err) {
+      console.error('Error loading travelers:', err);
+      setTravelersModal({
+        open: true,
+        booking,
+        travelers: []
+      });
+    }
+  };
+
+  const handleCloseTravelersModal = () => {
+    setTravelersModal({ open: false, booking: null, travelers: [] });
+  };
+
+  const handleEditTravelers = (bookingId: string) => {
+    navigate(`/travelers-info/${bookingId}`);
+  };
+
+  const getCategoryLabel = (categoria: string): string => {
+    const labels: Record<string, string> = {
+      adulto: 'Adulto',
+      nino: 'Niño',
+      infante: 'Infante',
+      adulto_mayor: 'Adulto Mayor',
+      mascota: 'Mascota',
+    };
+    return labels[categoria] || categoria;
   };
 
   // Helper function to format dates consistently
@@ -350,6 +400,14 @@ const TravelerBookings: React.FC = () => {
                       Ver Tour
                     </Link>
 
+                    <button
+                      onClick={() => handleOpenTravelersModal(booking)}
+                      className="btn btn-outline flex items-center justify-center"
+                    >
+                      <UserCheck className="h-4 w-4 mr-2" />
+                      Ver Acompañantes
+                    </button>
+
                     {booking.status === 'pending' && booking.payment_status !== 'succeeded' && (
                       <Link
                         to={`/tours/${booking.tour_id}`}
@@ -405,6 +463,104 @@ const TravelerBookings: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Travelers Modal */}
+      {travelersModal.open && travelersModal.booking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h2 className="text-2xl font-bold mb-2">Información de Acompañantes</h2>
+                  <p className="text-gray-600">
+                    {travelersModal.booking.tours?.name}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Reserva ID: {travelersModal.booking.id.substring(0, 8)}...
+                  </p>
+                </div>
+                <button
+                  onClick={handleCloseTravelersModal}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              {travelersModal.travelers.length === 0 ? (
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500">No hay información de acompañantes disponible</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {travelersModal.travelers.map((traveler, index) => (
+                    <div key={traveler.id} className="border border-gray-200 rounded-lg p-4 hover:border-primary-300 transition-colors">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-semibold text-lg">
+                          {getCategoryLabel(traveler.categoria_viajero)} {index + 1}
+                        </h3>
+                        <span className="text-sm text-gray-500 font-medium">
+                          ${traveler.precio_aplicado.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <div className="text-gray-500 mb-1">Nombre Completo</div>
+                          <div className="font-medium">{traveler.nombre}</div>
+                        </div>
+                        {traveler.categoria_viajero !== 'mascota' && (
+                          <>
+                            <div>
+                              <div className="text-gray-500 mb-1">Fecha de Nacimiento</div>
+                              <div className="font-medium">
+                                {traveler.fecha_nacimiento ? formatDate(traveler.fecha_nacimiento) : 'N/A'}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500 mb-1">Email</div>
+                              <div className="font-medium">
+                                <a href={`mailto:${traveler.email}`} className="text-primary-600 hover:text-primary-700">
+                                  {traveler.email}
+                                </a>
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500 mb-1">Teléfono</div>
+                              <div className="font-medium">{traveler.telefono || 'N/A'}</div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={handleCloseTravelersModal}
+                  className="btn btn-outline"
+                >
+                  Cerrar
+                </button>
+                {travelersModal.booking && (
+                  <button
+                    onClick={() => {
+                      handleEditTravelers(travelersModal.booking!.id);
+                      handleCloseTravelersModal();
+                    }}
+                    className="btn btn-primary flex items-center"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Editar Acompañantes
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
