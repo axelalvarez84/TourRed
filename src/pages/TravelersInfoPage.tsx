@@ -125,9 +125,11 @@ const TravelersInfoPage: React.FC = () => {
 
     const { data: userData } = await supabase
       .from('users')
-      .select('first_name, last_name, email, phone, date_of_birth')
+      .select('first_name, last_name, email, phone_number, date_of_birth')
       .eq('id', user?.id)
       .maybeSingle();
+
+    console.log('User data loaded:', userData);
 
     for (let i = 0; i < countAdultos; i++) {
       if (i === 0 && userData) {
@@ -135,7 +137,7 @@ const TravelersInfoPage: React.FC = () => {
           categoria_viajero: 'adulto',
           nombre: `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
           email: userData.email || user?.email || '',
-          telefono: userData.phone || '',
+          telefono: userData.phone_number || '',
           fecha_nacimiento: userData.date_of_birth || '',
           precio_aplicado: tourData.precio_adulto || tourData.price,
           saveAsFrequentCompanion: false,
