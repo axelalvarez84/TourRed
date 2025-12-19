@@ -240,12 +240,37 @@ export const getTours = async (filters: any = {}) => {
       query = query.eq('category', filters.category);
     }
 
-    if (filters.startDate) {
+    // Cambio en la lógica de fechas: buscar tours que inicien dentro del rango
+    if (filters.startDate && filters.endDate) {
+      // Buscar tours cuya fecha de inicio esté entre startDate y endDate
+      query = query.gte('start_date', filters.startDate).lte('start_date', filters.endDate);
+    } else if (filters.startDate) {
+      // Si solo hay startDate, buscar tours que inicien en esa fecha o después
       query = query.gte('start_date', filters.startDate);
+    } else if (filters.endDate) {
+      // Si solo hay endDate, buscar tours que inicien antes o en esa fecha
+      query = query.lte('start_date', filters.endDate);
     }
 
-    if (filters.endDate) {
-      query = query.lte('end_date', filters.endDate);
+    // Filtro por agencia
+    if (filters.agency) {
+      query = query.eq('agency_id', filters.agency);
+    }
+
+    // Filtro por rango de precios
+    if (filters.minPrice) {
+      query = query.gte('price', parseFloat(filters.minPrice));
+    }
+
+    if (filters.maxPrice) {
+      query = query.lte('price', parseFloat(filters.maxPrice));
+    }
+
+    // Filtro por pet friendly
+    if (filters.petFriendly === 'true') {
+      query = query.eq('pet_friendly', true);
+    } else if (filters.petFriendly === 'false') {
+      query = query.eq('pet_friendly', false);
     }
 
     if (filters.limit) {

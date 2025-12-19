@@ -229,6 +229,10 @@ export interface SearchFilters {
   category?: string;
   startDate?: string;
   endDate?: string;
+  agency?: string;
+  minPrice?: string;
+  maxPrice?: string;
+  petFriendly?: string;
 }
 
 export interface ImageUploadData {

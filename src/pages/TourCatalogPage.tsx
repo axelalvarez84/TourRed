@@ -28,6 +28,10 @@ const TourCatalogPage: React.FC = () => {
     category: searchParams.get('category') || '',
     startDate: searchParams.get('startDate') || '',
     endDate: searchParams.get('endDate') || '',
+    agency: searchParams.get('agency') || '',
+    minPrice: searchParams.get('minPrice') || '',
+    maxPrice: searchParams.get('maxPrice') || '',
+    petFriendly: searchParams.get('petFriendly') || '',
   };
 
   const toggleFilters = () => {
@@ -47,6 +51,10 @@ const TourCatalogPage: React.FC = () => {
           category: initialFilters.category || null,
           startDate: initialFilters.startDate || null,
           endDate: initialFilters.endDate || null,
+          agency: initialFilters.agency || null,
+          minPrice: initialFilters.minPrice || null,
+          maxPrice: initialFilters.maxPrice || null,
+          petFriendly: initialFilters.petFriendly || null,
         });
         
         if (error) {
@@ -130,12 +138,34 @@ const TourCatalogPage: React.FC = () => {
       matches = matches && tourCategories.includes(initialFilters.category);
     }
 
-    if (initialFilters.startDate) {
+    // Nueva lógica de fechas: buscar tours que inicien dentro del rango
+    if (initialFilters.startDate && initialFilters.endDate) {
+      const tourStart = new Date(tour.start_date);
+      const rangeStart = new Date(initialFilters.startDate);
+      const rangeEnd = new Date(initialFilters.endDate);
+      matches = matches && tourStart >= rangeStart && tourStart <= rangeEnd;
+    } else if (initialFilters.startDate) {
       matches = matches && new Date(tour.start_date) >= new Date(initialFilters.startDate);
+    } else if (initialFilters.endDate) {
+      matches = matches && new Date(tour.start_date) <= new Date(initialFilters.endDate);
     }
 
-    if (initialFilters.endDate) {
-      matches = matches && new Date(tour.end_date) <= new Date(initialFilters.endDate);
+    if (initialFilters.agency) {
+      matches = matches && tour.agency_id === initialFilters.agency;
+    }
+
+    if (initialFilters.minPrice) {
+      matches = matches && tour.price >= parseFloat(initialFilters.minPrice);
+    }
+
+    if (initialFilters.maxPrice) {
+      matches = matches && tour.price <= parseFloat(initialFilters.maxPrice);
+    }
+
+    if (initialFilters.petFriendly === 'true') {
+      matches = matches && tour.pet_friendly === true;
+    } else if (initialFilters.petFriendly === 'false') {
+      matches = matches && tour.pet_friendly === false;
     }
 
     return matches;
@@ -149,19 +179,19 @@ const TourCatalogPage: React.FC = () => {
         <div className="lg:hidden mb-6">
           <button
             onClick={toggleFilters}
-            className="flex items-center w-full justify-between bg-blue-100 p-4 rounded-lg shadow-sm"
+            className="flex items-center w-full justify-between bg-white p-4 rounded-lg shadow-sm text-gray-900"
           >
             <div className="flex items-center">
               <Filter className="h-5 w-5 text-primary-600 mr-2" />
-              <span>Filtros</span>
+              <span className="font-medium">Filtros</span>
             </div>
             {visibleFilters ? (
-              <ChevronUp className="h-5 w-5" />
+              <ChevronUp className="h-5 w-5 text-gray-600" />
             ) : (
-              <ChevronDown className="h-5 w-5" />
+              <ChevronDown className="h-5 w-5 text-gray-600" />
             )}
           </button>
-          
+
           {visibleFilters && (
             <div className="mt-4">
               <SearchBox initialFilters={initialFilters} />
@@ -173,8 +203,8 @@ const TourCatalogPage: React.FC = () => {
           <div className="hidden lg:block w-full lg:w-1/3 xl:w-1/4">
             <SearchBox initialFilters={initialFilters} />
             
-            <div className="bg-blue-100 rounded-lg shadow-md p-4 mt-6">
-              <h3 className="font-semibold mb-4">Categorías Populares</h3>
+            <div className="bg-white rounded-lg shadow-md p-4 mt-6">
+              <h3 className="font-semibold mb-4 text-gray-900">Categorías Populares</h3>
               <div className="space-y-2">
                 {categories.map((category) => (
                   <a
@@ -188,9 +218,9 @@ const TourCatalogPage: React.FC = () => {
                 ))}
               </div>
             </div>
-            
-            <div className="bg-blue-100 rounded-lg shadow-md p-4 mt-6">
-              <h3 className="font-semibold mb-4">Destinos Populares</h3>
+
+            <div className="bg-white rounded-lg shadow-md p-4 mt-6">
+              <h3 className="font-semibold mb-4 text-gray-900">Destinos Populares</h3>
               <div className="space-y-2">
                 {popularDestinations.length > 0 ? (
                   popularDestinations.map((destination) => (
@@ -215,9 +245,9 @@ const TourCatalogPage: React.FC = () => {
                 )}
               </div>
             </div>
-            
-            <div className="bg-blue-100 rounded-lg shadow-md p-4 mt-6">
-              <h3 className="font-semibold mb-4">Cuándo Ir</h3>
+
+            <div className="bg-white rounded-lg shadow-md p-4 mt-6">
+              <h3 className="font-semibold mb-4 text-gray-900">Cuándo Ir</h3>
               <div className="space-y-2">
                 <a
                   href="/tours?startDate=2025-06-01&endDate=2025-08-31"
@@ -250,29 +280,29 @@ const TourCatalogPage: React.FC = () => {
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
               </div>
             ) : error ? (
-              <div className="bg-blue-100 rounded-lg shadow-md p-6 text-center">
-                <p className="text-error-600 mb-4">Error: {error}</p>
+              <div className="bg-white rounded-lg shadow-md p-6 text-center">
+                <p className="text-error-600 mb-4 font-semibold">Error: {error}</p>
                 <p className="text-gray-600 mb-6">
                   No se pudieron cargar los tours desde la base de datos.
                 </p>
-                <button 
-                  onClick={() => window.location.reload()} 
+                <button
+                  onClick={() => window.location.reload()}
                   className="btn btn-primary"
                 >
                   Reintentar
                 </button>
               </div>
             ) : filteredTours.length === 0 ? (
-              <div className="bg-blue-100 rounded-lg shadow-md p-6 text-center">
-                <p className="text-xl mb-4">
-                  {tours.length === 0 
-                    ? 'No hay tours disponibles' 
+              <div className="bg-white rounded-lg shadow-md p-6 text-center">
+                <p className="text-xl mb-4 text-gray-900 font-semibold">
+                  {tours.length === 0
+                    ? 'No hay tours disponibles'
                     : 'No se encontraron tours que coincidan con tus criterios'
                   }
                 </p>
                 <p className="text-gray-600 mb-6">
-                  {tours.length === 0 
-                    ? 'Las agencias aún no han publicado tours. ¡Vuelve pronto!' 
+                  {tours.length === 0
+                    ? 'Las agencias aún no han publicado tours. ¡Vuelve pronto!'
                     : 'Intenta ajustar tus filtros o buscar algo diferente.'
                   }
                 </p>
@@ -293,7 +323,7 @@ const TourCatalogPage: React.FC = () => {
                   </p>
                   <div className="flex items-center">
                     <span className="text-sm text-gray-600 mr-2">Ordenar por:</span>
-                    <select className="border border-gray-300 rounded-md text-sm p-1">
+                    <select className="border border-gray-300 rounded-md text-sm p-1 text-gray-900 bg-white">
                       <option value="recommended">Recomendados</option>
                       <option value="price-low">Precio: Menor a Mayor</option>
                       <option value="price-high">Precio: Mayor a Menor</option>
@@ -312,10 +342,10 @@ const TourCatalogPage: React.FC = () => {
                 {/* Pagination placeholder */}
                 {filteredTours.length >= 10 && (
                   <div className="mt-8 flex justify-center">
-                    <div className="bg-blue-100 rounded-lg shadow-md p-4">
+                    <div className="bg-white rounded-lg shadow-md p-4">
                       <p className="text-gray-600 text-sm">
-                        Mostrando {filteredTours.length} tours. 
-                        {tours.length > filteredTours.length && 
+                        Mostrando {filteredTours.length} tours.
+                        {tours.length > filteredTours.length &&
                           ` (${tours.length - filteredTours.length} filtrados)`
                         }
                       </p>

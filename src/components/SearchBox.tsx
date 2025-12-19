@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MapPin, Tag, Calendar } from 'lucide-react';
+import { Search, MapPin, Tag, Calendar, Building2, DollarSign, Dog } from 'lucide-react';
 import { SearchFilters } from '../types';
+import { supabase } from '../lib/supabase';
 
 const categories = [
   { id: 'adventure', name: 'Aventura' },
@@ -22,24 +23,49 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
   const [category, setCategory] = useState(initialFilters.category || '');
   const [startDate, setStartDate] = useState(initialFilters.startDate || '');
   const [endDate, setEndDate] = useState(initialFilters.endDate || '');
+  const [agency, setAgency] = useState(initialFilters.agency || '');
+  const [minPrice, setMinPrice] = useState(initialFilters.minPrice || '');
+  const [maxPrice, setMaxPrice] = useState(initialFilters.maxPrice || '');
+  const [petFriendly, setPetFriendly] = useState(initialFilters.petFriendly || '');
+  const [agencies, setAgencies] = useState<any[]>([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const loadAgencies = async () => {
+      const { data } = await supabase
+        .from('agencies')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+
+      if (data) {
+        setAgencies(data);
+      }
+    };
+
+    loadAgencies();
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const queryParams = new URLSearchParams();
     if (destination) queryParams.set('destination', destination);
     if (category) queryParams.set('category', category);
     if (startDate) queryParams.set('startDate', startDate);
     if (endDate) queryParams.set('endDate', endDate);
-    
+    if (agency) queryParams.set('agency', agency);
+    if (minPrice) queryParams.set('minPrice', minPrice);
+    if (maxPrice) queryParams.set('maxPrice', maxPrice);
+    if (petFriendly) queryParams.set('petFriendly', petFriendly);
+
     navigate(`/tours?${queryParams.toString()}`);
   };
 
   return (
-    <div className={`bg-blue-100 rounded-lg shadow-lg p-4 md:p-6 ${className}`}>
+    <div className={`bg-white rounded-lg shadow-lg p-4 md:p-6 ${className}`}>
       <form onSubmit={handleSearch}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="relative">
             <label htmlFor="destination" className="block text-sm font-medium text-gray-700 mb-1">
               Destino
@@ -53,12 +79,12 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
                 id="destination"
                 value={destination}
                 onChange={(e) => setDestination(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
                 placeholder="¿A dónde quieres ir?"
               />
             </div>
           </div>
-          
+
           <div>
             <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
               Categoría
@@ -71,7 +97,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
                 id="category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm appearance-none"
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
               >
                 <option value="">Todas las Categorías</option>
                 {categories.map((cat) => (
@@ -82,7 +108,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
               </select>
             </div>
           </div>
-          
+
           <div>
             <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
               Fecha de Inicio
@@ -96,11 +122,11 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
                 id="startDate"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
               />
             </div>
           </div>
-          
+
           <div>
             <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
               Fecha de Fin
@@ -115,14 +141,99 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
                 min={startDate}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="agency" className="block text-sm font-medium text-gray-700 mb-1">
+              Agencia
+            </label>
+            <div className="relative rounded-md shadow-sm">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Building2 className="h-5 w-5 text-gray-400" />
+              </div>
+              <select
+                id="agency"
+                value={agency}
+                onChange={(e) => setAgency(e.target.value)}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
+              >
+                <option value="">Todas las Agencias</option>
+                {agencies.map((ag) => (
+                  <option key={ag.id} value={ag.id}>
+                    {ag.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="petFriendly" className="block text-sm font-medium text-gray-700 mb-1">
+              Pet Friendly
+            </label>
+            <div className="relative rounded-md shadow-sm">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Dog className="h-5 w-5 text-gray-400" />
+              </div>
+              <select
+                id="petFriendly"
+                value={petFriendly}
+                onChange={(e) => setPetFriendly(e.target.value)}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
+              >
+                <option value="">Todos los Tours</option>
+                <option value="true">Solo Pet Friendly</option>
+                <option value="false">Sin Mascotas</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="minPrice" className="block text-sm font-medium text-gray-700 mb-1">
+              Precio Mínimo
+            </label>
+            <div className="relative rounded-md shadow-sm">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <DollarSign className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="number"
+                id="minPrice"
+                value={minPrice}
+                onChange={(e) => setMinPrice(e.target.value)}
+                min="0"
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
+                placeholder="0"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="maxPrice" className="block text-sm font-medium text-gray-700 mb-1">
+              Precio Máximo
+            </label>
+            <div className="relative rounded-md shadow-sm">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <DollarSign className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="number"
+                id="maxPrice"
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(e.target.value)}
+                min={minPrice || "0"}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
+                placeholder="Sin límite"
               />
             </div>
           </div>
         </div>
-        
+
         <div className="mt-4">
-          <button type="submit" className="w-full btn btn-primary py-3">
+          <button type="submit" className="w-full btn btn-primary py-3 flex items-center justify-center">
             <Search className="h-5 w-5 mr-2" />
             Buscar Tours
           </button>
