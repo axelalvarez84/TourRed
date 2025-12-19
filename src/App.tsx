@@ -36,6 +36,7 @@ import CancelPage from './pages/CancelPage';
 import BookingSuccessPage from './pages/BookingSuccessPage';
 import BookingCancelPage from './pages/BookingCancelPage';
 import BookingPendingPage from './pages/BookingPendingPage';
+import TravelersInfoPage from './pages/TravelersInfoPage';
 import NotificationsPage from './pages/NotificationsPage';
 import AgencyPublicProfile from './pages/AgencyPublicProfile';
 import NotFoundPage from './pages/NotFoundPage';
@@ -76,7 +77,8 @@ const App: React.FC = () => {
           <Route path="/cancel" element={<CancelPage />} />
           <Route path="/booking-success" element={<BookingSuccessPage />} />
           <Route path="/booking-cancel" element={<BookingCancelPage />} />
-          <Route path="/booking-pending" element={<BookingPendingPage />} />
+          <Route path="/booking-pending/:bookingId" element={<BookingPendingPage />} />
+          <Route path="/booking-travelers/:bookingId" element={<TravelersInfoPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
 
           {/* Messaging Route - Available to all authenticated users */}

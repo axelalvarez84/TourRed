@@ -117,7 +117,6 @@ export interface Booking {
   tours?: Tour;
   agencies?: Agency;
   users?: User;
-  // Nuevos campos para el sistema de pagos
   service_charge?: number;
   user_payment?: number;
   platform_revenue?: number;
@@ -125,11 +124,29 @@ export interface Booking {
   payment_status?: 'pending' | 'processing' | 'succeeded' | 'failed' | 'canceled';
   payment_method?: string;
   paid_at?: string;
-  // Nuevos campos para aprobación
   approval_status?: 'pending' | 'approved' | 'rejected';
   approval_notes?: string;
   approved_at?: string;
   approved_by?: string;
+  count_adultos?: number;
+  count_ninos?: number;
+  count_infantes?: number;
+  count_adultos_mayores?: number;
+  count_mascotas?: number;
+  booking_approval_type?: 'automatic' | 'manual';
+}
+
+export interface BookingTraveler {
+  id?: string;
+  booking_id: string;
+  categoria_viajero: 'adulto' | 'nino' | 'infante' | 'adulto_mayor' | 'mascota';
+  nombre: string;
+  email: string;
+  telefono?: string;
+  fecha_nacimiento: string;
+  precio_aplicado: number;
+  frequent_companion_id?: string;
+  created_at?: string;
 }
 
 export interface Notification {

@@ -1,0 +1,440 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Users, ArrowLeft, Save } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { Booking, BookingTraveler, Tour } from '../types';
+import { useAuth } from '../context/AuthContext';
+
+interface TravelerFormData {
+  categoria_viajero: 'adulto' | 'nino' | 'infante' | 'adulto_mayor' | 'mascota';
+  nombre: string;
+  email: string;
+  telefono: string;
+  fecha_nacimiento: string;
+  precio_aplicado: number;
+}
+
+const TravelersInfoPage: React.FC = () => {
+  const { bookingId } = useParams<{ bookingId: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [booking, setBooking] = useState<Booking | null>(null);
+  const [tour, setTour] = useState<Tour | null>(null);
+  const [travelers, setTravelers] = useState<TravelerFormData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!bookingId) {
+      navigate('/');
+      return;
+    }
+    loadBookingData();
+  }, [bookingId]);
+
+  const loadBookingData = async () => {
+    try {
+      setIsLoading(true);
+
+      const { data: bookingData, error: bookingError } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          tours (*)
+        `)
+        .eq('id', bookingId)
+        .maybeSingle();
+
+      if (bookingError || !bookingData) {
+        throw new Error('No se pudo cargar la reserva');
+      }
+
+      if (bookingData.user_id !== user?.id) {
+        throw new Error('No tienes permiso para ver esta reserva');
+      }
+
+      setBooking(bookingData);
+      setTour(bookingData.tours);
+
+      const existingTravelers = await loadExistingTravelers();
+
+      if (existingTravelers.length > 0) {
+        setTravelers(existingTravelers);
+      } else {
+        initializeTravelerForms(bookingData);
+      }
+
+    } catch (err: any) {
+      console.error('Error loading booking:', err);
+      setError(err.message || 'Error al cargar la reserva');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadExistingTravelers = async (): Promise<TravelerFormData[]> => {
+    const { data, error } = await supabase
+      .from('booking_travelers')
+      .select('*')
+      .eq('booking_id', bookingId);
+
+    if (error || !data || data.length === 0) {
+      return [];
+    }
+
+    return data.map(t => ({
+      categoria_viajero: t.categoria_viajero,
+      nombre: t.nombre,
+      email: t.email,
+      telefono: t.telefono || '',
+      fecha_nacimiento: t.fecha_nacimiento,
+      precio_aplicado: t.precio_aplicado,
+    }));
+  };
+
+  const initializeTravelerForms = (bookingData: Booking) => {
+    const travelersList: TravelerFormData[] = [];
+    const tourData = bookingData.tours as Tour;
+
+    const countAdultos = bookingData.count_adultos || 0;
+    const countNinos = bookingData.count_ninos || 0;
+    const countInfantes = bookingData.count_infantes || 0;
+    const countAdultosMayores = bookingData.count_adultos_mayores || 0;
+    const countMascotas = bookingData.count_mascotas || 0;
+
+    for (let i = 0; i < countAdultos; i++) {
+      travelersList.push(createEmptyTraveler('adulto', tourData.precio_adulto || tourData.price));
+    }
+
+    for (let i = 0; i < countNinos; i++) {
+      travelersList.push(createEmptyTraveler('nino', tourData.precio_nino || tourData.price));
+    }
+
+    for (let i = 0; i < countInfantes; i++) {
+      travelersList.push(createEmptyTraveler('infante', tourData.precio_infante || tourData.price));
+    }
+
+    for (let i = 0; i < countAdultosMayores; i++) {
+      travelersList.push(createEmptyTraveler('adulto_mayor', tourData.precio_adulto_mayor || tourData.price));
+    }
+
+    for (let i = 0; i < countMascotas; i++) {
+      travelersList.push(createEmptyTraveler('mascota', tourData.precio_mascota || 0));
+    }
+
+    setTravelers(travelersList);
+  };
+
+  const createEmptyTraveler = (categoria: 'adulto' | 'nino' | 'infante' | 'adulto_mayor' | 'mascota', precio: number): TravelerFormData => {
+    return {
+      categoria_viajero: categoria,
+      nombre: '',
+      email: user?.email || '',
+      telefono: '',
+      fecha_nacimiento: '',
+      precio_aplicado: precio,
+    };
+  };
+
+  const getCategoryLabel = (categoria: string): string => {
+    const labels: Record<string, string> = {
+      adulto: 'Adulto',
+      nino: 'Niño',
+      infante: 'Infante',
+      adulto_mayor: 'Adulto Mayor',
+      mascota: 'Mascota',
+    };
+    return labels[categoria] || categoria;
+  };
+
+  const handleTravelerChange = (index: number, field: keyof TravelerFormData, value: string | number) => {
+    const updatedTravelers = [...travelers];
+    updatedTravelers[index] = {
+      ...updatedTravelers[index],
+      [field]: value,
+    };
+    setTravelers(updatedTravelers);
+  };
+
+  const validateForm = (): boolean => {
+    for (let i = 0; i < travelers.length; i++) {
+      const traveler = travelers[i];
+
+      if (!traveler.nombre.trim()) {
+        setError(`Por favor ingresa el nombre completo del viajero ${i + 1}`);
+        return false;
+      }
+
+      if (traveler.categoria_viajero !== 'mascota') {
+        if (!traveler.email.trim()) {
+          setError(`Por favor ingresa el email del viajero ${i + 1}`);
+          return false;
+        }
+
+        if (!traveler.fecha_nacimiento) {
+          setError(`Por favor ingresa la fecha de nacimiento del viajero ${i + 1}`);
+          return false;
+        }
+      }
+    }
+
+    return true;
+  };
+
+  const handleSave = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setError('');
+
+      await supabase
+        .from('booking_travelers')
+        .delete()
+        .eq('booking_id', bookingId);
+
+      const travelersToInsert = travelers.map(traveler => ({
+        booking_id: bookingId,
+        categoria_viajero: traveler.categoria_viajero,
+        nombre: traveler.nombre,
+        email: traveler.email,
+        telefono: traveler.telefono || null,
+        fecha_nacimiento: traveler.fecha_nacimiento,
+        precio_aplicado: traveler.precio_aplicado,
+      }));
+
+      const { error: insertError } = await supabase
+        .from('booking_travelers')
+        .insert(travelersToInsert);
+
+      if (insertError) {
+        throw new Error('Error al guardar los datos de viajeros');
+      }
+
+      if (tour?.booking_approval_type === 'manual') {
+        navigate(`/booking-pending/${bookingId}`);
+      } else {
+        proceedToPayment();
+      }
+
+    } catch (err: any) {
+      console.error('Error saving travelers:', err);
+      setError(err.message || 'Error al guardar los datos');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const proceedToPayment = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        throw new Error('No hay sesión activa');
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            bookingId: bookingId,
+            customerEmail: user?.email,
+            amount: booking?.user_payment,
+            tourName: tour?.name,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al crear la sesión de pago');
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Error al crear la sesión de pago');
+      }
+
+      if (result.url) {
+        window.location.href = result.url;
+      } else {
+        throw new Error('No se recibió la URL de pago');
+      }
+
+    } catch (error: any) {
+      console.error('Error creando sesión de checkout:', error);
+      setError(error.message || 'Error al procesar el pago');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!booking || !tour) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600">No se pudo cargar la información de la reserva</p>
+          <button
+            onClick={() => navigate('/')}
+            className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+          >
+            Volver al inicio
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-4xl mx-auto px-4">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center text-gray-600 hover:text-gray-900 mb-6"
+        >
+          <ArrowLeft className="w-5 h-5 mr-2" />
+          Volver
+        </button>
+
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="flex items-center mb-4">
+            <Users className="w-6 h-6 text-primary-600 mr-2" />
+            <h1 className="text-2xl font-bold">Información de Viajeros</h1>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-6">
+            <p className="text-sm text-blue-800">
+              <strong>Tour:</strong> {tour.name}
+            </p>
+            <p className="text-sm text-blue-800 mt-1">
+              Por favor ingresa la información de todos los viajeros que participarán en este tour.
+            </p>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-6">
+              <p className="text-sm text-red-800">{error}</p>
+            </div>
+          )}
+
+          <div className="space-y-6">
+            {travelers.map((traveler, index) => (
+              <div key={index} className="border border-gray-200 rounded-lg p-4">
+                <h3 className="font-semibold text-lg mb-4">
+                  {getCategoryLabel(traveler.categoria_viajero)} {index + 1}
+                  <span className="text-sm text-gray-500 ml-2">
+                    (${traveler.precio_aplicado.toLocaleString()})
+                  </span>
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nombre Completo *
+                    </label>
+                    <input
+                      type="text"
+                      value={traveler.nombre}
+                      onChange={(e) => handleTravelerChange(index, 'nombre', e.target.value)}
+                      className="input"
+                      placeholder={traveler.categoria_viajero === 'mascota' ? 'Nombre de la mascota' : 'Nombre y apellidos'}
+                      required
+                    />
+                  </div>
+
+                  {traveler.categoria_viajero !== 'mascota' && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Fecha de Nacimiento *
+                        </label>
+                        <input
+                          type="date"
+                          value={traveler.fecha_nacimiento}
+                          onChange={(e) => handleTravelerChange(index, 'fecha_nacimiento', e.target.value)}
+                          className="input"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Email *
+                        </label>
+                        <input
+                          type="email"
+                          value={traveler.email}
+                          onChange={(e) => handleTravelerChange(index, 'email', e.target.value)}
+                          className="input"
+                          placeholder="correo@ejemplo.com"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Teléfono
+                        </label>
+                        <input
+                          type="tel"
+                          value={traveler.telefono}
+                          onChange={(e) => handleTravelerChange(index, 'telefono', e.target.value)}
+                          className="input"
+                          placeholder="+52 123 456 7890"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 flex justify-end">
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className={`px-6 py-3 rounded-md font-semibold flex items-center ${
+                isSaving
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-primary-600 text-white hover:bg-primary-700'
+              }`}
+            >
+              {isSaving ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Save className="w-5 h-5 mr-2" />
+                  Continuar al Pago
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default TravelersInfoPage;

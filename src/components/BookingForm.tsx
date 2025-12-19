@@ -239,6 +239,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         status: initialStatus,
         payment_status: initialPaymentStatus,
         approval_status: initialApprovalStatus,
+        count_adultos: travelerCounts.adultos,
+        count_ninos: travelerCounts.ninos,
+        count_infantes: travelerCounts.infantes,
+        count_adultos_mayores: travelerCounts.adultos_mayores,
+        count_mascotas: travelerCounts.mascotas,
       };
 
       console.log('📝 Creando reserva con datos:', bookingData);
@@ -256,21 +261,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
       console.log('✅ Reserva creada exitosamente:', data);
 
-      if (tour.booking_approval_type === 'manual') {
-        navigate(`/booking-pending/${data.id}`);
-      } else {
-        const checkoutResult = await createStripeCheckout(data.id, user.email, userPayment);
-
-        if (!checkoutResult.success) {
-          throw new Error(checkoutResult.error || 'Error al crear la sesión de pago');
-        }
-
-        if (checkoutResult.url) {
-          window.location.href = checkoutResult.url;
-        } else {
-          throw new Error('No se recibió la URL de pago');
-        }
-      }
+      navigate(`/booking-travelers/${data.id}`);
 
     } catch (error: any) {
       console.error('❌ Error en el proceso de reserva:', error);
