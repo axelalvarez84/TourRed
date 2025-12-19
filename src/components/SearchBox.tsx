@@ -238,16 +238,16 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
               </div>
 
               {showAgencyDropdown && filteredAgencies.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+                <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 shadow-xl max-h-60 rounded-md py-1 overflow-auto">
                   {filteredAgencies.map((ag) => (
                     <div
                       key={ag.id}
                       onClick={() => handleAgencySelect(ag)}
-                      className={`cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-blue-50 ${
-                        agency === ag.id ? 'bg-blue-100' : ''
+                      className={`cursor-pointer select-none relative py-3 px-3 hover:bg-blue-50 transition-colors ${
+                        agency === ag.id ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
                       }`}
                     >
-                      <span className={`block truncate ${agency === ag.id ? 'font-semibold' : 'font-normal'}`}>
+                      <span className={`block truncate text-sm ${agency === ag.id ? 'font-semibold' : 'font-normal'}`}>
                         {ag.name}
                       </span>
                     </div>
