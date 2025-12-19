@@ -149,6 +149,16 @@ export interface BookingTraveler {
   created_at?: string;
 }
 
+export interface FrequentCompanion {
+  id: string;
+  user_id: string;
+  nombre: string;
+  email: string;
+  telefono?: string;
+  fecha_nacimiento: string;
+  created_at?: string;
+}
+
 export interface Notification {
   id: string;
   user_id: string;

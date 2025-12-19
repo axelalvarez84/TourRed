@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Users, ArrowLeft, Save } from 'lucide-react';
+import { Users, ArrowLeft, Save, UserPlus, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Booking, BookingTraveler, Tour } from '../types';
+import { Booking, BookingTraveler, Tour, FrequentCompanion } from '../types';
 import { useAuth } from '../context/AuthContext';
 
 interface TravelerFormData {
@@ -12,6 +12,8 @@ interface TravelerFormData {
   telefono: string;
   fecha_nacimiento: string;
   precio_aplicado: number;
+  saveAsFrequentCompanion: boolean;
+  selectedCompanionId?: string;
 }
 
 const TravelersInfoPage: React.FC = () => {
@@ -21,9 +23,11 @@ const TravelersInfoPage: React.FC = () => {
   const [booking, setBooking] = useState<Booking | null>(null);
   const [tour, setTour] = useState<Tour | null>(null);
   const [travelers, setTravelers] = useState<TravelerFormData[]>([]);
+  const [frequentCompanions, setFrequentCompanions] = useState<FrequentCompanion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showCompanionsSection, setShowCompanionsSection] = useState(true);
 
   useEffect(() => {
     if (!bookingId) {
@@ -57,12 +61,14 @@ const TravelersInfoPage: React.FC = () => {
       setBooking(bookingData);
       setTour(bookingData.tours);
 
+      await loadFrequentCompanions();
+
       const existingTravelers = await loadExistingTravelers();
 
       if (existingTravelers.length > 0) {
         setTravelers(existingTravelers);
       } else {
-        initializeTravelerForms(bookingData);
+        await initializeTravelerForms(bookingData);
       }
 
     } catch (err: any) {
@@ -70,6 +76,18 @@ const TravelersInfoPage: React.FC = () => {
       setError(err.message || 'Error al cargar la reserva');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadFrequentCompanions = async () => {
+    const { data, error } = await supabase
+      .from('frequent_companions')
+      .select('*')
+      .eq('user_id', user?.id)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      setFrequentCompanions(data);
     }
   };
 
@@ -90,10 +108,12 @@ const TravelersInfoPage: React.FC = () => {
       telefono: t.telefono || '',
       fecha_nacimiento: t.fecha_nacimiento,
       precio_aplicado: t.precio_aplicado,
+      saveAsFrequentCompanion: false,
+      selectedCompanionId: t.frequent_companion_id,
     }));
   };
 
-  const initializeTravelerForms = (bookingData: Booking) => {
+  const initializeTravelerForms = async (bookingData: Booking) => {
     const travelersList: TravelerFormData[] = [];
     const tourData = bookingData.tours as Tour;
 
@@ -103,8 +123,26 @@ const TravelersInfoPage: React.FC = () => {
     const countAdultosMayores = bookingData.count_adultos_mayores || 0;
     const countMascotas = bookingData.count_mascotas || 0;
 
+    const { data: userData } = await supabase
+      .from('users')
+      .select('first_name, last_name, email, phone, birth_date')
+      .eq('id', user?.id)
+      .maybeSingle();
+
     for (let i = 0; i < countAdultos; i++) {
-      travelersList.push(createEmptyTraveler('adulto', tourData.precio_adulto || tourData.price));
+      if (i === 0 && userData) {
+        travelersList.push({
+          categoria_viajero: 'adulto',
+          nombre: `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
+          email: userData.email || user?.email || '',
+          telefono: userData.phone || '',
+          fecha_nacimiento: userData.birth_date || '',
+          precio_aplicado: tourData.precio_adulto || tourData.price,
+          saveAsFrequentCompanion: false,
+        });
+      } else {
+        travelersList.push(createEmptyTraveler('adulto', tourData.precio_adulto || tourData.price));
+      }
     }
 
     for (let i = 0; i < countNinos; i++) {
@@ -134,6 +172,7 @@ const TravelersInfoPage: React.FC = () => {
       telefono: '',
       fecha_nacimiento: '',
       precio_aplicado: precio,
+      saveAsFrequentCompanion: false,
     };
   };
 
@@ -148,11 +187,24 @@ const TravelersInfoPage: React.FC = () => {
     return labels[categoria] || categoria;
   };
 
-  const handleTravelerChange = (index: number, field: keyof TravelerFormData, value: string | number) => {
+  const handleTravelerChange = (index: number, field: keyof TravelerFormData, value: string | number | boolean) => {
     const updatedTravelers = [...travelers];
     updatedTravelers[index] = {
       ...updatedTravelers[index],
       [field]: value,
+    };
+    setTravelers(updatedTravelers);
+  };
+
+  const selectFrequentCompanion = (index: number, companion: FrequentCompanion) => {
+    const updatedTravelers = [...travelers];
+    updatedTravelers[index] = {
+      ...updatedTravelers[index],
+      nombre: companion.nombre,
+      email: companion.email,
+      telefono: companion.telefono || '',
+      fecha_nacimiento: companion.fecha_nacimiento,
+      selectedCompanionId: companion.id,
     };
     setTravelers(updatedTravelers);
   };
@@ -204,6 +256,7 @@ const TravelersInfoPage: React.FC = () => {
         telefono: traveler.telefono || null,
         fecha_nacimiento: traveler.fecha_nacimiento,
         precio_aplicado: traveler.precio_aplicado,
+        frequent_companion_id: traveler.selectedCompanionId || null,
       }));
 
       const { error: insertError } = await supabase
@@ -212,6 +265,24 @@ const TravelersInfoPage: React.FC = () => {
 
       if (insertError) {
         throw new Error('Error al guardar los datos de viajeros');
+      }
+
+      for (const traveler of travelers) {
+        if (traveler.saveAsFrequentCompanion && traveler.categoria_viajero !== 'mascota') {
+          const existingCompanion = frequentCompanions.find(
+            c => c.email === traveler.email && c.fecha_nacimiento === traveler.fecha_nacimiento
+          );
+
+          if (!existingCompanion) {
+            await supabase.from('frequent_companions').insert({
+              user_id: user?.id,
+              nombre: traveler.nombre,
+              email: traveler.email,
+              telefono: traveler.telefono || null,
+              fecha_nacimiento: traveler.fecha_nacimiento,
+            });
+          }
+        }
       }
 
       if (tour?.booking_approval_type === 'manual') {
@@ -329,6 +400,52 @@ const TravelersInfoPage: React.FC = () => {
             </p>
           </div>
 
+          {frequentCompanions.length > 0 && (
+            <div className="mb-6 border-t border-gray-200 pt-6">
+              <button
+                onClick={() => setShowCompanionsSection(!showCompanionsSection)}
+                className="flex items-center justify-between w-full text-left mb-4"
+              >
+                <h2 className="text-lg font-semibold flex items-center">
+                  <UserPlus className="w-5 h-5 mr-2" />
+                  Acompañantes frecuentes
+                </h2>
+                <span className="text-sm text-gray-500">
+                  {showCompanionsSection ? '▼' : '▶'}
+                </span>
+              </button>
+
+              {showCompanionsSection && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {frequentCompanions.map((companion) => (
+                    <div
+                      key={companion.id}
+                      className="border border-gray-200 rounded-lg p-3 hover:border-primary-500 hover:bg-primary-50 transition-colors cursor-default"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center">
+                          <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-2">
+                            <Users className="w-5 h-5 text-primary-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">{companion.nombre}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(companion.fecha_nacimiento).getFullYear()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-2">{companion.email}</p>
+                      <p className="text-xs text-gray-400">
+                        Haz clic en "Usar datos" para autocompletar
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-6">
               <p className="text-sm text-red-800">{error}</p>
@@ -338,12 +455,36 @@ const TravelersInfoPage: React.FC = () => {
           <div className="space-y-6">
             {travelers.map((traveler, index) => (
               <div key={index} className="border border-gray-200 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-4">
-                  {getCategoryLabel(traveler.categoria_viajero)} {index + 1}
-                  <span className="text-sm text-gray-500 ml-2">
-                    (${traveler.precio_aplicado.toLocaleString()})
-                  </span>
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-lg">
+                    {getCategoryLabel(traveler.categoria_viajero)} {index + 1}
+                    <span className="text-sm text-gray-500 ml-2">
+                      (${traveler.precio_aplicado.toLocaleString()})
+                    </span>
+                  </h3>
+
+                  {frequentCompanions.length > 0 && traveler.categoria_viajero !== 'mascota' && (
+                    <div className="relative">
+                      <select
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            const companion = frequentCompanions.find(c => c.id === e.target.value);
+                            if (companion) selectFrequentCompanion(index, companion);
+                          }
+                        }}
+                        className="text-sm border border-gray-300 rounded-md px-3 py-1 hover:border-primary-500 focus:border-primary-500 focus:outline-none"
+                        value=""
+                      >
+                        <option value="">Usar datos guardados</option>
+                        {frequentCompanions.map((companion) => (
+                          <option key={companion.id} value={companion.id}>
+                            {companion.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -404,6 +545,26 @@ const TravelersInfoPage: React.FC = () => {
                     </>
                   )}
                 </div>
+
+                {traveler.categoria_viajero !== 'mascota' && index > 0 && (
+                  <div className="mt-4">
+                    <label className="flex items-center text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={traveler.saveAsFrequentCompanion}
+                        onChange={(e) => handleTravelerChange(index, 'saveAsFrequentCompanion', e.target.checked)}
+                        className="mr-2 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      />
+                      <span className="flex items-center">
+                        <Check className="w-4 h-4 text-green-600 mr-1" />
+                        Guardar como acompañante frecuente
+                      </span>
+                    </label>
+                    <p className="text-xs text-gray-500 ml-6 mt-1">
+                      Los datos de este viajero se guardarán en tu cuenta para futuras reservas
+                    </p>
+                  </div>
+                )}
               </div>
             ))}
           </div>
