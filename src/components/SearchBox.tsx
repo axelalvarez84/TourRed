@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MapPin, Tag, Calendar, Building2, DollarSign, Dog } from 'lucide-react';
+import { Search, MapPin, Tag, Calendar, Building2, DollarSign, Dog, X } from 'lucide-react';
 import { SearchFilters } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -24,10 +24,15 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
   const [startDate, setStartDate] = useState(initialFilters.startDate || '');
   const [endDate, setEndDate] = useState(initialFilters.endDate || '');
   const [agency, setAgency] = useState(initialFilters.agency || '');
+  const [agencySearchText, setAgencySearchText] = useState('');
   const [minPrice, setMinPrice] = useState(initialFilters.minPrice || '');
   const [maxPrice, setMaxPrice] = useState(initialFilters.maxPrice || '');
   const [petFriendly, setPetFriendly] = useState(initialFilters.petFriendly || '');
   const [agencies, setAgencies] = useState<any[]>([]);
+  const [filteredAgencies, setFilteredAgencies] = useState<any[]>([]);
+  const [showAgencyDropdown, setShowAgencyDropdown] = useState(false);
+  const [selectedAgencyName, setSelectedAgencyName] = useState('');
+  const agencyInputRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -40,11 +45,67 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
 
       if (data) {
         setAgencies(data);
+        setFilteredAgencies(data);
+
+        if (initialFilters.agency && data.length > 0) {
+          const selectedAgency = data.find(a => a.id === initialFilters.agency);
+          if (selectedAgency) {
+            setSelectedAgencyName(selectedAgency.name);
+            setAgencySearchText(selectedAgency.name);
+          }
+        }
       }
     };
 
     loadAgencies();
+  }, [initialFilters.agency]);
+
+  useEffect(() => {
+    if (agencySearchText === '') {
+      setFilteredAgencies(agencies);
+    } else {
+      const filtered = agencies.filter(ag =>
+        ag.name.toLowerCase().includes(agencySearchText.toLowerCase())
+      );
+      setFilteredAgencies(filtered);
+    }
+  }, [agencySearchText, agencies]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (agencyInputRef.current && !agencyInputRef.current.contains(event.target as Node)) {
+        setShowAgencyDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleAgencyInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setAgencySearchText(value);
+    setShowAgencyDropdown(true);
+
+    if (value === '') {
+      setAgency('');
+      setSelectedAgencyName('');
+    }
+  };
+
+  const handleAgencySelect = (selectedAgency: any) => {
+    setAgency(selectedAgency.id);
+    setAgencySearchText(selectedAgency.name);
+    setSelectedAgencyName(selectedAgency.name);
+    setShowAgencyDropdown(false);
+  };
+
+  const handleClearAgency = () => {
+    setAgency('');
+    setAgencySearchText('');
+    setSelectedAgencyName('');
+    setShowAgencyDropdown(false);
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,27 +207,53 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
             </div>
           </div>
 
-          <div>
+          <div ref={agencyInputRef}>
             <label htmlFor="agency" className="block text-sm font-medium text-gray-700 mb-1">
               Agencia
             </label>
-            <div className="relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Building2 className="h-5 w-5 text-gray-400" />
+            <div className="relative">
+              <div className="relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Building2 className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  id="agency"
+                  value={agencySearchText}
+                  onChange={handleAgencyInputChange}
+                  onFocus={() => setShowAgencyDropdown(true)}
+                  className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
+                  placeholder="Buscar agencia..."
+                  autoComplete="off"
+                />
+                {agency && (
+                  <button
+                    type="button"
+                    onClick={handleClearAgency}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  >
+                    <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                  </button>
+                )}
               </div>
-              <select
-                id="agency"
-                value={agency}
-                onChange={(e) => setAgency(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
-              >
-                <option value="">Todas las Agencias</option>
-                {agencies.map((ag) => (
-                  <option key={ag.id} value={ag.id}>
-                    {ag.name}
-                  </option>
-                ))}
-              </select>
+
+              {showAgencyDropdown && filteredAgencies.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+                  {filteredAgencies.map((ag) => (
+                    <div
+                      key={ag.id}
+                      onClick={() => handleAgencySelect(ag)}
+                      className={`cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-blue-50 ${
+                        agency === ag.id ? 'bg-blue-100' : ''
+                      }`}
+                    >
+                      <span className={`block truncate ${agency === ag.id ? 'font-semibold' : 'font-normal'}`}>
+                        {ag.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
