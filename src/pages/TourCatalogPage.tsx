@@ -131,51 +131,8 @@ const TourCatalogPage: React.FC = () => {
     fetchPopularDestinations();
   }, []);
 
-  // Filter tours based on search params (client-side filtering as backup)
-  const filteredTours = tours.filter(tour => {
-    let matches = true;
-
-    if (initialFilters.destination) {
-      matches = matches && tour.destination.toLowerCase().includes(initialFilters.destination.toLowerCase());
-    }
-
-    if (initialFilters.category) {
-      const tourCategories = Array.isArray(tour.category) ? tour.category : [tour.category];
-      matches = matches && tourCategories.includes(initialFilters.category);
-    }
-
-    // Nueva lógica de fechas: buscar tours que inicien dentro del rango
-    if (initialFilters.startDate && initialFilters.endDate) {
-      const tourStart = new Date(tour.start_date);
-      const rangeStart = new Date(initialFilters.startDate);
-      const rangeEnd = new Date(initialFilters.endDate);
-      matches = matches && tourStart >= rangeStart && tourStart <= rangeEnd;
-    } else if (initialFilters.startDate) {
-      matches = matches && new Date(tour.start_date) >= new Date(initialFilters.startDate);
-    } else if (initialFilters.endDate) {
-      matches = matches && new Date(tour.start_date) <= new Date(initialFilters.endDate);
-    }
-
-    if (initialFilters.agency) {
-      matches = matches && tour.agency_id === initialFilters.agency;
-    }
-
-    if (initialFilters.minPrice) {
-      matches = matches && tour.price >= parseFloat(initialFilters.minPrice);
-    }
-
-    if (initialFilters.maxPrice) {
-      matches = matches && tour.price <= parseFloat(initialFilters.maxPrice);
-    }
-
-    if (initialFilters.petFriendly === 'true') {
-      matches = matches && tour.pet_friendly === true;
-    } else if (initialFilters.petFriendly === 'false') {
-      matches = matches && tour.pet_friendly === false;
-    }
-
-    return matches;
-  });
+  // No client-side filtering needed - database already handles all filters correctly
+  const filteredTours = tours;
 
   return (
     <div className="bg-blue-50 min-h-screen py-8">
