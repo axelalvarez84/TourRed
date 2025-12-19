@@ -80,43 +80,49 @@ const TourCatalogPage: React.FC = () => {
     const fetchPopularDestinations = async () => {
       try {
         console.log('🌍 Cargando destinos populares...');
-        
-        // Get destinations with tour counts
-        const { data, error } = await supabase
+
+        // Get destinations with tour counts using a simpler query
+        const { data: destinations, error } = await supabase
           .from('destinations')
-          .select(`
-            id,
-            name,
-            tour_destinations(
-              tours(id)
-            )
-          `)
-          .limit(10);
-        
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name');
+
         if (error) {
-          console.error('❌ Error cargando destinos populares:', error);
+          console.error('❌ Error cargando destinos:', error);
           return;
         }
-        
-        if (!data || data.length === 0) {
-          console.log('📭 No hay destinos populares');
+
+        if (!destinations || destinations.length === 0) {
+          console.log('📭 No hay destinos');
           return;
         }
-        
-        // Process destinations and count tours
-        const processedDestinations = data
-          .map(dest => ({
-            id: dest.id,
-            name: dest.name,
-            tour_count: dest.tour_destinations?.length || 0
-          }))
-          .filter(dest => dest.tour_count > 0) // Only show destinations with tours
-          .sort((a, b) => b.tour_count - a.tour_count) // Sort by tour count
-          .slice(0, 4); // Take top 4
-        
+
+        // Get tour counts for each destination
+        const destinationsWithCounts = await Promise.all(
+          destinations.map(async (dest) => {
+            const { count, error: countError } = await supabase
+              .from('tour_destinations')
+              .select('*', { count: 'exact', head: true })
+              .eq('destination_id', dest.id);
+
+            return {
+              id: dest.id,
+              name: dest.name,
+              tour_count: countError ? 0 : (count || 0)
+            };
+          })
+        );
+
+        // Filter and sort destinations with tours
+        const processedDestinations = destinationsWithCounts
+          .filter(dest => dest.tour_count > 0)
+          .sort((a, b) => b.tour_count - a.tour_count)
+          .slice(0, 4);
+
         console.log('✅ Destinos populares procesados:', processedDestinations);
         setPopularDestinations(processedDestinations);
-        
+
       } catch (err: any) {
         console.error('❌ Error en fetchPopularDestinations:', err);
       }

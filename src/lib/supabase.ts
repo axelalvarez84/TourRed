@@ -218,6 +218,79 @@ export const getTours = async (filters: any = {}) => {
   try {
     console.log('🔍 Obteniendo tours con filtros:', filters);
 
+    // Si hay filtro de destino, primero buscar tours por la tabla de relaciones
+    if (filters.destination) {
+      const { data: matchingDestinations } = await supabase
+        .from('destinations')
+        .select('id')
+        .ilike('name', `%${filters.destination}%`);
+
+      if (matchingDestinations && matchingDestinations.length > 0) {
+        const destinationIds = matchingDestinations.map(d => d.id);
+
+        const { data: tourDestinations } = await supabase
+          .from('tour_destinations')
+          .select('tour_id')
+          .in('destination_id', destinationIds);
+
+        if (tourDestinations && tourDestinations.length > 0) {
+          const tourIds = tourDestinations.map(td => td.tour_id);
+
+          let query = supabase
+            .from('tours')
+            .select(`
+              *,
+              agencies(id, name, rating)
+            `)
+            .in('id', tourIds);
+
+          if (filters.includeExpired !== true) {
+            const today = formatDateForDB(new Date());
+            query = query.gte('end_date', today);
+          }
+
+          if (filters.category) {
+            query = query.eq('category', filters.category);
+          }
+
+          if (filters.startDate && filters.endDate) {
+            query = query.gte('start_date', filters.startDate).lte('start_date', filters.endDate);
+          } else if (filters.startDate) {
+            query = query.gte('start_date', filters.startDate);
+          } else if (filters.endDate) {
+            query = query.lte('start_date', filters.endDate);
+          }
+
+          if (filters.agency) {
+            query = query.eq('agency_id', filters.agency);
+          }
+
+          if (filters.minPrice) {
+            query = query.gte('price', parseFloat(filters.minPrice));
+          }
+
+          if (filters.maxPrice) {
+            query = query.lte('price', parseFloat(filters.maxPrice));
+          }
+
+          if (filters.petFriendly === 'true') {
+            query = query.eq('pet_friendly', true);
+          } else if (filters.petFriendly === 'false') {
+            query = query.eq('pet_friendly', false);
+          }
+
+          if (filters.limit) {
+            query = query.limit(filters.limit);
+          }
+
+          query = query.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
+
+          const { data, error } = await query;
+          return { data, error };
+        }
+      }
+    }
+
     let query = supabase
       .from('tours')
       .select(`
@@ -225,13 +298,11 @@ export const getTours = async (filters: any = {}) => {
         agencies(id, name, rating)
       `);
 
-    // Only show tours that haven't ended yet (unless explicitly disabled)
     if (filters.includeExpired !== true) {
       const today = formatDateForDB(new Date());
       query = query.gte('end_date', today);
     }
 
-    // Apply filters
     if (filters.destination) {
       query = query.ilike('destination', `%${filters.destination}%`);
     }
@@ -240,24 +311,18 @@ export const getTours = async (filters: any = {}) => {
       query = query.eq('category', filters.category);
     }
 
-    // Cambio en la lógica de fechas: buscar tours que inicien dentro del rango
     if (filters.startDate && filters.endDate) {
-      // Buscar tours cuya fecha de inicio esté entre startDate y endDate
       query = query.gte('start_date', filters.startDate).lte('start_date', filters.endDate);
     } else if (filters.startDate) {
-      // Si solo hay startDate, buscar tours que inicien en esa fecha o después
       query = query.gte('start_date', filters.startDate);
     } else if (filters.endDate) {
-      // Si solo hay endDate, buscar tours que inicien antes o en esa fecha
       query = query.lte('start_date', filters.endDate);
     }
 
-    // Filtro por agencia
     if (filters.agency) {
       query = query.eq('agency_id', filters.agency);
     }
 
-    // Filtro por rango de precios
     if (filters.minPrice) {
       query = query.gte('price', parseFloat(filters.minPrice));
     }
@@ -266,7 +331,6 @@ export const getTours = async (filters: any = {}) => {
       query = query.lte('price', parseFloat(filters.maxPrice));
     }
 
-    // Filtro por pet friendly
     if (filters.petFriendly === 'true') {
       query = query.eq('pet_friendly', true);
     } else if (filters.petFriendly === 'false') {
@@ -277,7 +341,6 @@ export const getTours = async (filters: any = {}) => {
       query = query.limit(filters.limit);
     }
 
-    // Order by featured first, then created_at
     query = query.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
 
     const { data, error } = await query;
