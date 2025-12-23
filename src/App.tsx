@@ -3,6 +3,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import NavBar from './components/NavBar';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
+import CookieBanner from './components/CookieBanner';
+import GoogleAnalytics from './components/GoogleAnalytics';
 import HomePage from './pages/HomePage';
 import TourCatalogPage from './pages/TourCatalogPage';
 import TourDetailPage from './pages/TourDetailPage';
@@ -31,6 +33,9 @@ import AdminProfile from './pages/admin/AdminProfile';
 import AdminSettings from './pages/admin/AdminSettings';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
+import CookiePolicyPage from './pages/CookiePolicyPage';
 import SuccessPage from './pages/SuccessPage';
 import CancelPage from './pages/CancelPage';
 import BookingSuccessPage from './pages/BookingSuccessPage';
@@ -58,6 +63,7 @@ const App: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <ScrollToTop />
+      <GoogleAnalytics />
       <NavBar />
       <main className="flex-grow">
         <Routes>
@@ -67,6 +73,9 @@ const App: React.FC = () => {
           <Route path="/agencies/:agencyId" element={<AgencyPublicProfile />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/aviso-privacidad" element={<PrivacyPolicyPage />} />
+          <Route path="/terminos-servicio" element={<TermsOfServicePage />} />
+          <Route path="/politica-cookies" element={<CookiePolicyPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/agency-signup" element={<AgencySignupPage />} />
@@ -239,6 +248,7 @@ const App: React.FC = () => {
         </Routes>
       </main>
       <Footer />
+      <CookieBanner />
     </div>
   );
 };

@@ -167,16 +167,25 @@ const Footer: React.FC = () => {
             <p className="text-gray-400 text-sm">
               &copy; {new Date().getFullYear()} ToursRed. Todos los derechos reservados.
             </p>
-            <div className="flex space-x-4 mt-4 md:mt-0">
-              <Link to="/privacy-policy" className="text-gray-400 hover:text-white text-sm transition-colors">
-                Política de Privacidad
+            <div className="flex flex-wrap gap-4 mt-4 md:mt-0 justify-center">
+              <Link to="/aviso-privacidad" className="text-gray-400 hover:text-white text-sm transition-colors">
+                Aviso de Privacidad
               </Link>
-              <Link to="/terms-of-service" className="text-gray-400 hover:text-white text-sm transition-colors">
+              <Link to="/terminos-servicio" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Términos de Servicio
               </Link>
-              <Link to="/cookie-policy" className="text-gray-400 hover:text-white text-sm transition-colors">
+              <Link to="/politica-cookies" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Política de Cookies
               </Link>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('cookie_consent');
+                  window.location.reload();
+                }}
+                className="text-gray-400 hover:text-white text-sm transition-colors"
+              >
+                Preferencias de Cookies
+              </button>
             </div>
           </div>
         </div>
