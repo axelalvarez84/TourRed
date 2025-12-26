@@ -8,27 +8,40 @@ function generateSessionId(): string {
 }
 
 export function getSessionId(): string {
-  let sessionId = localStorage.getItem(SESSION_ID_KEY);
-  if (!sessionId) {
-    sessionId = generateSessionId();
-    localStorage.setItem(SESSION_ID_KEY, sessionId);
+  try {
+    let sessionId = localStorage.getItem(SESSION_ID_KEY);
+    if (!sessionId) {
+      sessionId = generateSessionId();
+      localStorage.setItem(SESSION_ID_KEY, sessionId);
+    }
+    return sessionId;
+  } catch (error) {
+    console.warn('Failed to get/set session ID:', error);
+    return generateSessionId();
   }
-  return sessionId;
 }
 
 export function getConsent(): ConsentType {
-  const consent = localStorage.getItem(CONSENT_KEY);
-  if (consent === 'all' || consent === 'essential-only') {
-    return consent;
+  try {
+    const consent = localStorage.getItem(CONSENT_KEY);
+    if (consent === 'all' || consent === 'essential-only') {
+      return consent;
+    }
+  } catch (error) {
+    console.warn('Failed to read consent from localStorage:', error);
   }
   return null;
 }
 
 export function setConsent(consent: ConsentType): void {
-  if (consent) {
-    localStorage.setItem(CONSENT_KEY, consent);
-  } else {
-    localStorage.removeItem(CONSENT_KEY);
+  try {
+    if (consent) {
+      localStorage.setItem(CONSENT_KEY, consent);
+    } else {
+      localStorage.removeItem(CONSENT_KEY);
+    }
+  } catch (error) {
+    console.warn('Failed to save consent to localStorage:', error);
   }
 }
 
@@ -41,14 +54,18 @@ export function canUseAnalytics(): boolean {
 }
 
 export function clearNonEssentialCookies(): void {
-  const essentialKeys = ['sb-', 'cookie_consent', 'session_id'];
+  try {
+    const essentialKeys = ['sb-', 'cookie_consent', 'session_id'];
 
-  Object.keys(localStorage).forEach(key => {
-    const isEssential = essentialKeys.some(prefix => key.startsWith(prefix));
-    if (!isEssential) {
-      localStorage.removeItem(key);
-    }
-  });
+    Object.keys(localStorage).forEach(key => {
+      const isEssential = essentialKeys.some(prefix => key.startsWith(prefix));
+      if (!isEssential) {
+        localStorage.removeItem(key);
+      }
+    });
+  } catch (error) {
+    console.warn('Failed to clear non-essential cookies:', error);
+  }
 }
 
 export async function recordConsent(

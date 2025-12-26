@@ -16,9 +16,8 @@ export default function CookieBanner() {
 
   const handleAcceptAll = async () => {
     setConsent('all');
-    await recordConsent('all', user?.id || null);
     setVisible(false);
-    window.location.reload();
+    await recordConsent('all', user?.id || null);
   };
 
   const handleEssentialOnly = async () => {
