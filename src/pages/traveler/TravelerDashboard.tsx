@@ -47,6 +47,7 @@ interface Membership {
   status: string;
   current_period_end: string;
   service_fee_exemption_used: number;
+  cancel_at_period_end: boolean;
 }
 
 const TravelerDashboard: React.FC = () => {
@@ -55,6 +56,9 @@ const TravelerDashboard: React.FC = () => {
   const [savedTours, setSavedTours] = useState<SavedTour[]>([]);
   const [membership, setMembership] = useState<Membership | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -173,6 +177,74 @@ const TravelerDashboard: React.FC = () => {
     }
   };
 
+  const handleCancelSubscription = async () => {
+    if (!user) return;
+    setActionLoading(true);
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-membership-subscription`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          },
+          body: JSON.stringify({ action: 'cancel' }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al cancelar la suscripción');
+      }
+
+      alert('Tu suscripción se cancelará al final del período actual. Seguirás teniendo acceso a los beneficios hasta esa fecha.');
+      setShowCancelModal(false);
+      await loadDashboardData();
+    } catch (error: any) {
+      console.error('Error cancelling subscription:', error);
+      alert(error.message || 'Error al cancelar la suscripción');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUpgradeSubscription = async () => {
+    if (!user) return;
+    setActionLoading(true);
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-membership-subscription`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          },
+          body: JSON.stringify({ action: 'upgrade' }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al actualizar la suscripción');
+      }
+
+      alert('¡Tu plan ha sido actualizado a Anual! Disfrutarás de 2 meses gratis.');
+      setShowUpgradeModal(false);
+      await loadDashboardData();
+    } catch (error: any) {
+      console.error('Error upgrading subscription:', error);
+      alert(error.message || 'Error al actualizar la suscripción');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -210,8 +282,8 @@ const TravelerDashboard: React.FC = () => {
               <p className="text-yellow-100 text-xs">de $500 este mes</p>
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between">
-            <div className="flex-1">
+          <div className="mt-4">
+            <div className="flex-1 mb-4">
               <div className="w-full bg-white/20 rounded-full h-2">
                 <div
                   className="bg-white rounded-full h-2 transition-all duration-300"
@@ -219,12 +291,28 @@ const TravelerDashboard: React.FC = () => {
                 ></div>
               </div>
             </div>
-            <Link
-              to="/traveler/membership"
-              className="ml-4 bg-white text-yellow-600 px-4 py-2 rounded-lg font-semibold hover:bg-yellow-50 transition-colors text-sm"
-            >
-              Gestionar
-            </Link>
+            <div className="flex gap-2 flex-wrap">
+              <Link
+                to="/traveler/membership"
+                className="bg-white text-yellow-600 px-4 py-2 rounded-lg font-semibold hover:bg-yellow-50 transition-colors text-sm"
+              >
+                Ver Detalles
+              </Link>
+              {membership.plan_type === 'monthly' && !membership.cancel_at_period_end && (
+                <button
+                  onClick={() => setShowUpgradeModal(true)}
+                  className="bg-white/90 text-yellow-700 px-4 py-2 rounded-lg font-semibold hover:bg-white transition-colors text-sm"
+                >
+                  Actualizar a Anual (Ahorra $98)
+                </button>
+              )}
+              <button
+                onClick={() => setShowCancelModal(true)}
+                className="bg-white/20 text-white px-4 py-2 rounded-lg font-semibold hover:bg-white/30 transition-colors text-sm border border-white/40"
+              >
+                Cancelar Membresía
+              </button>
+            </div>
           </div>
         </div>
       ) : (
@@ -389,6 +477,72 @@ const TravelerDashboard: React.FC = () => {
           </div>
         )}
       </div>
+
+      {showCancelModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Cancelar Membresía</h3>
+            <p className="text-gray-700 mb-6">
+              ¿Estás seguro que deseas cancelar tu membresía ToursRed+? Podrás seguir disfrutando de los beneficios hasta el final de tu período actual, pero no se renovará automáticamente.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowCancelModal(false)}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                No, Mantener
+              </button>
+              <button
+                onClick={handleCancelSubscription}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {actionLoading ? 'Procesando...' : 'Sí, Cancelar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showUpgradeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Crown className="h-8 w-8 text-yellow-500" />
+              <h3 className="text-xl font-bold text-gray-900">Actualizar a Plan Anual</h3>
+            </div>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+              <p className="font-semibold text-yellow-900 mb-2">Ahorra $98 MXN al año</p>
+              <ul className="text-sm text-yellow-800 space-y-1">
+                <li>✓ Paga $490 en lugar de $588</li>
+                <li>✓ Equivale a solo $40.83/mes</li>
+                <li>✓ Todos los beneficios ToursRed+</li>
+                <li>✓ Sin cargos adicionales hasta tu próxima renovación anual</li>
+              </ul>
+            </div>
+            <p className="text-gray-700 text-sm mb-6">
+              Tu suscripción mensual se actualizará inmediatamente al plan anual. Se aplicará un prorrateo por el tiempo restante de tu período actual.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowUpgradeModal(false)}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleUpgradeSubscription}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 bg-yellow-500 text-white rounded-lg font-medium hover:bg-yellow-600 transition-colors disabled:opacity-50"
+              >
+                {actionLoading ? 'Procesando...' : 'Actualizar Ahora'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

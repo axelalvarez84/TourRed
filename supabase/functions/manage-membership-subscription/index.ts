@@ -38,7 +38,7 @@ Deno.serve(async (req: Request) => {
 
     const { action } = await req.json();
 
-    if (!action || !['cancel', 'reactivate'].includes(action)) {
+    if (!action || !['cancel', 'reactivate', 'upgrade'].includes(action)) {
       throw new Error('Invalid action');
     }
 
@@ -98,6 +98,49 @@ Deno.serve(async (req: Request) => {
 
       return new Response(
         JSON.stringify({ message: 'Subscription reactivated successfully' }),
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    } else if (action === 'upgrade') {
+      if (membership.plan_type !== 'monthly') {
+        throw new Error('Only monthly subscriptions can be upgraded');
+      }
+
+      const { data: settings } = await supabase
+        .from('platform_settings')
+        .select('stripe_annual_price_id')
+        .single();
+
+      if (!settings?.stripe_annual_price_id) {
+        throw new Error('Annual plan not configured');
+      }
+
+      const subscription = await stripe.subscriptions.retrieve(membership.stripe_subscription_id);
+
+      await stripe.subscriptions.update(membership.stripe_subscription_id, {
+        cancel_at_period_end: false,
+        proration_behavior: 'create_prorations',
+        items: [{
+          id: subscription.items.data[0].id,
+          price: settings.stripe_annual_price_id,
+        }],
+      });
+
+      await supabase
+        .from('memberships')
+        .update({
+          plan_type: 'annual',
+          cancel_at_period_end: false,
+        })
+        .eq('id', membership.id);
+
+      return new Response(
+        JSON.stringify({ message: 'Subscription upgraded to annual plan successfully' }),
         {
           status: 200,
           headers: {
