@@ -18,6 +18,7 @@ import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import TravelerDashboard from './pages/traveler/TravelerDashboard';
 import TravelerBookings from './pages/traveler/TravelerBookings';
 import TravelerProfile from './pages/traveler/TravelerProfile';
+import TravelerMembership from './pages/traveler/TravelerMembership';
 import AgencyDashboard from './pages/agency/AgencyDashboard';
 import AgencyTours from './pages/agency/AgencyTours';
 import AgencyBookings from './pages/agency/AgencyBookings';
@@ -31,6 +32,7 @@ import AdminMessages from './pages/admin/AdminMessages';
 import AdminDestinations from './pages/admin/AdminDestinations';
 import AdminProfile from './pages/admin/AdminProfile';
 import AdminSettings from './pages/admin/AdminSettings';
+import AdminMemberships from './pages/admin/AdminMemberships';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
@@ -122,6 +124,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.TRAVELER]}>
                 <TravelerProfile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/traveler/membership"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.TRAVELER]}>
+                <TravelerMembership />
               </ProtectedRoute>
             }
           />
@@ -230,6 +240,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                 <AdminSettings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/memberships"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminMemberships />
               </ProtectedRoute>
             }
           />

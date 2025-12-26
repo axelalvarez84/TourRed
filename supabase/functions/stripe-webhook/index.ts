@@ -345,6 +345,136 @@ Deno.serve(async (req) => {
         break;
       }
       
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object;
+        console.log(`Subscription ${event.type}: ${subscription.id}`);
+
+        const userId = subscription.metadata?.user_id;
+        const planType = subscription.metadata?.plan_type;
+
+        if (!userId || !planType) {
+          console.error('Missing user_id or plan_type in subscription metadata');
+          break;
+        }
+
+        const currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+        const nextResetDate = new Date(currentPeriodEnd);
+        nextResetDate.setMonth(nextResetDate.getMonth() + 1);
+
+        const { data: existingMembership } = await supabase
+          .from('memberships')
+          .select('id')
+          .eq('stripe_subscription_id', subscription.id)
+          .maybeSingle();
+
+        if (existingMembership) {
+          const { error: updateError } = await supabase
+            .from('memberships')
+            .update({
+              status: subscription.status,
+              current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+              current_period_end: currentPeriodEnd.toISOString(),
+              cancel_at_period_end: subscription.cancel_at_period_end || false,
+              cancelled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
+            })
+            .eq('id', existingMembership.id);
+
+          if (updateError) {
+            console.error(`Error updating membership: ${updateError.message}`);
+          } else {
+            console.log(`Membership updated for user ${userId}`);
+          }
+        } else {
+          const { error: insertError } = await supabase
+            .from('memberships')
+            .insert({
+              user_id: userId,
+              stripe_customer_id: subscription.customer,
+              stripe_subscription_id: subscription.id,
+              plan_type: planType,
+              status: subscription.status,
+              start_date: new Date(subscription.start_date * 1000).toISOString(),
+              current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+              current_period_end: currentPeriodEnd.toISOString(),
+              cancel_at_period_end: subscription.cancel_at_period_end || false,
+              service_fee_exemption_used: 0,
+              service_fee_exemption_reset_date: nextResetDate.toISOString(),
+            });
+
+          if (insertError) {
+            console.error(`Error creating membership: ${insertError.message}`);
+          } else {
+            console.log(`Membership created for user ${userId}`);
+          }
+        }
+
+        break;
+      }
+
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object;
+        console.log(`Subscription deleted: ${subscription.id}`);
+
+        const { error: deleteError } = await supabase
+          .from('memberships')
+          .update({
+            status: 'expired',
+            cancelled_at: new Date().toISOString(),
+          })
+          .eq('stripe_subscription_id', subscription.id);
+
+        if (deleteError) {
+          console.error(`Error marking membership as expired: ${deleteError.message}`);
+        } else {
+          console.log(`Membership marked as expired`);
+        }
+
+        break;
+      }
+
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object;
+
+        if (invoice.subscription) {
+          console.log(`Invoice payment succeeded for subscription: ${invoice.subscription}`);
+
+          const { error: updateError } = await supabase
+            .from('memberships')
+            .update({
+              status: 'active',
+            })
+            .eq('stripe_subscription_id', invoice.subscription);
+
+          if (updateError) {
+            console.error(`Error updating membership status: ${updateError.message}`);
+          }
+        }
+
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object;
+
+        if (invoice.subscription) {
+          console.log(`Invoice payment failed for subscription: ${invoice.subscription}`);
+
+          const { error: updateError } = await supabase
+            .from('memberships')
+            .update({
+              status: 'past_due',
+            })
+            .eq('stripe_subscription_id', invoice.subscription);
+
+          if (updateError) {
+            console.error(`Error updating membership status: ${updateError.message}`);
+          }
+        }
+
+        break;
+      }
+
       default:
         console.log(`Unhandled event type: ${event.type}`);
     }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Heart, Clock, CheckCircle } from 'lucide-react';
+import { Calendar, MapPin, Heart, Clock, CheckCircle, Crown, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Link } from 'react-router-dom';
@@ -41,10 +41,19 @@ interface SavedTour {
   };
 }
 
+interface Membership {
+  id: string;
+  plan_type: 'monthly' | 'annual';
+  status: string;
+  current_period_end: string;
+  service_fee_exemption_used: number;
+}
+
 const TravelerDashboard: React.FC = () => {
   const { user } = useAuth();
   const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
   const [savedTours, setSavedTours] = useState<SavedTour[]>([]);
+  const [membership, setMembership] = useState<Membership | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -117,6 +126,19 @@ const TravelerDashboard: React.FC = () => {
 
       if (savedError) throw savedError;
       setSavedTours(savedData || []);
+
+      const { data: membershipData, error: membershipError } = await supabase
+        .from('memberships')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (membershipError) {
+        console.error('Error fetching membership:', membershipError);
+      } else {
+        setMembership(membershipData);
+      }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -164,6 +186,82 @@ const TravelerDashboard: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">Panel del Viajero</h1>
+
+      {membership ? (
+        <div className="mb-8 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 rounded-xl shadow-lg p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Crown className="h-12 w-12" />
+              <div>
+                <h3 className="text-2xl font-bold flex items-center gap-2">
+                  ToursRed+ Activo
+                  <Sparkles className="h-5 w-5" />
+                </h3>
+                <p className="text-yellow-100">
+                  Plan {membership.plan_type === 'monthly' ? 'Mensual' : 'Anual'}
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-yellow-100 text-sm mb-1">Exención disponible</p>
+              <p className="text-3xl font-bold">
+                ${Math.max(0, 500 - (membership.service_fee_exemption_used || 0)).toFixed(0)} MXN
+              </p>
+              <p className="text-yellow-100 text-xs">de $500 este mes</p>
+            </div>
+          </div>
+          <div className="mt-4 flex items-center justify-between">
+            <div className="flex-1">
+              <div className="w-full bg-white/20 rounded-full h-2">
+                <div
+                  className="bg-white rounded-full h-2 transition-all duration-300"
+                  style={{ width: `${((500 - (membership.service_fee_exemption_used || 0)) / 500) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+            <Link
+              to="/traveler/membership"
+              className="ml-4 bg-white text-yellow-600 px-4 py-2 rounded-lg font-semibold hover:bg-yellow-50 transition-colors text-sm"
+            >
+              Gestionar
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <div className="mb-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl shadow-lg p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Crown className="h-12 w-12" />
+              <div>
+                <h3 className="text-2xl font-bold">Descubre ToursRed+</h3>
+                <p className="text-blue-100">
+                  Viaja más y ahorra en cada reserva con beneficios exclusivos
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/traveler/membership"
+              className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors shadow-md"
+            >
+              Ver Planes
+            </Link>
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-4">
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+              <p className="text-sm text-blue-100 mb-1">Sin cargo por servicio</p>
+              <p className="font-semibold">Hasta $500/mes</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+              <p className="text-sm text-blue-100 mb-1">Soporte</p>
+              <p className="font-semibold">Prioritario</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+              <p className="text-sm text-blue-100 mb-1">Ofertas</p>
+              <p className="font-semibold">Exclusivas</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mb-12">
         <div className="flex items-center justify-between mb-6">
