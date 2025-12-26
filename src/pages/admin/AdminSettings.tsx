@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent } from 'lucide-react';
+import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface EmailSettings {
@@ -16,6 +16,8 @@ interface PlatformSettings {
   id: string;
   service_charge_percentage: number;
   agency_commission_percentage: number;
+  stripe_monthly_price_id: string;
+  stripe_annual_price_id: string;
 }
 
 const AdminSettings: React.FC = () => {
@@ -32,6 +34,8 @@ const AdminSettings: React.FC = () => {
     id: '',
     service_charge_percentage: 5,
     agency_commission_percentage: 15,
+    stripe_monthly_price_id: '',
+    stripe_annual_price_id: '',
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -100,6 +104,8 @@ const AdminSettings: React.FC = () => {
           .update({
             service_charge_percentage: platformSettings.service_charge_percentage,
             agency_commission_percentage: platformSettings.agency_commission_percentage,
+            stripe_monthly_price_id: platformSettings.stripe_monthly_price_id,
+            stripe_annual_price_id: platformSettings.stripe_annual_price_id,
             updated_at: new Date().toISOString(),
             updated_by: user?.id
           })
@@ -138,9 +144,10 @@ const AdminSettings: React.FC = () => {
 
   const handlePlatformChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    const numericFields = ['service_charge_percentage', 'agency_commission_percentage'];
     setPlatformSettings(prev => ({
       ...prev,
-      [name]: parseFloat(value) || 0,
+      [name]: numericFields.includes(name) ? (parseFloat(value) || 0) : value,
     }));
   };
 
@@ -263,6 +270,68 @@ const AdminSettings: React.FC = () => {
                 {(5000 * platformSettings.agency_commission_percentage / 100).toFixed(2)}.
                 La agencia recibe ${(1000 - (5000 * platformSettings.agency_commission_percentage / 100)).toFixed(2)} del anticipo
               </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <CreditCard className="w-6 h-6 text-primary-600" />
+            <h2 className="text-xl font-semibold text-gray-900">
+              Configuración de Stripe - Membresías ToursRed+
+            </h2>
+          </div>
+
+          <div className="bg-amber-50 border border-amber-200 rounded-md p-4 mb-4">
+            <div className="flex items-start">
+              <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 mr-2 flex-shrink-0" />
+              <div className="text-sm text-amber-800">
+                <p className="font-medium mb-2">Cómo obtener tus Price IDs de Stripe:</p>
+                <ol className="space-y-1 text-xs list-decimal ml-4">
+                  <li>Ve a <a href="https://dashboard.stripe.com/products" target="_blank" rel="noopener noreferrer" className="underline">Stripe Dashboard → Products</a></li>
+                  <li>Crea dos productos recurrentes: uno mensual ($49) y uno anual ($490)</li>
+                  <li>Para cada producto, copia el <strong>Price ID</strong> que empieza con "price_"</li>
+                  <li>Pega los Price IDs en los campos de abajo</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="stripe_monthly_price_id" className="block text-sm font-medium text-gray-700 mb-1">
+                Stripe Price ID - Plan Mensual
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                ID del precio mensual en Stripe (ej: price_1ABC2DE3FGH4IJK5)
+              </p>
+              <input
+                type="text"
+                id="stripe_monthly_price_id"
+                name="stripe_monthly_price_id"
+                value={platformSettings.stripe_monthly_price_id}
+                onChange={handlePlatformChange}
+                placeholder="price_..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="stripe_annual_price_id" className="block text-sm font-medium text-gray-700 mb-1">
+                Stripe Price ID - Plan Anual
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                ID del precio anual en Stripe (ej: price_1ABC2DE3FGH4IJK5)
+              </p>
+              <input
+                type="text"
+                id="stripe_annual_price_id"
+                name="stripe_annual_price_id"
+                value={platformSettings.stripe_annual_price_id}
+                onChange={handlePlatformChange}
+                placeholder="price_..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+              />
             </div>
           </div>
         </div>

@@ -228,8 +228,26 @@ Deno.serve(async (req) => {
     };
 
     if (addMembership) {
-      const monthlyPriceId = Deno.env.get("STRIPE_MONTHLY_PRICE_ID");
-      const annualPriceId = Deno.env.get("STRIPE_ANNUAL_PRICE_ID");
+      const { data: settings, error: settingsError } = await supabase
+        .from('platform_settings')
+        .select('stripe_monthly_price_id, stripe_annual_price_id')
+        .maybeSingle();
+
+      if (settingsError || !settings) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Failed to load platform settings"
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 500,
+          }
+        );
+      }
+
+      const monthlyPriceId = settings.stripe_monthly_price_id;
+      const annualPriceId = settings.stripe_annual_price_id;
 
       if (!monthlyPriceId || !annualPriceId) {
         return new Response(

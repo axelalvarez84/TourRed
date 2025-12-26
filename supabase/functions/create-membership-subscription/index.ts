@@ -56,9 +56,18 @@ Deno.serve(async (req: Request) => {
       apiVersion: '2023-10-16',
     });
 
-    const priceId = planType === 'monthly' 
-      ? Deno.env.get('STRIPE_MONTHLY_PRICE_ID')
-      : Deno.env.get('STRIPE_ANNUAL_PRICE_ID');
+    const { data: settings, error: settingsError } = await supabase
+      .from('platform_settings')
+      .select('stripe_monthly_price_id, stripe_annual_price_id')
+      .maybeSingle();
+
+    if (settingsError || !settings) {
+      throw new Error('Failed to load platform settings');
+    }
+
+    const priceId = planType === 'monthly'
+      ? settings.stripe_monthly_price_id
+      : settings.stripe_annual_price_id;
 
     if (!priceId) {
       throw new Error(`Price ID not configured for ${planType} plan`);
