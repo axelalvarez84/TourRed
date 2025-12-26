@@ -287,11 +287,21 @@ const AdminSettings: React.FC = () => {
               <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 mr-2 flex-shrink-0" />
               <div className="text-sm text-amber-800">
                 <p className="font-medium mb-2">Cómo obtener tus Price IDs de Stripe:</p>
-                <ol className="space-y-1 text-xs list-decimal ml-4">
-                  <li>Ve a <a href="https://dashboard.stripe.com/products" target="_blank" rel="noopener noreferrer" className="underline">Stripe Dashboard → Products</a></li>
+                <ol className="space-y-2 text-xs list-decimal ml-4">
+                  <li>Ve a <a href="https://dashboard.stripe.com/products" target="_blank" rel="noopener noreferrer" className="underline font-semibold">Stripe Dashboard → Products</a></li>
                   <li>Crea dos productos recurrentes: uno mensual ($49) y uno anual ($490)</li>
-                  <li>Para cada producto, copia el <strong>Price ID</strong> que empieza con "price_"</li>
-                  <li>Pega los Price IDs en los campos de abajo</li>
+                  <li className="font-semibold text-red-700">
+                    IMPORTANTE: Necesitas el <strong>Price ID</strong> (empieza con "price_"), NO el Product ID (que empieza con "prod_")
+                  </li>
+                  <li>
+                    Para obtener el Price ID:
+                    <ul className="list-disc ml-4 mt-1 space-y-1 font-normal">
+                      <li>Haz clic en tu producto</li>
+                      <li>En la tabla "Tarifas", haz clic en el precio (ej: 49.00 MXN)</li>
+                      <li>Copia el <strong>API ID</strong> o <strong>Price ID</strong> que empieza con "price_"</li>
+                    </ul>
+                  </li>
+                  <li>Pega los Price IDs (price_xxxxx) en los campos de abajo</li>
                 </ol>
               </div>
             </div>
@@ -303,7 +313,7 @@ const AdminSettings: React.FC = () => {
                 Stripe Price ID - Plan Mensual
               </label>
               <p className="text-xs text-gray-500 mb-2">
-                ID del precio mensual en Stripe (ej: price_1ABC2DE3FGH4IJK5)
+                ID del precio mensual en Stripe. Debe empezar con <span className="font-mono font-semibold">price_</span> (NO con prod_)
               </p>
               <input
                 type="text"
@@ -311,9 +321,15 @@ const AdminSettings: React.FC = () => {
                 name="stripe_monthly_price_id"
                 value={platformSettings.stripe_monthly_price_id}
                 onChange={handlePlatformChange}
-                placeholder="price_..."
+                placeholder="price_1ABC2DE3FGH4IJK5..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
               />
+              {platformSettings.stripe_monthly_price_id && !platformSettings.stripe_monthly_price_id.startsWith('price_') && (
+                <p className="text-xs text-red-600 mt-1 flex items-center">
+                  <AlertCircle className="w-3 h-3 mr-1" />
+                  Este ID debe empezar con "price_" no con "prod_"
+                </p>
+              )}
             </div>
 
             <div>
@@ -321,7 +337,7 @@ const AdminSettings: React.FC = () => {
                 Stripe Price ID - Plan Anual
               </label>
               <p className="text-xs text-gray-500 mb-2">
-                ID del precio anual en Stripe (ej: price_1ABC2DE3FGH4IJK5)
+                ID del precio anual en Stripe. Debe empezar con <span className="font-mono font-semibold">price_</span> (NO con prod_)
               </p>
               <input
                 type="text"
@@ -329,9 +345,15 @@ const AdminSettings: React.FC = () => {
                 name="stripe_annual_price_id"
                 value={platformSettings.stripe_annual_price_id}
                 onChange={handlePlatformChange}
-                placeholder="price_..."
+                placeholder="price_1ABC2DE3FGH4IJK5..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
               />
+              {platformSettings.stripe_annual_price_id && !platformSettings.stripe_annual_price_id.startsWith('price_') && (
+                <p className="text-xs text-red-600 mt-1 flex items-center">
+                  <AlertCircle className="w-3 h-3 mr-1" />
+                  Este ID debe empezar con "price_" no con "prod_"
+                </p>
+              )}
             </div>
           </div>
         </div>
