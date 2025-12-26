@@ -1,31 +1,32 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.6";
 import Stripe from "npm:stripe@12.18.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
-      headers: {
-        ...corsHeaders,
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-      },
+      status: 200,
+      headers: corsHeaders,
     });
   }
 
   try {
-    const { 
-      amount, 
-      currency = 'mxn', 
-      description, 
-      bookingId, 
+    const {
+      amount,
+      currency = 'mxn',
+      description,
+      bookingId,
       metadata = {},
       success_url,
-      cancel_url
+      cancel_url,
+      addMembership = false,
+      membershipPlan = 'monthly'
     } = await req.json();
 
     if (!amount || !bookingId) {
@@ -205,7 +206,7 @@ serve(async (req) => {
       customerId = customers.customer_id;
     }
 
-    const session = await stripe.checkout.sessions.create({
+    let sessionConfig: any = {
       customer: customerId,
       payment_method_types: ['card', 'oxxo', 'customer_balance'],
       payment_method_options: {
@@ -216,7 +217,67 @@ serve(async (req) => {
           },
         },
       },
-      line_items: [
+      success_url: success_url || `${req.headers.get("origin")}/booking-success?booking_id=${bookingId}`,
+      cancel_url: cancel_url || `${req.headers.get("origin")}/booking-cancel?booking_id=${bookingId}`,
+      metadata: {
+        booking_id: bookingId,
+        add_membership: addMembership ? 'true' : 'false',
+        membership_plan: membershipPlan,
+        ...metadata,
+      },
+    };
+
+    if (addMembership) {
+      const monthlyPriceId = Deno.env.get("STRIPE_MONTHLY_PRICE_ID");
+      const annualPriceId = Deno.env.get("STRIPE_ANNUAL_PRICE_ID");
+
+      if (!monthlyPriceId || !annualPriceId) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Membership configuration is incomplete"
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 500,
+          }
+        );
+      }
+
+      const priceId = membershipPlan === 'monthly' ? monthlyPriceId : annualPriceId;
+
+      sessionConfig.mode = "subscription";
+      sessionConfig.line_items = [
+        {
+          price: priceId,
+          quantity: 1,
+        },
+      ];
+      sessionConfig.subscription_data = {
+        metadata: {
+          user_id: user.id,
+          booking_id: bookingId,
+        },
+      };
+
+      const invoiceItem = await stripe.invoiceItems.create({
+        customer: customerId,
+        amount: Math.round(amount * 100),
+        currency: currency,
+        description: description || "Reserva de Tour",
+      });
+
+      sessionConfig.invoice_creation = {
+        enabled: true,
+        invoice_data: {
+          metadata: {
+            booking_id: bookingId,
+          },
+        },
+      };
+    } else {
+      sessionConfig.mode = "payment";
+      sessionConfig.line_items = [
         {
           price_data: {
             currency: currency,
@@ -227,21 +288,16 @@ serve(async (req) => {
           },
           quantity: 1,
         },
-      ],
-      mode: "payment",
-      success_url: success_url || `${req.headers.get("origin")}/booking-success?booking_id=${bookingId}`,
-      cancel_url: cancel_url || `${req.headers.get("origin")}/booking-cancel?booking_id=${bookingId}`,
-      metadata: {
-        booking_id: bookingId,
-        ...metadata,
-      },
-      payment_intent_data: {
+      ];
+      sessionConfig.payment_intent_data = {
         metadata: {
           booking_id: bookingId,
           ...metadata,
         },
-      },
-    });
+      };
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionConfig);
 
     return new Response(
       JSON.stringify({

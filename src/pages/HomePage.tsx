@@ -5,6 +5,7 @@ import SearchBox from '../components/SearchBox';
 import CategoryList from '../components/CategoryList';
 import FeaturedDestinations from '../components/FeaturedDestinations';
 import TourCard from '../components/TourCard';
+import MembershipSection from '../components/MembershipSection';
 import { Tour } from '../types';
 import { getTours } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -122,6 +123,9 @@ const HomePage: React.FC = () => {
           )}
         </div>
       </section>
+
+      {/* Membership Section */}
+      <MembershipSection />
 
       {/* How It Works */}
       <section className="py-12 bg-blue-100">

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles } from 'lucide-react';
 import { Tour } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { createBooking, formatDateForDB, supabase } from '../lib/supabase';
@@ -27,6 +27,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [availableSpots, setAvailableSpots] = useState<number | null>(null);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(true);
   const [showTravelerSelector, setShowTravelerSelector] = useState(false);
+  const [hasMembership, setHasMembership] = useState(false);
+  const [isLoadingMembership, setIsLoadingMembership] = useState(true);
+  const [addMembershipToBooking, setAddMembershipToBooking] = useState(false);
+  const [selectedMembershipPlan, setSelectedMembershipPlan] = useState<'monthly' | 'annual'>('monthly');
 
   const [travelerCounts, setTravelerCounts] = useState<TravelerCounts>({
     adultos: 1,
@@ -60,6 +64,38 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
     fetchPlatformSettings();
   }, []);
+
+  React.useEffect(() => {
+    const checkMembership = async () => {
+      if (!user || !isTraveler) {
+        setIsLoadingMembership(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('toursred_plus_memberships')
+          .select('status')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error checking membership:', error);
+          setHasMembership(false);
+        } else {
+          setHasMembership(!!data);
+        }
+      } catch (err) {
+        console.error('Error loading membership:', err);
+        setHasMembership(false);
+      } finally {
+        setIsLoadingMembership(false);
+      }
+    };
+
+    checkMembership();
+  }, [user, isTraveler]);
 
   React.useEffect(() => {
     const fetchAvailability = async () => {
@@ -165,13 +201,22 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
   // Comisiones
   const agencyCommission = totalPrice * (agencyCommissionPercentage / 100);
-  const serviceCharge = totalPrice * (serviceChargePercentage / 100);
+
+  const membershipMonthlyPrice = 49;
+  const membershipAnnualPrice = 490;
+
+  const shouldWaiveServiceCharge = hasMembership || addMembershipToBooking;
+  const serviceCharge = shouldWaiveServiceCharge ? 0 : totalPrice * (serviceChargePercentage / 100);
   const platformRevenue = agencyCommission + serviceCharge;
 
-  // Lo que paga el usuario: depósito + cargo por servicio
+  const membershipCost = addMembershipToBooking
+    ? (selectedMembershipPlan === 'monthly' ? membershipMonthlyPrice : membershipAnnualPrice)
+    : 0;
+
   const userPayment = depositAmount + serviceCharge;
 
-  // Lo que recibe la agencia: depósito - comisión de agencia
+  const totalToPayNow = userPayment + membershipCost;
+
   const agencyReceives = depositAmount - agencyCommission;
 
   const handleCountChange = (categoria: keyof TravelerCounts, delta: number) => {
@@ -291,7 +336,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
             bookingId,
             customerEmail,
             amount,
-            tourName: tour.name,
+            description: `Depósito para ${tour.name}`,
+            addMembership: addMembershipToBooking,
+            membershipPlan: selectedMembershipPlan,
           }),
         }
       );
@@ -540,6 +587,90 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           )}
         </div>
 
+        {!isLoadingMembership && !hasMembership && totalTravelers > 0 && serviceCharge > 0 && (
+          <div className="mb-4 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-lg p-4">
+            <div className="flex items-start mb-3">
+              <Sparkles className="h-5 w-5 text-amber-600 mr-2 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-sm font-bold text-gray-900 mb-1">
+                  ¡Ahorra ${serviceCharge.toLocaleString()} con ToursRed+!
+                </h4>
+                <p className="text-xs text-gray-700">
+                  Los miembros ToursRed+ no pagan cargo por servicio. Agrega una membresía a tu compra y comienza a ahorrar hoy.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <label className="flex items-start cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={addMembershipToBooking}
+                  onChange={(e) => setAddMembershipToBooking(e.target.checked)}
+                  className="mt-1 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                />
+                <span className="ml-3 text-sm font-medium text-gray-900">
+                  Agregar membresía ToursRed+ a mi reserva
+                </span>
+              </label>
+
+              {addMembershipToBooking && (
+                <div className="ml-7 space-y-2">
+                  <label className="flex items-start cursor-pointer">
+                    <input
+                      type="radio"
+                      name="membership-plan"
+                      checked={selectedMembershipPlan === 'monthly'}
+                      onChange={() => setSelectedMembershipPlan('monthly')}
+                      className="mt-1 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                    />
+                    <div className="ml-3 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-900">Plan Mensual</span>
+                        <span className="text-sm font-bold text-primary-600">$49/mes</span>
+                      </div>
+                      <p className="text-xs text-gray-600">Cancela cuando quieras</p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start cursor-pointer">
+                    <input
+                      type="radio"
+                      name="membership-plan"
+                      checked={selectedMembershipPlan === 'annual'}
+                      onChange={() => setSelectedMembershipPlan('annual')}
+                      className="mt-1 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                    />
+                    <div className="ml-3 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-900">Plan Anual</span>
+                        <span className="text-sm font-bold text-primary-600">$490/año</span>
+                      </div>
+                      <p className="text-xs text-gray-600">Ahorra $98 al año (2 meses gratis)</p>
+                    </div>
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {hasMembership && (
+          <div className="mb-4 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-lg p-4">
+            <div className="flex items-center">
+              <Crown className="h-6 w-6 text-amber-600 mr-2" />
+              <div className="flex-1">
+                <h4 className="text-sm font-bold text-gray-900">
+                  Beneficio ToursRed+ Activo
+                </h4>
+                <p className="text-xs text-gray-700">
+                  No se aplicará cargo por servicio en esta reserva
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {totalTravelers > 0 && (
           <div className="mb-4 bg-gray-50 p-4 rounded-md space-y-2">
             <h4 className="text-sm font-semibold text-gray-900">Desglose de Costos</h4>
@@ -588,16 +719,45 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                 <span className="text-gray-600">Depósito ({tour.deposit_percentage}%):</span>
                 <span className="font-medium">${depositAmount.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-sm text-orange-600 mt-1">
-                <span>Cargo por Servicio ({serviceChargePercentage}%):</span>
-                <span className="font-medium">+${serviceCharge.toLocaleString()}</span>
-              </div>
+
+              {shouldWaiveServiceCharge ? (
+                <div className="flex justify-between text-sm text-green-600 mt-1">
+                  <span className="flex items-center">
+                    <Crown className="h-3 w-3 mr-1" />
+                    Cargo por Servicio ({serviceChargePercentage}%):
+                  </span>
+                  <span className="font-medium line-through text-gray-400">${(totalPrice * (serviceChargePercentage / 100)).toLocaleString()}</span>
+                </div>
+              ) : (
+                <div className="flex justify-between text-sm text-orange-600 mt-1">
+                  <span>Cargo por Servicio ({serviceChargePercentage}%):</span>
+                  <span className="font-medium">+${serviceCharge.toLocaleString()}</span>
+                </div>
+              )}
+
+              {addMembershipToBooking && (
+                <div className="flex justify-between text-sm text-amber-600 mt-1">
+                  <span className="flex items-center">
+                    <Crown className="h-3 w-3 mr-1" />
+                    Membresía ToursRed+ ({selectedMembershipPlan === 'monthly' ? 'Mensual' : 'Anual'}):
+                  </span>
+                  <span className="font-medium">+${membershipCost.toLocaleString()}</span>
+                </div>
+              )}
             </div>
 
             <div className="border-t pt-2 flex justify-between">
               <span className="font-bold text-gray-900">Total a Pagar Ahora:</span>
-              <span className="font-bold text-primary-600 text-lg">${userPayment.toLocaleString()}</span>
+              <span className="font-bold text-primary-600 text-lg">${totalToPayNow.toLocaleString()}</span>
             </div>
+
+            {shouldWaiveServiceCharge && (
+              <div className="bg-green-50 border border-green-200 rounded-md p-2 mt-2">
+                <p className="text-xs text-green-800 font-medium text-center">
+                  ✓ Ahorraste ${(totalPrice * (serviceChargePercentage / 100)).toLocaleString()} con ToursRed+
+                </p>
+              </div>
+            )}
 
             <div className="text-xs text-gray-500 mt-2">
               <div>Saldo Restante: ${(totalPrice - depositAmount).toLocaleString()}</div>
