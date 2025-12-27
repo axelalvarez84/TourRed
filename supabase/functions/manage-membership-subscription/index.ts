@@ -124,7 +124,8 @@ Deno.serve(async (req: Request) => {
 
       const updatedSubscription = await stripe.subscriptions.update(membership.stripe_subscription_id, {
         cancel_at_period_end: false,
-        proration_behavior: 'create_prorations',
+        proration_behavior: 'always_invoice',
+        billing_cycle_anchor: 'now',
         items: [{
           id: subscription.items.data[0].id,
           price: settings.stripe_annual_price_id,
