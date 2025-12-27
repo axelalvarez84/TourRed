@@ -104,9 +104,11 @@ Deno.serve(async (req: Request) => {
       ],
       success_url: `${req.headers.get('origin')}/traveler/membership?success=true`,
       cancel_url: `${req.headers.get('origin')}/traveler/membership?cancelled=true`,
-      metadata: {
-        user_id: user.id,
-        plan_type: planType,
+      subscription_data: {
+        metadata: {
+          user_id: user.id,
+          plan_type: planType,
+        },
       },
     });
 
