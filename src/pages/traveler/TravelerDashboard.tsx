@@ -522,7 +522,7 @@ const TravelerDashboard: React.FC = () => {
               </ul>
             </div>
             <p className="text-gray-700 text-sm mb-6">
-              Tu suscripción mensual se actualizará inmediatamente al plan anual. Se aplicará un prorrateo por el tiempo restante de tu período actual.
+              Tu plan mensual continuará hasta tu próxima fecha de renovación. A partir de esa fecha, tu membresía se convertirá automáticamente en plan anual y pagarás $490 MXN/año.
             </p>
             <div className="flex gap-3">
               <button
