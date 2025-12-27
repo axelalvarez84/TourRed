@@ -122,10 +122,9 @@ Deno.serve(async (req: Request) => {
 
       const subscription = await stripe.subscriptions.retrieve(membership.stripe_subscription_id);
 
-      await stripe.subscriptions.update(membership.stripe_subscription_id, {
+      const updatedSubscription = await stripe.subscriptions.update(membership.stripe_subscription_id, {
         cancel_at_period_end: false,
-        proration_behavior: 'none',
-        billing_cycle_anchor: 'unchanged',
+        proration_behavior: 'create_prorations',
         items: [{
           id: subscription.items.data[0].id,
           price: settings.stripe_annual_price_id,
@@ -137,13 +136,14 @@ Deno.serve(async (req: Request) => {
         .update({
           plan_type: 'annual',
           cancel_at_period_end: false,
+          current_period_end: new Date(updatedSubscription.current_period_end * 1000).toISOString(),
         })
         .eq('id', membership.id);
 
       return new Response(
         JSON.stringify({
-          message: 'Subscription will be upgraded to annual plan at the end of current period',
-          upgrade_date: membership.current_period_end
+          message: 'Subscription upgraded to annual plan successfully',
+          current_period_end: new Date(updatedSubscription.current_period_end * 1000).toISOString()
         }),
         {
           status: 200,

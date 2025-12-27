@@ -234,7 +234,7 @@ const TravelerDashboard: React.FC = () => {
         throw new Error(data.error || 'Error al actualizar la suscripción');
       }
 
-      alert('¡Tu plan ha sido actualizado a Anual! Disfrutarás de 2 meses gratis.');
+      alert('¡Tu plan ha sido actualizado a Anual! Se te acreditó el tiempo restante de tu plan mensual y ahora pagarás la tarifa anual.');
       setShowUpgradeModal(false);
       await loadDashboardData();
     } catch (error: any) {
