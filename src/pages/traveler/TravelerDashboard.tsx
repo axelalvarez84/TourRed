@@ -245,6 +245,39 @@ const TravelerDashboard: React.FC = () => {
     }
   };
 
+  const handleReactivateSubscription = async () => {
+    if (!user) return;
+    setActionLoading(true);
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-membership-subscription`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          },
+          body: JSON.stringify({ action: 'reactivate' }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al reactivar la suscripción');
+      }
+
+      alert('¡Tu suscripción ha sido reactivada! Seguirás disfrutando de los beneficios ToursRed+.');
+      await loadDashboardData();
+    } catch (error: any) {
+      console.error('Error reactivating subscription:', error);
+      alert(error.message || 'Error al reactivar la suscripción');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -271,6 +304,11 @@ const TravelerDashboard: React.FC = () => {
                 </h3>
                 <p className="text-yellow-100">
                   Plan {membership.plan_type === 'monthly' ? 'Mensual' : 'Anual'}
+                  {membership.cancel_at_period_end && (
+                    <span className="ml-2 text-xs bg-white/20 px-2 py-1 rounded">
+                      Se cancela el {formatDate(membership.current_period_end)}
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
@@ -291,6 +329,13 @@ const TravelerDashboard: React.FC = () => {
                 ></div>
               </div>
             </div>
+            {membership.cancel_at_period_end && (
+              <div className="mb-4 bg-white/20 border border-white/40 rounded-lg p-3">
+                <p className="text-sm text-white">
+                  <strong>Renovación automática desactivada.</strong> Puedes seguir disfrutando de los beneficios hasta el {formatDate(membership.current_period_end)}.
+                </p>
+              </div>
+            )}
             <div className="flex gap-2 flex-wrap">
               <Link
                 to="/traveler/membership"
@@ -298,7 +343,7 @@ const TravelerDashboard: React.FC = () => {
               >
                 Ver Detalles
               </Link>
-              {membership.plan_type === 'monthly' && !membership.cancel_at_period_end && (
+              {membership.plan_type === 'monthly' && (
                 <button
                   onClick={() => setShowUpgradeModal(true)}
                   className="bg-white/90 text-yellow-700 px-4 py-2 rounded-lg font-semibold hover:bg-white transition-colors text-sm"
@@ -306,12 +351,22 @@ const TravelerDashboard: React.FC = () => {
                   Actualizar a Anual (Ahorra $98)
                 </button>
               )}
-              <button
-                onClick={() => setShowCancelModal(true)}
-                className="bg-white/20 text-white px-4 py-2 rounded-lg font-semibold hover:bg-white/30 transition-colors text-sm border border-white/40"
-              >
-                Cancelar Membresía
-              </button>
+              {!membership.cancel_at_period_end ? (
+                <button
+                  onClick={() => setShowCancelModal(true)}
+                  className="bg-white/20 text-white px-4 py-2 rounded-lg font-semibold hover:bg-white/30 transition-colors text-sm border border-white/40"
+                >
+                  Cancelar Membresía
+                </button>
+              ) : (
+                <button
+                  onClick={handleReactivateSubscription}
+                  disabled={actionLoading}
+                  className="bg-green-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-600 transition-colors text-sm disabled:opacity-50"
+                >
+                  {actionLoading ? 'Procesando...' : 'Reactivar Membresía'}
+                </button>
+              )}
             </div>
           </div>
         </div>
