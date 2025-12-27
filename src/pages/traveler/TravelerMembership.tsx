@@ -85,7 +85,7 @@ export default function TravelerMembership() {
     }
   };
 
-  const handleManageSubscription = async (action: 'cancel' | 'reactivate') => {
+  const handleManageSubscription = async (action: 'cancel' | 'reactivate' | 'upgrade') => {
     setActionLoading(true);
     setError(null);
     setSuccessMessage(null);
@@ -242,6 +242,29 @@ export default function TravelerMembership() {
 
             <div className="bg-white rounded-xl shadow-md p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Gestionar Suscripción</h3>
+
+              {membership.plan_type === 'monthly' && !membership.cancel_at_period_end && (
+                <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-300 rounded-lg p-4 mb-4">
+                  <div className="flex items-start gap-3 mb-3">
+                    <Crown className="h-6 w-6 text-yellow-600 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold text-gray-900 mb-1">Actualiza a Plan Anual y ahorra $98 MXN</p>
+                      <p className="text-sm text-gray-700">
+                        Tu plan mensual continuará hasta el {formatDate(membership.current_period_end)}.
+                        A partir de esa fecha, pagarás solo $490 MXN/año (equivale a $40.83/mes).
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleManageSubscription('upgrade')}
+                    disabled={actionLoading}
+                    className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-yellow-600 hover:to-yellow-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {actionLoading ? 'Procesando...' : 'Actualizar a Plan Anual'}
+                  </button>
+                </div>
+              )}
+
               {membership.cancel_at_period_end ? (
                 <div>
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
