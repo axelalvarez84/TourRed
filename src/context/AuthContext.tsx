@@ -4,6 +4,7 @@ import { supabase, getCurrentUser, UserRole } from '../lib/supabase';
 export interface AdminPermissions {
   canManageAgencies: boolean;
   canManageUsers: boolean;
+  canManageTravelers: boolean;
   canManageDestinations: boolean;
   canManageReviews: boolean;
   canManageMessages: boolean;
@@ -182,6 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   setPermissions({
                     canManageAgencies: permsData.can_manage_agencies,
                     canManageUsers: permsData.can_manage_users,
+                    canManageTravelers: permsData.can_manage_travelers,
                     canManageDestinations: permsData.can_manage_destinations,
                     canManageReviews: permsData.can_manage_reviews,
                     canManageMessages: permsData.can_manage_messages,

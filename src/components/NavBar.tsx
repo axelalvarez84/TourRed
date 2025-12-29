@@ -93,7 +93,7 @@ const NavBar: React.FC = () => {
         menuItems.push({ to: '/admin/users', label: 'Usuarios' });
       }
 
-      if (isSuperAdmin || permissions?.canManageUsers) {
+      if (isSuperAdmin || permissions?.canManageTravelers) {
         menuItems.push({ to: '/admin/travelers', label: 'Viajeros' });
       }
 

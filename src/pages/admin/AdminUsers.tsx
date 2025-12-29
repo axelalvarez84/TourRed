@@ -29,6 +29,7 @@ const AdminUsers: React.FC = () => {
     permissions: {
       canManageAgencies: false,
       canManageUsers: false,
+      canManageTravelers: false,
       canManageDestinations: false,
       canManageReviews: false,
       canManageMessages: false,
@@ -40,6 +41,7 @@ const AdminUsers: React.FC = () => {
   const [tempPermissions, setTempPermissions] = useState<AdminPermissions>({
     canManageAgencies: false,
     canManageUsers: false,
+    canManageTravelers: false,
     canManageDestinations: false,
     canManageReviews: false,
     canManageMessages: false,
@@ -77,6 +79,7 @@ const AdminUsers: React.FC = () => {
             permissions: permsData ? {
               canManageAgencies: permsData.can_manage_agencies,
               canManageUsers: permsData.can_manage_users,
+              canManageTravelers: permsData.can_manage_travelers,
               canManageDestinations: permsData.can_manage_destinations,
               canManageReviews: permsData.can_manage_reviews,
               canManageMessages: permsData.can_manage_messages,
@@ -127,6 +130,7 @@ const AdminUsers: React.FC = () => {
             permissions: {
               can_manage_agencies: newUser.permissions.canManageAgencies,
               can_manage_users: newUser.permissions.canManageUsers,
+              can_manage_travelers: newUser.permissions.canManageTravelers,
               can_manage_destinations: newUser.permissions.canManageDestinations,
               can_manage_reviews: newUser.permissions.canManageReviews,
               can_manage_messages: newUser.permissions.canManageMessages,
@@ -179,6 +183,7 @@ const AdminUsers: React.FC = () => {
         .update({
           can_manage_agencies: tempPermissions.canManageAgencies,
           can_manage_users: tempPermissions.canManageUsers,
+          can_manage_travelers: tempPermissions.canManageTravelers,
           can_manage_destinations: tempPermissions.canManageDestinations,
           can_manage_reviews: tempPermissions.canManageReviews,
           can_manage_messages: tempPermissions.canManageMessages,
@@ -343,6 +348,11 @@ const AdminUsers: React.FC = () => {
                             onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageUsers: checked })}
                           />
                           <PermissionCheckbox
+                            label="Gestionar Viajeros"
+                            checked={tempPermissions.canManageTravelers}
+                            onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageTravelers: checked })}
+                          />
+                          <PermissionCheckbox
                             label="Gestionar Destinos"
                             checked={tempPermissions.canManageDestinations}
                             onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageDestinations: checked })}
@@ -379,6 +389,12 @@ const AdminUsers: React.FC = () => {
                           <PermissionCheckbox
                             label="Gestionar Usuarios"
                             checked={user.permissions.canManageUsers}
+                            onChange={() => {}}
+                            disabled
+                          />
+                          <PermissionCheckbox
+                            label="Gestionar Viajeros"
+                            checked={user.permissions.canManageTravelers}
                             onChange={() => {}}
                             disabled
                           />
@@ -530,6 +546,14 @@ const AdminUsers: React.FC = () => {
                       onChange={(checked) => setNewUser({
                         ...newUser,
                         permissions: { ...newUser.permissions, canManageUsers: checked }
+                      })}
+                    />
+                    <PermissionCheckbox
+                      label="Gestionar Viajeros"
+                      checked={newUser.permissions.canManageTravelers}
+                      onChange={(checked) => setNewUser({
+                        ...newUser,
+                        permissions: { ...newUser.permissions, canManageTravelers: checked }
                       })}
                     />
                     <PermissionCheckbox
