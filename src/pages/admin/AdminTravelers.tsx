@@ -331,26 +331,18 @@ export default function AdminTravelers() {
           </div>
 
           <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <DollarSign className="h-8 w-8 text-green-600" />
-              </div>
-              <div className="ml-4 min-w-0 flex-1">
-                <div className="text-lg font-bold text-gray-900 truncate">{formatCurrency(summaryStats.totalRevenue)}</div>
-                <div className="text-sm text-gray-500">Ingresos Totales</div>
-              </div>
+            <div className="text-2xl font-bold text-gray-900 mb-2">{formatCurrency(summaryStats.totalRevenue)}</div>
+            <div className="flex items-center text-sm text-gray-500">
+              <DollarSign className="h-4 w-4 mr-1 text-green-600" />
+              Ingresos Totales
             </div>
           </div>
 
           <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <CreditCard className="h-8 w-8 text-purple-600" />
-              </div>
-              <div className="ml-4 min-w-0 flex-1">
-                <div className="text-lg font-bold text-gray-900 truncate">{formatCurrency(summaryStats.totalServiceCharges)}</div>
-                <div className="text-sm text-gray-500">Cargos por Servicio</div>
-              </div>
+            <div className="text-2xl font-bold text-gray-900 mb-2">{formatCurrency(summaryStats.totalServiceCharges)}</div>
+            <div className="flex items-center text-sm text-gray-500">
+              <CreditCard className="h-4 w-4 mr-1 text-purple-600" />
+              Cargos por Servicio
             </div>
           </div>
 
