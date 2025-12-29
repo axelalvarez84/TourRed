@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { User, Mail, Phone, Calendar, MapPin, Shield, ShieldOff, Edit2, Star, ShoppingBag, X, DollarSign, CreditCard, Crown, TrendingUp, Users } from 'lucide-react';
+import { User, Mail, Phone, Calendar, MapPin, Shield, ShieldOff, Edit2, Star, ShoppingBag, X, DollarSign, CreditCard, Crown, TrendingUp, Users, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface Traveler {
   id: string;
@@ -50,6 +50,8 @@ export default function AdminTravelers() {
   const [selectedTraveler, setSelectedTraveler] = useState<Traveler | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     loadTravelersAndStats();
@@ -156,15 +158,87 @@ export default function AdminTravelers() {
     setShowEditModal(true);
   };
 
-  const filteredTravelers = travelers.filter(traveler => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      traveler.email?.toLowerCase().includes(searchLower) ||
-      traveler.first_name?.toLowerCase().includes(searchLower) ||
-      traveler.last_name?.toLowerCase().includes(searchLower) ||
-      traveler.phone_number?.includes(searchTerm)
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (column: string) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-4 w-4" />;
+    }
+    return sortDirection === 'asc' ? (
+      <ArrowUp className="h-4 w-4" />
+    ) : (
+      <ArrowDown className="h-4 w-4" />
     );
-  });
+  };
+
+  const filteredAndSortedTravelers = travelers
+    .filter(traveler => {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        traveler.email?.toLowerCase().includes(searchLower) ||
+        traveler.first_name?.toLowerCase().includes(searchLower) ||
+        traveler.last_name?.toLowerCase().includes(searchLower) ||
+        traveler.phone_number?.includes(searchTerm)
+      );
+    })
+    .sort((a, b) => {
+      if (!sortColumn) return 0;
+
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortColumn) {
+        case 'name':
+          aValue = `${a.first_name} ${a.last_name}`.toLowerCase();
+          bValue = `${b.first_name} ${b.last_name}`.toLowerCase();
+          break;
+        case 'email':
+          aValue = a.email?.toLowerCase() || '';
+          bValue = b.email?.toLowerCase() || '';
+          break;
+        case 'phone':
+          aValue = a.phone_number || '';
+          bValue = b.phone_number || '';
+          break;
+        case 'bookings':
+          aValue = a.total_bookings;
+          bValue = b.total_bookings;
+          break;
+        case 'spent':
+          aValue = a.total_spent;
+          bValue = b.total_spent;
+          break;
+        case 'service_charges':
+          aValue = a.total_service_charges;
+          bValue = b.total_service_charges;
+          break;
+        case 'last_booking':
+          aValue = a.last_booking_date ? new Date(a.last_booking_date).getTime() : 0;
+          bValue = b.last_booking_date ? new Date(b.last_booking_date).getTime() : 0;
+          break;
+        case 'membership':
+          aValue = a.has_active_membership ? 1 : 0;
+          bValue = b.has_active_membership ? 1 : 0;
+          break;
+        case 'status':
+          aValue = a.is_active ? 1 : 0;
+          bValue = b.is_active ? 1 : 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', {
@@ -261,8 +335,8 @@ export default function AdminTravelers() {
               <div className="flex-shrink-0">
                 <DollarSign className="h-8 w-8 text-green-600" />
               </div>
-              <div className="ml-4">
-                <div className="text-xl font-bold text-gray-900">{formatCurrency(summaryStats.totalRevenue)}</div>
+              <div className="ml-4 min-w-0 flex-1">
+                <div className="text-lg font-bold text-gray-900 truncate">{formatCurrency(summaryStats.totalRevenue)}</div>
                 <div className="text-sm text-gray-500">Ingresos Totales</div>
               </div>
             </div>
@@ -273,8 +347,8 @@ export default function AdminTravelers() {
               <div className="flex-shrink-0">
                 <CreditCard className="h-8 w-8 text-purple-600" />
               </div>
-              <div className="ml-4">
-                <div className="text-xl font-bold text-gray-900">{formatCurrency(summaryStats.totalServiceCharges)}</div>
+              <div className="ml-4 min-w-0 flex-1">
+                <div className="text-lg font-bold text-gray-900 truncate">{formatCurrency(summaryStats.totalServiceCharges)}</div>
                 <div className="text-sm text-gray-500">Cargos por Servicio</div>
               </div>
             </div>
@@ -309,28 +383,76 @@ export default function AdminTravelers() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Viajero
+                    <button
+                      onClick={() => handleSort('name')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      Viajero
+                      {getSortIcon('name')}
+                    </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Contacto
+                    <button
+                      onClick={() => handleSort('phone')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      Contacto
+                      {getSortIcon('phone')}
+                    </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Reservas
+                    <button
+                      onClick={() => handleSort('bookings')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      Reservas
+                      {getSortIcon('bookings')}
+                    </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total Gastado
+                    <button
+                      onClick={() => handleSort('spent')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      Total Gastado
+                      {getSortIcon('spent')}
+                    </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Cargos Servicio
+                    <button
+                      onClick={() => handleSort('service_charges')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      Cargos Servicio
+                      {getSortIcon('service_charges')}
+                    </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Última Reserva
+                    <button
+                      onClick={() => handleSort('last_booking')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      Última Reserva
+                      {getSortIcon('last_booking')}
+                    </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Membresía
+                    <button
+                      onClick={() => handleSort('membership')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      Membresía
+                      {getSortIcon('membership')}
+                    </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estado
+                    <button
+                      onClick={() => handleSort('status')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      Estado
+                      {getSortIcon('status')}
+                    </button>
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Acciones
@@ -338,14 +460,14 @@ export default function AdminTravelers() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredTravelers.length === 0 ? (
+                {filteredAndSortedTravelers.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
                       {searchTerm ? 'No se encontraron viajeros con ese criterio' : 'No hay viajeros registrados'}
                     </td>
                   </tr>
                 ) : (
-                  filteredTravelers.map((traveler) => (
+                  filteredAndSortedTravelers.map((traveler) => (
                     <tr key={traveler.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
@@ -450,7 +572,7 @@ export default function AdminTravelers() {
         </div>
 
         <div className="mt-4 text-sm text-gray-600">
-          Mostrando {filteredTravelers.length} de {travelers.length} viajeros
+          Mostrando {filteredAndSortedTravelers.length} de {travelers.length} viajeros
         </div>
       </div>
 

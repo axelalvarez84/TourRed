@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building, Users, Eye, EyeOff, Mail, Phone, Globe, Calendar, Search, Filter, MoreVertical, CheckCircle, XCircle, Edit, Save, X, Percent, DollarSign, AlertTriangle, User, MapPin } from 'lucide-react';
+import { Building, Users, Eye, EyeOff, Mail, Phone, Globe, Calendar, Search, Filter, MoreVertical, CheckCircle, XCircle, Edit, Save, X, Percent, DollarSign, AlertTriangle, User, MapPin, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { getAllAgencies, updateAgencyStatus, supabase } from '../../lib/supabase';
 
 interface Agency {
@@ -43,6 +43,8 @@ const AdminAgencies: React.FC = () => {
   const [selectedAgency, setSelectedAgency] = useState<Agency | null>(null);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [isEditingAgency, setIsEditingAgency] = useState(false);
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [editForm, setEditForm] = useState({
     name: '',
     description: '',
@@ -274,21 +276,89 @@ const AdminAgencies: React.FC = () => {
     setError('');
   };
 
-  const filteredAgencies = agencies.filter(agency => {
-    const matchesSearch = 
-      agency.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      agency.contact_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (agency.users?.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (agency.users?.first_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (agency.users?.last_name || '').toLowerCase().includes(searchTerm.toLowerCase());
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
 
-    const matchesFilter = 
-      filterStatus === 'all' ||
-      (filterStatus === 'active' && agency.is_active) ||
-      (filterStatus === 'inactive' && !agency.is_active);
+  const getSortIcon = (column: string) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-4 w-4" />;
+    }
+    return sortDirection === 'asc' ? (
+      <ArrowUp className="h-4 w-4" />
+    ) : (
+      <ArrowDown className="h-4 w-4" />
+    );
+  };
 
-    return matchesSearch && matchesFilter;
-  });
+  const filteredAgencies = agencies
+    .filter(agency => {
+      const matchesSearch =
+        agency.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        agency.contact_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (agency.users?.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (agency.users?.first_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (agency.users?.last_name || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesFilter =
+        filterStatus === 'all' ||
+        (filterStatus === 'active' && agency.is_active) ||
+        (filterStatus === 'inactive' && !agency.is_active);
+
+      return matchesSearch && matchesFilter;
+    })
+    .sort((a, b) => {
+      if (!sortColumn) return 0;
+
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortColumn) {
+        case 'name':
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+          break;
+        case 'owner':
+          aValue = `${a.users?.first_name || ''} ${a.users?.last_name || ''}`.toLowerCase();
+          bValue = `${b.users?.first_name || ''} ${b.users?.last_name || ''}`.toLowerCase();
+          break;
+        case 'tours':
+          aValue = a.tour_count || 0;
+          bValue = b.tour_count || 0;
+          break;
+        case 'bookings':
+          aValue = a.booking_count || 0;
+          bValue = b.booking_count || 0;
+          break;
+        case 'revenue':
+          aValue = a.total_revenue || 0;
+          bValue = b.total_revenue || 0;
+          break;
+        case 'commission':
+          aValue = a.commission_rate || 0;
+          bValue = b.commission_rate || 0;
+          break;
+        case 'platform_commission':
+          aValue = a.platform_commission || 0;
+          bValue = b.platform_commission || 0;
+          break;
+        case 'status':
+          aValue = a.is_active ? 1 : 0;
+          bValue = b.is_active ? 1 : 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
 
   const getStatusBadge = (isActive: boolean) => {
     if (isActive) {
@@ -452,22 +522,52 @@ const AdminAgencies: React.FC = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Agencia
+                    <button
+                      onClick={() => handleSort('name')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      Agencia
+                      {getSortIcon('name')}
+                    </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Propietario
+                    <button
+                      onClick={() => handleSort('owner')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      Propietario
+                      {getSortIcon('owner')}
+                    </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Contacto
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Comisión
+                    <button
+                      onClick={() => handleSort('commission')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      Comisión
+                      {getSortIcon('commission')}
+                    </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estadísticas
+                    <button
+                      onClick={() => handleSort('tours')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      Estadísticas
+                      {getSortIcon('tours')}
+                    </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estado
+                    <button
+                      onClick={() => handleSort('status')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      Estado
+                      {getSortIcon('status')}
+                    </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Acciones
