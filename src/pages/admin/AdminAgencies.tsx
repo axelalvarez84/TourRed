@@ -104,17 +104,25 @@ const AdminAgencies: React.FC = () => {
               .eq('agency_id', agency.id);
 
             // Calcular ingresos totales (suma de agency_net_amount de commission_records)
-            const { data: commissionData } = await supabase
+            const { data: commissionData, error: commissionError } = await supabase
               .from('commission_records')
               .select('agency_net_amount, agency_commission_amount')
               .eq('agency_id', agency.id)
               .eq('status', 'processed');
+
+            if (commissionError) {
+              console.error(`❌ Error obteniendo comisiones para ${agency.name}:`, commissionError);
+            }
+
+            console.log(`📊 Comisiones para ${agency.name}:`, commissionData);
 
             const totalRevenue = commissionData?.reduce((sum, record) =>
               sum + (parseFloat(record.agency_net_amount) || 0), 0) || 0;
 
             const platformCommission = commissionData?.reduce((sum, record) =>
               sum + (parseFloat(record.agency_commission_amount) || 0), 0) || 0;
+
+            console.log(`💰 ${agency.name} - Revenue: ${totalRevenue}, Commission: ${platformCommission}`);
 
             return {
               ...agency,
