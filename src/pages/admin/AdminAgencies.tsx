@@ -31,6 +31,7 @@ interface Agency {
   tour_count?: number;
   booking_count?: number;
   total_revenue?: number;
+  platform_commission?: number;
 }
 
 const AdminAgencies: React.FC = () => {
@@ -105,18 +106,22 @@ const AdminAgencies: React.FC = () => {
             // Calcular ingresos totales (suma de agency_net_amount de commission_records)
             const { data: commissionData } = await supabase
               .from('commission_records')
-              .select('agency_net_amount')
+              .select('agency_net_amount, agency_commission_amount')
               .eq('agency_id', agency.id)
               .eq('status', 'processed');
 
-            const totalRevenue = commissionData?.reduce((sum, record) => 
+            const totalRevenue = commissionData?.reduce((sum, record) =>
               sum + (record.agency_net_amount || 0), 0) || 0;
+
+            const platformCommission = commissionData?.reduce((sum, record) =>
+              sum + (record.agency_commission_amount || 0), 0) || 0;
 
             return {
               ...agency,
               tour_count: tourCount || 0,
               booking_count: bookingCount || 0,
-              total_revenue: totalRevenue
+              total_revenue: totalRevenue,
+              platform_commission: platformCommission
             };
           } catch (err) {
             console.error('Error obteniendo estadísticas para agencia:', agency.id, err);
@@ -124,7 +129,8 @@ const AdminAgencies: React.FC = () => {
               ...agency,
               tour_count: 0,
               booking_count: 0,
-              total_revenue: 0
+              total_revenue: 0,
+              platform_commission: 0
             };
           }
         })
@@ -531,7 +537,7 @@ const AdminAgencies: React.FC = () => {
                             {((agency.commission_rate || 0.10) * 100).toFixed(1)}%
                           </div>
                           <div className="text-xs text-gray-500">
-                            ${((agency.total_revenue || 0) * (agency.commission_rate || 0.10)).toLocaleString()} generado
+                            ${(agency.platform_commission || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} generado
                           </div>
                         </div>
                       </div>
