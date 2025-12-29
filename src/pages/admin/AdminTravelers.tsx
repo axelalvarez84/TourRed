@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { User, Mail, Phone, Calendar, MapPin, Shield, ShieldOff, Edit2, Star, ShoppingBag, X } from 'lucide-react';
+import { User, Mail, Phone, Calendar, MapPin, Shield, ShieldOff, Edit2, Star, ShoppingBag, X, DollarSign, CreditCard, Crown, TrendingUp, Users } from 'lucide-react';
 
 interface Traveler {
   id: string;
@@ -12,6 +12,11 @@ interface Traveler {
   created_at: string;
   is_active: boolean;
   total_bookings: number;
+  total_spent: number;
+  total_service_charges: number;
+  last_booking_date: string | null;
+  has_active_membership: boolean;
+  membership_plan_type: string | null;
   date_of_birth: string | null;
   address: string | null;
   curp: string | null;
@@ -19,8 +24,27 @@ interface Traveler {
   is_foreign_traveler: boolean;
 }
 
+interface SummaryStats {
+  totalTravelers: number;
+  activeTravelers: number;
+  inactiveTravelers: number;
+  totalBookings: number;
+  totalRevenue: number;
+  totalServiceCharges: number;
+  travelersWithMembership: number;
+}
+
 export default function AdminTravelers() {
   const [travelers, setTravelers] = useState<Traveler[]>([]);
+  const [summaryStats, setSummaryStats] = useState<SummaryStats>({
+    totalTravelers: 0,
+    activeTravelers: 0,
+    inactiveTravelers: 0,
+    totalBookings: 0,
+    totalRevenue: 0,
+    totalServiceCharges: 0,
+    travelersWithMembership: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTraveler, setSelectedTraveler] = useState<Traveler | null>(null);
@@ -28,10 +52,10 @@ export default function AdminTravelers() {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    loadTravelers();
+    loadTravelersAndStats();
   }, []);
 
-  const loadTravelers = async () => {
+  const loadTravelersAndStats = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -44,21 +68,53 @@ export default function AdminTravelers() {
 
       if (travelersError) throw travelersError;
 
-      const travelersWithBookings = await Promise.all(
+      const travelersWithDetails = await Promise.all(
         (travelersData || []).map(async (traveler) => {
-          const { count } = await supabase
+          const { data: bookingsData } = await supabase
             .from('bookings')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', traveler.id);
+            .select('total_price, service_charge, created_at, payment_status')
+            .eq('user_id', traveler.id)
+            .eq('payment_status', 'succeeded');
+
+          const totalBookings = bookingsData?.length || 0;
+          const totalSpent = bookingsData?.reduce((sum, b) => sum + Number(b.total_price || 0), 0) || 0;
+          const totalServiceCharges = bookingsData?.reduce((sum, b) => sum + Number(b.service_charge || 0), 0) || 0;
+          const lastBookingDate = bookingsData?.length > 0
+            ? bookingsData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].created_at
+            : null;
+
+          const { data: membershipData } = await supabase
+            .from('memberships')
+            .select('status, plan_type')
+            .eq('user_id', traveler.id)
+            .eq('status', 'active')
+            .maybeSingle();
 
           return {
             ...traveler,
-            total_bookings: count || 0,
+            total_bookings: totalBookings,
+            total_spent: totalSpent,
+            total_service_charges: totalServiceCharges,
+            last_booking_date: lastBookingDate,
+            has_active_membership: !!membershipData,
+            membership_plan_type: membershipData?.plan_type || null,
           };
         })
       );
 
-      setTravelers(travelersWithBookings);
+      setTravelers(travelersWithDetails);
+
+      const stats: SummaryStats = {
+        totalTravelers: travelersWithDetails.length,
+        activeTravelers: travelersWithDetails.filter(t => t.is_active).length,
+        inactiveTravelers: travelersWithDetails.filter(t => !t.is_active).length,
+        totalBookings: travelersWithDetails.reduce((sum, t) => sum + t.total_bookings, 0),
+        totalRevenue: travelersWithDetails.reduce((sum, t) => sum + t.total_spent, 0),
+        totalServiceCharges: travelersWithDetails.reduce((sum, t) => sum + t.total_service_charges, 0),
+        travelersWithMembership: travelersWithDetails.filter(t => t.has_active_membership).length,
+      };
+
+      setSummaryStats(stats);
     } catch (err: any) {
       console.error('Error cargando viajeros:', err);
       setError('Error al cargar los viajeros');
@@ -83,6 +139,12 @@ export default function AdminTravelers() {
       if (selectedTraveler?.id === travelerId) {
         setSelectedTraveler({ ...selectedTraveler, is_active: !currentStatus });
       }
+
+      setSummaryStats(prev => ({
+        ...prev,
+        activeTravelers: !currentStatus ? prev.activeTravelers + 1 : prev.activeTravelers - 1,
+        inactiveTravelers: !currentStatus ? prev.inactiveTravelers - 1 : prev.inactiveTravelers + 1,
+      }));
     } catch (err: any) {
       console.error('Error actualizando estado del viajero:', err);
       alert('Error al actualizar el estado del viajero');
@@ -103,6 +165,22 @@ export default function AdminTravelers() {
       traveler.phone_number?.includes(searchTerm)
     );
   });
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: 'MXN',
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('es-MX', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
 
   if (loading) {
     return (
@@ -129,6 +207,92 @@ export default function AdminTravelers() {
           </div>
         )}
 
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-8">
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Users className="h-8 w-8 text-blue-600" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-gray-900">{summaryStats.totalTravelers}</div>
+                <div className="text-sm text-gray-500">Total Viajeros</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Shield className="h-8 w-8 text-green-600" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-gray-900">{summaryStats.activeTravelers}</div>
+                <div className="text-sm text-gray-500">Activos</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <ShieldOff className="h-8 w-8 text-red-600" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-gray-900">{summaryStats.inactiveTravelers}</div>
+                <div className="text-sm text-gray-500">Inactivos</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <ShoppingBag className="h-8 w-8 text-orange-600" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-gray-900">{summaryStats.totalBookings}</div>
+                <div className="text-sm text-gray-500">Reservas Totales</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <DollarSign className="h-8 w-8 text-green-600" />
+              </div>
+              <div className="ml-4">
+                <div className="text-xl font-bold text-gray-900">{formatCurrency(summaryStats.totalRevenue)}</div>
+                <div className="text-sm text-gray-500">Ingresos Totales</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <CreditCard className="h-8 w-8 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <div className="text-xl font-bold text-gray-900">{formatCurrency(summaryStats.totalServiceCharges)}</div>
+                <div className="text-sm text-gray-500">Cargos por Servicio</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Crown className="h-8 w-8 text-yellow-600" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-gray-900">{summaryStats.travelersWithMembership}</div>
+                <div className="text-sm text-gray-500">Con Membresía</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="mb-6">
           <input
             type="text"
@@ -154,10 +318,19 @@ export default function AdminTravelers() {
                     Reservas
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estado
+                    Total Gastado
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Fecha de Registro
+                    Cargos Servicio
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Última Reserva
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Membresía
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Estado
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Acciones
@@ -167,7 +340,7 @@ export default function AdminTravelers() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredTravelers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
                       {searchTerm ? 'No se encontraron viajeros con ese criterio' : 'No hay viajeros registrados'}
                     </td>
                   </tr>
@@ -207,6 +380,33 @@ export default function AdminTravelers() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {formatCurrency(traveler.total_spent)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {formatCurrency(traveler.total_service_charges)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {formatDate(traveler.last_booking_date)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {traveler.has_active_membership ? (
+                          <div className="flex items-center">
+                            <Crown className="h-4 w-4 text-yellow-600 mr-1" />
+                            <span className="text-sm font-medium text-yellow-700">
+                              {traveler.membership_plan_type === 'monthly' ? 'Mensual' : 'Anual'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-500">Sin membresía</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                             traveler.is_active
@@ -216,9 +416,6 @@ export default function AdminTravelers() {
                         >
                           {traveler.is_active ? 'Activo' : 'Inactivo'}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(traveler.created_at).toLocaleDateString('es-MX')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
@@ -253,13 +450,13 @@ export default function AdminTravelers() {
         </div>
 
         <div className="mt-4 text-sm text-gray-600">
-          Total de viajeros: {filteredTravelers.length}
+          Mostrando {filteredTravelers.length} de {travelers.length} viajeros
         </div>
       </div>
 
       {showEditModal && selectedTraveler && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
               <h2 className="text-2xl font-bold text-gray-900">Perfil del Viajero</h2>
               <button
@@ -283,20 +480,60 @@ export default function AdminTravelers() {
                     <User className="h-12 w-12 text-blue-600" />
                   </div>
                 )}
-                <div className="ml-6">
+                <div className="ml-6 flex-1">
                   <h3 className="text-xl font-bold text-gray-900">
                     {selectedTraveler.first_name} {selectedTraveler.last_name}
                   </h3>
                   <p className="text-gray-600">{selectedTraveler.email}</p>
-                  <span
-                    className={`mt-2 inline-block px-3 py-1 text-xs font-semibold rounded-full ${
-                      selectedTraveler.is_active
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}
-                  >
-                    {selectedTraveler.is_active ? 'Activo' : 'Inactivo'}
-                  </span>
+                  <div className="flex items-center gap-3 mt-2">
+                    <span
+                      className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${
+                        selectedTraveler.is_active
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
+                    >
+                      {selectedTraveler.is_active ? 'Activo' : 'Inactivo'}
+                    </span>
+                    {selectedTraveler.has_active_membership && (
+                      <span className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                        <Crown className="h-3 w-3 mr-1" />
+                        ToursRed+ {selectedTraveler.membership_plan_type === 'monthly' ? 'Mensual' : 'Anual'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <ShoppingBag className="h-8 w-8 text-blue-600 mr-3" />
+                    <div>
+                      <p className="text-sm text-gray-600">Total Reservas</p>
+                      <p className="text-2xl font-bold text-gray-900">{selectedTraveler.total_bookings}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-green-50 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <DollarSign className="h-8 w-8 text-green-600 mr-3" />
+                    <div>
+                      <p className="text-sm text-gray-600">Total Gastado</p>
+                      <p className="text-xl font-bold text-gray-900">{formatCurrency(selectedTraveler.total_spent)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-purple-50 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <CreditCard className="h-8 w-8 text-purple-600 mr-3" />
+                    <div>
+                      <p className="text-sm text-gray-600">Cargos por Servicio</p>
+                      <p className="text-xl font-bold text-gray-900">{formatCurrency(selectedTraveler.total_service_charges)}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -349,7 +586,7 @@ export default function AdminTravelers() {
 
                 <div className="space-y-4">
                   <h4 className="font-semibold text-gray-900 text-lg border-b pb-2">
-                    Información de Identificación
+                    Información Adicional
                   </h4>
 
                   <div className="flex items-start">
@@ -387,11 +624,11 @@ export default function AdminTravelers() {
                   )}
 
                   <div className="flex items-start">
-                    <ShoppingBag className="h-5 w-5 text-gray-400 mr-3 mt-0.5" />
+                    <Calendar className="h-5 w-5 text-gray-400 mr-3 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-gray-500">Total de Reservas</p>
-                      <p className="text-gray-900 text-2xl font-bold">
-                        {selectedTraveler.total_bookings}
+                      <p className="text-sm font-medium text-gray-500">Última Reserva</p>
+                      <p className="text-gray-900">
+                        {formatDate(selectedTraveler.last_booking_date)}
                       </p>
                     </div>
                   </div>
@@ -409,6 +646,18 @@ export default function AdminTravelers() {
                       </p>
                     </div>
                   </div>
+
+                  {selectedTraveler.has_active_membership && (
+                    <div className="flex items-start">
+                      <Crown className="h-5 w-5 text-yellow-600 mr-3 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Membresía ToursRed+</p>
+                        <p className="text-gray-900">
+                          Plan {selectedTraveler.membership_plan_type === 'monthly' ? 'Mensual' : 'Anual'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
