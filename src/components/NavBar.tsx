@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { signOut, supabase } from '../lib/supabase';
 
 const NavBar: React.FC = () => {
-  const { user, isAdmin, isAgency, isTraveler, isEmailVerified } = useAuth();
+  const { user, isAdmin, isAgency, isTraveler, isEmailVerified, isSuperAdmin, permissions } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
@@ -81,17 +81,41 @@ const NavBar: React.FC = () => {
 
   const getRoleSpecificMenuItems = () => {
     if (isAdmin) {
-      return [
-        { to: '/admin/dashboard', label: 'Panel Admin' },
-        { to: '/admin/agencies', label: 'Agencias' },
-        { to: '/admin/users', label: 'Usuarios' },
-        { to: '/admin/destinations', label: 'Destinos' },
-        { to: '/admin/reviews', label: 'Reseñas' },
-        { to: '/admin/messages', label: 'Mensajes' },
-        { to: '/admin/settings', label: 'Configuración' },
-      ];
+      const menuItems = [];
+
+      menuItems.push({ to: '/admin/dashboard', label: 'Panel Admin' });
+
+      if (isSuperAdmin || permissions?.canManageAgencies) {
+        menuItems.push({ to: '/admin/agencies', label: 'Agencias' });
+      }
+
+      if (isSuperAdmin || permissions?.canManageUsers) {
+        menuItems.push({ to: '/admin/users', label: 'Usuarios' });
+      }
+
+      if (isSuperAdmin || permissions?.canManageDestinations) {
+        menuItems.push({ to: '/admin/destinations', label: 'Destinos' });
+      }
+
+      if (isSuperAdmin || permissions?.canManageReviews) {
+        menuItems.push({ to: '/admin/reviews', label: 'Reseñas' });
+      }
+
+      if (isSuperAdmin || permissions?.canManageMessages) {
+        menuItems.push({ to: '/admin/messages', label: 'Mensajes' });
+      }
+
+      if (isSuperAdmin || permissions?.canManageSettings) {
+        menuItems.push({ to: '/admin/settings', label: 'Configuración' });
+      }
+
+      if (isSuperAdmin || permissions?.canManageMemberships) {
+        menuItems.push({ to: '/admin/memberships', label: 'Membresías' });
+      }
+
+      return menuItems;
     }
-    
+
     if (isAgency) {
       return [
         { to: '/agency/dashboard', label: 'Panel' },
@@ -100,14 +124,14 @@ const NavBar: React.FC = () => {
         { to: '/agency/bookings', label: 'Reservas' },
       ];
     }
-    
+
     if (isTraveler) {
       return [
         { to: '/traveler/dashboard', label: 'Panel' },
         { to: '/traveler/bookings', label: 'Reservas' },
       ];
     }
-    
+
     return [];
   };
 
