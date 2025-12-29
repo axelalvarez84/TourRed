@@ -1,955 +1,601 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Search, Filter, Edit, Trash2, Eye, UserPlus, Shield, Building, MapPin, Calendar, Mail, Phone, MoreVertical, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { useAuth, AdminPermissions } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { format } from 'date-fns';
+import { UserPlus, Shield, X, Check, AlertCircle } from 'lucide-react';
 
-interface AdminUser {
+interface StaffUser {
   id: string;
   email: string;
-  first_name?: string;
-  last_name?: string;
-  role: 'admin' | 'agency' | 'traveler';
+  nombre: string;
+  apellido: string;
+  is_super_admin: boolean;
   created_at: string;
-  updated_at: string;
-  agencies?: {
-    id: string;
-    name: string;
-    is_active: boolean;
-    tour_count?: number;
-    booking_count?: number;
-  };
-  booking_count?: number;
-  last_login?: string;
+  permissions: AdminPermissions | null;
 }
 
 const AdminUsers: React.FC = () => {
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'agency' | 'traveler'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
-  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
-  const [isCreatingUser, setIsCreatingUser] = useState(false);
-  const [isEditingUser, setIsEditingUser] = useState(false);
-  const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const { isSuperAdmin } = useAuth();
+  const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingPermissions, setEditingPermissions] = useState<string | null>(null);
 
-  const [userForm, setUserForm] = useState({
+  const [newUser, setNewUser] = useState({
     email: '',
-    first_name: '',
-    last_name: '',
-    role: 'traveler' as 'admin' | 'agency' | 'traveler',
     password: '',
-    agency_name: '',
-    agency_contact_phone: ''
+    nombre: '',
+    apellido: '',
+    permissions: {
+      canManageAgencies: false,
+      canManageUsers: false,
+      canManageDestinations: false,
+      canManageReviews: false,
+      canManageMessages: false,
+      canManageSettings: false,
+      canManageMemberships: false,
+    }
+  });
+
+  const [tempPermissions, setTempPermissions] = useState<AdminPermissions>({
+    canManageAgencies: false,
+    canManageUsers: false,
+    canManageDestinations: false,
+    canManageReviews: false,
+    canManageMessages: false,
+    canManageSettings: false,
+    canManageMemberships: false,
   });
 
   useEffect(() => {
-    fetchUsers();
+    loadStaffUsers();
   }, []);
 
-  const fetchUsers = async () => {
+  const loadStaffUsers = async () => {
     try {
-      setIsLoading(true);
-      setError('');
+      setLoading(true);
+      setError(null);
 
-      console.log('👥 Cargando usuarios desde la BD...');
-
-      // Obtener usuarios con información de agencias
       const { data: usersData, error: usersError } = await supabase
         .from('users')
-        .select(`
-          *,
-          agencies(
-            id,
-            name,
-            is_active
-          )
-        `)
+        .select('*')
+        .eq('role', 'admin')
         .order('created_at', { ascending: false });
 
-      if (usersError) {
-        throw new Error(usersError.message);
-      }
+      if (usersError) throw usersError;
 
-      console.log('✅ Usuarios cargados:', usersData);
-
-      // Obtener estadísticas adicionales para cada usuario
-      const usersWithStats = await Promise.all(
+      const staffWithPermissions = await Promise.all(
         (usersData || []).map(async (user) => {
-          try {
-            let agencyStats = null;
-            let bookingCount = 0;
+          const { data: permsData } = await supabase
+            .from('admin_permissions')
+            .select('*')
+            .eq('user_id', user.id)
+            .maybeSingle();
 
-            if (user.role === 'agency' && user.agencies) {
-              // Estadísticas para agencias
-              const [toursResult, bookingsResult] = await Promise.all([
-                supabase
-                  .from('tours')
-                  .select('*', { count: 'exact', head: true })
-                  .eq('agency_id', user.agencies.id),
-                supabase
-                  .from('bookings')
-                  .select('*', { count: 'exact', head: true })
-                  .eq('agency_id', user.agencies.id)
-              ]);
-
-              agencyStats = {
-                ...user.agencies,
-                tour_count: toursResult.count || 0,
-                booking_count: bookingsResult.count || 0
-              };
-            } else if (user.role === 'traveler') {
-              // Estadísticas para viajeros
-              const { count } = await supabase
-                .from('bookings')
-                .select('*', { count: 'exact', head: true })
-                .eq('user_id', user.id);
-
-              bookingCount = count || 0;
-            }
-
-            return {
-              ...user,
-              agencies: agencyStats,
-              booking_count: bookingCount
-            };
-          } catch (err) {
-            console.error('Error obteniendo estadísticas para usuario:', user.id, err);
-            return {
-              ...user,
-              booking_count: 0
-            };
-          }
+          return {
+            ...user,
+            permissions: permsData ? {
+              canManageAgencies: permsData.can_manage_agencies,
+              canManageUsers: permsData.can_manage_users,
+              canManageDestinations: permsData.can_manage_destinations,
+              canManageReviews: permsData.can_manage_reviews,
+              canManageMessages: permsData.can_manage_messages,
+              canManageSettings: permsData.can_manage_settings,
+              canManageMemberships: permsData.can_manage_memberships,
+            } : null
+          };
         })
       );
 
-      setUsers(usersWithStats);
+      setStaffUsers(staffWithPermissions);
     } catch (err: any) {
-      console.error('❌ Error cargando usuarios:', err);
-      setError(err.message || 'Error al cargar usuarios');
+      console.error('Error cargando usuarios staff:', err);
+      setError('Error al cargar los usuarios');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   const handleCreateUser = async () => {
-    try {
-      setIsUpdating('creating');
-      setError('');
-
-      // Validaciones
-      if (!userForm.email || !userForm.password || !userForm.role) {
-        throw new Error('Email, contraseña y rol son obligatorios');
-      }
-
-      if (userForm.role === 'agency' && !userForm.agency_name) {
-        throw new Error('El nombre de la agencia es obligatorio para usuarios tipo agencia');
-      }
-
-      // Crear usuario en Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: userForm.email,
-        password: userForm.password,
-        email_confirm: true,
-        user_metadata: {
-          role: userForm.role
-        }
-      });
-
-      if (authError) {
-        throw new Error(`Error creando usuario: ${authError.message}`);
-      }
-
-      if (!authData.user) {
-        throw new Error('No se pudo crear el usuario');
-      }
-
-      // Crear perfil de usuario
-      const { error: profileError } = await supabase
-        .from('users')
-        .insert({
-          id: authData.user.id,
-          email: userForm.email,
-          first_name: userForm.first_name || null,
-          last_name: userForm.last_name || null,
-          role: userForm.role
-        });
-
-      if (profileError) {
-        throw new Error(`Error creando perfil: ${profileError.message}`);
-      }
-
-      // Si es agencia, crear perfil de agencia
-      if (userForm.role === 'agency') {
-        const { error: agencyError } = await supabase
-          .from('agencies')
-          .insert({
-            user_id: authData.user.id,
-            name: userForm.agency_name,
-            contact_email: userForm.email,
-            contact_phone: userForm.agency_contact_phone || null,
-            is_active: true
-          });
-
-        if (agencyError) {
-          throw new Error(`Error creando agencia: ${agencyError.message}`);
-        }
-      }
-
-      console.log('✅ Usuario creado correctamente');
-      await fetchUsers();
-      setIsCreatingUser(false);
-      resetForm();
-    } catch (err: any) {
-      console.error('❌ Error creando usuario:', err);
-      setError(err.message || 'Error al crear usuario');
-    } finally {
-      setIsUpdating(null);
-    }
-  };
-
-  const handleUpdateUser = async () => {
-    if (!selectedUser) return;
-
-    try {
-      setIsUpdating(selectedUser.id);
-      setError('');
-
-      // Actualizar perfil de usuario
-      const { error: profileError } = await supabase
-        .from('users')
-        .update({
-          first_name: userForm.first_name || null,
-          last_name: userForm.last_name || null,
-          role: userForm.role,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', selectedUser.id);
-
-      if (profileError) {
-        throw new Error(`Error actualizando perfil: ${profileError.message}`);
-      }
-
-      // Si es agencia y tiene perfil de agencia, actualizar
-      if (userForm.role === 'agency' && selectedUser.agencies) {
-        const { error: agencyError } = await supabase
-          .from('agencies')
-          .update({
-            name: userForm.agency_name,
-            contact_phone: userForm.agency_contact_phone || null,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', selectedUser.agencies.id);
-
-        if (agencyError) {
-          throw new Error(`Error actualizando agencia: ${agencyError.message}`);
-        }
-      }
-
-      console.log('✅ Usuario actualizado correctamente');
-      await fetchUsers();
-      setIsEditingUser(false);
-      setSelectedUser(null);
-      resetForm();
-    } catch (err: any) {
-      console.error('❌ Error actualizando usuario:', err);
-      setError(err.message || 'Error al actualizar usuario');
-    } finally {
-      setIsUpdating(null);
-    }
-  };
-
-  const handleDeleteUser = async (user: AdminUser) => {
-    if (!confirm(`¿Estás seguro de que quieres eliminar al usuario "${user.email}"?\n\nEsta acción eliminará:\n- El perfil del usuario\n- Su agencia (si la tiene)\n- Todos sus tours y reservas\n\nEsta acción NO se puede deshacer.`)) {
+    if (!newUser.email || !newUser.password || !newUser.nombre || !newUser.apellido) {
+      setError('Todos los campos son obligatorios');
       return;
     }
 
     try {
-      setIsUpdating(user.id);
-      setError('');
+      setLoading(true);
+      setError(null);
 
-      // Eliminar usuario de Supabase Auth (esto activará el CASCADE en la BD)
-      const { error: authError } = await supabase.auth.admin.deleteUser(user.id);
-
-      if (authError) {
-        throw new Error(`Error eliminando usuario: ${authError.message}`);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No hay sesión activa');
       }
 
-      console.log('✅ Usuario eliminado correctamente');
-      await fetchUsers();
-    } catch (err: any) {
-      console.error('❌ Error eliminando usuario:', err);
-      setError(err.message || 'Error al eliminar usuario');
-    } finally {
-      setIsUpdating(null);
-    }
-  };
-
-  const handleToggleAgencyStatus = async (user: AdminUser) => {
-    if (!user.agencies) return;
-
-    try {
-      setIsUpdating(user.id);
-      setError('');
-
-      const newStatus = !user.agencies.is_active;
-
-      const { error } = await supabase
-        .from('agencies')
-        .update({ 
-          is_active: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.agencies.id);
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      console.log(`✅ Estado de agencia actualizado a: ${newStatus}`);
-      await fetchUsers();
-    } catch (err: any) {
-      console.error('❌ Error actualizando estado de agencia:', err);
-      setError(err.message || 'Error al actualizar estado de agencia');
-    } finally {
-      setIsUpdating(null);
-    }
-  };
-
-  const resetForm = () => {
-    setUserForm({
-      email: '',
-      first_name: '',
-      last_name: '',
-      role: 'traveler',
-      password: '',
-      agency_name: '',
-      agency_contact_phone: ''
-    });
-  };
-
-  const openCreateModal = () => {
-    resetForm();
-    setIsCreatingUser(true);
-    setSelectedUser(null);
-  };
-
-  const openEditModal = (user: AdminUser) => {
-    setUserForm({
-      email: user.email,
-      first_name: user.first_name || '',
-      last_name: user.last_name || '',
-      role: user.role,
-      password: '',
-      agency_name: user.agencies?.name || '',
-      agency_contact_phone: user.agencies?.contact_phone || ''
-    });
-    setSelectedUser(user);
-    setIsEditingUser(true);
-  };
-
-  const closeModals = () => {
-    setIsCreatingUser(false);
-    setIsEditingUser(false);
-    setSelectedUser(null);
-    resetForm();
-    setError('');
-  };
-
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = 
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (user.first_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (user.last_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (user.agencies?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-
-    const matchesStatus = statusFilter === 'all' || 
-      (statusFilter === 'active' && (user.role !== 'agency' || user.agencies?.is_active)) ||
-      (statusFilter === 'inactive' && user.role === 'agency' && !user.agencies?.is_active);
-
-    return matchesSearch && matchesRole && matchesStatus;
-  });
-
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full flex items-center"><Shield className="h-3 w-3 mr-1" />Admin</span>;
-      case 'agency':
-        return <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full flex items-center"><Building className="h-3 w-3 mr-1" />Agencia</span>;
-      default:
-        return <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full flex items-center"><MapPin className="h-3 w-3 mr-1" />Viajero</span>;
-    }
-  };
-
-  const getStatusBadge = (user: AdminUser) => {
-    if (user.role === 'agency') {
-      return user.agencies?.is_active ? (
-        <span className="px-2 py-1 text-xs font-medium bg-success-100 text-success-800 rounded-full flex items-center">
-          <CheckCircle className="h-3 w-3 mr-1" />Activa
-        </span>
-      ) : (
-        <span className="px-2 py-1 text-xs font-medium bg-error-100 text-error-800 rounded-full flex items-center">
-          <XCircle className="h-3 w-3 mr-1" />Inactiva
-        </span>
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: newUser.email,
+            password: newUser.password,
+            nombre: newUser.nombre,
+            apellido: newUser.apellido,
+            permissions: {
+              can_manage_agencies: newUser.permissions.canManageAgencies,
+              can_manage_users: newUser.permissions.canManageUsers,
+              can_manage_destinations: newUser.permissions.canManageDestinations,
+              can_manage_reviews: newUser.permissions.canManageReviews,
+              can_manage_messages: newUser.permissions.canManageMessages,
+              can_manage_settings: newUser.permissions.canManageSettings,
+              can_manage_memberships: newUser.permissions.canManageMemberships,
+            }
+          }),
+        }
       );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al crear usuario');
+      }
+
+      setShowCreateModal(false);
+      setNewUser({
+        email: '',
+        password: '',
+        nombre: '',
+        apellido: '',
+        permissions: {
+          canManageAgencies: false,
+          canManageUsers: false,
+          canManageDestinations: false,
+          canManageReviews: false,
+          canManageMessages: false,
+          canManageSettings: false,
+          canManageMemberships: false,
+        }
+      });
+
+      await loadStaffUsers();
+    } catch (err: any) {
+      console.error('Error creando usuario:', err);
+      setError(err.message || 'Error al crear usuario');
+    } finally {
+      setLoading(false);
     }
-    return (
-      <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
-        N/A
+  };
+
+  const handleUpdatePermissions = async (userId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { error: updateError } = await supabase
+        .from('admin_permissions')
+        .update({
+          can_manage_agencies: tempPermissions.canManageAgencies,
+          can_manage_users: tempPermissions.canManageUsers,
+          can_manage_destinations: tempPermissions.canManageDestinations,
+          can_manage_reviews: tempPermissions.canManageReviews,
+          can_manage_messages: tempPermissions.canManageMessages,
+          can_manage_settings: tempPermissions.canManageSettings,
+          can_manage_memberships: tempPermissions.canManageMemberships,
+        })
+        .eq('user_id', userId);
+
+      if (updateError) throw updateError;
+
+      setEditingPermissions(null);
+      await loadStaffUsers();
+    } catch (err: any) {
+      console.error('Error actualizando permisos:', err);
+      setError('Error al actualizar permisos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startEditPermissions = (user: StaffUser) => {
+    if (user.permissions) {
+      setTempPermissions(user.permissions);
+      setEditingPermissions(user.id);
+    }
+  };
+
+  const cancelEditPermissions = () => {
+    setEditingPermissions(null);
+    setTempPermissions({
+      canManageAgencies: false,
+      canManageUsers: false,
+      canManageDestinations: false,
+      canManageReviews: false,
+      canManageMessages: false,
+      canManageSettings: false,
+      canManageMemberships: false,
+    });
+  };
+
+  const PermissionCheckbox = ({
+    label,
+    checked,
+    onChange,
+    disabled = false
+  }: {
+    label: string;
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+    disabled?: boolean;
+  }) => (
+    <label className="flex items-center space-x-2 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        disabled={disabled}
+        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+      />
+      <span className={`text-sm ${disabled ? 'text-gray-400' : 'text-gray-700'}`}>
+        {label}
       </span>
-    );
-  };
+    </label>
+  );
 
-  const getUserDisplayName = (user: AdminUser) => {
-    if (user.first_name || user.last_name) {
-      return `${user.first_name || ''} ${user.last_name || ''}`.trim();
-    }
-    return user.email;
-  };
-
-  const stats = {
-    total: users.length,
-    admins: users.filter(u => u.role === 'admin').length,
-    agencies: users.filter(u => u.role === 'agency').length,
-    travelers: users.filter(u => u.role === 'traveler').length,
-    activeAgencies: users.filter(u => u.role === 'agency' && u.agencies?.is_active).length
-  };
-
-  if (isLoading) {
+  if (!isSuperAdmin) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Acceso Denegado</h2>
+          <p className="text-gray-600">Solo el super administrador puede gestionar usuarios del sistema.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Gestión de Usuarios</h1>
-          <p className="text-gray-600 mt-1">
-            Administra todos los usuarios registrados en la plataforma
-          </p>
-        </div>
-        <button
-          onClick={openCreateModal}
-          className="btn btn-primary"
-        >
-          <UserPlus className="h-5 w-5 mr-2" />
-          Crear Usuario
-        </button>
-      </div>
-
-      {error && (
-        <div className="mb-6 bg-error-50 text-error-600 p-4 rounded-md flex items-start">
-          <AlertTriangle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="font-medium">Error</p>
-            <p className="text-sm">{error}</p>
+    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-8">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Usuarios del Sistema</h1>
+              <p className="mt-2 text-gray-600">
+                Gestiona los usuarios internos y sus permisos de acceso
+              </p>
+            </div>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <UserPlus className="w-5 h-5 mr-2" />
+              Crear Usuario
+            </button>
           </div>
         </div>
-      )}
 
-      {/* Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <div className="text-2xl font-bold text-primary-600">{stats.total}</div>
-          <div className="text-sm text-gray-500">Total Usuarios</div>
-        </div>
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <div className="text-2xl font-bold text-red-600">{stats.admins}</div>
-          <div className="text-sm text-gray-500">Administradores</div>
-        </div>
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <div className="text-2xl font-bold text-blue-600">{stats.agencies}</div>
-          <div className="text-sm text-gray-500">Agencias</div>
-        </div>
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <div className="text-2xl font-bold text-green-600">{stats.travelers}</div>
-          <div className="text-sm text-gray-500">Viajeros</div>
-        </div>
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <div className="text-2xl font-bold text-success-600">{stats.activeAgencies}</div>
-          <div className="text-sm text-gray-500">Agencias Activas</div>
-        </div>
-      </div>
-
-      {/* Filtros */}
-      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Buscar por nombre, email o agencia..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              />
-            </div>
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
+            <AlertCircle className="w-5 h-5 text-red-600 mr-2 mt-0.5" />
+            <span className="text-red-800">{error}</span>
           </div>
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Filter className="h-4 w-4 text-gray-400" />
-              <select
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value as any)}
-                className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              >
-                <option value="all">Todos los roles</option>
-                <option value="admin">Administradores</option>
-                <option value="agency">Agencias</option>
-                <option value="traveler">Viajeros</option>
-              </select>
-            </div>
-            <div className="flex items-center space-x-2">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              >
-                <option value="all">Todos los estados</option>
-                <option value="active">Activos</option>
-                <option value="inactive">Inactivos</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
+        )}
 
-      {/* Lista de Usuarios */}
-      {filteredUsers.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-md p-8 text-center">
-          <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold mb-2">
-            {users.length === 0 ? 'No hay usuarios registrados' : 'No se encontraron usuarios'}
-          </h3>
-          <p className="text-gray-600">
-            {users.length === 0 
-              ? 'Los usuarios aparecerán aquí cuando se registren en la plataforma.'
-              : 'Intenta ajustar los filtros de búsqueda.'
-            }
-          </p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Usuario
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Rol
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Información Adicional
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estado
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estadísticas
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Fecha de Registro
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center">
-                            {user.role === 'admin' ? (
-                              <Shield className="h-5 w-5 text-red-500" />
-                            ) : user.role === 'agency' ? (
-                              <Building className="h-5 w-5 text-blue-500" />
-                            ) : (
-                              <Users className="h-5 w-5 text-green-500" />
-                            )}
-                          </div>
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {getUserDisplayName(user)}
-                          </div>
-                          <div className="text-sm text-gray-500">{user.email}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getRoleBadge(user.role)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {user.role === 'agency' && user.agencies ? (
-                        <div className="text-sm">
-                          <div className="font-medium text-gray-900">{user.agencies.name}</div>
-                          <div className="text-gray-500">Agencia de Viajes</div>
-                        </div>
-                      ) : user.role === 'admin' ? (
-                        <div className="text-sm text-gray-500">
-                          Administrador del Sistema
-                        </div>
-                      ) : (
-                        <div className="text-sm text-gray-500">
-                          Usuario Viajero
-                        </div>
+        {loading && staffUsers.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Cargando usuarios...</p>
+          </div>
+        ) : (
+          <div className="grid gap-6">
+            {staffUsers.map((user) => (
+              <div key={user.id} className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center">
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                      <Shield className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div className="ml-4">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {user.nombre} {user.apellido}
+                      </h3>
+                      <p className="text-gray-600">{user.email}</p>
+                      {user.is_super_admin && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 mt-1">
+                          Super Administrador
+                        </span>
                       )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(user)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {user.role === 'agency' && user.agencies ? (
-                          <div className="space-y-1">
-                            <div>{user.agencies.tour_count || 0} tours</div>
-                            <div className="text-gray-500">{user.agencies.booking_count || 0} reservas</div>
-                          </div>
-                        ) : user.role === 'traveler' ? (
-                          <div>{user.booking_count || 0} reservas</div>
-                        ) : (
-                          <div className="text-gray-500">N/A</div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center text-sm text-gray-500">
-                        <Calendar className="h-3 w-3 mr-1" />
-                        {format(new Date(user.created_at), 'dd/MM/yyyy')}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => openEditModal(user)}
-                          disabled={isUpdating === user.id}
-                          className="text-primary-600 hover:text-primary-900 disabled:opacity-50"
-                          title="Editar usuario"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        
-                        {user.role === 'agency' && user.agencies && (
-                          <button
-                            onClick={() => handleToggleAgencyStatus(user)}
-                            disabled={isUpdating === user.id}
-                            className={`${
-                              user.agencies.is_active
-                                ? 'text-error-600 hover:text-error-900'
-                                : 'text-success-600 hover:text-success-900'
-                            } disabled:opacity-50`}
-                            title={user.agencies.is_active ? 'Desactivar agencia' : 'Activar agencia'}
-                          >
-                            {user.agencies.is_active ? <XCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-                          </button>
-                        )}
-                        
-                        <button
-                          onClick={() => handleDeleteUser(user)}
-                          disabled={isUpdating === user.id}
-                          className="text-error-600 hover:text-error-900 disabled:opacity-50"
-                          title="Eliminar usuario"
-                        >
-                          {isUpdating === user.id ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-error-600"></div>
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Crear Usuario */}
-      {isCreatingUser && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Crear Nuevo Usuario</h3>
-              <button onClick={closeModals} className="text-gray-400 hover:text-gray-600">
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  value={userForm.email}
-                  onChange={(e) => setUserForm({...userForm, email: e.target.value})}
-                  className="input"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Contraseña *
-                </label>
-                <input
-                  type="password"
-                  value={userForm.password}
-                  onChange={(e) => setUserForm({...userForm, password: e.target.value})}
-                  className="input"
-                  required
-                  minLength={6}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nombre
-                  </label>
-                  <input
-                    type="text"
-                    value={userForm.first_name}
-                    onChange={(e) => setUserForm({...userForm, first_name: e.target.value})}
-                    className="input"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Apellido
-                  </label>
-                  <input
-                    type="text"
-                    value={userForm.last_name}
-                    onChange={(e) => setUserForm({...userForm, last_name: e.target.value})}
-                    className="input"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Rol *
-                </label>
-                <select
-                  value={userForm.role}
-                  onChange={(e) => setUserForm({...userForm, role: e.target.value as any})}
-                  className="input"
-                  required
-                >
-                  <option value="traveler">Viajero</option>
-                  <option value="agency">Agencia</option>
-                  <option value="admin">Administrador</option>
-                </select>
-              </div>
-
-              {userForm.role === 'agency' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nombre de la Agencia *
-                    </label>
-                    <input
-                      type="text"
-                      value={userForm.agency_name}
-                      onChange={(e) => setUserForm({...userForm, agency_name: e.target.value})}
-                      className="input"
-                      required
-                    />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Teléfono de Contacto
-                    </label>
-                    <input
-                      type="tel"
-                      value={userForm.agency_contact_phone}
-                      onChange={(e) => setUserForm({...userForm, agency_contact_phone: e.target.value})}
-                      className="input"
-                    />
-                  </div>
-                </>
-              )}
-            </div>
+                  {!user.is_super_admin && editingPermissions !== user.id && (
+                    <button
+                      onClick={() => startEditPermissions(user)}
+                      className="px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    >
+                      Editar Permisos
+                    </button>
+                  )}
+                </div>
 
-            <div className="flex justify-end space-x-4 mt-6">
-              <button
-                onClick={closeModals}
-                className="btn btn-outline"
-                disabled={isUpdating === 'creating'}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleCreateUser}
-                className="btn btn-primary"
-                disabled={isUpdating === 'creating' || !userForm.email || !userForm.password}
-              >
-                {isUpdating === 'creating' ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
-                    Creando...
-                  </>
+                {user.is_super_admin ? (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <p className="text-sm text-yellow-800">
+                      El super administrador tiene acceso completo a todas las secciones del sistema.
+                    </p>
+                  </div>
+                ) : user.permissions ? (
+                  <div className="border-t border-gray-200 pt-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">Permisos de Acceso:</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {editingPermissions === user.id ? (
+                        <>
+                          <PermissionCheckbox
+                            label="Gestionar Agencias"
+                            checked={tempPermissions.canManageAgencies}
+                            onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageAgencies: checked })}
+                          />
+                          <PermissionCheckbox
+                            label="Gestionar Usuarios"
+                            checked={tempPermissions.canManageUsers}
+                            onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageUsers: checked })}
+                          />
+                          <PermissionCheckbox
+                            label="Gestionar Destinos"
+                            checked={tempPermissions.canManageDestinations}
+                            onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageDestinations: checked })}
+                          />
+                          <PermissionCheckbox
+                            label="Gestionar Reseñas"
+                            checked={tempPermissions.canManageReviews}
+                            onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageReviews: checked })}
+                          />
+                          <PermissionCheckbox
+                            label="Ver Mensajes"
+                            checked={tempPermissions.canManageMessages}
+                            onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageMessages: checked })}
+                          />
+                          <PermissionCheckbox
+                            label="Configuración"
+                            checked={tempPermissions.canManageSettings}
+                            onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageSettings: checked })}
+                          />
+                          <PermissionCheckbox
+                            label="Gestionar Membresías"
+                            checked={tempPermissions.canManageMemberships}
+                            onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageMemberships: checked })}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <PermissionCheckbox
+                            label="Gestionar Agencias"
+                            checked={user.permissions.canManageAgencies}
+                            onChange={() => {}}
+                            disabled
+                          />
+                          <PermissionCheckbox
+                            label="Gestionar Usuarios"
+                            checked={user.permissions.canManageUsers}
+                            onChange={() => {}}
+                            disabled
+                          />
+                          <PermissionCheckbox
+                            label="Gestionar Destinos"
+                            checked={user.permissions.canManageDestinations}
+                            onChange={() => {}}
+                            disabled
+                          />
+                          <PermissionCheckbox
+                            label="Gestionar Reseñas"
+                            checked={user.permissions.canManageReviews}
+                            onChange={() => {}}
+                            disabled
+                          />
+                          <PermissionCheckbox
+                            label="Ver Mensajes"
+                            checked={user.permissions.canManageMessages}
+                            onChange={() => {}}
+                            disabled
+                          />
+                          <PermissionCheckbox
+                            label="Configuración"
+                            checked={user.permissions.canManageSettings}
+                            onChange={() => {}}
+                            disabled
+                          />
+                          <PermissionCheckbox
+                            label="Gestionar Membresías"
+                            checked={user.permissions.canManageMemberships}
+                            onChange={() => {}}
+                            disabled
+                          />
+                        </>
+                      )}
+                    </div>
+                    {editingPermissions === user.id && (
+                      <div className="mt-4 flex justify-end space-x-2">
+                        <button
+                          onClick={cancelEditPermissions}
+                          className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={() => handleUpdatePermissions(user.id)}
+                          disabled={loading}
+                          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                        >
+                          <Check className="w-5 h-5 mr-2" />
+                          Guardar Permisos
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 ) : (
-                  <>
-                    <UserPlus className="h-4 w-4 mr-2" />
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <p className="text-sm text-gray-600">Sin permisos configurados</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {showCreateModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">Crear Nuevo Usuario</h2>
+                  <button
+                    onClick={() => setShowCreateModal(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="space-y-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={newUser.email}
+                      onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="usuario@toursred.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Contraseña
+                    </label>
+                    <input
+                      type="password"
+                      value={newUser.password}
+                      onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Contraseña segura"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Nombre
+                      </label>
+                      <input
+                        type="text"
+                        value={newUser.nombre}
+                        onChange={(e) => setNewUser({ ...newUser, nombre: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Juan"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Apellido
+                      </label>
+                      <input
+                        type="text"
+                        value={newUser.apellido}
+                        onChange={(e) => setNewUser({ ...newUser, apellido: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Pérez"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-200 pt-4 mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Permisos de Acceso</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <PermissionCheckbox
+                      label="Gestionar Agencias"
+                      checked={newUser.permissions.canManageAgencies}
+                      onChange={(checked) => setNewUser({
+                        ...newUser,
+                        permissions: { ...newUser.permissions, canManageAgencies: checked }
+                      })}
+                    />
+                    <PermissionCheckbox
+                      label="Gestionar Usuarios"
+                      checked={newUser.permissions.canManageUsers}
+                      onChange={(checked) => setNewUser({
+                        ...newUser,
+                        permissions: { ...newUser.permissions, canManageUsers: checked }
+                      })}
+                    />
+                    <PermissionCheckbox
+                      label="Gestionar Destinos"
+                      checked={newUser.permissions.canManageDestinations}
+                      onChange={(checked) => setNewUser({
+                        ...newUser,
+                        permissions: { ...newUser.permissions, canManageDestinations: checked }
+                      })}
+                    />
+                    <PermissionCheckbox
+                      label="Gestionar Reseñas"
+                      checked={newUser.permissions.canManageReviews}
+                      onChange={(checked) => setNewUser({
+                        ...newUser,
+                        permissions: { ...newUser.permissions, canManageReviews: checked }
+                      })}
+                    />
+                    <PermissionCheckbox
+                      label="Ver Mensajes"
+                      checked={newUser.permissions.canManageMessages}
+                      onChange={(checked) => setNewUser({
+                        ...newUser,
+                        permissions: { ...newUser.permissions, canManageMessages: checked }
+                      })}
+                    />
+                    <PermissionCheckbox
+                      label="Configuración"
+                      checked={newUser.permissions.canManageSettings}
+                      onChange={(checked) => setNewUser({
+                        ...newUser,
+                        permissions: { ...newUser.permissions, canManageSettings: checked }
+                      })}
+                    />
+                    <PermissionCheckbox
+                      label="Gestionar Membresías"
+                      checked={newUser.permissions.canManageMemberships}
+                      onChange={(checked) => setNewUser({
+                        ...newUser,
+                        permissions: { ...newUser.permissions, canManageMemberships: checked }
+                      })}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                  <button
+                    onClick={() => setShowCreateModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleCreateUser}
+                    disabled={loading}
+                    className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    <UserPlus className="w-5 h-5 mr-2" />
                     Crear Usuario
-                  </>
-                )}
-              </button>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Modal de Editar Usuario */}
-      {isEditingUser && selectedUser && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Editar Usuario</h3>
-              <button onClick={closeModals} className="text-gray-400 hover:text-gray-600">
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
-                </label>
-                <div className="flex items-center p-3 bg-gray-50 rounded-md">
-                  <Mail className="h-4 w-4 text-gray-400 mr-2" />
-                  <span className="text-sm text-gray-600">{selectedUser.email}</span>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  El email no se puede modificar
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nombre
-                  </label>
-                  <input
-                    type="text"
-                    value={userForm.first_name}
-                    onChange={(e) => setUserForm({...userForm, first_name: e.target.value})}
-                    className="input"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Apellido
-                  </label>
-                  <input
-                    type="text"
-                    value={userForm.last_name}
-                    onChange={(e) => setUserForm({...userForm, last_name: e.target.value})}
-                    className="input"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Rol *
-                </label>
-                <select
-                  value={userForm.role}
-                  onChange={(e) => setUserForm({...userForm, role: e.target.value as any})}
-                  className="input"
-                  required
-                >
-                  <option value="traveler">Viajero</option>
-                  <option value="agency">Agencia</option>
-                  <option value="admin">Administrador</option>
-                </select>
-              </div>
-
-              {userForm.role === 'agency' && selectedUser.agencies && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nombre de la Agencia *
-                    </label>
-                    <input
-                      type="text"
-                      value={userForm.agency_name}
-                      onChange={(e) => setUserForm({...userForm, agency_name: e.target.value})}
-                      className="input"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Teléfono de Contacto
-                    </label>
-                    <input
-                      type="tel"
-                      value={userForm.agency_contact_phone}
-                      onChange={(e) => setUserForm({...userForm, agency_contact_phone: e.target.value})}
-                      className="input"
-                    />
-                  </div>
-                </>
-              )}
-
-              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-                <p className="text-sm text-yellow-800">
-                  <strong>Nota:</strong> Cambiar el rol de un usuario puede afectar su acceso a la plataforma.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-4 mt-6">
-              <button
-                onClick={closeModals}
-                className="btn btn-outline"
-                disabled={isUpdating === selectedUser.id}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleUpdateUser}
-                className="btn btn-primary"
-                disabled={isUpdating === selectedUser.id}
-              >
-                {isUpdating === selectedUser.id ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
-                    Actualizando...
-                  </>
-                ) : (
-                  <>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Actualizar Usuario
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
