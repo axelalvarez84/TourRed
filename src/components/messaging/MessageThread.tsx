@@ -19,7 +19,7 @@ interface Message {
     last_name?: string;
     email: string;
     role: string;
-    agencies?: Array<{ name: string }>;
+    agency_name?: string;
   };
 }
 
@@ -40,31 +40,21 @@ const MessageThread: React.FC<MessageThreadProps> = ({
   const [error, setError] = useState('');
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
-  const [shouldScrollToBottom, setShouldScrollToBottom] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (conversationId) {
       fetchMessages();
       markAsRead();
-      setShouldScrollToBottom(true);
     }
   }, [conversationId]);
-
-  useEffect(() => {
-    if (shouldScrollToBottom && messages.length > 0) {
-      scrollToBottom();
-      setShouldScrollToBottom(false);
-    }
-  }, [messages, shouldScrollToBottom]);
 
   const fetchMessages = async () => {
     try {
       setIsLoading(true);
       setError('');
 
-      const { data, error } = await supabase
+      const { data: messagesData, error } = await supabase
         .from('messages')
         .select(`
           *,
@@ -72,8 +62,7 @@ const MessageThread: React.FC<MessageThreadProps> = ({
             first_name,
             last_name,
             email,
-            role,
-            agencies(name)
+            role
           )
         `)
         .eq('conversation_id', conversationId)
@@ -83,7 +72,31 @@ const MessageThread: React.FC<MessageThreadProps> = ({
         throw new Error(error.message);
       }
 
-      setMessages(data || []);
+      const agencyIds = messagesData
+        ?.filter(m => m.sender?.role === 'agency')
+        .map(m => m.sender_id) || [];
+
+      let agenciesMap = new Map();
+      if (agencyIds.length > 0) {
+        const { data: agenciesData } = await supabase
+          .from('agencies')
+          .select('user_id, name')
+          .in('user_id', agencyIds);
+
+        agenciesData?.forEach(agency => {
+          agenciesMap.set(agency.user_id, agency.name);
+        });
+      }
+
+      const enrichedMessages = messagesData?.map(msg => ({
+        ...msg,
+        sender: msg.sender ? {
+          ...msg.sender,
+          agency_name: msg.sender.role === 'agency' ? agenciesMap.get(msg.sender_id) : undefined
+        } : undefined
+      }));
+
+      setMessages(enrichedMessages || []);
     } catch (err: any) {
       console.error('Error fetching messages:', err);
       setError(err.message || 'Error al cargar mensajes');
@@ -122,8 +135,7 @@ const MessageThread: React.FC<MessageThreadProps> = ({
             first_name,
             last_name,
             email,
-            role,
-            agencies(name)
+            role
           )
         `)
         .single();
@@ -132,9 +144,27 @@ const MessageThread: React.FC<MessageThreadProps> = ({
         throw new Error(error.message);
       }
 
-      setMessages(prev => [...prev, data]);
+      let enrichedMessage = data;
+      if (data.sender?.role === 'agency') {
+        const { data: agencyData } = await supabase
+          .from('agencies')
+          .select('name')
+          .eq('user_id', data.sender_id)
+          .single();
+
+        if (agencyData) {
+          enrichedMessage = {
+            ...data,
+            sender: {
+              ...data.sender,
+              agency_name: agencyData.name
+            }
+          };
+        }
+      }
+
+      setMessages(prev => [...prev, enrichedMessage]);
       setNewMessage('');
-      setShouldScrollToBottom(true);
     } catch (err: any) {
       console.error('Error sending message:', err);
       setError(err.message || 'Error al enviar mensaje');
@@ -200,9 +230,6 @@ const MessageThread: React.FC<MessageThreadProps> = ({
     }
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -232,8 +259,8 @@ const MessageThread: React.FC<MessageThreadProps> = ({
   };
 
   const getUserDisplayName = (message: Message) => {
-    if (message.sender?.role === 'agency' && message.sender?.agencies?.[0]?.name) {
-      return message.sender.agencies[0].name;
+    if (message.sender?.role === 'agency' && message.sender?.agency_name) {
+      return message.sender.agency_name;
     }
     if (message.sender?.first_name || message.sender?.last_name) {
       return `${message.sender.first_name || ''} ${message.sender.last_name || ''}`.trim();
@@ -288,7 +315,7 @@ const MessageThread: React.FC<MessageThreadProps> = ({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
         {error && (
           <div className="bg-error-50 text-error-600 p-3 rounded-md text-sm">
             {error}
@@ -404,7 +431,6 @@ const MessageThread: React.FC<MessageThreadProps> = ({
                 </div>
               );
             })}
-            <div ref={messagesEndRef} />
           </>
         )}
       </div>
