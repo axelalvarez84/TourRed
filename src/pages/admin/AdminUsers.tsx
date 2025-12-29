@@ -6,8 +6,8 @@ import { UserPlus, Shield, X, Check, AlertCircle } from 'lucide-react';
 interface StaffUser {
   id: string;
   email: string;
-  nombre: string;
-  apellido: string;
+  first_name: string;
+  last_name: string;
   is_super_admin: boolean;
   created_at: string;
   permissions: AdminPermissions | null;
@@ -300,7 +300,7 @@ const AdminUsers: React.FC = () => {
                     </div>
                     <div className="ml-4">
                       <h3 className="text-lg font-semibold text-gray-900">
-                        {user.nombre} {user.apellido}
+                        {user.first_name} {user.last_name}
                       </h3>
                       <p className="text-gray-600">{user.email}</p>
                       {user.is_super_admin && (
