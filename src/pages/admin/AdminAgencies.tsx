@@ -111,10 +111,10 @@ const AdminAgencies: React.FC = () => {
               .eq('status', 'processed');
 
             const totalRevenue = commissionData?.reduce((sum, record) =>
-              sum + (record.agency_net_amount || 0), 0) || 0;
+              sum + (parseFloat(record.agency_net_amount) || 0), 0) || 0;
 
             const platformCommission = commissionData?.reduce((sum, record) =>
-              sum + (record.agency_commission_amount || 0), 0) || 0;
+              sum + (parseFloat(record.agency_commission_amount) || 0), 0) || 0;
 
             return {
               ...agency,
@@ -329,8 +329,8 @@ const AdminAgencies: React.FC = () => {
     inactive: agencies.filter(a => !a.is_active).length,
     totalTours: agencies.reduce((sum, a) => sum + (a.tour_count || 0), 0),
     totalBookings: agencies.reduce((sum, a) => sum + (a.booking_count || 0), 0),
-    averageCommission: agencies.length > 0 
-      ? Math.round((agencies.reduce((sum, a) => sum + (a.commission_rate || 0.10), 0) / agencies.length) * 1000) / 10
+    averageCommission: agencies.length > 0
+      ? Math.round((agencies.reduce((sum, a) => sum + (parseFloat(a.commission_rate) || 0.10), 0) / agencies.length) * 1000) / 10
       : 10
   };
 
@@ -534,7 +534,7 @@ const AdminAgencies: React.FC = () => {
                         <Percent className="h-4 w-4 text-orange-600 mr-2" />
                         <div>
                           <div className="text-sm font-medium text-gray-900">
-                            {((agency.commission_rate || 0.10) * 100).toFixed(1)}%
+                            {((parseFloat(agency.commission_rate) || 0.10) * 100).toFixed(1)}%
                           </div>
                           <div className="text-xs text-gray-500">
                             ${(agency.platform_commission || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} generado
@@ -551,11 +551,11 @@ const AdminAgencies: React.FC = () => {
                           {agency.booking_count || 0} reservas
                         </div>
                         <div className="text-sm text-gray-500">
-                          ${(agency.total_revenue || 0).toLocaleString()} ingresos
+                          ${(agency.total_revenue || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ingresos
                         </div>
                         {agency.rating && (
                           <div className="text-sm text-gray-500">
-                            ⭐ {agency.rating.toFixed(1)}
+                            ⭐ {parseFloat(agency.rating).toFixed(1)}
                           </div>
                         )}
                       </div>
