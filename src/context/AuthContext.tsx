@@ -1,6 +1,16 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, getCurrentUser, UserRole } from '../lib/supabase';
 
+export interface AdminPermissions {
+  canManageAgencies: boolean;
+  canManageUsers: boolean;
+  canManageDestinations: boolean;
+  canManageReviews: boolean;
+  canManageMessages: boolean;
+  canManageSettings: boolean;
+  canManageMemberships: boolean;
+}
+
 interface AuthContextType {
   user: any | null;
   userRole: UserRole | null;
@@ -9,6 +19,8 @@ interface AuthContextType {
   isAgency: boolean;
   isTraveler: boolean;
   isEmailVerified: boolean;
+  isSuperAdmin: boolean;
+  permissions: AdminPermissions | null;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -19,6 +31,8 @@ const AuthContext = createContext<AuthContextType>({
   isAgency: false,
   isTraveler: false,
   isEmailVerified: false,
+  isSuperAdmin: false,
+  permissions: null,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -28,6 +42,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [permissions, setPermissions] = useState<AdminPermissions | null>(null);
 
   const getCachedRole = (userId: string): UserRole | null => {
     try {
@@ -143,9 +159,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('🎭 Rol determinado:', role, 'Email verificado:', emailVerified);
         setUserRole(role);
         setIsEmailVerified(emailVerified);
+
+        if (role === UserRole.ADMIN) {
+          try {
+            const { data: userData } = await supabase
+              .from('users')
+              .select('is_super_admin')
+              .eq('id', authUser.id)
+              .maybeSingle();
+
+            if (userData) {
+              setIsSuperAdmin(userData.is_super_admin || false);
+
+              if (!userData.is_super_admin) {
+                const { data: permsData } = await supabase
+                  .from('admin_permissions')
+                  .select('*')
+                  .eq('user_id', authUser.id)
+                  .maybeSingle();
+
+                if (permsData) {
+                  setPermissions({
+                    canManageAgencies: permsData.can_manage_agencies,
+                    canManageUsers: permsData.can_manage_users,
+                    canManageDestinations: permsData.can_manage_destinations,
+                    canManageReviews: permsData.can_manage_reviews,
+                    canManageMessages: permsData.can_manage_messages,
+                    canManageSettings: permsData.can_manage_settings,
+                    canManageMemberships: permsData.can_manage_memberships,
+                  });
+                } else {
+                  setPermissions(null);
+                }
+              } else {
+                setPermissions(null);
+              }
+            }
+          } catch (err) {
+            console.error('Error cargando permisos de admin:', err);
+            setIsSuperAdmin(false);
+            setPermissions(null);
+          }
+        } else {
+          setIsSuperAdmin(false);
+          setPermissions(null);
+        }
       } else {
         setUserRole(null);
         setIsEmailVerified(false);
+        setIsSuperAdmin(false);
+        setPermissions(null);
         try {
           localStorage.clear();
         } catch (err) {
@@ -158,6 +221,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (authUser.email === 'tourredmx@gmail.com') {
           setUserRole(UserRole.ADMIN);
           setIsEmailVerified(true);
+          setIsSuperAdmin(true);
+          setPermissions(null);
         } else {
           const cachedRole = getCachedRole(authUser.id);
           if (cachedRole) {
@@ -168,10 +233,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUserRole(UserRole.TRAVELER);
             setIsEmailVerified(true);
           }
+          setIsSuperAdmin(false);
+          setPermissions(null);
         }
       } else {
         setUserRole(null);
         setIsEmailVerified(false);
+        setIsSuperAdmin(false);
+        setPermissions(null);
       }
     } finally {
       console.log('✅ Finalizando carga - estableciendo isLoading: false');
@@ -265,9 +334,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isAgency,
       isTraveler,
       isEmailVerified,
+      isSuperAdmin,
+      permissions,
       isLoading
     });
-  }, [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isEmailVerified]);
+  }, [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isEmailVerified, isSuperAdmin, permissions]);
 
   return (
     <AuthContext.Provider value={{
@@ -277,7 +348,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isAdmin,
       isAgency,
       isTraveler,
-      isEmailVerified
+      isEmailVerified,
+      isSuperAdmin,
+      permissions
     }}>
       {children}
     </AuthContext.Provider>
