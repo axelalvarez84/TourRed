@@ -19,6 +19,7 @@ interface Message {
     last_name?: string;
     email: string;
     role: string;
+    agencies?: Array<{ name: string }>;
   };
 }
 
@@ -39,18 +40,24 @@ const MessageThread: React.FC<MessageThreadProps> = ({
   const [error, setError] = useState('');
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
+  const [shouldScrollToBottom, setShouldScrollToBottom] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (conversationId) {
       fetchMessages();
       markAsRead();
+      setShouldScrollToBottom(true);
     }
   }, [conversationId]);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (shouldScrollToBottom && messages.length > 0) {
+      scrollToBottom();
+      setShouldScrollToBottom(false);
+    }
+  }, [messages, shouldScrollToBottom]);
 
   const fetchMessages = async () => {
     try {
@@ -61,7 +68,13 @@ const MessageThread: React.FC<MessageThreadProps> = ({
         .from('messages')
         .select(`
           *,
-          sender:users(first_name, last_name, email, role)
+          sender:users(
+            first_name,
+            last_name,
+            email,
+            role,
+            agencies(name)
+          )
         `)
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
@@ -105,7 +118,13 @@ const MessageThread: React.FC<MessageThreadProps> = ({
         })
         .select(`
           *,
-          sender:users(first_name, last_name, email, role)
+          sender:users(
+            first_name,
+            last_name,
+            email,
+            role,
+            agencies(name)
+          )
         `)
         .single();
 
@@ -115,6 +134,7 @@ const MessageThread: React.FC<MessageThreadProps> = ({
 
       setMessages(prev => [...prev, data]);
       setNewMessage('');
+      setShouldScrollToBottom(true);
     } catch (err: any) {
       console.error('Error sending message:', err);
       setError(err.message || 'Error al enviar mensaje');
@@ -212,6 +232,9 @@ const MessageThread: React.FC<MessageThreadProps> = ({
   };
 
   const getUserDisplayName = (message: Message) => {
+    if (message.sender?.role === 'agency' && message.sender?.agencies?.[0]?.name) {
+      return message.sender.agencies[0].name;
+    }
     if (message.sender?.first_name || message.sender?.last_name) {
       return `${message.sender.first_name || ''} ${message.sender.last_name || ''}`.trim();
     }
