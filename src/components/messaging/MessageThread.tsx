@@ -88,14 +88,20 @@ const MessageThread: React.FC<MessageThreadProps> = ({
         });
       }
 
-      const enrichedMessages = messagesData?.map(msg => ({
-        ...msg,
-        sender: msg.sender ? {
-          ...msg.sender,
-          agency_name: msg.sender.role === 'agency' ? agenciesMap.get(msg.sender_id) : undefined
-        } : undefined
-      }));
+      const enrichedMessages = messagesData?.map(msg => {
+        const agencyName = msg.sender?.role === 'agency' ? agenciesMap.get(msg.sender_id) : null;
+        console.log('Mensaje:', msg.id, 'Sender role:', msg.sender?.role, 'Agency name:', agencyName);
+        return {
+          ...msg,
+          sender: msg.sender ? {
+            ...msg.sender,
+            agency_name: agencyName || undefined
+          } : undefined
+        };
+      });
 
+      console.log('Agencies Map:', agenciesMap);
+      console.log('Enriched messages:', enrichedMessages);
       setMessages(enrichedMessages || []);
     } catch (err: any) {
       console.error('Error fetching messages:', err);
@@ -259,7 +265,9 @@ const MessageThread: React.FC<MessageThreadProps> = ({
   };
 
   const getUserDisplayName = (message: Message) => {
-    if (message.sender?.role === 'agency' && message.sender?.agency_name) {
+    console.log('getUserDisplayName - sender:', message.sender, 'agency_name:', message.sender?.agency_name);
+
+    if (message.sender?.agency_name) {
       return message.sender.agency_name;
     }
     if (message.sender?.first_name || message.sender?.last_name) {
