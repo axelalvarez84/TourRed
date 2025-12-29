@@ -54,54 +54,26 @@ const MessageThread: React.FC<MessageThreadProps> = ({
       setIsLoading(true);
       setError('');
 
-      const { data: messagesData, error } = await supabase
-        .from('messages')
-        .select(`
-          *,
-          sender:users(
-            first_name,
-            last_name,
-            email,
-            role
-          )
-        `)
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
+      const { data: messagesData, error } = await supabase.rpc('get_conversation_messages', {
+        p_conversation_id: conversationId
+      });
 
       if (error) {
         throw new Error(error.message);
       }
 
-      const agencyIds = messagesData
-        ?.filter(m => m.sender?.role === 'agency')
-        .map(m => m.sender_id) || [];
+      const enrichedMessages = messagesData?.map(msg => ({
+        ...msg,
+        sender: {
+          first_name: msg.sender_first_name,
+          last_name: msg.sender_last_name,
+          email: msg.sender_email,
+          role: msg.sender_role,
+          profile_picture: msg.sender_profile_picture,
+          agency_name: msg.agency_name
+        }
+      }));
 
-      let agenciesMap = new Map();
-      if (agencyIds.length > 0) {
-        const { data: agenciesData } = await supabase
-          .from('agencies')
-          .select('user_id, name')
-          .in('user_id', agencyIds);
-
-        agenciesData?.forEach(agency => {
-          agenciesMap.set(agency.user_id, agency.name);
-        });
-      }
-
-      const enrichedMessages = messagesData?.map(msg => {
-        const agencyName = msg.sender?.role === 'agency' ? agenciesMap.get(msg.sender_id) : null;
-        console.log('Mensaje:', msg.id, 'Sender role:', msg.sender?.role, 'Agency name:', agencyName);
-        return {
-          ...msg,
-          sender: msg.sender ? {
-            ...msg.sender,
-            agency_name: agencyName || undefined
-          } : undefined
-        };
-      });
-
-      console.log('Agencies Map:', agenciesMap);
-      console.log('Enriched messages:', enrichedMessages);
       setMessages(enrichedMessages || []);
     } catch (err: any) {
       console.error('Error fetching messages:', err);
@@ -265,8 +237,6 @@ const MessageThread: React.FC<MessageThreadProps> = ({
   };
 
   const getUserDisplayName = (message: Message) => {
-    console.log('getUserDisplayName - sender:', message.sender, 'agency_name:', message.sender?.agency_name);
-
     if (message.sender?.agency_name) {
       return message.sender.agency_name;
     }
