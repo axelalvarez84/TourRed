@@ -15,7 +15,7 @@ interface Inquiry {
   num_people: number;
   message: string | null;
   source: string;
-  status: 'pending' | 'contacted' | 'converted';
+  status: 'pending' | 'contacted' | 'converted' | 'no_convertido';
   created_at: string;
   updated_at: string;
 }
@@ -25,6 +25,7 @@ interface Stats {
   pending: number;
   contacted: number;
   converted: number;
+  noConvertido: number;
   conversionRate: number;
   topDestinations: { destination: string; count: number }[];
 }
@@ -37,6 +38,7 @@ const AdminInternationalInquiries: React.FC = () => {
     pending: 0,
     contacted: 0,
     converted: 0,
+    noConvertido: 0,
     conversionRate: 0,
     topDestinations: []
   });
@@ -79,7 +81,10 @@ const AdminInternationalInquiries: React.FC = () => {
     const pending = data.filter(i => i.status === 'pending').length;
     const contacted = data.filter(i => i.status === 'contacted').length;
     const converted = data.filter(i => i.status === 'converted').length;
-    const conversionRate = total > 0 ? (converted / total) * 100 : 0;
+    const noConvertido = data.filter(i => i.status === 'no_convertido').length;
+
+    const totalResolved = converted + noConvertido;
+    const conversionRate = totalResolved > 0 ? (converted / totalResolved) * 100 : 0;
 
     const destinationCounts = data.reduce((acc, inquiry) => {
       acc[inquiry.destination] = (acc[inquiry.destination] || 0) + 1;
@@ -96,6 +101,7 @@ const AdminInternationalInquiries: React.FC = () => {
       pending,
       contacted,
       converted,
+      noConvertido,
       conversionRate,
       topDestinations
     });
@@ -124,7 +130,7 @@ const AdminInternationalInquiries: React.FC = () => {
     setFilteredInquiries(filtered);
   };
 
-  const updateStatus = async (inquiryId: string, newStatus: 'pending' | 'contacted' | 'converted') => {
+  const updateStatus = async (inquiryId: string, newStatus: 'pending' | 'contacted' | 'converted' | 'no_convertido') => {
     try {
       const { error } = await supabase
         .from('international_tour_inquiries')
@@ -160,6 +166,8 @@ const AdminInternationalInquiries: React.FC = () => {
         return 'bg-blue-100 text-blue-800';
       case 'converted':
         return 'bg-green-100 text-green-800';
+      case 'no_convertido':
+        return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -173,6 +181,8 @@ const AdminInternationalInquiries: React.FC = () => {
         return 'Contactado';
       case 'converted':
         return 'Convertido';
+      case 'no_convertido':
+        return 'No Convertido';
       default:
         return status;
     }
@@ -186,7 +196,7 @@ const AdminInternationalInquiries: React.FC = () => {
           <p className="text-gray-600">Gestiona las solicitudes de cotización de tours internacionales</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-600">Total</span>
@@ -217,6 +227,14 @@ const AdminInternationalInquiries: React.FC = () => {
               <CheckCircle className="h-5 w-5 text-green-500" />
             </div>
             <p className="text-3xl font-bold text-green-600">{stats.converted}</p>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-gray-600">No Convertidos</span>
+              <X className="h-5 w-5 text-red-500" />
+            </div>
+            <p className="text-3xl font-bold text-red-600">{stats.noConvertido}</p>
           </div>
 
           <div className="bg-white rounded-lg shadow p-6">
@@ -275,6 +293,7 @@ const AdminInternationalInquiries: React.FC = () => {
                     <option value="pending">Pendientes</option>
                     <option value="contacted">Contactados</option>
                     <option value="converted">Convertidos</option>
+                    <option value="no_convertido">No Convertidos</option>
                   </select>
                 </div>
 
@@ -357,6 +376,7 @@ const AdminInternationalInquiries: React.FC = () => {
                           <option value="pending">Pendiente</option>
                           <option value="contacted">Contactado</option>
                           <option value="converted">Convertido</option>
+                          <option value="no_convertido">No Convertido</option>
                         </select>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
