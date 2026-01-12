@@ -6,13 +6,19 @@ const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
 
   const searchParams = new URLSearchParams(location.search);
   const redirectUrl = searchParams.get('redirect');
+  const isBlocked = searchParams.get('blocked') === 'true';
   const from = location.state?.from?.pathname || '/';
+
+  const [error, setError] = useState(
+    isBlocked
+      ? 'Tu cuenta ha sido bloqueada. Por favor contacta al administrador para más información.'
+      : ''
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +30,7 @@ const LoginPage: React.FC = () => {
       const { data, error } = await signIn(email, password);
 
       if (error) {
-        throw new Error(error.message);
+        throw error;
       }
 
       if (data.user) {
@@ -43,7 +49,11 @@ const LoginPage: React.FC = () => {
         }
       }
     } catch (err: any) {
-      setError('Error al iniciar sesión. Por favor verifica tus credenciales.');
+      if (err.message === 'USUARIO_BLOQUEADO') {
+        setError('Tu cuenta ha sido bloqueada. Por favor contacta al administrador para más información.');
+      } else {
+        setError('Error al iniciar sesión. Por favor verifica tus credenciales.');
+      }
     } finally {
       setIsLoading(false);
     }

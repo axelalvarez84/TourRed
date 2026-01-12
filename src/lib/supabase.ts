@@ -114,14 +114,31 @@ export const signUp = async (
 export const signIn = async (email: string, password: string) => {
   try {
     console.log('🔐 Iniciando sesión con email:', email);
-    
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    
+
     if (error) throw error;
-    
+
+    // Verificar si el usuario está activo
+    if (data.user) {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('is_active')
+        .eq('id', data.user.id)
+        .maybeSingle();
+
+      if (userError) {
+        console.error('❌ Error verificando estado del usuario:', userError);
+      } else if (userData && userData.is_active === false) {
+        // Usuario bloqueado, cerrar sesión inmediatamente
+        await supabase.auth.signOut();
+        throw new Error('USUARIO_BLOQUEADO');
+      }
+    }
+
     return { data, error: null };
   } catch (error: any) {
     console.error('❌ Error en signIn:', error);

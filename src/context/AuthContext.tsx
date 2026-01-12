@@ -125,6 +125,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (profile.is_active === false) {
           console.log('🚫 Usuario bloqueado, cerrando sesión');
           await supabase.auth.signOut();
+          // Redirigir al login con mensaje
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login?blocked=true';
+          }
           throw new Error('Usuario bloqueado');
         }
 
