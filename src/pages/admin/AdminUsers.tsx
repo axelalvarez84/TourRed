@@ -35,6 +35,7 @@ const AdminUsers: React.FC = () => {
       canManageMessages: false,
       canManageSettings: false,
       canManageMemberships: false,
+      canManageInquiries: false,
     }
   });
 
@@ -47,6 +48,7 @@ const AdminUsers: React.FC = () => {
     canManageMessages: false,
     canManageSettings: false,
     canManageMemberships: false,
+    canManageInquiries: false,
   });
 
   useEffect(() => {
@@ -85,6 +87,7 @@ const AdminUsers: React.FC = () => {
               canManageMessages: permsData.can_manage_messages,
               canManageSettings: permsData.can_manage_settings,
               canManageMemberships: permsData.can_manage_memberships,
+              canManageInquiries: permsData.can_manage_inquiries,
             } : null
           };
         })
@@ -136,6 +139,7 @@ const AdminUsers: React.FC = () => {
               can_manage_messages: newUser.permissions.canManageMessages,
               can_manage_settings: newUser.permissions.canManageSettings,
               can_manage_memberships: newUser.permissions.canManageMemberships,
+              can_manage_inquiries: newUser.permissions.canManageInquiries,
             }
           }),
         }
@@ -161,6 +165,7 @@ const AdminUsers: React.FC = () => {
           canManageMessages: false,
           canManageSettings: false,
           canManageMemberships: false,
+          canManageInquiries: false,
         }
       });
 
@@ -189,6 +194,7 @@ const AdminUsers: React.FC = () => {
           can_manage_messages: tempPermissions.canManageMessages,
           can_manage_settings: tempPermissions.canManageSettings,
           can_manage_memberships: tempPermissions.canManageMemberships,
+          can_manage_inquiries: tempPermissions.canManageInquiries,
         })
         .eq('user_id', userId);
 
@@ -221,6 +227,7 @@ const AdminUsers: React.FC = () => {
       canManageMessages: false,
       canManageSettings: false,
       canManageMemberships: false,
+      canManageInquiries: false,
     });
   };
 
@@ -377,6 +384,11 @@ const AdminUsers: React.FC = () => {
                             checked={tempPermissions.canManageMemberships}
                             onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageMemberships: checked })}
                           />
+                          <PermissionCheckbox
+                            label="Gestionar Cotizaciones"
+                            checked={tempPermissions.canManageInquiries}
+                            onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageInquiries: checked })}
+                          />
                         </>
                       ) : (
                         <>
@@ -425,6 +437,12 @@ const AdminUsers: React.FC = () => {
                           <PermissionCheckbox
                             label="Gestionar Membresías"
                             checked={user.permissions.canManageMemberships}
+                            onChange={() => {}}
+                            disabled
+                          />
+                          <PermissionCheckbox
+                            label="Gestionar Cotizaciones"
+                            checked={user.permissions.canManageInquiries}
                             onChange={() => {}}
                             disabled
                           />
@@ -594,6 +612,14 @@ const AdminUsers: React.FC = () => {
                       onChange={(checked) => setNewUser({
                         ...newUser,
                         permissions: { ...newUser.permissions, canManageMemberships: checked }
+                      })}
+                    />
+                    <PermissionCheckbox
+                      label="Gestionar Cotizaciones"
+                      checked={newUser.permissions.canManageInquiries}
+                      onChange={(checked) => setNewUser({
+                        ...newUser,
+                        permissions: { ...newUser.permissions, canManageInquiries: checked }
                       })}
                     />
                   </div>

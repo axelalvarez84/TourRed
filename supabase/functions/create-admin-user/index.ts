@@ -14,11 +14,13 @@ interface CreateAdminUserRequest {
   permissions: {
     can_manage_agencies: boolean;
     can_manage_users: boolean;
+    can_manage_travelers: boolean;
     can_manage_destinations: boolean;
     can_manage_reviews: boolean;
     can_manage_messages: boolean;
     can_manage_settings: boolean;
     can_manage_memberships: boolean;
+    can_manage_inquiries: boolean;
   };
 }
 
@@ -145,11 +147,13 @@ Deno.serve(async (req: Request) => {
         user_id: authData.user.id,
         can_manage_agencies: permissions.can_manage_agencies,
         can_manage_users: permissions.can_manage_users,
+        can_manage_travelers: permissions.can_manage_travelers,
         can_manage_destinations: permissions.can_manage_destinations,
         can_manage_reviews: permissions.can_manage_reviews,
         can_manage_messages: permissions.can_manage_messages,
         can_manage_settings: permissions.can_manage_settings,
         can_manage_memberships: permissions.can_manage_memberships,
+        can_manage_inquiries: permissions.can_manage_inquiries,
       });
 
     if (permsError) {
