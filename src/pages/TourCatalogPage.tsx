@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Filter, MapPin, Calendar, Tag, ChevronDown, ChevronUp } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Filter, MapPin, Calendar, Tag, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import SearchBox from '../components/SearchBox';
 import TourCard from '../components/TourCard';
 import { Tour, SearchFilters } from '../types';
@@ -137,7 +137,34 @@ const TourCatalogPage: React.FC = () => {
   return (
     <div className="bg-blue-50 min-h-screen py-8">
       <div className="container-custom">
-        <h1 className="text-3xl font-bold mb-6">Encuentra Tu Tour Perfecto</h1>
+        <nav className="flex mb-4" aria-label="Breadcrumb">
+          <ol className="inline-flex items-center space-x-1 md:space-x-3">
+            <li className="inline-flex items-center">
+              <Link to="/" className="text-gray-500 hover:text-primary-600">
+                Inicio
+              </Link>
+            </li>
+            <li>
+              <div className="flex items-center">
+                <ChevronRight className="h-4 w-4 text-gray-400" />
+                <span className="ml-1 text-gray-500">Tours</span>
+              </div>
+            </li>
+            <li aria-current="page">
+              <div className="flex items-center">
+                <ChevronRight className="h-4 w-4 text-gray-400" />
+                <span className="ml-1 font-medium text-gray-900">Tours Nacionales</span>
+              </div>
+            </li>
+          </ol>
+        </nav>
+
+        <div className="flex items-center gap-3 mb-6">
+          <h1 className="text-3xl font-bold">Tours Nacionales</h1>
+          <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-semibold">
+            Destinos en México
+          </span>
+        </div>
         
         <div className="lg:hidden mb-6">
           <button

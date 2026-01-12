@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Compass, Search, Award, CreditCard, Users } from 'lucide-react';
+import { Compass, Search, Award, CreditCard, Users, Plane, Globe, Clock } from 'lucide-react';
 import SearchBox from '../components/SearchBox';
 import CategoryList from '../components/CategoryList';
 import FeaturedDestinations from '../components/FeaturedDestinations';
@@ -121,6 +121,107 @@ const HomePage: React.FC = () => {
               </Link>
             </div>
           )}
+        </div>
+      </section>
+
+      {/* International Tours Section */}
+      <section className="py-16 bg-gradient-to-br from-blue-100 via-blue-50 to-orange-50">
+        <div className="container-custom">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-100 rounded-full mb-4">
+              <Globe className="h-8 w-8 text-primary-600" />
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Explora el Mundo</h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Tours Internacionales con Nuestros Aliados Verificados
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            <Link
+              to="/tours/international/mega-travel"
+              className="group bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+            >
+              <div className="relative h-48 bg-gradient-to-r from-primary-600 to-primary-800 flex items-center justify-center">
+                <Plane className="h-20 w-20 text-white opacity-20 absolute" />
+                <div className="relative z-10 text-center">
+                  <Plane className="h-12 w-12 text-white mx-auto mb-2" />
+                  <h3 className="text-2xl font-bold text-white">Catálogo Mega Travel</h3>
+                </div>
+              </div>
+              <div className="p-6">
+                <p className="text-gray-600 mb-4">
+                  Más de 100 destinos internacionales en Europa, Asia, América, el Caribe y más
+                </p>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">
+                    Europa
+                  </span>
+                  <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">
+                    Asia
+                  </span>
+                  <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">
+                    América
+                  </span>
+                  <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">
+                    Caribe
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-primary-600 font-semibold group-hover:text-primary-700 flex items-center">
+                    Ver Catálogo
+                    <Compass className="ml-2 h-4 w-4" />
+                  </span>
+                  <div className="flex items-center text-sm text-gray-500">
+                    <Clock className="h-4 w-4 mr-1" />
+                    Cotización en 24h
+                  </div>
+                </div>
+              </div>
+            </Link>
+
+            <Link
+              to="/tours/international/coming-soon"
+              className="group bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+            >
+              <div className="relative h-48 bg-gradient-to-r from-accent-400 to-accent-600 flex items-center justify-center">
+                <Globe className="h-20 w-20 text-white opacity-20 absolute" />
+                <div className="relative z-10 text-center">
+                  <Globe className="h-12 w-12 text-white mx-auto mb-2" />
+                  <h3 className="text-2xl font-bold text-white">Más Opciones</h3>
+                </div>
+              </div>
+              <div className="p-6">
+                <p className="text-gray-600 mb-4">
+                  Estamos agregando más destinos internacionales con agencias verificadas
+                </p>
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-orange-800 font-medium">
+                    Próximamente: Nuevas opciones de viajes internacionales
+                  </p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-accent-600 font-semibold group-hover:text-accent-700 flex items-center">
+                    Notifícame
+                    <Compass className="ml-2 h-4 w-4" />
+                  </span>
+                  <div className="flex items-center text-sm text-gray-500">
+                    <Clock className="h-4 w-4 mr-1" />
+                    Disponible pronto
+                  </div>
+                </div>
+              </div>
+            </Link>
+          </div>
+
+          <div className="text-center mt-8">
+            <p className="text-gray-600">
+              ¿Buscas tours dentro de México?{' '}
+              <Link to="/tours" className="text-primary-600 hover:text-primary-700 font-semibold">
+                Ver Tours Nacionales →
+              </Link>
+            </p>
+          </div>
         </div>
       </section>
 

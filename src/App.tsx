@@ -34,6 +34,9 @@ import AdminDestinations from './pages/admin/AdminDestinations';
 import AdminProfile from './pages/admin/AdminProfile';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminMemberships from './pages/admin/AdminMemberships';
+import AdminInternationalInquiries from './pages/admin/AdminInternationalInquiries';
+import MegaTravelPage from './pages/international/MegaTravelPage';
+import ComingSoonPage from './pages/international/ComingSoonPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
@@ -73,6 +76,8 @@ const App: React.FC = () => {
           <Route path="/" element={<HomePage />} />
           <Route path="/tours" element={<TourCatalogPage />} />
           <Route path="/tours/:id" element={<TourDetailPage />} />
+          <Route path="/tours/international/mega-travel" element={<MegaTravelPage />} />
+          <Route path="/tours/international/coming-soon" element={<ComingSoonPage />} />
           <Route path="/agencies/:agencyId" element={<AgencyPublicProfile />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
@@ -257,6 +262,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                 <AdminMemberships />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/international-inquiries"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminInternationalInquiries />
               </ProtectedRoute>
             }
           />

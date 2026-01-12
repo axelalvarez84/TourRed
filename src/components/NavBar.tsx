@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X, User, LogOut, Compass, Search, MessageCircle } from 'lucide-react';
+import { Menu, X, User, LogOut, Compass, Search, MessageCircle, ChevronDown } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import { useAuth } from '../context/AuthContext';
 import { signOut, supabase } from '../lib/supabase';
@@ -9,11 +9,14 @@ const NavBar: React.FC = () => {
   const { user, isAdmin, isAgency, isTraveler, isEmailVerified, isSuperAdmin, permissions } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isToursDropdownOpen, setIsToursDropdownOpen] = useState(false);
+  const [isMobileToursOpen, setIsMobileToursOpen] = useState(false);
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const toggleProfile = () => setIsProfileOpen(!isProfileOpen);
+  const toggleMobileTours = () => setIsMobileToursOpen(!isMobileToursOpen);
 
   useEffect(() => {
     const fetchProfilePicture = async () => {
@@ -109,6 +112,8 @@ const NavBar: React.FC = () => {
         menuItems.push({ to: '/admin/messages', label: 'Mensajes' });
       }
 
+      menuItems.push({ to: '/admin/international-inquiries', label: 'Cotizaciones Internac.' });
+
       if (isSuperAdmin || permissions?.canManageSettings) {
         menuItems.push({ to: '/admin/settings', label: 'Configuración' });
       }
@@ -151,9 +156,50 @@ const NavBar: React.FC = () => {
               <Link to="/" className="border-transparent text-gray-500 hover:border-primary-500 hover:text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                 Inicio
               </Link>
-              <Link to="/tours" className="border-transparent text-gray-500 hover:border-primary-500 hover:text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                Tours
-              </Link>
+
+              <div
+                className="relative inline-flex items-center"
+                onMouseEnter={() => setIsToursDropdownOpen(true)}
+                onMouseLeave={() => setIsToursDropdownOpen(false)}
+              >
+                <button className="border-transparent text-gray-500 hover:border-primary-500 hover:text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                  Tours
+                  <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${isToursDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isToursDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-1 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5">
+                    <div className="py-1" role="menu">
+                      <Link
+                        to="/tours"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-primary-600"
+                        role="menuitem"
+                      >
+                        Tours Nacionales
+                      </Link>
+                      <div className="border-t border-gray-100"></div>
+                      <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        Tours Internacionales
+                      </div>
+                      <Link
+                        to="/tours/international/mega-travel"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-primary-600"
+                        role="menuitem"
+                      >
+                        Mega Travel
+                      </Link>
+                      <Link
+                        to="/tours/international/coming-soon"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-primary-600"
+                        role="menuitem"
+                      >
+                        Otras Agencias
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <Link to="/about" className="border-transparent text-gray-500 hover:border-primary-500 hover:text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                 Nosotros
               </Link>
@@ -317,13 +363,46 @@ const NavBar: React.FC = () => {
             >
               Inicio
             </Link>
-            <Link
-              to="/tours"
-              className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
-              onClick={toggleMenu}
-            >
-              Tours
-            </Link>
+
+            <div>
+              <button
+                onClick={toggleMobileTours}
+                className="w-full flex items-center justify-between border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+              >
+                <span>Tours</span>
+                <ChevronDown className={`h-5 w-5 transition-transform ${isMobileToursOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isMobileToursOpen && (
+                <div className="pl-8 pr-4 py-2 space-y-1 bg-blue-50">
+                  <Link
+                    to="/tours"
+                    className="block py-2 text-sm text-gray-600 hover:text-gray-900"
+                    onClick={toggleMenu}
+                  >
+                    Tours Nacionales
+                  </Link>
+                  <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider py-1">
+                    Tours Internacionales
+                  </div>
+                  <Link
+                    to="/tours/international/mega-travel"
+                    className="block py-2 text-sm text-gray-600 hover:text-gray-900"
+                    onClick={toggleMenu}
+                  >
+                    Mega Travel
+                  </Link>
+                  <Link
+                    to="/tours/international/coming-soon"
+                    className="block py-2 text-sm text-gray-600 hover:text-gray-900"
+                    onClick={toggleMenu}
+                  >
+                    Otras Agencias
+                  </Link>
+                </div>
+              )}
+            </div>
+
             <Link
               to="/about"
               className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
