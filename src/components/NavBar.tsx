@@ -112,7 +112,9 @@ const NavBar: React.FC = () => {
         menuItems.push({ to: '/admin/messages', label: 'Mensajes' });
       }
 
-      menuItems.push({ to: '/admin/international-inquiries', label: 'Cotizaciones Internac.' });
+      if (isSuperAdmin || permissions?.canManageInquiries) {
+        menuItems.push({ to: '/admin/international-inquiries', label: 'Cotizaciones Internac.' });
+      }
 
       if (isSuperAdmin || permissions?.canManageSettings) {
         menuItems.push({ to: '/admin/settings', label: 'Configuración' });
