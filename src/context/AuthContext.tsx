@@ -104,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const queryPromise = supabase
         .from('users')
-        .select('role, email_verified')
+        .select('role, email_verified, is_active')
         .eq('id', authUser.id)
         .maybeSingle();
 
@@ -120,6 +120,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else if (profile) {
         console.log('✅ Perfil encontrado en BD:', profile);
+
+        // Verificar si el usuario está bloqueado
+        if (profile.is_active === false) {
+          console.log('🚫 Usuario bloqueado, cerrando sesión');
+          await supabase.auth.signOut();
+          throw new Error('Usuario bloqueado');
+        }
+
         const role = profile.role as UserRole;
         const emailVerified = profile.email_verified || false;
         setCachedRole(authUser.id, role);

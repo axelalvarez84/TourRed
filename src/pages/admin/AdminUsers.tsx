@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth, AdminPermissions } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { UserPlus, Shield, X, Check, AlertCircle } from 'lucide-react';
+import { UserPlus, Shield, X, Check, AlertCircle, Lock, Unlock, Trash2 } from 'lucide-react';
 
 interface StaffUser {
   id: string;
@@ -9,6 +9,7 @@ interface StaffUser {
   first_name: string;
   last_name: string;
   is_super_admin: boolean;
+  is_active: boolean;
   created_at: string;
   permissions: AdminPermissions | null;
 }
@@ -231,6 +232,68 @@ const AdminUsers: React.FC = () => {
     });
   };
 
+  const handleToggleUserStatus = async (userId: string, currentStatus: boolean) => {
+    if (!window.confirm(currentStatus ? '¿Bloquear este usuario?' : '¿Desbloquear este usuario?')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ is_active: !currentStatus })
+        .eq('id', userId);
+
+      if (updateError) throw updateError;
+
+      await loadStaffUsers();
+    } catch (err: any) {
+      console.error('Error actualizando estado del usuario:', err);
+      setError('Error al actualizar el estado del usuario');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, userEmail: string) => {
+    if (!window.confirm(`¿Estás seguro de eliminar permanentemente al usuario ${userEmail}? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No hay sesión activa');
+      }
+
+      const { error: permsError } = await supabase
+        .from('admin_permissions')
+        .delete()
+        .eq('user_id', userId);
+
+      if (permsError) throw permsError;
+
+      const { error: userError } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', userId);
+
+      if (userError) throw userError;
+
+      await loadStaffUsers();
+    } catch (err: any) {
+      console.error('Error eliminando usuario:', err);
+      setError('Error al eliminar el usuario');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const PermissionCheckbox = ({
     label,
     checked,
@@ -315,20 +378,51 @@ const AdminUsers: React.FC = () => {
                         {user.first_name} {user.last_name}
                       </h3>
                       <p className="text-gray-600">{user.email}</p>
-                      {user.is_super_admin && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 mt-1">
-                          Super Administrador
+                      <div className="flex gap-2 mt-1">
+                        {user.is_super_admin && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            Super Administrador
+                          </span>
+                        )}
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          user.is_active
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {user.is_active ? 'Activo' : 'Bloqueado'}
                         </span>
-                      )}
+                      </div>
                     </div>
                   </div>
                   {!user.is_super_admin && editingPermissions !== user.id && (
-                    <button
-                      onClick={() => startEditPermissions(user)}
-                      className="px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    >
-                      Editar Permisos
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => startEditPermissions(user)}
+                        className="px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      >
+                        Editar Permisos
+                      </button>
+                      <button
+                        onClick={() => handleToggleUserStatus(user.id, user.is_active)}
+                        className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+                          user.is_active
+                            ? 'text-orange-600 hover:bg-orange-50'
+                            : 'text-green-600 hover:bg-green-50'
+                        }`}
+                        title={user.is_active ? 'Bloquear usuario' : 'Desbloquear usuario'}
+                      >
+                        {user.is_active ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                        {user.is_active ? 'Bloquear' : 'Desbloquear'}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUser(user.id, user.email)}
+                        className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2"
+                        title="Eliminar usuario"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Eliminar
+                      </button>
+                    </div>
                   )}
                 </div>
 
