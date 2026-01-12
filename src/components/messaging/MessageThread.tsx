@@ -85,7 +85,7 @@ const MessageThread: React.FC<MessageThreadProps> = ({
 
   const markAsRead = async () => {
     try {
-      await supabase.rpc('mark_messages_as_read', {
+      await supabase.rpc('mark_conversation_read', {
         p_conversation_id: conversationId
       });
     } catch (err: any) {
@@ -99,50 +99,18 @@ const MessageThread: React.FC<MessageThreadProps> = ({
     try {
       setIsSending(true);
 
-      const { data, error } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversationId,
-          sender_id: user?.id,
-          content: newMessage.trim(),
-          message_type: 'text'
-        })
-        .select(`
-          *,
-          sender:users(
-            first_name,
-            last_name,
-            email,
-            role
-          )
-        `)
-        .single();
+      const { data: messageId, error } = await supabase.rpc('send_message', {
+        p_conversation_id: conversationId,
+        p_content: newMessage.trim(),
+        p_message_type: 'text'
+      });
 
       if (error) {
         throw new Error(error.message);
       }
 
-      let enrichedMessage = data;
-      if (data.sender?.role === 'agency') {
-        const { data: agencyData } = await supabase
-          .from('agencies')
-          .select('name')
-          .eq('user_id', data.sender_id)
-          .single();
-
-        if (agencyData) {
-          enrichedMessage = {
-            ...data,
-            sender: {
-              ...data.sender,
-              agency_name: agencyData.name
-            }
-          };
-        }
-      }
-
-      setMessages(prev => [...prev, enrichedMessage]);
       setNewMessage('');
+      await fetchMessages();
     } catch (err: any) {
       console.error('Error sending message:', err);
       setError(err.message || 'Error al enviar mensaje');

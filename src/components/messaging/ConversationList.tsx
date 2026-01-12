@@ -10,11 +10,16 @@ interface Conversation {
   status: string;
   booking_id?: string;
   tour_id?: string;
+  tour_title?: string;
   last_message_at: string;
   unread_count: number;
   last_message_content?: string;
   last_message_sender?: string;
   participant_count: number;
+  other_participant_id?: string;
+  other_participant_name?: string;
+  other_participant_email?: string;
+  other_participant_role?: string;
 }
 
 interface ConversationListProps {
