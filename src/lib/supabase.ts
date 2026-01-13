@@ -199,13 +199,38 @@ export const createAgencyProfile = async (
 
 export const updateAgencyStatus = async (agencyId: string, isActive: boolean) => {
   try {
-    const { data, error } = await supabase
+    // Primero obtener el user_id de la agencia
+    const { data: agencyData, error: agencyError } = await supabase
+      .from('agencies')
+      .select('user_id')
+      .eq('id', agencyId)
+      .single();
+
+    if (agencyError) throw agencyError;
+
+    // Actualizar is_active en la tabla agencies
+    const { error: updateAgencyError } = await supabase
       .from('agencies')
       .update({ is_active: isActive })
-      .eq('id', agencyId)
+      .eq('id', agencyId);
+
+    if (updateAgencyError) throw updateAgencyError;
+
+    // Actualizar is_active en la tabla users (esto controla el login)
+    const { error: updateUserError } = await supabase
+      .from('users')
+      .update({ is_active: isActive })
+      .eq('id', agencyData.user_id);
+
+    if (updateUserError) throw updateUserError;
+
+    // Retornar los datos actualizados
+    const { data, error } = await supabase
+      .from('agencies')
       .select()
+      .eq('id', agencyId)
       .single();
-    
+
     return { data, error };
   } catch (error: any) {
     console.error('❌ Error en updateAgencyStatus:', error);
