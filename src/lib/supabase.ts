@@ -546,7 +546,6 @@ export const getUserBookings = async (userId: string) => {
         total_price,
         deposit_amount,
         user_payment,
-        agency_payment,
         service_charge,
         travelers_count,
         approval_status,
