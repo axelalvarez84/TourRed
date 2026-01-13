@@ -113,49 +113,66 @@ Deno.serve(async (req: Request) => {
     if (mapboxToken) {
       console.log('🗺️ Calling Mapbox Geocoding API...');
       try {
-        // Use Geocoding API v5 which is designed for server-side use
-        // POI types include landmarks, public transit, shopping, etc.
-        let mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&country=MX&types=poi,address,place,locality,neighborhood&language=es&limit=${limit - suggestions.length}&fuzzyMatch=true`;
+        // Build base URL with proximity if available
+        let baseUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}`;
 
-        // Add proximity bias if coordinates provided
         if (proximityLng && proximityLat) {
-          mapboxUrl += `&proximity=${proximityLng},${proximityLat}`;
+          baseUrl += `&proximity=${proximityLng},${proximityLat}`;
         }
 
-        console.log('📡 Mapbox URL (token hidden):', mapboxUrl.replace(/access_token=[^&]+/, 'access_token=***'));
+        // First try: Search for POIs only (landmarks, monuments, stations, etc.)
+        const poiUrl = `${baseUrl}&types=poi&language=es&limit=${limit - suggestions.length}`;
+        console.log('📡 Trying POI search first...');
 
-        const mapboxResponse = await fetch(mapboxUrl);
-
-        console.log('📥 Mapbox response status:', mapboxResponse.status, mapboxResponse.statusText);
+        let mapboxResponse = await fetch(poiUrl);
+        let mapboxData: any = null;
 
         if (mapboxResponse.ok) {
-          const mapboxData: any = await mapboxResponse.json();
-          console.log('✅ Mapbox features received:', mapboxData.features?.length || 0);
+          mapboxData = await mapboxResponse.json();
+          console.log('✅ POI search results:', mapboxData.features?.length || 0);
+        }
 
-          if (mapboxData.features && mapboxData.features.length > 0) {
-            suggestions.push(
-              ...mapboxData.features.map((feature: any) => {
-                const placeType = feature.place_type?.[0] || 'place';
-                const city = feature.context?.find((c: any) => c.id.startsWith('place.'))?.text || '';
-                const state = feature.context?.find((c: any) => c.id.startsWith('region.'))?.text || '';
+        // If no POI results, try broader search
+        if (!mapboxData?.features || mapboxData.features.length === 0) {
+          console.log('📡 No POIs found, trying broader search...');
+          const broadUrl = `${baseUrl}&types=poi,place,address,locality&language=es&limit=${limit - suggestions.length}`;
+          mapboxResponse = await fetch(broadUrl);
 
-                return {
-                  mapbox_id: feature.id,
-                  name: feature.text,
-                  address: feature.place_name,
-                  city,
-                  state,
-                  place_type: placeType,
-                  coordinates: {
-                    lng: feature.center[0],
-                    lat: feature.center[1],
-                  },
-                  source: 'mapbox',
-                };
-              })
-            );
-            console.log('📍 Total suggestions after Mapbox:', suggestions.length);
+          if (mapboxResponse.ok) {
+            mapboxData = await mapboxResponse.json();
+            console.log('✅ Broad search results:', mapboxData.features?.length || 0);
           }
+        }
+
+        if (mapboxData?.features && mapboxData.features.length > 0) {
+          suggestions.push(
+            ...mapboxData.features.map((feature: any) => {
+              const placeType = feature.place_type?.[0] || 'place';
+              const city = feature.context?.find((c: any) => c.id.startsWith('place.'))?.text || '';
+              const state = feature.context?.find((c: any) => c.id.startsWith('region.'))?.text || '';
+
+              console.log('📍 Feature:', {
+                name: feature.text,
+                type: placeType,
+                id: feature.id,
+              });
+
+              return {
+                mapbox_id: feature.id,
+                name: feature.text,
+                address: feature.place_name,
+                city,
+                state,
+                place_type: placeType,
+                coordinates: {
+                  lng: feature.center[0],
+                  lat: feature.center[1],
+                },
+                source: 'mapbox',
+              };
+            })
+          );
+          console.log('📍 Total suggestions after Mapbox:', suggestions.length);
         } else {
           const errorText = await mapboxResponse.text();
           console.error('❌ Mapbox API error:', mapboxResponse.status, errorText);
