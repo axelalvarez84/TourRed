@@ -321,6 +321,10 @@ export const getTours = async (filters: any = {}) => {
             query = query.eq('pet_friendly', false);
           }
 
+          if (filters.departurePoint) {
+            query = query.contains('departure_points', [filters.departurePoint]);
+          }
+
           query = query.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
 
           const { data, error } = await query;
@@ -384,6 +388,10 @@ export const getTours = async (filters: any = {}) => {
       query = query.eq('pet_friendly', true);
     } else if (filters.petFriendly === 'false') {
       query = query.eq('pet_friendly', false);
+    }
+
+    if (filters.departurePoint) {
+      query = query.contains('departure_points', [filters.departurePoint]);
     }
 
     query = query.order('is_featured', { ascending: false }).order('created_at', { ascending: false });

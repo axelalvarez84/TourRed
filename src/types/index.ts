@@ -87,6 +87,7 @@ export interface Tour {
   itinerary?: string;
   includes?: string[];
   excludes?: string[];
+  departure_points?: string[];
   booking_deadline?: string;
   booking_approval_type?: 'automatic' | 'manual';
   approval_required?: boolean;
@@ -233,6 +234,7 @@ export interface SearchFilters {
   minPrice?: string;
   maxPrice?: string;
   petFriendly?: string;
+  departurePoint?: string;
 }
 
 export interface ImageUploadData {

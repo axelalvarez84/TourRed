@@ -586,6 +586,26 @@ const TourDetailPage: React.FC = () => {
                       ))}
                     </ul>
 
+                    {tour.departure_points && tour.departure_points.length > 0 && (
+                      <>
+                        <h3 className="text-lg font-semibold mt-6 mb-3 flex items-center">
+                          <MapPin className="h-5 w-5 mr-2 text-primary-600" />
+                          Puntos de Partida
+                        </h3>
+                        <ul className="space-y-2">
+                          {tour.departure_points.map((point, index) => (
+                            <li key={index} className="flex items-start">
+                              <span className="text-primary-600 mr-2">📍</span>
+                              <span>{point}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="text-sm text-gray-600 mt-2 italic">
+                          El tour sale desde {tour.departure_points.length === 1 ? 'este punto' : 'estos puntos'}. Asegúrate de llegar con tiempo suficiente.
+                        </p>
+                      </>
+                    )}
+
                     {isOwner && (
                       <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                         <p className="text-sm text-blue-800">

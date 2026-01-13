@@ -32,6 +32,7 @@ const TourCatalogPage: React.FC = () => {
     minPrice: searchParams.get('minPrice') || '',
     maxPrice: searchParams.get('maxPrice') || '',
     petFriendly: searchParams.get('petFriendly') || '',
+    departurePoint: searchParams.get('departurePoint') || '',
   };
 
   const toggleFilters = () => {
@@ -55,6 +56,7 @@ const TourCatalogPage: React.FC = () => {
           minPrice: initialFilters.minPrice || null,
           maxPrice: initialFilters.maxPrice || null,
           petFriendly: initialFilters.petFriendly || null,
+          departurePoint: initialFilters.departurePoint || null,
         });
         
         if (error) {

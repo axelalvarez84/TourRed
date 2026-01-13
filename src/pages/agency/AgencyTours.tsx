@@ -64,6 +64,7 @@ const AgencyTours: React.FC = () => {
 
   const [includes, setIncludes] = useState<string[]>(['']);
   const [excludes, setExcludes] = useState<string[]>(['']);
+  const [departurePoints, setDeparturePoints] = useState<string[]>(['']);
   const [tourImageData, setTourImageData] = useState<{base64: string, type: string, size: number} | null>(null);
 
   useEffect(() => {
@@ -216,6 +217,7 @@ const AgencyTours: React.FC = () => {
     setShowSearchResults(false);
     setIncludes(['']);
     setExcludes(['']);
+    setDeparturePoints(['']);
     setTourImageData(null);
   };
 
@@ -269,6 +271,7 @@ const AgencyTours: React.FC = () => {
     setSelectedDestinations(selectedDest);
     setIncludes(tour.includes && tour.includes.length > 0 ? tour.includes : ['']);
     setExcludes(tour.excludes && tour.excludes.length > 0 ? tour.excludes : ['']);
+    setDeparturePoints(tour.departure_points && tour.departure_points.length > 0 ? tour.departure_points : ['']);
     setTourImageData(null); // Reset image data when editing
     setEditingTour(tour);
     setIsCreating(false);
@@ -440,6 +443,22 @@ const AgencyTours: React.FC = () => {
     }
   };
 
+  const handleDeparturePointChange = (index: number, value: string) => {
+    const newDeparturePoints = [...departurePoints];
+    newDeparturePoints[index] = value;
+    setDeparturePoints(newDeparturePoints);
+  };
+
+  const addDeparturePoint = () => {
+    setDeparturePoints([...departurePoints, '']);
+  };
+
+  const removeDeparturePoint = (index: number) => {
+    if (departurePoints.length > 1) {
+      setDeparturePoints(departurePoints.filter((_, i) => i !== index));
+    }
+  };
+
   const handleImageSelect = (base64: string, type: string, size: number) => {
     setTourImageData({ base64, type, size });
     // También actualizar la URL para vista previa
@@ -491,9 +510,15 @@ const AgencyTours: React.FC = () => {
         }
       }
 
-      // Filtrar includes y excludes vacíos
+      // Filtrar includes, excludes y departure_points vacíos
       const filteredIncludes = includes.filter(item => item.trim() !== '');
       const filteredExcludes = excludes.filter(item => item.trim() !== '');
+      const filteredDeparturePoints = departurePoints.filter(item => item.trim() !== '');
+
+      // Validar que haya al menos un punto de partida
+      if (filteredDeparturePoints.length === 0) {
+        throw new Error('Debe especificar al menos un punto de partida para el tour');
+      }
 
       // Calcular fecha límite por defecto si no se especifica
       let bookingDeadline = formData.booking_deadline;
@@ -518,6 +543,7 @@ const AgencyTours: React.FC = () => {
         destination: selectedDestinations.length > 0 ? selectedDestinations[0].name : '',
         includes: filteredIncludes.length > 0 ? filteredIncludes : null,
         excludes: filteredExcludes.length > 0 ? filteredExcludes : null,
+        departure_points: filteredDeparturePoints,
         booking_deadline: bookingDeadline,
         booking_approval_type: formData.booking_approval_type,
         pet_friendly: formData.pet_friendly,
@@ -982,6 +1008,49 @@ const AgencyTours: React.FC = () => {
                 )}
                 <p className="text-xs text-gray-500 mt-1">
                   💡 Tip: Escribe el nombre del destino y presiona Enter o haz clic en el botón + para agregarlo. Si el destino no existe, se creará automáticamente.
+                </p>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Puntos de Partida * <span className="text-xs text-gray-500">(Al menos uno es obligatorio)</span>
+                </label>
+                <div className="space-y-2">
+                  {departurePoints.map((point, index) => (
+                    <div key={index} className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        value={point}
+                        onChange={(e) => handleDeparturePointChange(index, e.target.value)}
+                        className="input flex-1"
+                        placeholder="Ej: Monumento a la Revolución, Metro Oceanía, etc."
+                      />
+                      {departurePoints.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeDeparturePoint(index)}
+                          className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+                          title="Eliminar punto de partida"
+                        >
+                          <Minus className="h-5 w-5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addDeparturePoint}
+                    className="flex items-center space-x-2 text-primary-600 hover:text-primary-800"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span className="text-sm">Agregar punto de partida</span>
+                  </button>
+                </div>
+                {departurePoints.filter(p => p.trim() !== '').length === 0 && (
+                  <p className="text-sm text-red-500 mt-1">⚠️ Debe especificar al menos un punto de partida</p>
+                )}
+                <p className="text-xs text-gray-500 mt-2">
+                  💡 Los puntos de partida son importantes para los viajeros. Especifica todos los lugares desde donde pueden abordar el tour.
                 </p>
               </div>
 
