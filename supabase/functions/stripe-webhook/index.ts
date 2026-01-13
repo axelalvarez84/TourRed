@@ -148,6 +148,51 @@ Deno.serve(async (req) => {
           } else {
             console.log(`Successfully updated booking ${bookingId} to paid status`);
 
+            // Update membership exemption usage if user has active membership
+            try {
+              const { data: booking } = await supabase
+                .from('bookings')
+                .select('user_id, total_price, service_charge')
+                .eq('id', bookingId)
+                .single();
+
+              if (booking) {
+                const { data: membership } = await supabase
+                  .from('memberships')
+                  .select('id, service_fee_exemption_used')
+                  .eq('user_id', booking.user_id)
+                  .eq('status', 'active')
+                  .maybeSingle();
+
+                if (membership && booking.service_charge === 0) {
+                  // Calculate what the service charge would have been (5% default)
+                  const { data: settings } = await supabase
+                    .from('platform_settings')
+                    .select('service_charge_percentage')
+                    .maybeSingle();
+
+                  const serviceChargeRate = settings?.service_charge_percentage || 5;
+                  const wouldBeServiceCharge = (booking.total_price * serviceChargeRate) / 100;
+
+                  // Update membership exemption usage
+                  const { error: membershipError } = await supabase
+                    .from('memberships')
+                    .update({
+                      service_fee_exemption_used: parseFloat(membership.service_fee_exemption_used) + wouldBeServiceCharge
+                    })
+                    .eq('id', membership.id);
+
+                  if (membershipError) {
+                    console.error(`Error updating membership exemption: ${membershipError.message}`);
+                  } else {
+                    console.log(`Updated membership exemption: +${wouldBeServiceCharge} MXN`);
+                  }
+                }
+              }
+            } catch (membershipError) {
+              console.error('Error processing membership exemption:', membershipError);
+            }
+
             try {
               const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-booking-confirmation`, {
                 method: 'POST',
@@ -272,6 +317,51 @@ Deno.serve(async (req) => {
           } else {
             console.log(`Successfully confirmed booking ${bookingId} after payment`);
 
+            // Update membership exemption usage if user has active membership
+            try {
+              const { data: booking } = await supabase
+                .from('bookings')
+                .select('user_id, total_price, service_charge')
+                .eq('id', bookingId)
+                .single();
+
+              if (booking) {
+                const { data: membership } = await supabase
+                  .from('memberships')
+                  .select('id, service_fee_exemption_used')
+                  .eq('user_id', booking.user_id)
+                  .eq('status', 'active')
+                  .maybeSingle();
+
+                if (membership && booking.service_charge === 0) {
+                  // Calculate what the service charge would have been (5% default)
+                  const { data: settings } = await supabase
+                    .from('platform_settings')
+                    .select('service_charge_percentage')
+                    .maybeSingle();
+
+                  const serviceChargeRate = settings?.service_charge_percentage || 5;
+                  const wouldBeServiceCharge = (booking.total_price * serviceChargeRate) / 100;
+
+                  // Update membership exemption usage
+                  const { error: membershipError } = await supabase
+                    .from('memberships')
+                    .update({
+                      service_fee_exemption_used: parseFloat(membership.service_fee_exemption_used) + wouldBeServiceCharge
+                    })
+                    .eq('id', membership.id);
+
+                  if (membershipError) {
+                    console.error(`Error updating membership exemption: ${membershipError.message}`);
+                  } else {
+                    console.log(`Updated membership exemption: +${wouldBeServiceCharge} MXN`);
+                  }
+                }
+              }
+            } catch (membershipError) {
+              console.error('Error processing membership exemption:', membershipError);
+            }
+
             try {
               const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-booking-confirmation`, {
                 method: 'POST',
@@ -322,91 +412,52 @@ Deno.serve(async (req) => {
 
         break;
       }
-      
-      case 'payment_intent.payment_failed': {
-        const paymentIntent = event.data.object;
-        const bookingId = paymentIntent.metadata?.booking_id;
-        
-        if (bookingId) {
-          const { error } = await supabase
-            .from('bookings')
-            .update({
-              payment_status: 'failed',
-              payment_intent_id: paymentIntent.id
-            })
-            .eq('id', bookingId);
 
-          if (error) {
-            console.error(`Error updating booking: ${error.message}`);
-          }
-        }
-        
-        console.log(`Payment failed: ${paymentIntent.id}, ${paymentIntent.last_payment_error?.message || 'Unknown error'}`);
-        break;
-      }
-      
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const subscription = event.data.object;
+        
         console.log(`Subscription ${event.type}: ${subscription.id}`);
-
+        
         const userId = subscription.metadata?.user_id;
-        const planType = subscription.metadata?.plan_type;
-
-        if (!userId || !planType) {
-          console.error('Missing user_id or plan_type in subscription metadata');
+        if (!userId) {
+          console.error('No user_id in subscription metadata');
           break;
         }
 
-        const currentPeriodEnd = new Date(subscription.current_period_end * 1000);
-        const nextResetDate = new Date(currentPeriodEnd);
-        nextResetDate.setMonth(nextResetDate.getMonth() + 1);
+        const statusMap = {
+          'incomplete': 'trialing',
+          'incomplete_expired': 'expired',
+          'trialing': 'trialing',
+          'active': 'active',
+          'past_due': 'past_due',
+          'canceled': 'cancelled',
+          'unpaid': 'expired',
+          'paused': 'past_due'
+        };
 
-        const { data: existingMembership } = await supabase
+        const mappedStatus = statusMap[subscription.status] || 'cancelled';
+
+        const { error: membershipError } = await supabase
           .from('memberships')
-          .select('id')
-          .eq('stripe_subscription_id', subscription.id)
-          .maybeSingle();
+          .upsert({
+            user_id: userId,
+            stripe_customer_id: subscription.customer,
+            stripe_subscription_id: subscription.id,
+            plan_type: subscription.metadata?.plan_type || 'monthly',
+            status: mappedStatus,
+            current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+            cancel_at_period_end: subscription.cancel_at_period_end || false,
+            cancelled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
+          }, {
+            onConflict: 'stripe_subscription_id'
+          });
 
-        if (existingMembership) {
-          const { error: updateError } = await supabase
-            .from('memberships')
-            .update({
-              status: subscription.status,
-              current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-              current_period_end: currentPeriodEnd.toISOString(),
-              cancel_at_period_end: subscription.cancel_at_period_end || false,
-              cancelled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
-            })
-            .eq('id', existingMembership.id);
-
-          if (updateError) {
-            console.error(`Error updating membership: ${updateError.message}`);
-          } else {
-            console.log(`Membership updated for user ${userId}`);
-          }
+        if (membershipError) {
+          console.error(`Error updating membership: ${membershipError.message}`);
         } else {
-          const { error: insertError } = await supabase
-            .from('memberships')
-            .insert({
-              user_id: userId,
-              stripe_customer_id: subscription.customer,
-              stripe_subscription_id: subscription.id,
-              plan_type: planType,
-              status: subscription.status,
-              start_date: new Date(subscription.start_date * 1000).toISOString(),
-              current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-              current_period_end: currentPeriodEnd.toISOString(),
-              cancel_at_period_end: subscription.cancel_at_period_end || false,
-              service_fee_exemption_used: 0,
-              service_fee_exemption_reset_date: nextResetDate.toISOString(),
-            });
-
-          if (insertError) {
-            console.error(`Error creating membership: ${insertError.message}`);
-          } else {
-            console.log(`Membership created for user ${userId}`);
-          }
+          console.log(`Successfully updated membership for user ${userId}`);
         }
 
         break;
@@ -414,62 +465,21 @@ Deno.serve(async (req) => {
 
       case 'customer.subscription.deleted': {
         const subscription = event.data.object;
+        
         console.log(`Subscription deleted: ${subscription.id}`);
 
-        const { error: deleteError } = await supabase
+        const { error: membershipError } = await supabase
           .from('memberships')
           .update({
-            status: 'expired',
+            status: 'cancelled',
             cancelled_at: new Date().toISOString(),
           })
           .eq('stripe_subscription_id', subscription.id);
 
-        if (deleteError) {
-          console.error(`Error marking membership as expired: ${deleteError.message}`);
+        if (membershipError) {
+          console.error(`Error cancelling membership: ${membershipError.message}`);
         } else {
-          console.log(`Membership marked as expired`);
-        }
-
-        break;
-      }
-
-      case 'invoice.payment_succeeded': {
-        const invoice = event.data.object;
-
-        if (invoice.subscription) {
-          console.log(`Invoice payment succeeded for subscription: ${invoice.subscription}`);
-
-          const { error: updateError } = await supabase
-            .from('memberships')
-            .update({
-              status: 'active',
-            })
-            .eq('stripe_subscription_id', invoice.subscription);
-
-          if (updateError) {
-            console.error(`Error updating membership status: ${updateError.message}`);
-          }
-        }
-
-        break;
-      }
-
-      case 'invoice.payment_failed': {
-        const invoice = event.data.object;
-
-        if (invoice.subscription) {
-          console.log(`Invoice payment failed for subscription: ${invoice.subscription}`);
-
-          const { error: updateError } = await supabase
-            .from('memberships')
-            .update({
-              status: 'past_due',
-            })
-            .eq('stripe_subscription_id', invoice.subscription);
-
-          if (updateError) {
-            console.error(`Error updating membership status: ${updateError.message}`);
-          }
+          console.log(`Successfully cancelled membership ${subscription.id}`);
         }
 
         break;
@@ -480,19 +490,22 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ received: true }),
+      JSON.stringify({ success: true, received: true }),
       {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
       }
     );
   } catch (error) {
-    console.error(`Webhook error: ${error.message}`);
+    console.error('Webhook error:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message || "An unexpected error occurred" }),
+      JSON.stringify({
+        success: false,
+        error: error.message || 'Unknown error'
+      }),
       {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
       }
     );
   }
