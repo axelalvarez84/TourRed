@@ -4,15 +4,6 @@ import { Search, MapPin, Tag, Calendar, Building2, DollarSign, Dog, X } from 'lu
 import { SearchFilters } from '../types';
 import { supabase } from '../lib/supabase';
 
-const categories = [
-  { id: 'adventure', name: 'Aventura' },
-  { id: 'nature', name: 'Naturaleza' },
-  { id: 'cultural', name: 'Cultural' },
-  { id: 'beach', name: 'Playa' },
-  { id: 'urban', name: 'Urbano' },
-  { id: 'wellness', name: 'Bienestar' },
-];
-
 interface SearchBoxProps {
   initialFilters?: SearchFilters;
   className?: string;
@@ -28,12 +19,29 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
   const [minPrice, setMinPrice] = useState(initialFilters.minPrice || '');
   const [maxPrice, setMaxPrice] = useState(initialFilters.maxPrice || '');
   const [petFriendly, setPetFriendly] = useState(initialFilters.petFriendly || '');
+  const [categories, setCategories] = useState<any[]>([]);
   const [agencies, setAgencies] = useState<any[]>([]);
   const [filteredAgencies, setFilteredAgencies] = useState<any[]>([]);
   const [showAgencyDropdown, setShowAgencyDropdown] = useState(false);
   const [selectedAgencyName, setSelectedAgencyName] = useState('');
   const agencyInputRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      const { data } = await supabase
+        .from('tour_categories')
+        .select('id, name, slug')
+        .eq('is_active', true)
+        .order('name');
+
+      if (data) {
+        setCategories(data);
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   useEffect(() => {
     const loadAgencies = async () => {
@@ -162,7 +170,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
               >
                 <option value="">Todas las Categorías</option>
                 {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
+                  <option key={cat.id} value={cat.slug}>
                     {cat.name}
                   </option>
                 ))}

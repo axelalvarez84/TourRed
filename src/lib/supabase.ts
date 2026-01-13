@@ -292,7 +292,7 @@ export const getTours = async (filters: any = {}) => {
           }
 
           if (filters.category) {
-            query = query.eq('category', filters.category);
+            query = query.contains('category', [filters.category]);
           }
 
           if (filters.startDate && filters.endDate) {
@@ -361,7 +361,7 @@ export const getTours = async (filters: any = {}) => {
     }
 
     if (filters.category) {
-      query = query.eq('category', filters.category);
+      query = query.contains('category', [filters.category]);
     }
 
     if (filters.startDate && filters.endDate) {

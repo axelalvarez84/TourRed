@@ -6,15 +6,6 @@ import TourCard from '../components/TourCard';
 import { Tour, SearchFilters } from '../types';
 import { getTours, supabase } from '../lib/supabase';
 
-const categories = [
-  { id: 'adventure', name: 'Aventura' },
-  { id: 'nature', name: 'Naturaleza' },
-  { id: 'cultural', name: 'Cultural' },
-  { id: 'beach', name: 'Playa' },
-  { id: 'urban', name: 'Urbano' },
-  { id: 'wellness', name: 'Bienestar' },
-];
-
 const TourCatalogPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [tours, setTours] = useState<Tour[]>([]);
@@ -22,6 +13,7 @@ const TourCatalogPage: React.FC = () => {
   const [error, setError] = useState('');
   const [visibleFilters, setVisibleFilters] = useState(false);
   const [popularDestinations, setPopularDestinations] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   
   const initialFilters: SearchFilters = {
     destination: searchParams.get('destination') || '',
@@ -77,6 +69,31 @@ const TourCatalogPage: React.FC = () => {
 
     fetchTours();
   }, [searchParams]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('tour_categories')
+          .select('id, name, slug')
+          .eq('is_active', true)
+          .order('name');
+
+        if (error) {
+          console.error('❌ Error cargando categorías:', error);
+          return;
+        }
+
+        if (data) {
+          setCategories(data);
+        }
+      } catch (err: any) {
+        console.error('❌ Error en fetchCategories:', err);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     const fetchPopularDestinations = async () => {
@@ -198,16 +215,22 @@ const TourCatalogPage: React.FC = () => {
             <div className="bg-white rounded-lg shadow-md p-4 mt-6">
               <h3 className="font-semibold mb-4 text-gray-900">Categorías Populares</h3>
               <div className="space-y-2">
-                {categories.map((category) => (
-                  <a
-                    key={category.id}
-                    href={`/tours?category=${category.id}`}
-                    className="flex items-center text-gray-700 hover:text-primary-600 transition-colors"
-                  >
-                    <Tag className="h-4 w-4 mr-2" />
-                    <span>{category.name}</span>
-                  </a>
-                ))}
+                {categories.length > 0 ? (
+                  categories.map((category) => (
+                    <a
+                      key={category.id}
+                      href={`/tours?category=${category.slug}`}
+                      className="flex items-center text-gray-700 hover:text-primary-600 transition-colors"
+                    >
+                      <Tag className="h-4 w-4 mr-2" />
+                      <span>{category.name}</span>
+                    </a>
+                  ))
+                ) : (
+                  <div className="text-gray-500 text-sm text-center py-4">
+                    Cargando categorías...
+                  </div>
+                )}
               </div>
             </div>
 

@@ -24,18 +24,31 @@ const TourDetailPage: React.FC = () => {
   const [totalCapacity, setTotalCapacity] = useState<number>(0);
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [categoryMap, setCategoryMap] = useState<{ [key: string]: string }>({});
+
+  // Load categories from database
+  useEffect(() => {
+    const loadCategories = async () => {
+      const { data } = await supabase
+        .from('tour_categories')
+        .select('slug, name')
+        .eq('is_active', true);
+
+      if (data) {
+        const map: { [key: string]: string } = {};
+        data.forEach(cat => {
+          map[cat.slug] = cat.name;
+        });
+        setCategoryMap(map);
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   // Helper function to get category name
   const getCategoryName = (category: string) => {
-    const categories: { [key: string]: string } = {
-      adventure: 'Aventura',
-      nature: 'Naturaleza',
-      cultural: 'Cultural',
-      beach: 'Playa',
-      urban: 'Urbano',
-      wellness: 'Bienestar'
-    };
-    return categories[category] || category;
+    return categoryMap[category] || category;
   };
 
   // Helper function to format categories array
