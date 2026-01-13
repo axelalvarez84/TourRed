@@ -712,12 +712,21 @@ const AgencyTours: React.FC = () => {
           </p>
         </div>
         <button
-          onClick={handleCreate}
-          className="btn btn-primary"
-          disabled={isCreating || editingTour}
+          onClick={isCreating ? handleCancel : handleCreate}
+          className={isCreating ? "btn btn-outline" : "btn btn-primary"}
+          disabled={editingTour}
         >
-          <Plus className="h-5 w-5 mr-2" />
-          {isCreating ? 'Cancelar' : 'Crear Nuevo Tour'}
+          {isCreating ? (
+            <>
+              <X className="h-5 w-5 mr-2" />
+              Cancelar
+            </>
+          ) : (
+            <>
+              <Plus className="h-5 w-5 mr-2" />
+              Crear Nuevo Tour
+            </>
+          )}
         </button>
       </div>
 
