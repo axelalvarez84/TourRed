@@ -121,6 +121,49 @@ const TravelerBookings: React.FC = () => {
     navigate(`/booking-travelers/${bookingId}`);
   };
 
+  const handleCompletePayment = async (booking: Booking) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        throw new Error('No hay sesión activa');
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-checkout`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            booking_id: booking.id,
+            tour_id: booking.tour_id,
+            total_amount: booking.user_payment,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`Error al crear la sesión de pago: ${errorText}`);
+      }
+
+      const data = await response.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No se recibió URL de checkout');
+      }
+    } catch (err: any) {
+      console.error('Error al proceder al pago:', err);
+      alert(`Error al proceder al pago: ${err.message}`);
+    }
+  };
+
   const getCategoryLabel = (categoria: string): string => {
     const labels: Record<string, string> = {
       adulto: 'Adulto',
@@ -159,30 +202,38 @@ const TravelerBookings: React.FC = () => {
     }
   };
 
-  const getStatusBadge = (status: string, paymentStatus?: string) => {
+  const getStatusBadge = (status: string, paymentStatus?: string, approvalStatus?: string) => {
     let statusText = '';
     let statusClass = '';
 
-    switch (status) {
-      case 'pending':
-        statusText = paymentStatus === 'succeeded' ? 'Confirmando' : 'Pendiente de Pago';
-        statusClass = 'bg-yellow-100 text-yellow-800';
-        break;
-      case 'confirmed':
-        statusText = 'Confirmada';
-        statusClass = 'bg-green-100 text-green-800';
-        break;
-      case 'completed':
-        statusText = 'Completada';
-        statusClass = 'bg-blue-100 text-blue-800';
-        break;
-      case 'cancelled':
-        statusText = 'Cancelada';
-        statusClass = 'bg-red-100 text-red-800';
-        break;
-      default:
-        statusText = status;
-        statusClass = 'bg-gray-100 text-gray-800';
+    if (approvalStatus === 'rejected') {
+      statusText = 'Rechazada';
+      statusClass = 'bg-red-100 text-red-800';
+    } else if (approvalStatus === 'pending') {
+      statusText = 'Pendiente de Aprobación';
+      statusClass = 'bg-yellow-100 text-yellow-800';
+    } else {
+      switch (status) {
+        case 'pending':
+          statusText = paymentStatus === 'succeeded' ? 'Confirmando' : 'Pendiente de Pago';
+          statusClass = 'bg-yellow-100 text-yellow-800';
+          break;
+        case 'confirmed':
+          statusText = 'Confirmada';
+          statusClass = 'bg-green-100 text-green-800';
+          break;
+        case 'completed':
+          statusText = 'Completada';
+          statusClass = 'bg-blue-100 text-blue-800';
+          break;
+        case 'cancelled':
+          statusText = 'Cancelada';
+          statusClass = 'bg-red-100 text-red-800';
+          break;
+        default:
+          statusText = status;
+          statusClass = 'bg-gray-100 text-gray-800';
+      }
     }
 
     return (
@@ -295,7 +346,7 @@ const TravelerBookings: React.FC = () => {
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute top-4 left-4">
-                      {getStatusBadge(booking.status, booking.payment_status)}
+                      {getStatusBadge(booking.status, booking.payment_status, (booking as any).approval_status)}
                       {getPaymentStatusBadge(booking.payment_status)}
                     </div>
                   </div>
@@ -408,14 +459,16 @@ const TravelerBookings: React.FC = () => {
                       Ver Acompañantes
                     </button>
 
-                    {booking.status === 'pending' && booking.payment_status !== 'succeeded' && (
-                      <Link
-                        to={`/tours/${booking.tour_id}`}
+                    {booking.status === 'pending' &&
+                     booking.payment_status !== 'succeeded' &&
+                     (booking as any).approval_status === 'approved' && (
+                      <button
+                        onClick={() => handleCompletePayment(booking)}
                         className="btn btn-primary flex items-center justify-center"
                       >
                         <DollarSign className="h-4 w-4 mr-2" />
                         Completar Pago
-                      </Link>
+                      </button>
                     )}
 
                     {booking.status === 'confirmed' && (
@@ -436,6 +489,35 @@ const TravelerBookings: React.FC = () => {
                   </div>
 
                   {/* Important Notes */}
+                  {(booking as any).approval_status === 'pending' && (
+                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-sm text-yellow-800">
+                        <strong>Pendiente de aprobación.</strong> La agencia está revisando tu solicitud. Te notificaremos cuando tomen una decisión.
+                      </p>
+                    </div>
+                  )}
+
+                  {(booking as any).approval_status === 'rejected' && (
+                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                      <p className="text-sm text-red-800">
+                        <strong>Reserva rechazada.</strong> La agencia no pudo aprobar tu solicitud.
+                        {(booking as any).approval_notes && (
+                          <span className="block mt-2">
+                            <strong>Motivo:</strong> {(booking as any).approval_notes}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+
+                  {(booking as any).approval_status === 'approved' && booking.status === 'pending' && booking.payment_status !== 'succeeded' && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                      <p className="text-sm text-green-800">
+                        <strong>¡Solicitud aprobada!</strong> Tu reserva ha sido aprobada por la agencia. Ahora puedes completar el pago.
+                      </p>
+                    </div>
+                  )}
+
                   {booking.status === 'confirmed' && (
                     <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
                       <p className="text-sm text-green-800">
