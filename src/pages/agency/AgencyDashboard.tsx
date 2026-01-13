@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, MapPin, Calendar, Users, Search, X, DollarSign, TrendingUp, Activity, AlertCircle, CreditCard } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, MapPin, Calendar, Users, DollarSign, Activity, AlertCircle, CreditCard } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { createTour, searchDestinations, supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 
 interface DashboardStats {
   totalTours: number;
@@ -16,6 +17,7 @@ interface DashboardStats {
 
 const AgencyDashboard: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
     totalTours: 0,
     activeTours: 0,
@@ -27,50 +29,14 @@ const AgencyDashboard: React.FC = () => {
     recentActivity: []
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [isCreating, setIsCreating] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [selectedDestinations, setSelectedDestinations] = useState<string[]>([]);
-  const [showSearchResults, setShowSearchResults] = useState(false);
   const [agencyId, setAgencyId] = useState<string | null>(null);
-
-  const [formData, setFormData] = useState({
-    name: '',
-    category: 'adventure',
-    description: '',
-    itinerary: '',
-    price: '',
-    deposit_percentage: '',
-    image_url: '',
-    start_date: '',
-    end_date: '',
-    max_travelers: '',
-  });
 
   useEffect(() => {
     if (user?.id) {
       fetchAgencyData();
     }
   }, [user]);
-
-  useEffect(() => {
-    const searchDestinationsDebounced = setTimeout(async () => {
-      if (searchQuery.length >= 2) {
-        const { data, error } = await searchDestinations(searchQuery);
-        if (!error && data) {
-          setSearchResults(data);
-          setShowSearchResults(true);
-        }
-      } else {
-        setSearchResults([]);
-        setShowSearchResults(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(searchDestinationsDebounced);
-  }, [searchQuery]);
 
   const fetchAgencyData = async () => {
     if (!user?.id) return;
@@ -216,85 +182,6 @@ const AgencyDashboard: React.FC = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setError('');
-
-    try {
-      if (!user?.id) {
-        throw new Error('User not authenticated');
-      }
-
-      if (selectedDestinations.length === 0) {
-        throw new Error('Debe seleccionar al menos un destino para el tour');
-      }
-
-      const tourData = {
-        ...formData,
-        destination: selectedDestinations[0], // Use the first selected destination as the primary destination
-        price: parseFloat(formData.price),
-        deposit_percentage: parseInt(formData.deposit_percentage),
-        max_travelers: parseInt(formData.max_travelers),
-      };
-
-      const { error } = await createTour(tourData, selectedDestinations, user.id);
-
-      if (error) throw error;
-
-      setIsCreating(false);
-      setFormData({
-        name: '',
-        category: 'adventure',
-        description: '',
-        itinerary: '',
-        price: '',
-        deposit_percentage: '',
-        image_url: '',
-        start_date: '',
-        end_date: '',
-        max_travelers: '',
-      });
-      setSelectedDestinations([]);
-      
-      // Recargar estadísticas después de crear un tour
-      await fetchAgencyData();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const addDestination = (destination: string) => {
-    if (!selectedDestinations.includes(destination)) {
-      setSelectedDestinations([...selectedDestinations, destination]);
-    }
-    setSearchQuery('');
-    setSearchResults([]);
-    setShowSearchResults(false);
-  };
-
-  const addDestinationFromInput = () => {
-    if (searchQuery.trim() && !selectedDestinations.includes(searchQuery.trim())) {
-      setSelectedDestinations([...selectedDestinations, searchQuery.trim()]);
-      setSearchQuery('');
-      setSearchResults([]);
-      setShowSearchResults(false);
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addDestinationFromInput();
-    }
-  };
-
-  const removeDestination = (destination: string) => {
-    setSelectedDestinations(selectedDestinations.filter(d => d !== destination));
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed': return 'text-success-600 bg-success-100';
@@ -347,11 +234,11 @@ const AgencyDashboard: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Panel de la Agencia</h1>
         <button
-          onClick={() => setIsCreating(!isCreating)}
+          onClick={() => navigate('/agency/tours')}
           className="btn btn-primary"
         >
           <Plus className="h-5 w-5 mr-2" />
-          {isCreating ? 'Cancelar' : 'Crear Nuevo Tour'}
+          Crear Nuevo Tour
         </button>
       </div>
 
@@ -383,243 +270,6 @@ const AgencyDashboard: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {isCreating && (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">Crear Nuevo Tour</h2>
-          
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre del Tour
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="input"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Categoría
-                </label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({...formData, category: e.target.value})}
-                  className="input"
-                  required
-                >
-                  <option value="adventure">Aventura</option>
-                  <option value="nature">Naturaleza</option>
-                  <option value="cultural">Cultural</option>
-                  <option value="beach">Playa</option>
-                  <option value="urban">Urbano</option>
-                  <option value="wellness">Bienestar</option>
-                </select>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Descripción
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  className="input"
-                  rows={3}
-                  required
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Itinerario Detallado
-                </label>
-                <textarea
-                  value={formData.itinerary}
-                  onChange={(e) => setFormData({...formData, itinerary: e.target.value})}
-                  className="input"
-                  rows={5}
-                  required
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Destinos * <span className="text-sm text-gray-500">(Presiona Enter para agregar)</span>
-                </label>
-                <div className="mb-2 flex flex-wrap gap-2">
-                  {selectedDestinations.map((destination) => (
-                    <span
-                      key={destination}
-                      className="inline-flex items-center bg-primary-100 text-primary-800 px-3 py-1 rounded-full text-sm"
-                    >
-                      {destination}
-                      <button
-                        type="button"
-                        onClick={() => removeDestination(destination)}
-                        className="ml-2 text-primary-600 hover:text-primary-800"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                <div className="relative">
-                  <div className="flex">
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      className="input flex-1"
-                      placeholder="Escribe un destino y presiona Enter..."
-                    />
-                    <button
-                      type="button"
-                      onClick={addDestinationFromInput}
-                      className="ml-2 px-3 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 flex items-center"
-                      disabled={!searchQuery.trim()}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
-                  </div>
-                  
-                  {showSearchResults && searchResults.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg border">
-                      <div className="py-1">
-                        <div className="px-3 py-2 text-xs text-gray-500 border-b">
-                          Destinos existentes:
-                        </div>
-                        {searchResults.map((result) => (
-                          <button
-                            key={result.id}
-                            type="button"
-                            className="w-full text-left px-3 py-2 hover:bg-gray-100 text-sm"
-                            onClick={() => addDestination(result.name)}
-                          >
-                            {result.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                {selectedDestinations.length === 0 && (
-                  <p className="text-sm text-red-500 mt-1">⚠️ Debe seleccionar al menos un destino</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Precio Total (MXN)
-                </label>
-                <input
-                  type="number"
-                  value={formData.price}
-                  onChange={(e) => setFormData({...formData, price: e.target.value})}
-                  className="input"
-                  min="0"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Porcentaje de Depósito
-                </label>
-                <input
-                  type="number"
-                  value={formData.deposit_percentage}
-                  onChange={(e) => setFormData({...formData, deposit_percentage: e.target.value})}
-                  className="input"
-                  min="0"
-                  max="100"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  URL de la Imagen Principal
-                </label>
-                <input
-                  type="url"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData({...formData, image_url: e.target.value})}
-                  className="input"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Máximo de Viajeros
-                </label>
-                <input
-                  type="number"
-                  value={formData.max_travelers}
-                  onChange={(e) => setFormData({...formData, max_travelers: e.target.value})}
-                  className="input"
-                  min="1"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Fecha de Inicio
-                </label>
-                <input
-                  type="date"
-                  value={formData.start_date}
-                  onChange={(e) => setFormData({...formData, start_date: e.target.value})}
-                  className="input"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Fecha de Fin
-                </label>
-                <input
-                  type="date"
-                  value={formData.end_date}
-                  onChange={(e) => setFormData({...formData, end_date: e.target.value})}
-                  className="input"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-4">
-              <button
-                type="button"
-                onClick={() => setIsCreating(false)}
-                className="btn btn-outline"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting || selectedDestinations.length === 0}
-                className={`btn btn-primary ${
-                  selectedDestinations.length === 0 
-                    ? 'opacity-50 cursor-not-allowed' 
-                    : ''
-                }`}
-              >
-                {isSubmitting ? 'Creando...' : 'Crear Tour'}
-              </button>
-            </div>
-          </form>
         </div>
       )}
 
