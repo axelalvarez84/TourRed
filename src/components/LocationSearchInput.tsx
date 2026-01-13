@@ -79,6 +79,7 @@ export default function LocationSearchInput({
   }, [value]);
 
   const fetchSuggestions = async (query: string) => {
+    console.log('🔍 Buscando sugerencias para:', query);
     setIsLoading(true);
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -88,20 +89,28 @@ export default function LocationSearchInput({
         url += `&lng=${userLocation.lng}&lat=${userLocation.lat}`;
       }
 
+      console.log('📡 URL de la función:', url);
+
       const response = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
         },
       });
 
+      console.log('📥 Respuesta recibida:', response.status, response.statusText);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Datos recibidos:', data);
         setSuggestions(data.suggestions || []);
         setShowSuggestions(true);
         setHighlightedIndex(-1);
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Error en respuesta:', response.status, errorText);
       }
     } catch (error) {
-      console.error('Error fetching suggestions:', error);
+      console.error('❌ Error fetching suggestions:', error);
     } finally {
       setIsLoading(false);
     }

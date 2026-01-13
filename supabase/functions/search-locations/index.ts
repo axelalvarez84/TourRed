@@ -42,7 +42,10 @@ Deno.serve(async (req: Request) => {
     const proximityLat = url.searchParams.get('lat');
     const limit = parseInt(url.searchParams.get('limit') || '8');
 
+    console.log('🔍 Search locations request:', { query, proximityLng, proximityLat, limit });
+
     if (!query || query.trim().length < 2) {
+      console.log('⚠️ Query too short, returning empty results');
       return new Response(
         JSON.stringify({ suggestions: [] }),
         {
@@ -56,14 +59,28 @@ Deno.serve(async (req: Request) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const mapboxToken = Deno.env.get('MAPBOX_SECRET_TOKEN');
 
+    console.log('🔑 Environment check:', {
+      hasSupabaseUrl: !!supabaseUrl,
+      hasSupabaseKey: !!supabaseAnonKey,
+      hasMapboxToken: !!mapboxToken,
+      mapboxTokenLength: mapboxToken?.length || 0,
+    });
+
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
     // First, search local database for existing locations
+    console.log('🗄️ Searching local database...');
     const { data: localResults, error: localError } = await supabase
       .rpc('get_departure_location_suggestions', {
         search_text: query,
         limit_results: Math.min(limit, 5),
       });
+
+    if (localError) {
+      console.error('❌ Local search error:', localError);
+    } else {
+      console.log('✅ Local results found:', localResults?.length || 0);
+    }
 
     const suggestions: any[] = [];
 
@@ -81,6 +98,7 @@ Deno.serve(async (req: Request) => {
           source: 'local',
         }))
       );
+      console.log('📍 Added local suggestions:', suggestions.length);
     }
 
     // If we have enough local results, return them
@@ -96,19 +114,25 @@ Deno.serve(async (req: Request) => {
 
     // Otherwise, supplement with Mapbox suggestions
     if (mapboxToken) {
+      console.log('🗺️ Calling Mapbox API...');
       try {
         let mapboxUrl = `https://api.mapbox.com/search/searchbox/v1/suggest?q=${encodeURIComponent(query)}&access_token=${mapboxToken}&country=MX&types=poi,address,place,neighborhood&language=es&limit=${limit - suggestions.length}`;
-        
+
         // Add proximity bias if coordinates provided
         if (proximityLng && proximityLat) {
           mapboxUrl += `&proximity=${proximityLng},${proximityLat}`;
         }
 
+        console.log('📡 Mapbox URL (token hidden):', mapboxUrl.replace(/access_token=[^&]+/, 'access_token=***'));
+
         const mapboxResponse = await fetch(mapboxUrl);
-        
+
+        console.log('📥 Mapbox response status:', mapboxResponse.status, mapboxResponse.statusText);
+
         if (mapboxResponse.ok) {
           const mapboxData: MapboxSuggestResponse = await mapboxResponse.json();
-          
+          console.log('✅ Mapbox suggestions received:', mapboxData.suggestions?.length || 0);
+
           if (mapboxData.suggestions) {
             suggestions.push(
               ...mapboxData.suggestions.map((s: MapboxSuggestion) => ({
@@ -125,16 +149,25 @@ Deno.serve(async (req: Request) => {
                 source: 'mapbox',
               }))
             );
+            console.log('📍 Total suggestions after Mapbox:', suggestions.length);
           }
+        } else {
+          const errorText = await mapboxResponse.text();
+          console.error('❌ Mapbox API error:', mapboxResponse.status, errorText);
         }
       } catch (mapboxError) {
-        console.error('Mapbox suggestion error:', mapboxError);
+        console.error('❌ Mapbox suggestion error:', mapboxError);
         // Continue with just local results
       }
+    } else {
+      console.warn('⚠️ MAPBOX_SECRET_TOKEN not configured, skipping Mapbox API call');
     }
 
+    const finalSuggestions = suggestions.slice(0, limit);
+    console.log('✅ Returning suggestions:', finalSuggestions.length);
+
     return new Response(
-      JSON.stringify({ suggestions: suggestions.slice(0, limit) }),
+      JSON.stringify({ suggestions: finalSuggestions }),
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
