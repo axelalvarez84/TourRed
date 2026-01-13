@@ -16,7 +16,7 @@ const LoginPage: React.FC = () => {
 
   const [error, setError] = useState(
     isBlocked
-      ? 'Tu cuenta ha sido bloqueada. Por favor contacta al administrador para más información.'
+      ? 'Su cuenta ha sido bloqueada. Para mayor información contáctenos.'
       : ''
   );
 
@@ -50,7 +50,7 @@ const LoginPage: React.FC = () => {
       }
     } catch (err: any) {
       if (err.message === 'USUARIO_BLOQUEADO') {
-        setError('Tu cuenta ha sido bloqueada. Por favor contacta al administrador para más información.');
+        setError('Su cuenta ha sido bloqueada. Para mayor información contáctenos.');
       } else {
         setError('Error al iniciar sesión. Por favor verifica tus credenciales.');
       }
