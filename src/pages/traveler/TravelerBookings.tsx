@@ -130,7 +130,7 @@ const TravelerBookings: React.FC = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-checkout`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`,
         {
           method: 'POST',
           headers: {
@@ -138,9 +138,12 @@ const TravelerBookings: React.FC = () => {
             'Authorization': `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
-            booking_id: booking.id,
-            tour_id: booking.tour_id,
-            total_amount: booking.user_payment,
+            bookingId: booking.id,
+            amount: booking.user_payment || booking.deposit_amount,
+            currency: 'mxn',
+            description: `Pago de reserva - ${booking.tours?.name || 'Tour'}`,
+            success_url: `${window.location.origin}/booking-success?booking_id=${booking.id}`,
+            cancel_url: `${window.location.origin}/traveler/bookings`,
           }),
         }
       );
