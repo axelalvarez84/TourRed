@@ -44,6 +44,7 @@ export default function LocationSearchInput({
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout>();
+  const isSelectingRef = useRef(false);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -57,6 +58,12 @@ export default function LocationSearchInput({
   }, []);
 
   useEffect(() => {
+    // Don't search if we're selecting a suggestion
+    if (isSelectingRef.current) {
+      isSelectingRef.current = false;
+      return;
+    }
+
     if (value.length < 2) {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -117,6 +124,8 @@ export default function LocationSearchInput({
   };
 
   const handleSuggestionClick = async (suggestion: LocationSuggestion) => {
+    // Mark that we're selecting to prevent triggering search
+    isSelectingRef.current = true;
     onChange(suggestion.name);
     setShowSuggestions(false);
     setSuggestions([]);
@@ -195,6 +204,7 @@ export default function LocationSearchInput({
               const data = await response.json();
               if (data.features && data.features.length > 0) {
                 const place = data.features[0];
+                isSelectingRef.current = true;
                 onChange(place.text);
                 onLocationSelect({
                   name: place.text,
