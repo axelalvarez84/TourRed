@@ -220,7 +220,7 @@ export default function TravelerMembership() {
                   <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="font-medium text-gray-900">Sin cargo por servicio hasta $500 MXN/mes</p>
-                    <p className="text-sm text-gray-600">Ahorra el 5% en tus reservas de tours</p>
+                    <p className="text-sm text-gray-600">Ahorra el 5% en tus reservas nacionales</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -309,7 +309,7 @@ export default function TravelerMembership() {
               <ul className="space-y-4 mb-8">
                 <li className="flex items-start gap-3">
                   <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <span className="text-gray-700">Sin cargo por servicio hasta $500 MXN/mes</span>
+                  <span className="text-gray-700">Sin cargo por servicio hasta $500 MXN/mes en reservas nacionales</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
@@ -351,7 +351,7 @@ export default function TravelerMembership() {
               <ul className="space-y-4 mb-8">
                 <li className="flex items-start gap-3">
                   <Check className="h-5 w-5 text-white flex-shrink-0 mt-0.5" />
-                  <span>Sin cargo por servicio hasta $500 MXN/mes</span>
+                  <span>Sin cargo por servicio hasta $500 MXN/mes en reservas nacionales</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Check className="h-5 w-5 text-white flex-shrink-0 mt-0.5" />
@@ -384,11 +384,11 @@ export default function TravelerMembership() {
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">¿Cómo funciona la exención de cargo por servicio?</h3>
               <p className="text-gray-700 mb-4">
-                Como miembro de ToursRed+, no pagas el cargo por servicio del 5% en tus reservas hasta un monto acumulado de $500 MXN por mes.
+                Como miembro de ToursRed+, no pagas el cargo por servicio del 5% en tus reservas nacionales hasta un monto acumulado de $500 MXN por mes.
                 El contador se resetea automáticamente cada mes en la fecha de renovación de tu membresía.
               </p>
               <p className="text-gray-700 text-sm">
-                <strong>Ejemplo:</strong> Si reservas un tour de $1,000 MXN, normalmente pagarías $50 MXN de cargo por servicio.
+                <strong>Ejemplo:</strong> Si reservas un tour nacional de $1,000 MXN, normalmente pagarías $50 MXN de cargo por servicio.
                 Con ToursRed+, ¡ese cargo es $0! Y aún te quedarían $450 MXN de exención disponible para el mes.
               </p>
             </div>

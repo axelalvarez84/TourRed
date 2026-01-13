@@ -597,7 +597,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                   ¡Ahorra ${serviceCharge.toLocaleString()} con ToursRed+!
                 </h4>
                 <p className="text-xs text-gray-700">
-                  Los miembros ToursRed+ no pagan cargo por servicio. Agrega una membresía a tu compra y comienza a ahorrar hoy.
+                  Los miembros ToursRed+ no pagan cargo por servicio en reservas nacionales. Agrega una membresía a tu compra y comienza a ahorrar hoy.
                 </p>
               </div>
             </div>

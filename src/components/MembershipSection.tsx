@@ -29,11 +29,11 @@ const MembershipSection: React.FC = () => {
             <ul className="space-y-3 mb-8">
               <li className="flex items-start">
                 <Check className="h-5 w-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
-                <span className="text-gray-700">Sin cargo por servicio en reservas</span>
+                <span className="text-gray-700">Sin Cargo por Servicio en reservas nacionales</span>
               </li>
               <li className="flex items-start">
                 <Check className="h-5 w-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
-                <span className="text-gray-700">Ahorra 5% en cada reserva</span>
+                <span className="text-gray-700">Ahorra 5% en cada Reserva Nacional</span>
               </li>
               <li className="flex items-start">
                 <Check className="h-5 w-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
@@ -107,7 +107,7 @@ const MembershipSection: React.FC = () => {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-3xl mx-auto">
             <h4 className="font-semibold text-gray-900 mb-2">¿Cómo funciona?</h4>
             <p className="text-gray-700">
-              Al suscribirte a ToursRed+, eliminas el cargo por servicio del 5% en todas tus reservas.
+              Al suscribirte a ToursRed+, eliminas el cargo por servicio del 5% en todas tus reservas nacionales.
               Si reservas tours frecuentemente, tu membresía se paga sola en la primera o segunda reserva.
               Además, puedes agregar la membresía directamente al hacer tu primera reserva.
             </p>
