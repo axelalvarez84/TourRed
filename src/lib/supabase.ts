@@ -811,3 +811,96 @@ export const getImageSrc = (base64?: string, url?: string): string => {
   }
   return 'https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg'; // Default image
 };
+
+// Tour Categories functions
+export const getTourCategories = async (includeInactive: boolean = false) => {
+  try {
+    let query = supabase
+      .from('tour_categories')
+      .select('*')
+      .order('display_order', { ascending: true });
+
+    if (!includeInactive) {
+      query = query.eq('is_active', true);
+    }
+
+    const { data, error } = await query;
+    return { data, error };
+  } catch (error: any) {
+    console.error('❌ Error en getTourCategories:', error);
+    return { data: null, error };
+  }
+};
+
+export const createTourCategory = async (categoryData: {
+  name: string;
+  slug: string;
+  description?: string;
+  display_order?: number;
+}) => {
+  try {
+    const { data, error } = await supabase
+      .from('tour_categories')
+      .insert(categoryData)
+      .select()
+      .single();
+
+    return { data, error };
+  } catch (error: any) {
+    console.error('❌ Error en createTourCategory:', error);
+    return { data: null, error };
+  }
+};
+
+export const updateTourCategory = async (
+  id: string,
+  categoryData: Partial<{
+    name: string;
+    slug: string;
+    description: string;
+    is_active: boolean;
+    display_order: number;
+  }>
+) => {
+  try {
+    const { data, error } = await supabase
+      .from('tour_categories')
+      .update(categoryData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    return { data, error };
+  } catch (error: any) {
+    console.error('❌ Error en updateTourCategory:', error);
+    return { data: null, error };
+  }
+};
+
+export const deleteTourCategory = async (id: string) => {
+  try {
+    // Verificar si hay tours usando esta categoría
+    const { data: tours } = await supabase
+      .from('tours')
+      .select('id')
+      .contains('category', [id])
+      .limit(1);
+
+    if (tours && tours.length > 0) {
+      return {
+        data: null,
+        error: { message: 'No se puede eliminar la categoría porque tiene tours asociados' }
+      };
+    }
+
+    const { error } = await supabase
+      .from('tour_categories')
+      .delete()
+      .eq('id', id);
+
+    return { error };
+  } catch (error: any) {
+    console.error('❌ Error en deleteTourCategory:', error);
+    return { error };
+  }
+};

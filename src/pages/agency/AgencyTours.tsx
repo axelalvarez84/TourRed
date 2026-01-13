@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination } from '../../lib/supabase';
+import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination, getTourCategories } from '../../lib/supabase';
 import { Plus, Search, X, Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy } from 'lucide-react';
 import { Tour, Destination } from '../../types';
 import { format } from 'date-fns';
 import ImageUploader from '../../components/ImageUploader';
 
+interface TourCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+}
+
 const AgencyTours: React.FC = () => {
   const { user } = useAuth();
   const [tours, setTours] = useState<Tour[]>([]);
+  const [categories, setCategories] = useState<TourCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,6 +69,7 @@ const AgencyTours: React.FC = () => {
   useEffect(() => {
     fetchAgencyTours();
     fetchAllDestinations();
+    fetchCategories();
   }, [user]);
 
   useEffect(() => {
@@ -87,6 +96,24 @@ const AgencyTours: React.FC = () => {
       setAllAvailableDestinations(data || []);
     } catch (err: any) {
       console.error('❌ Error cargando destinos:', err);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await getTourCategories();
+      if (error) throw error;
+      setCategories(data || []);
+
+      // Si hay categorías y el formData aún tiene el valor por defecto, actualizar
+      if (data && data.length > 0 && formData.category[0] === 'adventure') {
+        setFormData(prev => ({
+          ...prev,
+          category: [data[0].slug]
+        }));
+      }
+    } catch (err: any) {
+      console.error('❌ Error cargando categorías:', err);
     }
   };
 
@@ -160,7 +187,7 @@ const AgencyTours: React.FC = () => {
   const resetForm = () => {
     setFormData({
       name: '',
-      category: ['adventure'],
+      category: categories.length > 0 ? [categories[0].slug] : [],
       description: '',
       itinerary: '',
       price: '',
@@ -612,16 +639,9 @@ const AgencyTours: React.FC = () => {
     }
   };
 
-  const getCategoryName = (category: string) => {
-    const categories: { [key: string]: string } = {
-      adventure: 'Aventura',
-      nature: 'Naturaleza',
-      cultural: 'Cultural',
-      beach: 'Playa',
-      urban: 'Urbano',
-      wellness: 'Bienestar'
-    };
-    return categories[category] || category;
+  const getCategoryName = (categorySlug: string) => {
+    const category = categories.find(c => c.slug === categorySlug);
+    return category ? category.name : categorySlug;
   };
 
   const getCategoryNames = (categories: string | string[]) => {
@@ -708,24 +728,22 @@ const AgencyTours: React.FC = () => {
                   Categorías * <span className="text-xs text-gray-500">(Selecciona al menos una)</span>
                 </label>
                 <div className="space-y-2">
-                  {[
-                    { value: 'adventure', label: 'Aventura' },
-                    { value: 'nature', label: 'Naturaleza' },
-                    { value: 'cultural', label: 'Cultural' },
-                    { value: 'beach', label: 'Playa' },
-                    { value: 'urban', label: 'Urbano' },
-                    { value: 'wellness', label: 'Bienestar' }
-                  ].map((cat) => (
-                    <label key={cat.value} className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.category.includes(cat.value)}
-                        onChange={() => handleCategoryToggle(cat.value)}
+                  {categories.length === 0 ? (
+                    <p className="text-sm text-gray-500 italic">Cargando categorías...</p>
+                  ) : (
+                    categories.map((cat) => (
+                      <label key={cat.slug} className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.category.includes(cat.slug)}
+                        onChange={() => handleCategoryToggle(cat.slug)}
                         className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                       />
-                      <span className="text-sm text-gray-700">{cat.label}</span>
+                      <span className="text-sm text-gray-700">{cat.name}</span>
                     </label>
-                  ))}
+                  ))
+                  )}
+
                 </div>
                 {formData.category.length === 0 && (
                   <p className="text-sm text-red-500 mt-1">⚠️ Debes seleccionar al menos una categoría</p>
