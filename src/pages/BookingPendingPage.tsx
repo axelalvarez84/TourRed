@@ -1,26 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { Clock, CheckCircle, MapPin, Users, Calendar, ArrowRight, Home, Bell } from 'lucide-react';
 import { supabase, parseDateFromDB } from '../lib/supabase';
 import { Booking, Tour } from '../types';
 import { format } from 'date-fns';
 
 const BookingPendingPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const { bookingId } = useParams<{ bookingId: string }>();
   const [booking, setBooking] = useState<Booking | null>(null);
   const [tour, setTour] = useState<Tour | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const bookingId = searchParams.get('booking_id');
     if (bookingId) {
       fetchBookingDetails(bookingId);
     } else {
       setError('ID de reserva no encontrado');
       setIsLoading(false);
     }
-  }, [searchParams]);
+  }, [bookingId]);
 
   const fetchBookingDetails = async (bookingId: string) => {
     try {
@@ -42,10 +41,14 @@ const BookingPendingPage: React.FC = () => {
           )
         `)
         .eq('id', bookingId)
-        .single();
+        .maybeSingle();
 
       if (bookingError) {
         throw new Error(bookingError.message);
+      }
+
+      if (!bookingData) {
+        throw new Error('Reserva no encontrada');
       }
 
       setBooking(bookingData);
