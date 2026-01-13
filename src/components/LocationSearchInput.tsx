@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MapPin, Navigation, Search } from 'lucide-react';
+import { MapPin, Navigation, Search, Landmark, Building2, Store, Train } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface LocationSuggestion {
@@ -255,7 +255,25 @@ export default function LocationSearchInput({
   };
 
   const getPlaceIcon = (placeType: string) => {
-    return <MapPin className="w-4 h-4 text-gray-400" />;
+    const iconClass = "w-5 h-5";
+
+    if (placeType === 'poi') {
+      return <Landmark className={`${iconClass} text-blue-600`} />;
+    }
+
+    switch (placeType) {
+      case 'poi':
+        return <Landmark className={`${iconClass} text-blue-600`} />;
+      case 'address':
+        return <MapPin className={`${iconClass} text-gray-500`} />;
+      case 'place':
+        return <Building2 className={`${iconClass} text-green-600`} />;
+      case 'neighborhood':
+      case 'locality':
+        return <Store className={`${iconClass} text-purple-600`} />;
+      default:
+        return <MapPin className={`${iconClass} text-gray-400`} />;
+    }
   };
 
   return (

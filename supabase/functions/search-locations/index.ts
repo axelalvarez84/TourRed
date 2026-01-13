@@ -114,7 +114,8 @@ Deno.serve(async (req: Request) => {
       console.log('🗺️ Calling Mapbox Geocoding API...');
       try {
         // Use Geocoding API v5 which is designed for server-side use
-        let mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&country=MX&types=poi,address,place,neighborhood&language=es&limit=${limit - suggestions.length}`;
+        // POI types include landmarks, public transit, shopping, etc.
+        let mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&country=MX&types=poi,address,place,locality,neighborhood&language=es&limit=${limit - suggestions.length}&fuzzyMatch=true`;
 
         // Add proximity bias if coordinates provided
         if (proximityLng && proximityLat) {
