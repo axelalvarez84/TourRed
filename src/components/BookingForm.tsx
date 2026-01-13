@@ -74,7 +74,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
       try {
         const { data, error } = await supabase
-          .from('toursred_plus_memberships')
+          .from('memberships')
           .select('status')
           .eq('user_id', user.id)
           .eq('status', 'active')
@@ -85,6 +85,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           setHasMembership(false);
         } else {
           setHasMembership(!!data);
+          console.log('✅ Estado de membresía:', !!data ? 'ACTIVA' : 'NO ACTIVA');
         }
       } catch (err) {
         console.error('Error loading membership:', err);
