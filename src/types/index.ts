@@ -235,6 +235,10 @@ export interface SearchFilters {
   maxPrice?: string;
   petFriendly?: string;
   departurePoint?: string;
+  lat?: string;
+  lng?: string;
+  radius?: string;
+  locationName?: string;
 }
 
 export interface ImageUploadData {

@@ -5,12 +5,23 @@ import { Plus, Search, X, Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign
 import { Tour, Destination } from '../../types';
 import { format } from 'date-fns';
 import ImageUploader from '../../components/ImageUploader';
+import LocationSearchInput from '../../components/LocationSearchInput';
 
 interface TourCategory {
   id: string;
   name: string;
   slug: string;
   description?: string;
+}
+
+interface DepartureLocation {
+  locationId?: string;
+  name: string;
+  address: string;
+  coordinates?: { lat: number; lng: number };
+  isPrimary: boolean;
+  meetingTime?: string;
+  meetingInstructions?: string;
 }
 
 const AgencyTours: React.FC = () => {
@@ -65,6 +76,11 @@ const AgencyTours: React.FC = () => {
   const [includes, setIncludes] = useState<string[]>(['']);
   const [excludes, setExcludes] = useState<string[]>(['']);
   const [departurePoints, setDeparturePoints] = useState<string[]>(['']);
+  const [departureLocations, setDepartureLocations] = useState<DepartureLocation[]>([{
+    name: '',
+    address: '',
+    isPrimary: true,
+  }]);
   const [tourImageData, setTourImageData] = useState<{base64: string, type: string, size: number} | null>(null);
 
   useEffect(() => {
@@ -459,6 +475,52 @@ const AgencyTours: React.FC = () => {
     }
   };
 
+  // New handlers for departure locations
+  const handleDepartureLocationChange = (index: number, name: string) => {
+    const newLocations = [...departureLocations];
+    newLocations[index] = { ...newLocations[index], name };
+    setDepartureLocations(newLocations);
+  };
+
+  const handleDepartureLocationSelect = (
+    index: number,
+    location: { name: string; address: string; coordinates: { lat: number; lng: number } }
+  ) => {
+    const newLocations = [...departureLocations];
+    newLocations[index] = {
+      ...newLocations[index],
+      name: location.name,
+      address: location.address,
+      coordinates: location.coordinates,
+    };
+    setDepartureLocations(newLocations);
+  };
+
+  const addDepartureLocation = () => {
+    setDepartureLocations([
+      ...departureLocations,
+      { name: '', address: '', isPrimary: false },
+    ]);
+  };
+
+  const removeDepartureLocation = (index: number) => {
+    if (departureLocations.length > 1) {
+      const newLocations = departureLocations.filter((_, i) => i !== index);
+      if (newLocations.every((loc) => !loc.isPrimary) && newLocations.length > 0) {
+        newLocations[0].isPrimary = true;
+      }
+      setDepartureLocations(newLocations);
+    }
+  };
+
+  const togglePrimaryLocation = (index: number) => {
+    const newLocations = departureLocations.map((loc, i) => ({
+      ...loc,
+      isPrimary: i === index,
+    }));
+    setDepartureLocations(newLocations);
+  };
+
   const handleImageSelect = (base64: string, type: string, size: number) => {
     setTourImageData({ base64, type, size });
     // También actualizar la URL para vista previa
@@ -515,9 +577,13 @@ const AgencyTours: React.FC = () => {
       const filteredExcludes = excludes.filter(item => item.trim() !== '');
       const filteredDeparturePoints = departurePoints.filter(item => item.trim() !== '');
 
-      // Validar que haya al menos un punto de partida
-      if (filteredDeparturePoints.length === 0) {
-        throw new Error('Debe especificar al menos un punto de partida para el tour');
+      // Validar departure locations (nuevo sistema)
+      const validDepartureLocations = departureLocations.filter(
+        (loc) => loc.name.trim() !== '' && loc.coordinates
+      );
+
+      if (validDepartureLocations.length === 0) {
+        throw new Error('Debe especificar al menos un punto de partida válido para el tour');
       }
 
       // Calcular fecha límite por defecto si no se especifica
@@ -558,21 +624,77 @@ const AgencyTours: React.FC = () => {
         admite_adultos_mayores: formData.admite_adultos_mayores,
       };
 
+      let tourId: string;
+
       if (editingTour) {
         // Actualizar tour existente
         const { error } = await updateTour(editingTour.id, tourData);
         if (error) throw error;
+        tourId = editingTour.id;
         console.log('✅ Tour actualizado correctamente');
       } else {
         // Crear nuevo tour
-        const { error } = await createTour(tourData, processedDestinations, user.id);
+        const { data: newTour, error } = await createTour(tourData, processedDestinations, user.id);
         if (error) throw error;
+        tourId = newTour.id;
         console.log('✅ Tour creado correctamente');
+      }
+
+      // Geocodificar y guardar departure locations
+      console.log('🌍 Procesando puntos de partida...');
+      const { data: sessionData } = await supabase.auth.getSession();
+
+      if (sessionData?.session) {
+        // Eliminar puntos de partida anteriores del tour
+        await supabase
+          .from('tour_departure_locations')
+          .delete()
+          .eq('tour_id', tourId);
+
+        // Procesar cada ubicación
+        for (const location of validDepartureLocations) {
+          try {
+            // Geocodificar la ubicación
+            const geocodeResponse = await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/geocode-location`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${sessionData.session.access_token}`,
+                },
+                body: JSON.stringify({ query: location.address || location.name }),
+              }
+            );
+
+            if (geocodeResponse.ok) {
+              const geocodeResult = await geocodeResponse.json();
+              if (geocodeResult.success && geocodeResult.location) {
+                // Crear relación entre tour y ubicación
+                const { error: relationError } = await supabase
+                  .from('tour_departure_locations')
+                  .insert({
+                    tour_id: tourId,
+                    location_id: geocodeResult.location.id,
+                    is_primary: location.isPrimary,
+                    meeting_time: location.meetingTime || null,
+                    meeting_instructions: location.meetingInstructions || null,
+                  });
+
+                if (relationError) {
+                  console.error('Error guardando relación de ubicación:', relationError);
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Error geocodificando ubicación:', location.name, err);
+          }
+        }
       }
 
       // Recargar destinos disponibles después de crear nuevos
       await fetchAllDestinations();
-      
+
       // Recargar tours después de crear/actualizar
       await fetchAgencyTours();
       handleCancel();
@@ -1022,44 +1144,90 @@ const AgencyTours: React.FC = () => {
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Puntos de Partida * <span className="text-xs text-gray-500">(Al menos uno es obligatorio)</span>
+                  Puntos de Partida * <span className="text-xs text-gray-500">(Al menos uno es obligatorio, máx. 5)</span>
                 </label>
-                <div className="space-y-2">
-                  {departurePoints.map((point, index) => (
-                    <div key={index} className="flex items-center space-x-2">
-                      <input
-                        type="text"
-                        value={point}
-                        onChange={(e) => handleDeparturePointChange(index, e.target.value)}
-                        className="input flex-1"
-                        placeholder="Ej: Monumento a la Revolución, Metro Oceanía, etc."
-                      />
-                      {departurePoints.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeDeparturePoint(index)}
-                          className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
-                          title="Eliminar punto de partida"
-                        >
-                          <Minus className="h-5 w-5" />
-                        </button>
-                      )}
+                <div className="space-y-4">
+                  {departureLocations.map((location, index) => (
+                    <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                      <div className="flex items-start space-x-3">
+                        <div className="flex-1 space-y-3">
+                          <LocationSearchInput
+                            value={location.name}
+                            onChange={(value) => handleDepartureLocationChange(index, value)}
+                            onLocationSelect={(loc) => handleDepartureLocationSelect(index, loc)}
+                            placeholder="Buscar punto de partida (Ej: Monumento a la Revolución)"
+                          />
+                          {location.address && (
+                            <p className="text-xs text-gray-600 flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {location.address}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-3">
+                            <label className="flex items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={location.isPrimary}
+                                onChange={() => togglePrimaryLocation(index)}
+                                className="rounded text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-gray-700">Punto principal</span>
+                            </label>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <input
+                              type="text"
+                              value={location.meetingTime || ''}
+                              onChange={(e) => {
+                                const newLocations = [...departureLocations];
+                                newLocations[index].meetingTime = e.target.value;
+                                setDepartureLocations(newLocations);
+                              }}
+                              placeholder="Hora de salida (opcional)"
+                              className="input text-sm"
+                            />
+                            <input
+                              type="text"
+                              value={location.meetingInstructions || ''}
+                              onChange={(e) => {
+                                const newLocations = [...departureLocations];
+                                newLocations[index].meetingInstructions = e.target.value;
+                                setDepartureLocations(newLocations);
+                              }}
+                              placeholder="Instrucciones (opcional)"
+                              className="input text-sm"
+                            />
+                          </div>
+                        </div>
+                        {departureLocations.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeDepartureLocation(index)}
+                            className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded mt-1"
+                            title="Eliminar punto de partida"
+                          >
+                            <X className="h-5 w-5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
-                  <button
-                    type="button"
-                    onClick={addDeparturePoint}
-                    className="flex items-center space-x-2 text-primary-600 hover:text-primary-800"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span className="text-sm">Agregar punto de partida</span>
-                  </button>
+                  {departureLocations.length < 5 && (
+                    <button
+                      type="button"
+                      onClick={addDepartureLocation}
+                      className="flex items-center space-x-2 text-primary-600 hover:text-primary-800 transition-colors"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span className="text-sm font-medium">Agregar otro punto de partida</span>
+                    </button>
+                  )}
                 </div>
-                {departurePoints.filter(p => p.trim() !== '').length === 0 && (
-                  <p className="text-sm text-red-500 mt-1">⚠️ Debe especificar al menos un punto de partida</p>
+                {departureLocations.filter((loc) => loc.name.trim() !== '' && loc.coordinates).length === 0 && (
+                  <p className="text-sm text-red-500 mt-2">⚠️ Debe especificar al menos un punto de partida válido</p>
                 )}
-                <p className="text-xs text-gray-500 mt-2">
-                  💡 Los puntos de partida son importantes para los viajeros. Especifica todos los lugares desde donde pueden abordar el tour.
+                <p className="text-xs text-gray-500 mt-3">
+                  💡 Los puntos de partida permiten que los viajeros busquen tours cercanos. Geocodificamos automáticamente las ubicaciones.
                 </p>
               </div>
 

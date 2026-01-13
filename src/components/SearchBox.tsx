@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MapPin, Tag, Calendar, Building2, DollarSign, Dog, X } from 'lucide-react';
+import { Search, Tag, Calendar, Building2, DollarSign, Dog, X } from 'lucide-react';
 import { SearchFilters } from '../types';
 import { supabase } from '../lib/supabase';
+import LocationSearchInput from './LocationSearchInput';
 
 interface SearchBoxProps {
   initialFilters?: SearchFilters;
@@ -19,6 +20,13 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
   const [minPrice, setMinPrice] = useState(initialFilters.minPrice || '');
   const [maxPrice, setMaxPrice] = useState(initialFilters.maxPrice || '');
   const [petFriendly, setPetFriendly] = useState(initialFilters.petFriendly || '');
+  const [locationName, setLocationName] = useState(initialFilters.locationName || '');
+  const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | null>(
+    initialFilters.lat && initialFilters.lng
+      ? { lat: parseFloat(initialFilters.lat), lng: parseFloat(initialFilters.lng) }
+      : null
+  );
+  const [radius, setRadius] = useState(initialFilters.radius || '5');
   const [categories, setCategories] = useState<any[]>([]);
   const [agencies, setAgencies] = useState<any[]>([]);
   const [filteredAgencies, setFilteredAgencies] = useState<any[]>([]);
@@ -115,6 +123,14 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
     setShowAgencyDropdown(false);
   };
 
+  const handleLocationSelect = (location: {
+    name: string;
+    address: string;
+    coordinates: { lat: number; lng: number };
+  }) => {
+    setLocationCoords(location.coordinates);
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -128,6 +144,13 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
     if (maxPrice) queryParams.set('maxPrice', maxPrice);
     if (petFriendly) queryParams.set('petFriendly', petFriendly);
 
+    if (locationCoords) {
+      queryParams.set('lat', locationCoords.lat.toString());
+      queryParams.set('lng', locationCoords.lng.toString());
+      queryParams.set('radius', radius);
+      if (locationName) queryParams.set('locationName', locationName);
+    }
+
     navigate(`/tours?${queryParams.toString()}`);
   };
 
@@ -135,20 +158,50 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
     <div className={`bg-white rounded-lg shadow-lg p-4 md:p-6 ${className}`}>
       <form onSubmit={handleSearch}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Punto de Salida
+            </label>
+            <LocationSearchInput
+              value={locationName}
+              onChange={setLocationName}
+              onLocationSelect={handleLocationSelect}
+              placeholder="Buscar punto de salida (Ej: Monumento a la Revolución)"
+            />
+            {locationCoords && (
+              <div className="mt-3">
+                <label htmlFor="radius" className="block text-sm font-medium text-gray-700 mb-2">
+                  Radio de búsqueda: <span className="font-bold text-blue-600">{radius} km</span>
+                </label>
+                <input
+                  type="range"
+                  id="radius"
+                  min="1"
+                  max="25"
+                  step="1"
+                  value={radius}
+                  onChange={(e) => setRadius(e.target.value)}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>1 km</span>
+                  <span>25 km</span>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="relative">
             <label htmlFor="destination" className="block text-sm font-medium text-gray-700 mb-1">
-              Destino
+              Destino (opcional)
             </label>
             <div className="relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <MapPin className="h-5 w-5 text-gray-400" />
-              </div>
               <input
                 type="text"
                 id="destination"
                 value={destination}
                 onChange={(e) => setDestination(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
                 placeholder="¿A dónde quieres ir?"
               />
             </div>

@@ -6,14 +6,34 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 
 interface TourCardProps {
-  tour: Tour;
+  tour: Tour & {
+    distance_meters?: number;
+    nearest_departure_location?: string;
+    nearest_departure_address?: string;
+  };
   className?: string;
+  showDistance?: boolean;
 }
 
-const TourCard: React.FC<TourCardProps> = ({ tour, className = '' }) => {
+const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance = false }) => {
   const { user } = useAuth();
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  const formatDistance = (meters: number) => {
+    const km = meters / 1000;
+    if (km < 1) {
+      return `${Math.round(meters)} m`;
+    }
+    return `${km.toFixed(1)} km`;
+  };
+
+  const getDistanceBadgeColor = (meters: number) => {
+    const km = meters / 1000;
+    if (km < 2) return 'bg-green-100 text-green-800 border-green-300';
+    if (km < 5) return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+    return 'bg-orange-100 text-orange-800 border-orange-300';
+  };
 
   useEffect(() => {
     if (user) {
@@ -131,9 +151,29 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '' }) => {
           </div>
         </div>
         
-        <div className="flex items-center text-gray-500 text-sm mb-2">
-          <MapPin className="w-4 h-4 mr-1" />
-          <span>{tour.destination}</span>
+        <div className="space-y-2 mb-2">
+          <div className="flex items-center text-gray-500 text-sm">
+            <MapPin className="w-4 h-4 mr-1" />
+            <span>{tour.destination}</span>
+          </div>
+
+          {showDistance && tour.distance_meters !== undefined && (
+            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getDistanceBadgeColor(tour.distance_meters)}`}>
+              <MapPin className="w-3.5 h-3.5" />
+              <span>
+                A {formatDistance(tour.distance_meters)} de tu búsqueda
+              </span>
+            </div>
+          )}
+
+          {showDistance && tour.nearest_departure_location && (
+            <div className="text-xs text-gray-600 flex items-start gap-1">
+              <MapPin className="w-3 h-3 mt-0.5 flex-shrink-0" />
+              <span className="line-clamp-1">
+                Sale desde: <span className="font-medium">{tour.nearest_departure_location}</span>
+              </span>
+            </div>
+          )}
         </div>
 
         {tour.agencies && (

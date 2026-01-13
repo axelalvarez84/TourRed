@@ -10,9 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mapbox/search-js-react": "^1.5.1",
     "@supabase/supabase-js": "^2.39.6",
     "date-fns": "^3.3.1",
     "lucide-react": "^0.344.0",
+    "mapbox-gl": "^3.17.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.22.0"

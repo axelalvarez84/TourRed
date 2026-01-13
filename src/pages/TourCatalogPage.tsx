@@ -25,7 +25,13 @@ const TourCatalogPage: React.FC = () => {
     maxPrice: searchParams.get('maxPrice') || '',
     petFriendly: searchParams.get('petFriendly') || '',
     departurePoint: searchParams.get('departurePoint') || '',
+    lat: searchParams.get('lat') || '',
+    lng: searchParams.get('lng') || '',
+    radius: searchParams.get('radius') || '',
+    locationName: searchParams.get('locationName') || '',
   };
+
+  const hasGeoSearch = !!(initialFilters.lat && initialFilters.lng);
 
   const toggleFilters = () => {
     setVisibleFilters(!visibleFilters);
@@ -36,32 +42,81 @@ const TourCatalogPage: React.FC = () => {
       try {
         setIsLoading(true);
         setError('');
-        
-        console.log('🔍 Cargando tours desde la BD con filtros:', initialFilters);
-        
-        const { data, error } = await getTours({
-          destination: initialFilters.destination || null,
-          category: initialFilters.category || null,
-          startDate: initialFilters.startDate || null,
-          endDate: initialFilters.endDate || null,
-          agency: initialFilters.agency || null,
-          minPrice: initialFilters.minPrice || null,
-          maxPrice: initialFilters.maxPrice || null,
-          petFriendly: initialFilters.petFriendly || null,
-          departurePoint: initialFilters.departurePoint || null,
-        });
-        
-        if (error) {
-          console.error('❌ Error cargando tours:', error);
-          throw new Error(error.message);
+
+        if (hasGeoSearch) {
+          console.log('🌍 Buscando tours por proximidad:', {
+            lat: initialFilters.lat,
+            lng: initialFilters.lng,
+            radius: initialFilters.radius,
+          });
+
+          const { data, error } = await supabase.rpc('search_tours_by_departure_radius', {
+            search_lat: parseFloat(initialFilters.lat!),
+            search_lng: parseFloat(initialFilters.lng!),
+            radius_km: parseFloat(initialFilters.radius || '5'),
+            filter_category: initialFilters.category ? [initialFilters.category] : null,
+            filter_destination: initialFilters.destination || null,
+            min_price: initialFilters.minPrice ? parseFloat(initialFilters.minPrice) : null,
+            max_price: initialFilters.maxPrice ? parseFloat(initialFilters.maxPrice) : null,
+            limit_results: 100,
+          });
+
+          if (error) {
+            console.error('❌ Error en búsqueda por proximidad:', error);
+            throw new Error(error.message);
+          }
+
+          console.log('✅ Tours encontrados por proximidad:', data);
+
+          const transformedTours = data?.map((row: any) => ({
+            id: row.tour_id,
+            name: row.tour_name,
+            description: row.tour_description,
+            price: row.tour_price,
+            duration: row.tour_duration,
+            category: row.tour_category,
+            destination: row.tour_destination,
+            image_url: row.tour_image_url,
+            is_featured: row.tour_is_featured,
+            agency_id: row.agency_id,
+            agencies: {
+              id: row.agency_id,
+              name: row.agency_name,
+            },
+            distance_meters: row.distance_meters,
+            nearest_departure_location: row.nearest_departure_location,
+            nearest_departure_address: row.nearest_departure_address,
+            all_departure_locations: row.all_departure_locations,
+          })) || [];
+
+          setTours(transformedTours);
+        } else {
+          console.log('🔍 Cargando tours desde la BD con filtros:', initialFilters);
+
+          const { data, error } = await getTours({
+            destination: initialFilters.destination || null,
+            category: initialFilters.category || null,
+            startDate: initialFilters.startDate || null,
+            endDate: initialFilters.endDate || null,
+            agency: initialFilters.agency || null,
+            minPrice: initialFilters.minPrice || null,
+            maxPrice: initialFilters.maxPrice || null,
+            petFriendly: initialFilters.petFriendly || null,
+            departurePoint: initialFilters.departurePoint || null,
+          });
+
+          if (error) {
+            console.error('❌ Error cargando tours:', error);
+            throw new Error(error.message);
+          }
+
+          console.log('✅ Tours cargados desde BD:', data);
+          setTours(data || []);
         }
-        
-        console.log('✅ Tours cargados desde BD:', data);
-        setTours(data || []);
       } catch (err: any) {
         console.error('❌ Error en fetchTours:', err);
         setError(err.message || 'Error al cargar los tours');
-        setTours([]); // Clear tours on error
+        setTours([]);
       } finally {
         setIsLoading(false);
       }
@@ -329,9 +384,12 @@ const TourCatalogPage: React.FC = () => {
               <>
                 <div className="flex justify-between items-center mb-4">
                   <p className="text-gray-600">
-                    {filteredTours.length === 1 
-                      ? 'Encontrado 1 tour' 
+                    {filteredTours.length === 1
+                      ? 'Encontrado 1 tour'
                       : `Encontrados ${filteredTours.length} tours`
+                    }
+                    {hasGeoSearch && initialFilters.locationName &&
+                      ` cerca de "${initialFilters.locationName}"`
                     }
                     {initialFilters.destination && ` para "${initialFilters.destination}"`}
                     {initialFilters.category && ` en ${initialFilters.category}`}
@@ -350,7 +408,7 @@ const TourCatalogPage: React.FC = () => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {filteredTours.map((tour) => (
-                    <TourCard key={tour.id} tour={tour} />
+                    <TourCard key={tour.id} tour={tour} showDistance={hasGeoSearch} />
                   ))}
                 </div>
                 
