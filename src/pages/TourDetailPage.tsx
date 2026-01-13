@@ -790,9 +790,21 @@ const TourDetailPage: React.FC = () => {
               </div>
             )}
 
-            {/* Booking Form - Solo mostrar si NO es el propietario */}
-            {!isOwner && <BookingForm tour={tour} />}
-            
+            {/* Mensaje si la agencia está inactiva */}
+            {!isOwner && tour.agencies?.is_active === false && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
+                <h3 className="text-lg font-semibold text-red-900 mb-2">
+                  Tour No Disponible
+                </h3>
+                <p className="text-red-800">
+                  Este tour no está disponible para nuevas reservas en este momento. La agencia asociada se encuentra temporalmente inactiva.
+                </p>
+              </div>
+            )}
+
+            {/* Booking Form - Solo mostrar si NO es el propietario Y la agencia está activa */}
+            {!isOwner && tour.agencies?.is_active !== false && <BookingForm tour={tour} />}
+
             {/* Mensaje para el propietario */}
             {isOwner && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">

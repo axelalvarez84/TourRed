@@ -282,7 +282,7 @@ export const getTours = async (filters: any = {}) => {
             .from('tours')
             .select(`
               *,
-              agencies(id, name, rating)
+              agencies(id, name, rating, is_active)
             `)
             .in('id', tourIds);
 
@@ -321,13 +321,20 @@ export const getTours = async (filters: any = {}) => {
             query = query.eq('pet_friendly', false);
           }
 
-          if (filters.limit) {
-            query = query.limit(filters.limit);
-          }
-
           query = query.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
 
           const { data, error } = await query;
+
+          // Filtrar tours de agencias inactivas (excepto si se solicita explícitamente incluirlas)
+          if (data && filters.includeInactiveAgencies !== true) {
+            const filteredData = data.filter((tour: any) => tour.agencies?.is_active !== false);
+
+            // Aplicar límite después del filtrado si es necesario
+            const finalData = filters.limit ? filteredData.slice(0, filters.limit) : filteredData;
+
+            return { data: finalData, error };
+          }
+
           return { data, error };
         }
       }
@@ -337,7 +344,7 @@ export const getTours = async (filters: any = {}) => {
       .from('tours')
       .select(`
         *,
-        agencies(id, name, rating)
+        agencies(id, name, rating, is_active)
       `);
 
     if (filters.includeExpired !== true) {
@@ -379,13 +386,19 @@ export const getTours = async (filters: any = {}) => {
       query = query.eq('pet_friendly', false);
     }
 
-    if (filters.limit) {
-      query = query.limit(filters.limit);
-    }
-
     query = query.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
 
     const { data, error } = await query;
+
+    // Filtrar tours de agencias inactivas (excepto si se solicita explícitamente incluirlas)
+    if (data && filters.includeInactiveAgencies !== true) {
+      const filteredData = data.filter((tour: any) => tour.agencies?.is_active !== false);
+
+      // Aplicar límite después del filtrado si es necesario
+      const finalData = filters.limit ? filteredData.slice(0, filters.limit) : filteredData;
+
+      return { data: finalData, error };
+    }
 
     return { data, error };
   } catch (error: any) {
@@ -400,11 +413,11 @@ export const getTourById = async (id: string) => {
       .from('tours')
       .select(`
         *,
-        agencies(id, name, rating, logo, description, contact_email)
+        agencies(id, name, rating, logo, description, contact_email, is_active)
       `)
       .eq('id', id)
       .single();
-    
+
     return { data, error };
   } catch (error: any) {
     console.error('❌ Error en getTourById:', error);
