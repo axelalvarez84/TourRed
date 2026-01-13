@@ -330,7 +330,9 @@ const TravelersInfoPage: React.FC = () => {
             bookingId: bookingId,
             customerEmail: user?.email,
             amount: booking?.user_payment,
-            tourName: tour?.name,
+            description: `Depósito para ${tour?.name}`,
+            success_url: `${window.location.origin}/booking-success?booking_id=${bookingId}`,
+            cancel_url: `${window.location.origin}/booking-cancel?booking_id=${bookingId}`,
           }),
         }
       );
