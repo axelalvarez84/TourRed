@@ -20,6 +20,7 @@ const AgencyTours: React.FC = () => {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [editingTour, setEditingTour] = useState<Tour | null>(null);
   const [duplicatingTour, setDuplicatingTour] = useState<Tour | null>(null);
+  const [isAgencyApproved, setIsAgencyApproved] = useState(true);
   const [duplicateFormData, setDuplicateFormData] = useState({
     name: '',
     start_date: '',
@@ -95,8 +96,19 @@ const AgencyTours: React.FC = () => {
     try {
       setIsLoading(true);
       setError('');
-      
+
       console.log('🎯 Cargando tours de la agencia para usuario:', user.id);
+
+      // Verificar si la agencia está aprobada
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('is_approved')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!userError && userData) {
+        setIsAgencyApproved(userData.is_approved !== false);
+      }
 
       // Primero obtener el ID de la agencia
       const { data: agencyData, error: agencyError } = await supabase
@@ -181,6 +193,10 @@ const AgencyTours: React.FC = () => {
   };
 
   const handleCreate = () => {
+    if (!isAgencyApproved) {
+      alert('Su cuenta se encuentra en proceso de validación. Para mayor información o agilizar el proceso, contáctenos a contacto@toursred.com');
+      return;
+    }
     resetForm();
     setIsCreating(true);
     setEditingTour(null);

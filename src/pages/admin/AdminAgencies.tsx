@@ -13,6 +13,7 @@ interface Agency {
   website?: string;
   rating?: number;
   is_active: boolean;
+  is_approved?: boolean;
   created_at: string;
   updated_at: string;
   commission_rate?: number;
@@ -79,7 +80,7 @@ const AdminAgencies: React.FC = () => {
         .from('agencies')
         .select(`
           *,
-          users(first_name, last_name, email)
+          users(first_name, last_name, email, is_approved)
         `)
         .order('created_at', { ascending: false });
 
@@ -128,6 +129,7 @@ const AdminAgencies: React.FC = () => {
 
             return {
               ...agency,
+              is_approved: agency.users?.is_approved,
               tour_count: tourCount || 0,
               booking_count: bookingCount || 0,
               total_revenue: totalRevenue,
@@ -155,19 +157,47 @@ const AdminAgencies: React.FC = () => {
     }
   };
 
-  const handleStatusToggle = async (agencyId: string, currentStatus: boolean) => {
+  const handleApprovalToggle = async (userId: string, currentApproval: boolean) => {
     try {
-      setIsUpdating(agencyId);
-      
-      const { error } = await updateAgencyStatus(agencyId, !currentStatus);
-      
+      setIsUpdating(userId);
+
+      const { error } = await supabase
+        .from('users')
+        .update({ is_approved: !currentApproval })
+        .eq('id', userId);
+
       if (error) {
         throw new Error(error.message);
       }
 
       // Actualizar el estado local
-      setAgencies(agencies.map(agency => 
-        agency.id === agencyId 
+      setAgencies(agencies.map(agency =>
+        agency.user_id === userId
+          ? { ...agency, is_approved: !currentApproval }
+          : agency
+      ));
+
+      setError('');
+    } catch (err: any) {
+      setError(err.message || 'Error al cambiar estado de aprobación');
+    } finally {
+      setIsUpdating(null);
+    }
+  };
+
+  const handleStatusToggle = async (agencyId: string, currentStatus: boolean) => {
+    try {
+      setIsUpdating(agencyId);
+
+      const { error } = await updateAgencyStatus(agencyId, !currentStatus);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Actualizar el estado local
+      setAgencies(agencies.map(agency =>
+        agency.id === agencyId
           ? { ...agency, is_active: !currentStatus }
           : agency
       ));
@@ -378,6 +408,24 @@ const AdminAgencies: React.FC = () => {
     }
   };
 
+  const getApprovalBadge = (isApproved: boolean | undefined) => {
+    if (isApproved !== false) {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          <CheckCircle className="h-3 w-3 mr-1" />
+          Aprobada
+        </span>
+      );
+    } else {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+          <AlertTriangle className="h-3 w-3 mr-1" />
+          Pendiente
+        </span>
+      );
+    }
+  };
+
   const getUserDisplayName = (agency: Agency) => {
     if (agency.users?.first_name || agency.users?.last_name) {
       return `${agency.users.first_name || ''} ${agency.users.last_name || ''}`.trim();
@@ -570,6 +618,9 @@ const AdminAgencies: React.FC = () => {
                     </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Validación
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Acciones
                   </th>
                 </tr>
@@ -671,6 +722,9 @@ const AdminAgencies: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(agency.is_active)}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getApprovalBadge(agency.is_approved)}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center space-x-2">
                         <button
@@ -681,7 +735,26 @@ const AdminAgencies: React.FC = () => {
                         >
                           <Edit className="h-4 w-4" />
                         </button>
-                        
+
+                        <button
+                          onClick={() => handleApprovalToggle(agency.user_id, agency.is_approved !== false)}
+                          disabled={isUpdating === agency.user_id}
+                          className={`${
+                            agency.is_approved !== false
+                              ? 'text-orange-600 hover:text-orange-900'
+                              : 'text-green-600 hover:text-green-900'
+                          } disabled:opacity-50`}
+                          title={agency.is_approved !== false ? 'Revocar aprobación' : 'Aprobar agencia'}
+                        >
+                          {isUpdating === agency.user_id ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-current"></div>
+                          ) : agency.is_approved !== false ? (
+                            <XCircle className="h-4 w-4" />
+                          ) : (
+                            <CheckCircle className="h-4 w-4" />
+                          )}
+                        </button>
+
                         <button
                           onClick={() => handleStatusToggle(agency.id, agency.is_active)}
                           disabled={isUpdating === agency.id}

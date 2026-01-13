@@ -103,6 +103,54 @@ const AgencySignupPage: React.FC = () => {
 
       console.log('✅ Agencia creada:', agencyData);
 
+      // 3. Send notification emails
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (session) {
+          // Send email to admin
+          console.log('📧 Enviando notificación al administrador...');
+          await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-agency-registration-admin`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                agencyName: agencyName.trim(),
+                email: email,
+                firstName: firstName,
+                lastName: lastName,
+                phone: phoneNumber || null,
+              }),
+            }
+          );
+
+          // Send welcome email to agency
+          console.log('📧 Enviando email de bienvenida a la agencia...');
+          await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-agency-welcome`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                email: email,
+                firstName: firstName,
+                agencyName: agencyName.trim(),
+              }),
+            }
+          );
+        }
+      } catch (emailError) {
+        console.error('Error enviando emails de notificación:', emailError);
+        // No detenemos el registro si falla el envío de emails
+      }
+
       if (isExistingUser) {
         setError('Usuario ya registrado. Se ha iniciado sesión automáticamente y se creó el perfil de agencia.');
         setTimeout(() => navigate('/dashboard'), 2000);
