@@ -536,7 +536,24 @@ export const getUserBookings = async (userId: string) => {
     const { data: bookings, error } = await supabase
       .from('bookings')
       .select(`
-        *,
+        id,
+        user_id,
+        tour_id,
+        agency_id,
+        booking_date,
+        status,
+        payment_status,
+        total_price,
+        deposit_amount,
+        user_payment,
+        agency_payment,
+        service_charge,
+        travelers_count,
+        approval_status,
+        approval_notes,
+        approved_at,
+        created_at,
+        updated_at,
         tours:tour_id(id, name, destination, image_url, start_date, end_date),
         agencies:agency_id(id, name, contact_email)
       `)
