@@ -35,11 +35,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Test the token with a simple request
+    // Test the token with Geocoding API v5 (server-side API)
     const testQuery = 'Ciudad de Mexico';
-    const mapboxUrl = `https://api.mapbox.com/search/searchbox/v1/suggest?q=${encodeURIComponent(testQuery)}&access_token=${mapboxToken}&country=MX&language=es&limit=3`;
+    const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(testQuery)}.json?access_token=${mapboxToken}&country=MX&language=es&limit=3`;
     
-    console.log('📡 Testing Mapbox API with query:', testQuery);
+    console.log('📡 Testing Mapbox Geocoding API with query:', testQuery);
     
     const response = await fetch(mapboxUrl);
     const responseText = await response.text();
@@ -58,7 +58,7 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           success: true,
-          message: '✅ Token de Mapbox funciona correctamente',
+          message: '✅ Token de Mapbox funciona correctamente con Geocoding API v5',
           tokenInfo: {
             hasToken: true,
             tokenLength: mapboxToken.length,
@@ -67,8 +67,8 @@ Deno.serve(async (req: Request) => {
           testResult: {
             status: response.status,
             statusText: response.statusText,
-            suggestionsCount: parsedData.suggestions?.length || 0,
-            firstSuggestion: parsedData.suggestions?.[0]?.name || null,
+            featuresCount: parsedData.features?.length || 0,
+            firstFeature: parsedData.features?.[0]?.place_name || null,
           },
           fullResponse: parsedData,
         }),
@@ -94,7 +94,7 @@ Deno.serve(async (req: Request) => {
           },
           possibleReasons: [
             'El token es inválido o ha expirado',
-            'El token no tiene permisos para la API de Search',
+            'El token no tiene permisos para la API de Geocoding',
             'Estás usando el token público en lugar del secreto',
             'La cuota de la API se ha agotado',
           ],

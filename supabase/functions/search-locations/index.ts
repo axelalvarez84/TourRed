@@ -6,24 +6,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
-interface MapboxSuggestion {
-  mapbox_id: string;
-  name: string;
-  name_preferred?: string;
-  place_formatted: string;
-  place_type: string;
-  context?: {
-    place?: { name: string };
-    region?: { name: string };
-  };
-  coordinates: {
-    longitude: number;
-    latitude: number;
-  };
+interface MapboxFeature {
+  id: string;
+  text: string;
+  place_name: string;
+  place_type: string[];
+  center: [number, number];
+  context?: Array<{
+    id: string;
+    text: string;
+  }>;
 }
 
-interface MapboxSuggestResponse {
-  suggestions: MapboxSuggestion[];
+interface MapboxGeocodingResponse {
+  type: string;
+  features: MapboxFeature[];
   attribution: string;
 }
 
@@ -112,11 +109,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Otherwise, supplement with Mapbox suggestions
+    // Otherwise, supplement with Mapbox suggestions using Geocoding API v5
     if (mapboxToken) {
-      console.log('🗺️ Calling Mapbox API...');
+      console.log('🗺️ Calling Mapbox Geocoding API...');
       try {
-        let mapboxUrl = `https://api.mapbox.com/search/searchbox/v1/suggest?q=${encodeURIComponent(query)}&access_token=${mapboxToken}&country=MX&types=poi,address,place,neighborhood&language=es&limit=${limit - suggestions.length}`;
+        // Use Geocoding API v5 which is designed for server-side use
+        let mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&country=MX&types=poi,address,place,neighborhood&language=es&limit=${limit - suggestions.length}`;
 
         // Add proximity bias if coordinates provided
         if (proximityLng && proximityLat) {
@@ -130,24 +128,30 @@ Deno.serve(async (req: Request) => {
         console.log('📥 Mapbox response status:', mapboxResponse.status, mapboxResponse.statusText);
 
         if (mapboxResponse.ok) {
-          const mapboxData: MapboxSuggestResponse = await mapboxResponse.json();
-          console.log('✅ Mapbox suggestions received:', mapboxData.suggestions?.length || 0);
+          const mapboxData: any = await mapboxResponse.json();
+          console.log('✅ Mapbox features received:', mapboxData.features?.length || 0);
 
-          if (mapboxData.suggestions) {
+          if (mapboxData.features && mapboxData.features.length > 0) {
             suggestions.push(
-              ...mapboxData.suggestions.map((s: MapboxSuggestion) => ({
-                mapbox_id: s.mapbox_id,
-                name: s.name_preferred || s.name,
-                address: s.place_formatted,
-                city: s.context?.place?.name || '',
-                state: s.context?.region?.name || '',
-                place_type: s.place_type,
-                coordinates: {
-                  lng: s.coordinates.longitude,
-                  lat: s.coordinates.latitude,
-                },
-                source: 'mapbox',
-              }))
+              ...mapboxData.features.map((feature: any) => {
+                const placeType = feature.place_type?.[0] || 'place';
+                const city = feature.context?.find((c: any) => c.id.startsWith('place.'))?.text || '';
+                const state = feature.context?.find((c: any) => c.id.startsWith('region.'))?.text || '';
+
+                return {
+                  mapbox_id: feature.id,
+                  name: feature.text,
+                  address: feature.place_name,
+                  city,
+                  state,
+                  place_type: placeType,
+                  coordinates: {
+                    lng: feature.center[0],
+                    lat: feature.center[1],
+                  },
+                  source: 'mapbox',
+                };
+              })
             );
             console.log('📍 Total suggestions after Mapbox:', suggestions.length);
           }
