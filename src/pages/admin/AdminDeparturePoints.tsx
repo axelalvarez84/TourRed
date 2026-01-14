@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Search, Plus, Edit, Trash2, ExternalLink, Eye, AlertCircle, Check, X } from 'lucide-react';
+import { MapPin, Search, Plus, Edit2, Trash2, ExternalLink, Eye, AlertCircle, Check, X, Save } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import DeparturePointForm from '../../components/DeparturePointForm';
 
 interface DeparturePoint {
   id: string;
@@ -28,11 +27,19 @@ const AdminDeparturePoints: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [isLoading, setIsLoading] = useState(true);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editingPoint, setEditingPoint] = useState<DeparturePoint | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isAddingNew, setIsAddingNew] = useState(false);
   const [viewingPointId, setViewingPointId] = useState<string | null>(null);
   const [toursUsingPoint, setToursUsingPoint] = useState<ToursUsingPoint[]>([]);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [formData, setFormData] = useState({
+    name: '',
+    city: '',
+    municipality: '',
+    google_maps_url: '',
+    is_active: true
+  });
 
   useEffect(() => {
     fetchDeparturePoints();
@@ -88,14 +95,113 @@ const AdminDeparturePoints: React.FC = () => {
     setViewingPointId(pointId);
     try {
       const { data, error } = await supabase
-        .rpc('get_tours_for_departure_point', { point_id: pointId });
+        .from('tour_departure_points')
+        .select(`
+          tour_id,
+          display_order,
+          tours(name),
+          tours:tour_id(agency_id),
+          agencies(name)
+        `)
+        .eq('departure_point_id', pointId);
 
       if (error) throw error;
 
-      setToursUsingPoint(data || []);
+      const processed = (data || []).map((item: any) => ({
+        tour_id: item.tour_id,
+        tour_name: item.tours?.name || 'Sin nombre',
+        agency_name: item.agencies?.name || 'Sin agencia',
+        display_order: item.display_order
+      }));
+
+      setToursUsingPoint(processed);
     } catch (err: any) {
       console.error('Error fetching tours for point:', err);
       alert('Error al cargar los tours que usan este punto');
+    }
+  };
+
+  const handleEdit = (point: DeparturePoint) => {
+    setEditingId(point.id);
+    setFormData({
+      name: point.name,
+      city: point.city,
+      municipality: point.municipality,
+      google_maps_url: point.google_maps_url || '',
+      is_active: point.is_active
+    });
+    setIsAddingNew(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setIsAddingNew(false);
+    setFormData({
+      name: '',
+      city: '',
+      municipality: '',
+      google_maps_url: '',
+      is_active: true
+    });
+  };
+
+  const handleAddNew = () => {
+    setIsAddingNew(true);
+    setEditingId(null);
+    setFormData({
+      name: '',
+      city: '',
+      municipality: '',
+      google_maps_url: '',
+      is_active: true
+    });
+  };
+
+  const handleSave = async () => {
+    try {
+      setError('');
+      setSuccess('');
+
+      if (!formData.name.trim() || !formData.city.trim() || !formData.municipality.trim()) {
+        setError('El nombre, ciudad y municipio son obligatorios');
+        return;
+      }
+
+      if (isAddingNew) {
+        const { error: insertError } = await supabase
+          .from('departure_points')
+          .insert({
+            name: formData.name.trim(),
+            city: formData.city.trim(),
+            municipality: formData.municipality.trim(),
+            google_maps_url: formData.google_maps_url.trim() || null,
+            is_active: formData.is_active
+          });
+
+        if (insertError) throw insertError;
+        setSuccess('Punto de partida creado exitosamente');
+      } else if (editingId) {
+        const { error: updateError } = await supabase
+          .from('departure_points')
+          .update({
+            name: formData.name.trim(),
+            city: formData.city.trim(),
+            municipality: formData.municipality.trim(),
+            google_maps_url: formData.google_maps_url.trim() || null,
+            is_active: formData.is_active,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingId);
+
+        if (updateError) throw updateError;
+        setSuccess('Punto de partida actualizado exitosamente');
+      }
+
+      handleCancelEdit();
+      fetchDeparturePoints();
+    } catch (err: any) {
+      console.error('Error saving departure point:', err);
+      setError(err.message || 'Error al guardar el punto de partida');
     }
   };
 
@@ -179,8 +285,9 @@ const AdminDeparturePoints: React.FC = () => {
           </p>
         </div>
         <button
-          onClick={() => setShowCreateForm(true)}
-          className="btn btn-primary mt-4 md:mt-0"
+          onClick={handleAddNew}
+          disabled={isAddingNew}
+          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed mt-4 md:mt-0"
         >
           <Plus className="w-5 h-5 mr-2" />
           Nuevo Punto
@@ -191,6 +298,101 @@ const AdminDeparturePoints: React.FC = () => {
         <div className="mb-6 bg-error-50 border border-error-200 rounded-lg p-4 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-error-600 flex-shrink-0 mt-0.5" />
           <p className="text-sm text-error-800">{error}</p>
+        </div>
+      )}
+
+      {success && (
+        <div className="mb-6 bg-success-50 text-success-700 p-4 rounded-md">
+          {success}
+        </div>
+      )}
+
+      {isAddingNew && (
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6 border-2 border-primary-500">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Nuevo Punto de Partida</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nombre del Punto <span className="text-error-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="ej. Monumento a la Revolución"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Ciudad <span className="text-error-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.city}
+                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                placeholder="ej. Ciudad de México"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Municipio/Alcaldía <span className="text-error-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.municipality}
+                onChange={(e) => setFormData({ ...formData, municipality: e.target.value })}
+                placeholder="ej. Cuauhtémoc"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                URL de Google Maps
+              </label>
+              <input
+                type="url"
+                value={formData.google_maps_url}
+                onChange={(e) => setFormData({ ...formData, google_maps_url: e.target.value })}
+                placeholder="https://maps.app.goo.gl/..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              />
+            </div>
+
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="new-is-active"
+                checked={formData.is_active}
+                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+              />
+              <label htmlFor="new-is-active" className="ml-2 block text-sm text-gray-900">
+                Activo
+              </label>
+            </div>
+          </div>
+
+          <div className="mt-4 flex justify-end space-x-3">
+            <button
+              onClick={handleCancelEdit}
+              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            >
+              <X className="h-4 w-4 inline mr-1" />
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            >
+              <Save className="h-4 w-4 inline mr-1" />
+              Guardar
+            </button>
+          </div>
         </div>
       )}
 
@@ -328,8 +530,94 @@ const AdminDeparturePoints: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredPoints.map((point) => (
-                  <tr key={point.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
+                  <React.Fragment key={point.id}>
+                    {editingId === point.id ? (
+                      <tr className="bg-blue-50">
+                        <td colSpan={5} className="px-6 py-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Nombre <span className="text-error-600">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Ciudad <span className="text-error-600">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={formData.city}
+                                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Municipio <span className="text-error-600">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={formData.municipality}
+                                onChange={(e) => setFormData({ ...formData, municipality: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                URL de Google Maps
+                              </label>
+                              <input
+                                type="url"
+                                value={formData.google_maps_url}
+                                onChange={(e) => setFormData({ ...formData, google_maps_url: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                              />
+                            </div>
+
+                            <div className="flex items-center">
+                              <input
+                                type="checkbox"
+                                id={`edit-is-active-${point.id}`}
+                                checked={formData.is_active}
+                                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                              />
+                              <label htmlFor={`edit-is-active-${point.id}`} className="ml-2 block text-sm text-gray-900">
+                                Activo
+                              </label>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 flex justify-end space-x-3">
+                            <button
+                              onClick={handleCancelEdit}
+                              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                            >
+                              <X className="h-4 w-4 inline mr-1" />
+                              Cancelar
+                            </button>
+                            <button
+                              onClick={handleSave}
+                              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+                            >
+                              <Save className="h-4 w-4 inline mr-1" />
+                              Guardar Cambios
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr className="hover:bg-gray-50">
+                        <td className="px-6 py-4">
                       <div className="flex items-start gap-3">
                         <MapPin className="w-5 h-5 text-primary-600 flex-shrink-0 mt-1" />
                         <div>
@@ -380,6 +668,13 @@ const AdminDeparturePoints: React.FC = () => {
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
+                          onClick={() => handleEdit(point)}
+                          className="p-2 text-primary-600 hover:bg-primary-50 rounded-md transition-colors"
+                          title="Editar"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => handleToggleActive(point.id, point.is_active)}
                           className={`p-2 rounded-md transition-colors ${
                             point.is_active
@@ -392,8 +687,8 @@ const AdminDeparturePoints: React.FC = () => {
                         </button>
                         <button
                           onClick={() => handleDelete(point)}
-                          className="p-2 text-error-600 hover:bg-error-50 rounded-md transition-colors"
-                          title="Eliminar"
+                          className="p-2 text-error-600 hover:bg-error-50 rounded-md transition-colors disabled:text-gray-300 disabled:cursor-not-allowed"
+                          title={point.usage_count > 0 ? 'No se puede eliminar (en uso)' : 'Eliminar'}
                           disabled={point.usage_count > 0}
                         >
                           <Trash2 className="w-4 h-4" />
@@ -401,21 +696,13 @@ const AdminDeparturePoints: React.FC = () => {
                       </div>
                     </td>
                   </tr>
+                    )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
           </div>
         </div>
-      )}
-
-      {showCreateForm && (
-        <DeparturePointForm
-          onClose={() => setShowCreateForm(false)}
-          onSuccess={(newPoint) => {
-            fetchDeparturePoints();
-            setShowCreateForm(false);
-          }}
-        />
       )}
 
       {viewingPointId && (
