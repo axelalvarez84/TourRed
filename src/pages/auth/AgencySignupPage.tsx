@@ -13,6 +13,8 @@ const AgencySignupPage: React.FC = () => {
   const redirectUrl = searchParams.get('redirect');
 
   const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -29,7 +31,7 @@ const AgencySignupPage: React.FC = () => {
     setIsLoading(true);
     setError('');
 
-    const { email, password, confirmPassword, agencyName, phoneNumber, website, rfc, razonSocial, rnt } = formData;
+    const { firstName, lastName, email, password, confirmPassword, agencyName, phoneNumber, website, rfc, razonSocial, rnt } = formData;
 
     if (password.trim() !== confirmPassword.trim()) {
       setError('Las contraseñas no coinciden');
@@ -38,6 +40,18 @@ const AgencySignupPage: React.FC = () => {
     }
 
     // Validaciones adicionales
+    if (!firstName.trim()) {
+      setError('El nombre es obligatorio');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!lastName.trim()) {
+      setError('El apellido es obligatorio');
+      setIsLoading(false);
+      return;
+    }
+
     if (!agencyName.trim()) {
       setError('El nombre de la agencia es obligatorio');
       setIsLoading(false);
@@ -78,7 +92,21 @@ const AgencySignupPage: React.FC = () => {
 
       console.log('✅ Usuario creado:', { user: data.user, profile: profileData, isExistingUser });
 
-      // 2. Create agency profile
+      // 2. Update user profile with name
+      console.log('👤 Actualizando nombre del usuario...');
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+        })
+        .eq('id', data.user.id);
+
+      if (updateError) {
+        console.error('❌ Error actualizando nombre del usuario:', updateError);
+      }
+
+      // 3. Create agency profile
       console.log('🏢 Creando perfil de agencia...');
       const { data: agencyData, error: agencyError } = await supabase
         .from('agencies')
@@ -103,7 +131,7 @@ const AgencySignupPage: React.FC = () => {
 
       console.log('✅ Agencia creada:', agencyData);
 
-      // 3. Send notification emails
+      // 4. Send notification emails
       try {
         const { data: { session } } = await supabase.auth.getSession();
 
@@ -246,7 +274,49 @@ const AgencySignupPage: React.FC = () => {
           <form className="space-y-6" onSubmit={handleSubmit}>
             {/* Información Básica */}
             <div className="border-b border-gray-200 pb-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Información Básica</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Información Personal</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+                    Nombre(s) *
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="firstName"
+                      name="firstName"
+                      type="text"
+                      value={formData.firstName}
+                      onChange={(e) => handleInputChange('firstName', e.target.value)}
+                      required
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      placeholder="Ej: Juan"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
+                    Apellido(s) *
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="lastName"
+                      name="lastName"
+                      type="text"
+                      value={formData.lastName}
+                      onChange={(e) => handleInputChange('lastName', e.target.value)}
+                      required
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      placeholder="Ej: Pérez García"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Información de la Agencia */}
+            <div className="border-b border-gray-200 pb-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Información de la Agencia</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="agencyName" className="block text-sm font-medium text-gray-700">
