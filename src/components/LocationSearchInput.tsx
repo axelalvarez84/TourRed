@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MapPin, Navigation, Search, Landmark, Building2, Store, Train } from 'lucide-react';
+import { MapPin, Navigation, Search, Landmark, Building2, Store, Train, Bus, Shield } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface LocationSuggestion {
@@ -280,6 +280,10 @@ export default function LocationSearchInput({
         return <Landmark className={`${iconClass} text-orange-600`} />;
       case 'metro_station':
         return <Train className={`${iconClass} text-blue-600`} />;
+      case 'bus_terminal':
+        return <Bus className={`${iconClass} text-green-700`} />;
+      case 'toll_booth':
+        return <Shield className={`${iconClass} text-yellow-600`} />;
       case 'landmark':
         return <Building2 className={`${iconClass} text-purple-600`} />;
       case 'shopping':
