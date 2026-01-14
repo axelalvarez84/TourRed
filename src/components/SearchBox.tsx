@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Tag, Calendar, Building2, DollarSign, Dog, X } from 'lucide-react';
+import { Search, Tag, Calendar, Building2, DollarSign, Dog, X, MapPin } from 'lucide-react';
 import { SearchFilters } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -16,6 +16,8 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
   const [endDate, setEndDate] = useState(initialFilters.endDate || '');
   const [agency, setAgency] = useState(initialFilters.agency || '');
   const [agencySearchText, setAgencySearchText] = useState('');
+  const [departurePoint, setDeparturePoint] = useState(initialFilters.departurePoint || '');
+  const [departurePointSearchText, setDeparturePointSearchText] = useState(initialFilters.departurePoint || '');
   const [minPrice, setMinPrice] = useState(initialFilters.minPrice || '');
   const [maxPrice, setMaxPrice] = useState(initialFilters.maxPrice || '');
   const [petFriendly, setPetFriendly] = useState(initialFilters.petFriendly || '');
@@ -31,7 +33,11 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
   const [filteredAgencies, setFilteredAgencies] = useState<any[]>([]);
   const [showAgencyDropdown, setShowAgencyDropdown] = useState(false);
   const [selectedAgencyName, setSelectedAgencyName] = useState('');
+  const [departurePoints, setDeparturePoints] = useState<any[]>([]);
+  const [filteredDeparturePoints, setFilteredDeparturePoints] = useState<any[]>([]);
+  const [showDeparturePointDropdown, setShowDeparturePointDropdown] = useState(false);
   const agencyInputRef = useRef<HTMLDivElement>(null);
+  const departurePointInputRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -87,9 +93,41 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
   }, [agencySearchText, agencies]);
 
   useEffect(() => {
+    const loadDeparturePoints = async () => {
+      const { data } = await supabase
+        .from('departure_points')
+        .select('id, location_name, city, state')
+        .eq('is_active', true)
+        .order('location_name');
+
+      if (data) {
+        setDeparturePoints(data);
+        setFilteredDeparturePoints(data);
+      }
+    };
+
+    loadDeparturePoints();
+  }, []);
+
+  useEffect(() => {
+    if (departurePointSearchText === '') {
+      setFilteredDeparturePoints(departurePoints);
+    } else {
+      const filtered = departurePoints.filter(dp =>
+        dp.location_name.toLowerCase().includes(departurePointSearchText.toLowerCase()) ||
+        (dp.city && dp.city.toLowerCase().includes(departurePointSearchText.toLowerCase()))
+      );
+      setFilteredDeparturePoints(filtered);
+    }
+  }, [departurePointSearchText, departurePoints]);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (agencyInputRef.current && !agencyInputRef.current.contains(event.target as Node)) {
         setShowAgencyDropdown(false);
+      }
+      if (departurePointInputRef.current && !departurePointInputRef.current.contains(event.target as Node)) {
+        setShowDeparturePointDropdown(false);
       }
     };
 
@@ -122,6 +160,28 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
     setShowAgencyDropdown(false);
   };
 
+  const handleDeparturePointInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setDeparturePointSearchText(value);
+    setShowDeparturePointDropdown(true);
+
+    if (value === '') {
+      setDeparturePoint('');
+    }
+  };
+
+  const handleDeparturePointSelect = (selectedPoint: any) => {
+    setDeparturePoint(selectedPoint.location_name);
+    setDeparturePointSearchText(selectedPoint.location_name);
+    setShowDeparturePointDropdown(false);
+  };
+
+  const handleClearDeparturePoint = () => {
+    setDeparturePoint('');
+    setDeparturePointSearchText('');
+    setShowDeparturePointDropdown(false);
+  };
+
   const handleLocationSelect = (location: {
     name: string;
     address: string;
@@ -139,6 +199,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
     if (startDate) queryParams.set('startDate', startDate);
     if (endDate) queryParams.set('endDate', endDate);
     if (agency) queryParams.set('agency', agency);
+    if (departurePoint) queryParams.set('departurePoint', departurePoint);
     if (minPrice) queryParams.set('minPrice', minPrice);
     if (maxPrice) queryParams.set('maxPrice', maxPrice);
     if (petFriendly) queryParams.set('petFriendly', petFriendly);
@@ -277,6 +338,61 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
                       <span className={`block truncate text-sm ${agency === ag.id ? 'font-semibold' : 'font-normal'}`}>
                         {ag.name}
                       </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div ref={departurePointInputRef}>
+            <label htmlFor="departurePoint" className="block text-sm font-medium text-gray-700 mb-1">
+              Punto de Partida
+            </label>
+            <div className="relative">
+              <div className="relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <MapPin className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  id="departurePoint"
+                  value={departurePointSearchText}
+                  onChange={handleDeparturePointInputChange}
+                  onFocus={() => setShowDeparturePointDropdown(true)}
+                  className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
+                  placeholder="Buscar punto de salida..."
+                  autoComplete="off"
+                />
+                {departurePoint && (
+                  <button
+                    type="button"
+                    onClick={handleClearDeparturePoint}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  >
+                    <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                  </button>
+                )}
+              </div>
+
+              {showDeparturePointDropdown && filteredDeparturePoints.length > 0 && (
+                <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 shadow-xl max-h-60 rounded-md py-1 overflow-auto">
+                  {filteredDeparturePoints.map((point) => (
+                    <div
+                      key={point.id}
+                      onClick={() => handleDeparturePointSelect(point)}
+                      className={`cursor-pointer select-none relative py-3 px-3 hover:bg-blue-50 transition-colors ${
+                        departurePoint === point.location_name ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
+                      }`}
+                    >
+                      <div className={`block truncate text-sm ${departurePoint === point.location_name ? 'font-semibold' : 'font-normal'}`}>
+                        {point.location_name}
+                      </div>
+                      {point.city && (
+                        <div className="text-xs text-gray-500 truncate mt-0.5">
+                          {point.city}{point.state ? `, ${point.state}` : ''}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

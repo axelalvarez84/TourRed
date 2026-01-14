@@ -14,6 +14,7 @@ const TourCatalogPage: React.FC = () => {
   const [visibleFilters, setVisibleFilters] = useState(false);
   const [popularDestinations, setPopularDestinations] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [popularDeparturePoints, setPopularDeparturePoints] = useState<any[]>([]);
   
   const initialFilters: SearchFilters = {
     destination: searchParams.get('destination') || '',
@@ -206,6 +207,62 @@ const TourCatalogPage: React.FC = () => {
     fetchPopularDestinations();
   }, []);
 
+  useEffect(() => {
+    const fetchPopularDeparturePoints = async () => {
+      try {
+        console.log('📍 Cargando puntos de partida populares...');
+
+        const { data: departurePoints, error } = await supabase
+          .from('departure_points')
+          .select('id, location_name, city, state')
+          .eq('is_active', true)
+          .order('location_name');
+
+        if (error) {
+          console.error('❌ Error cargando puntos de partida:', error);
+          return;
+        }
+
+        if (!departurePoints || departurePoints.length === 0) {
+          console.log('📭 No hay puntos de partida');
+          return;
+        }
+
+        // Get tour counts for each departure point
+        const pointsWithCounts = await Promise.all(
+          departurePoints.map(async (point) => {
+            const { count, error: countError } = await supabase
+              .from('tour_departure_points')
+              .select('*', { count: 'exact', head: true })
+              .eq('departure_point_id', point.id);
+
+            return {
+              id: point.id,
+              location_name: point.location_name,
+              city: point.city,
+              state: point.state,
+              tour_count: countError ? 0 : (count || 0)
+            };
+          })
+        );
+
+        // Filter and sort points with tours
+        const processedPoints = pointsWithCounts
+          .filter(point => point.tour_count > 0)
+          .sort((a, b) => b.tour_count - a.tour_count)
+          .slice(0, 6);
+
+        console.log('✅ Puntos de partida populares procesados:', processedPoints);
+        setPopularDeparturePoints(processedPoints);
+
+      } catch (err: any) {
+        console.error('❌ Error en fetchPopularDeparturePoints:', err);
+      }
+    };
+
+    fetchPopularDeparturePoints();
+  }, []);
+
   // No client-side filtering needed - database already handles all filters correctly
   const filteredTours = tours;
 
@@ -318,29 +375,36 @@ const TourCatalogPage: React.FC = () => {
             </div>
 
             <div className="bg-white rounded-lg shadow-md p-4 mt-6">
-              <h3 className="font-semibold mb-4 text-gray-900">Cuándo Ir</h3>
+              <h3 className="font-semibold mb-4 text-gray-900">Puntos de Partida Populares</h3>
               <div className="space-y-2">
-                <a
-                  href="/tours?startDate=2025-06-01&endDate=2025-08-31"
-                  className="flex items-center text-gray-700 hover:text-primary-600 transition-colors"
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  <span>Verano 2025</span>
-                </a>
-                <a
-                  href="/tours?startDate=2025-09-01&endDate=2025-11-30"
-                  className="flex items-center text-gray-700 hover:text-primary-600 transition-colors"
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  <span>Otoño 2025</span>
-                </a>
-                <a
-                  href="/tours?startDate=2025-12-01&endDate=2026-02-28"
-                  className="flex items-center text-gray-700 hover:text-primary-600 transition-colors"
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  <span>Invierno 2025/2026</span>
-                </a>
+                {popularDeparturePoints.length > 0 ? (
+                  popularDeparturePoints.map((point) => (
+                    <a
+                      key={point.id}
+                      href={`/tours?departurePoint=${encodeURIComponent(point.location_name)}`}
+                      className="flex items-center justify-between text-gray-700 hover:text-primary-600 transition-colors"
+                    >
+                      <div className="flex items-center min-w-0 flex-1">
+                        <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <div className="truncate">{point.location_name}</div>
+                          {point.city && (
+                            <div className="text-xs text-gray-500 truncate">
+                              {point.city}{point.state ? `, ${point.state}` : ''}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
+                        {point.tour_count} {point.tour_count === 1 ? 'tour' : 'tours'}
+                      </span>
+                    </a>
+                  ))
+                ) : (
+                  <div className="text-gray-500 text-sm text-center py-4">
+                    No hay puntos de partida disponibles
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -260,7 +260,11 @@ export const getTours = async (filters: any = {}) => {
   try {
     console.log('🔍 Obteniendo tours con filtros:', filters);
 
-    // Si hay filtro de destino, primero buscar tours por la tabla de relaciones
+    // Variables para acumular IDs de tours filtrados
+    let tourIdsByDestination: string[] | null = null;
+    let tourIdsByDeparturePoint: string[] | null = null;
+
+    // Si hay filtro de destino, buscar tours por la tabla de relaciones
     if (filters.destination) {
       const { data: matchingDestinations } = await supabase
         .from('destinations')
@@ -276,72 +280,114 @@ export const getTours = async (filters: any = {}) => {
           .in('destination_id', destinationIds);
 
         if (tourDestinations && tourDestinations.length > 0) {
-          const tourIds = tourDestinations.map(td => td.tour_id);
-
-          let query = supabase
-            .from('tours')
-            .select(`
-              *,
-              agencies(id, name, rating, is_active)
-            `)
-            .in('id', tourIds);
-
-          if (filters.includeExpired !== true) {
-            const today = formatDateForDB(new Date());
-            query = query.gte('end_date', today);
-          }
-
-          if (filters.category) {
-            query = query.contains('category', [filters.category]);
-          }
-
-          if (filters.startDate && filters.endDate) {
-            query = query.gte('start_date', filters.startDate).lte('start_date', filters.endDate);
-          } else if (filters.startDate) {
-            query = query.gte('start_date', filters.startDate);
-          } else if (filters.endDate) {
-            query = query.lte('start_date', filters.endDate);
-          }
-
-          if (filters.agency) {
-            query = query.eq('agency_id', filters.agency);
-          }
-
-          if (filters.minPrice) {
-            query = query.gte('price', parseFloat(filters.minPrice));
-          }
-
-          if (filters.maxPrice) {
-            query = query.lte('price', parseFloat(filters.maxPrice));
-          }
-
-          if (filters.petFriendly === 'true') {
-            query = query.eq('pet_friendly', true);
-          } else if (filters.petFriendly === 'false') {
-            query = query.eq('pet_friendly', false);
-          }
-
-          if (filters.departurePoint) {
-            query = query.contains('departure_points', [filters.departurePoint]);
-          }
-
-          query = query.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
-
-          const { data, error } = await query;
-
-          // Filtrar tours de agencias inactivas (excepto si se solicita explícitamente incluirlas)
-          if (data && filters.includeInactiveAgencies !== true) {
-            const filteredData = data.filter((tour: any) => tour.agencies?.is_active !== false);
-
-            // Aplicar límite después del filtrado si es necesario
-            const finalData = filters.limit ? filteredData.slice(0, filters.limit) : filteredData;
-
-            return { data: finalData, error };
-          }
-
-          return { data, error };
+          tourIdsByDestination = tourDestinations.map(td => td.tour_id);
+        } else {
+          tourIdsByDestination = [];
         }
+      } else {
+        tourIdsByDestination = [];
       }
+    }
+
+    // Si hay filtro de punto de partida, buscar tours por la tabla de relaciones
+    if (filters.departurePoint) {
+      const { data: matchingDeparturePoints } = await supabase
+        .from('departure_points')
+        .select('id')
+        .ilike('location_name', `%${filters.departurePoint}%`);
+
+      if (matchingDeparturePoints && matchingDeparturePoints.length > 0) {
+        const departurePointIds = matchingDeparturePoints.map(dp => dp.id);
+
+        const { data: tourDeparturePoints } = await supabase
+          .from('tour_departure_points')
+          .select('tour_id')
+          .in('departure_point_id', departurePointIds);
+
+        if (tourDeparturePoints && tourDeparturePoints.length > 0) {
+          tourIdsByDeparturePoint = tourDeparturePoints.map(tdp => tdp.tour_id);
+        } else {
+          tourIdsByDeparturePoint = [];
+        }
+      } else {
+        tourIdsByDeparturePoint = [];
+      }
+    }
+
+    // Combinar los IDs de tours filtrados
+    let finalTourIds: string[] | null = null;
+
+    if (tourIdsByDestination !== null && tourIdsByDeparturePoint !== null) {
+      // Intersección: tours que cumplen ambos filtros
+      finalTourIds = tourIdsByDestination.filter(id => tourIdsByDeparturePoint!.includes(id));
+    } else if (tourIdsByDestination !== null) {
+      finalTourIds = tourIdsByDestination;
+    } else if (tourIdsByDeparturePoint !== null) {
+      finalTourIds = tourIdsByDeparturePoint;
+    }
+
+    // Si tenemos IDs filtrados, aplicar filtro .in()
+    if (finalTourIds !== null) {
+      if (finalTourIds.length === 0) {
+        // No hay tours que cumplan los criterios
+        return { data: [], error: null };
+      }
+
+      let query = supabase
+        .from('tours')
+        .select(`
+          *,
+          agencies(id, name, rating, is_active)
+        `)
+        .in('id', finalTourIds);
+
+      if (filters.includeExpired !== true) {
+        const today = formatDateForDB(new Date());
+        query = query.gte('end_date', today);
+      }
+
+      if (filters.category) {
+        query = query.contains('category', [filters.category]);
+      }
+
+      if (filters.startDate && filters.endDate) {
+        query = query.gte('start_date', filters.startDate).lte('start_date', filters.endDate);
+      } else if (filters.startDate) {
+        query = query.gte('start_date', filters.startDate);
+      } else if (filters.endDate) {
+        query = query.lte('start_date', filters.endDate);
+      }
+
+      if (filters.agency) {
+        query = query.eq('agency_id', filters.agency);
+      }
+
+      if (filters.minPrice) {
+        query = query.gte('price', parseFloat(filters.minPrice));
+      }
+
+      if (filters.maxPrice) {
+        query = query.lte('price', parseFloat(filters.maxPrice));
+      }
+
+      if (filters.petFriendly === 'true') {
+        query = query.eq('pet_friendly', true);
+      } else if (filters.petFriendly === 'false') {
+        query = query.eq('pet_friendly', false);
+      }
+
+      query = query.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
+
+      const { data, error } = await query;
+
+      // Filtrar tours de agencias inactivas
+      if (data && filters.includeInactiveAgencies !== true) {
+        const filteredData = data.filter((tour: any) => tour.agencies?.is_active !== false);
+        const finalData = filters.limit ? filteredData.slice(0, filters.limit) : filteredData;
+        return { data: finalData, error };
+      }
+
+      return { data, error };
     }
 
     let query = supabase
@@ -388,10 +434,6 @@ export const getTours = async (filters: any = {}) => {
       query = query.eq('pet_friendly', true);
     } else if (filters.petFriendly === 'false') {
       query = query.eq('pet_friendly', false);
-    }
-
-    if (filters.departurePoint) {
-      query = query.contains('departure_points', [filters.departurePoint]);
     }
 
     query = query.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
