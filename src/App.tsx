@@ -36,6 +36,7 @@ import AdminProfile from './pages/admin/AdminProfile';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminMemberships from './pages/admin/AdminMemberships';
 import AdminInternationalInquiries from './pages/admin/AdminInternationalInquiries';
+import AdminTransportLocations from './pages/admin/AdminTransportLocations';
 import MegaTravelPage from './pages/international/MegaTravelPage';
 import ComingSoonPage from './pages/international/ComingSoonPage';
 import AboutPage from './pages/AboutPage';
@@ -279,6 +280,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                 <AdminInternationalInquiries />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/transport-locations"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminTransportLocations />
               </ProtectedRoute>
             }
           />
