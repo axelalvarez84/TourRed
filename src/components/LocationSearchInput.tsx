@@ -257,11 +257,16 @@ export default function LocationSearchInput({
   const getPlaceIcon = (placeType: string) => {
     const iconClass = "w-5 h-5";
 
-    if (placeType === 'poi') {
-      return <Landmark className={`${iconClass} text-blue-600`} />;
-    }
-
     switch (placeType) {
+      case 'monument':
+        return <Landmark className={`${iconClass} text-orange-600`} />;
+      case 'metro_station':
+        return <Train className={`${iconClass} text-blue-600`} />;
+      case 'landmark':
+        return <Building2 className={`${iconClass} text-purple-600`} />;
+      case 'shopping':
+      case 'stadium':
+        return <Store className={`${iconClass} text-green-600`} />;
       case 'poi':
         return <Landmark className={`${iconClass} text-blue-600`} />;
       case 'address':

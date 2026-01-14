@@ -65,12 +65,48 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-    // First, search local database for existing locations
-    console.log('🗄️ Searching local database...');
+    const suggestions: any[] = [];
+
+    // First, search featured POIs (monuments, metro stations, etc.)
+    console.log('🌟 Searching featured POIs...');
+    const { data: poiResults, error: poiError } = await supabase
+      .rpc('search_featured_pois', {
+        search_query: query,
+        limit_results: limit,
+      });
+
+    if (poiError) {
+      console.error('❌ POI search error:', poiError);
+    } else {
+      console.log('✅ Featured POI results found:', poiResults?.length || 0);
+    }
+
+    // Add featured POI results
+    if (!poiError && poiResults && poiResults.length > 0) {
+      suggestions.push(
+        ...poiResults.map((poi: any) => ({
+          id: poi.id,
+          name: poi.name,
+          address: poi.address,
+          city: poi.city,
+          state: poi.state,
+          place_type: poi.category,
+          coordinates: {
+            lat: poi.latitude,
+            lng: poi.longitude,
+          },
+          source: 'featured_poi',
+        }))
+      );
+      console.log('📍 Added featured POI suggestions:', suggestions.length);
+    }
+
+    // Second, search local database for existing departure locations
+    console.log('🗄️ Searching departure locations...');
     const { data: localResults, error: localError } = await supabase
       .rpc('get_departure_location_suggestions', {
         search_text: query,
-        limit_results: Math.min(limit, 5),
+        limit_results: Math.min(limit - suggestions.length, 5),
       });
 
     if (localError) {
@@ -78,8 +114,6 @@ Deno.serve(async (req: Request) => {
     } else {
       console.log('✅ Local results found:', localResults?.length || 0);
     }
-
-    const suggestions: any[] = [];
 
     // Add local results
     if (!localError && localResults) {
@@ -95,7 +129,7 @@ Deno.serve(async (req: Request) => {
           source: 'local',
         }))
       );
-      console.log('📍 Added local suggestions:', suggestions.length);
+      console.log('📍 Total suggestions after local search:', suggestions.length);
     }
 
     // If we have enough local results, return them
