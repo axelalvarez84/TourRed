@@ -15,6 +15,8 @@ interface DeparturePointInfo {
   municipality: string;
   google_maps_url?: string;
   display_order: number;
+  departure_time?: string;
+  special_instructions?: string;
 }
 
 const TourDetailPage: React.FC = () => {
@@ -97,6 +99,8 @@ const TourDetailPage: React.FC = () => {
             .from('tour_departure_points')
             .select(`
               display_order,
+              departure_time,
+              special_instructions,
               departure_points (
                 id,
                 name,
@@ -114,6 +118,8 @@ const TourDetailPage: React.FC = () => {
               .map(tdp => ({
                 ...(tdp.departure_points as any),
                 display_order: tdp.display_order,
+                departure_time: tdp.departure_time || undefined,
+                special_instructions: tdp.special_instructions || undefined,
               }));
             setDeparturePointsInfo(pointsInfo);
           }
@@ -647,19 +653,29 @@ const TourDetailPage: React.FC = () => {
                         </h3>
                         <div className="space-y-3">
                           {departurePointsInfo.map((point) => (
-                            <div key={point.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                            <div key={point.id} className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
                               <div className="flex-shrink-0 w-8 h-8 bg-primary-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">
                                 {point.display_order}
                               </div>
                               <div className="flex-1">
                                 <p className="font-medium text-gray-900">{point.name}</p>
                                 <p className="text-sm text-gray-600">{point.city}, {point.municipality}</p>
+                                {point.departure_time && (
+                                  <p className="text-sm text-primary-700 font-medium mt-1">
+                                    Hora de salida: {point.departure_time}
+                                  </p>
+                                )}
+                                {point.special_instructions && (
+                                  <p className="text-sm text-gray-700 mt-1 italic">
+                                    📍 {point.special_instructions}
+                                  </p>
+                                )}
                                 {point.google_maps_url && (
                                   <a
                                     href={point.google_maps_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 mt-1"
+                                    className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 mt-2"
                                   >
                                     Ver ubicación en Google Maps <ExternalLink className="w-3 h-3" />
                                   </a>

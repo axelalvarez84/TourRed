@@ -13,6 +13,8 @@ interface DeparturePoint {
 
 interface SelectedDeparturePoint extends DeparturePoint {
   display_order: number;
+  departure_time?: string;
+  special_instructions?: string;
 }
 
 interface DeparturePointSelectorProps {
@@ -262,51 +264,90 @@ const DeparturePointSelector: React.FC<DeparturePointSelectorProps> = ({
       </div>
 
       {selectedPoints.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-3">
           <p className="text-sm font-medium text-gray-700">Puntos seleccionados ({selectedPoints.length}/{maxPoints}):</p>
           {selectedPoints.map((point, index) => (
             <div
               key={point.id}
-              className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200"
+              className="p-4 bg-gray-50 rounded-lg border border-gray-200"
             >
-              <div className="flex-shrink-0 w-8 h-8 bg-primary-600 text-white rounded-full flex items-center justify-center font-semibold">
-                {point.display_order}
-              </div>
-              <MapPin className="w-5 h-5 text-primary-600 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900">{point.name}</p>
-                <p className="text-sm text-gray-600">{point.city}, {point.municipality}</p>
-              </div>
-              <div className="flex items-center gap-1">
-                {index > 0 && (
+              <div className="flex items-start gap-3 mb-3">
+                <div className="flex-shrink-0 w-8 h-8 bg-primary-600 text-white rounded-full flex items-center justify-center font-semibold">
+                  {point.display_order}
+                </div>
+                <MapPin className="w-5 h-5 text-primary-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-900">{point.name}</p>
+                  <p className="text-sm text-gray-600">{point.city}, {point.municipality}</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  {index > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleReorderPoint(point.id, 'up')}
+                      className="p-1 text-gray-400 hover:text-gray-600"
+                      title="Mover arriba"
+                    >
+                      ▲
+                    </button>
+                  )}
+                  {index < selectedPoints.length - 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleReorderPoint(point.id, 'down')}
+                      className="p-1 text-gray-400 hover:text-gray-600"
+                      title="Mover abajo"
+                    >
+                      ▼
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => handleReorderPoint(point.id, 'up')}
-                    className="p-1 text-gray-400 hover:text-gray-600"
-                    title="Mover arriba"
+                    onClick={() => handleRemovePoint(point.id)}
+                    className="p-1 text-error-600 hover:text-error-700 ml-2"
+                    title="Eliminar"
+                    disabled={selectedPoints.length <= minPoints}
                   >
-                    ▲
+                    <X className="w-5 h-5" />
                   </button>
-                )}
-                {index < selectedPoints.length - 1 && (
-                  <button
-                    type="button"
-                    onClick={() => handleReorderPoint(point.id, 'down')}
-                    className="p-1 text-gray-400 hover:text-gray-600"
-                    title="Mover abajo"
-                  >
-                    ▼
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => handleRemovePoint(point.id)}
-                  className="p-1 text-error-600 hover:text-error-700 ml-2"
-                  title="Eliminar"
-                  disabled={selectedPoints.length <= minPoints}
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 ml-11">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Hora de salida (opcional)
+                  </label>
+                  <input
+                    type="time"
+                    value={point.departure_time || ''}
+                    onChange={(e) => {
+                      const updated = selectedPoints.map(p =>
+                        p.id === point.id ? { ...p, departure_time: e.target.value } : p
+                      );
+                      onPointsChange(updated);
+                    }}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Instrucciones especiales (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={point.special_instructions || ''}
+                    onChange={(e) => {
+                      const updated = selectedPoints.map(p =>
+                        p.id === point.id ? { ...p, special_instructions: e.target.value } : p
+                      );
+                      onPointsChange(updated);
+                    }}
+                    placeholder="Ej: Junto al Starbucks"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
               </div>
             </div>
           ))}

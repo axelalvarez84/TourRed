@@ -17,6 +17,8 @@ interface TourCategory {
 
 interface SelectedDeparturePoint extends DeparturePoint {
   display_order: number;
+  departure_time?: string;
+  special_instructions?: string;
 }
 
 const AgencyTours: React.FC = () => {
@@ -400,6 +402,8 @@ const AgencyTours: React.FC = () => {
         .select(`
           id,
           display_order,
+          departure_time,
+          special_instructions,
           departure_points (
             id,
             name,
@@ -421,6 +425,8 @@ const AgencyTours: React.FC = () => {
           .map(tdp => ({
             ...(tdp.departure_points as DeparturePoint),
             display_order: tdp.display_order,
+            departure_time: tdp.departure_time || undefined,
+            special_instructions: tdp.special_instructions || undefined,
           }));
         setSelectedDeparturePoints(selectedPoints);
       }
@@ -765,6 +771,8 @@ const AgencyTours: React.FC = () => {
             tour_id: tourId,
             departure_point_id: point.id,
             display_order: uniquePoints.findIndex(p => p.id === point.id) + 1,
+            departure_time: point.departure_time || null,
+            special_instructions: point.special_instructions || null,
           }));
 
         // 3. Identificar puntos a eliminar (ya no seleccionados)
@@ -799,17 +807,21 @@ const AgencyTours: React.FC = () => {
           }
         }
 
-        // 6. Actualizar display_order de todos los puntos
+        // 6. Actualizar display_order, departure_time y special_instructions de todos los puntos
         for (let i = 0; i < uniquePoints.length; i++) {
           const point = uniquePoints[i];
           const { error: updateError } = await supabase
             .from('tour_departure_points')
-            .update({ display_order: i + 1 })
+            .update({
+              display_order: i + 1,
+              departure_time: point.departure_time || null,
+              special_instructions: point.special_instructions || null
+            })
             .eq('tour_id', tourId)
             .eq('departure_point_id', point.id);
 
           if (updateError) {
-            console.error('❌ Error actualizando display_order:', updateError);
+            console.error('❌ Error actualizando punto de salida:', updateError);
           }
         }
 
@@ -820,6 +832,8 @@ const AgencyTours: React.FC = () => {
           tour_id: tourId,
           departure_point_id: point.id,
           display_order: index + 1,
+          departure_time: point.departure_time || null,
+          special_instructions: point.special_instructions || null,
         }));
 
         console.log('📍 Insertando puntos:', departurePointsToInsert);
