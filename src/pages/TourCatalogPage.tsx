@@ -73,11 +73,12 @@ const TourCatalogPage: React.FC = () => {
             name: row.tour_name,
             description: row.tour_description,
             price: row.tour_price,
-            duration: row.tour_duration,
             category: row.tour_category,
             destination: row.tour_destination,
             image_url: row.tour_image_url,
             is_featured: row.tour_is_featured,
+            start_date: row.tour_start_date,
+            end_date: row.tour_end_date,
             agency_id: row.agency_id,
             agencies: {
               id: row.agency_id,
