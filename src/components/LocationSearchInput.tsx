@@ -11,7 +11,7 @@ interface LocationSuggestion {
   state: string;
   place_type: string;
   tour_count?: number;
-  source: 'local' | 'mapbox';
+  source: 'local' | 'mapbox' | 'featured_poi';
   coordinates?: {
     lng: number;
     lat: number;
@@ -130,6 +130,20 @@ export default function LocationSearchInput({
     setShowSuggestions(false);
     setSuggestions([]);
 
+    console.log('🎯 Selected suggestion:', suggestion);
+
+    // Handle featured POIs (from featured_pois table)
+    if (suggestion.source === 'featured_poi' && suggestion.coordinates) {
+      console.log('✅ Using featured POI coordinates:', suggestion.coordinates);
+      onLocationSelect({
+        name: suggestion.name,
+        address: suggestion.address,
+        coordinates: { lat: suggestion.coordinates.lat, lng: suggestion.coordinates.lng },
+      });
+      return;
+    }
+
+    // Handle local departure locations
     if (suggestion.source === 'local' && suggestion.id) {
       const { data } = await supabase
         .from('departure_locations')
@@ -146,7 +160,11 @@ export default function LocationSearchInput({
           coordinates: { lat, lng },
         });
       }
-    } else if (suggestion.source === 'mapbox' && suggestion.coordinates) {
+      return;
+    }
+
+    // Handle Mapbox results
+    if (suggestion.source === 'mapbox' && suggestion.coordinates) {
       const { data: session } = await supabase.auth.getSession();
       if (session?.session) {
         try {
