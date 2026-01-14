@@ -652,8 +652,12 @@ const AgencyTours: React.FC = () => {
           .eq('tour_id', tourId);
 
         // Procesar cada ubicación
+        let savedLocationsCount = 0;
+        const locationErrors: string[] = [];
+
         for (const location of validDepartureLocations) {
           try {
+            console.log(`🌍 Geocodificando: ${location.name}`);
             // Geocodificar la ubicación
             const geocodeResponse = await fetch(
               `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/geocode-location`,
@@ -667,27 +671,51 @@ const AgencyTours: React.FC = () => {
               }
             );
 
-            if (geocodeResponse.ok) {
-              const geocodeResult = await geocodeResponse.json();
-              if (geocodeResult.success && geocodeResult.location) {
-                // Crear relación entre tour y ubicación
-                const { error: relationError } = await supabase
-                  .from('tour_departure_locations')
-                  .insert({
-                    tour_id: tourId,
-                    location_id: geocodeResult.location.id,
-                    is_primary: location.isPrimary,
-                    meeting_time: location.meetingTime || null,
-                    meeting_instructions: location.meetingInstructions || null,
-                  });
-
-                if (relationError) {
-                  console.error('Error guardando relación de ubicación:', relationError);
-                }
-              }
+            if (!geocodeResponse.ok) {
+              const errorData = await geocodeResponse.json();
+              throw new Error(`Error geocodificando "${location.name}": ${errorData.error || geocodeResponse.statusText}`);
             }
-          } catch (err) {
-            console.error('Error geocodificando ubicación:', location.name, err);
+
+            const geocodeResult = await geocodeResponse.json();
+            console.log('📍 Resultado geocodificación:', geocodeResult);
+
+            if (geocodeResult.success && geocodeResult.location) {
+              // Crear relación entre tour y ubicación
+              console.log(`💾 Guardando relación tour-ubicación: ${location.name} (${geocodeResult.location.id})`);
+              const { data: insertedData, error: relationError } = await supabase
+                .from('tour_departure_locations')
+                .insert({
+                  tour_id: tourId,
+                  location_id: geocodeResult.location.id,
+                  is_primary: location.isPrimary,
+                  meeting_time: location.meetingTime || null,
+                  meeting_instructions: location.meetingInstructions || null,
+                })
+                .select();
+
+              if (relationError) {
+                console.error('❌ Error guardando relación de ubicación:', relationError);
+                throw new Error(`Error guardando punto de partida "${location.name}": ${relationError.message}`);
+              }
+
+              console.log('✅ Relación guardada:', insertedData);
+              savedLocationsCount++;
+            } else {
+              throw new Error(`No se pudo geocodificar "${location.name}"`);
+            }
+          } catch (err: any) {
+            console.error('❌ Error procesando ubicación:', location.name, err);
+            locationErrors.push(`${location.name}: ${err.message}`);
+          }
+        }
+
+        console.log(`📊 Resumen: ${savedLocationsCount} de ${validDepartureLocations.length} puntos guardados`);
+
+        if (locationErrors.length > 0) {
+          console.warn('⚠️ Errores al guardar algunos puntos de partida:', locationErrors);
+          // No lanzar error si al menos uno se guardó correctamente
+          if (savedLocationsCount === 0) {
+            throw new Error(`No se pudieron guardar los puntos de partida:\n${locationErrors.join('\n')}`);
           }
         }
       }
