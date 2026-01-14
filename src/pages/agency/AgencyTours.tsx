@@ -1124,19 +1124,6 @@ const AgencyTours: React.FC = () => {
                   maxPoints={4}
                   minPoints={1}
                 />
-                {showCreateDepartureForm && (
-                  <DeparturePointForm
-                    onClose={() => setShowCreateDepartureForm(false)}
-                    onSuccess={(newPoint) => {
-                      const newSelected: SelectedDeparturePoint = {
-                        ...newPoint,
-                        display_order: selectedDeparturePoints.length + 1,
-                      };
-                      setSelectedDeparturePoints([...selectedDeparturePoints, newSelected]);
-                      setShowCreateDepartureForm(false);
-                    }}
-                  />
-                )}
               </div>
 
               <div>
@@ -1404,6 +1391,21 @@ const AgencyTours: React.FC = () => {
             </div>
           </form>
         </div>
+      )}
+
+      {/* Modal de Crear Punto de Salida */}
+      {showCreateDepartureForm && (
+        <DeparturePointForm
+          onClose={() => setShowCreateDepartureForm(false)}
+          onSuccess={(newPoint) => {
+            const newSelected: SelectedDeparturePoint = {
+              ...newPoint,
+              display_order: selectedDeparturePoints.length + 1,
+            };
+            setSelectedDeparturePoints([...selectedDeparturePoints, newSelected]);
+            setShowCreateDepartureForm(false);
+          }}
+        />
       )}
 
       {/* Modal de Duplicar Tour */}
