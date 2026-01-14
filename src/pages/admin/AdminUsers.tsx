@@ -32,6 +32,8 @@ const AdminUsers: React.FC = () => {
       canManageUsers: false,
       canManageTravelers: false,
       canManageDestinations: false,
+      canManageCategories: false,
+      canManageDeparturePoints: false,
       canManageReviews: false,
       canManageMessages: false,
       canManageSettings: false,
@@ -45,6 +47,8 @@ const AdminUsers: React.FC = () => {
     canManageUsers: false,
     canManageTravelers: false,
     canManageDestinations: false,
+    canManageCategories: false,
+    canManageDeparturePoints: false,
     canManageReviews: false,
     canManageMessages: false,
     canManageSettings: false,
@@ -84,6 +88,8 @@ const AdminUsers: React.FC = () => {
               canManageUsers: permsData.can_manage_users,
               canManageTravelers: permsData.can_manage_travelers,
               canManageDestinations: permsData.can_manage_destinations,
+              canManageCategories: permsData.can_manage_categories,
+              canManageDeparturePoints: permsData.can_manage_departure_points,
               canManageReviews: permsData.can_manage_reviews,
               canManageMessages: permsData.can_manage_messages,
               canManageSettings: permsData.can_manage_settings,
@@ -136,6 +142,8 @@ const AdminUsers: React.FC = () => {
               can_manage_users: newUser.permissions.canManageUsers,
               can_manage_travelers: newUser.permissions.canManageTravelers,
               can_manage_destinations: newUser.permissions.canManageDestinations,
+              can_manage_categories: newUser.permissions.canManageCategories,
+              can_manage_departure_points: newUser.permissions.canManageDeparturePoints,
               can_manage_reviews: newUser.permissions.canManageReviews,
               can_manage_messages: newUser.permissions.canManageMessages,
               can_manage_settings: newUser.permissions.canManageSettings,
@@ -161,7 +169,10 @@ const AdminUsers: React.FC = () => {
         permissions: {
           canManageAgencies: false,
           canManageUsers: false,
+          canManageTravelers: false,
           canManageDestinations: false,
+          canManageCategories: false,
+          canManageDeparturePoints: false,
           canManageReviews: false,
           canManageMessages: false,
           canManageSettings: false,
@@ -191,6 +202,8 @@ const AdminUsers: React.FC = () => {
           can_manage_users: tempPermissions.canManageUsers,
           can_manage_travelers: tempPermissions.canManageTravelers,
           can_manage_destinations: tempPermissions.canManageDestinations,
+          can_manage_categories: tempPermissions.canManageCategories,
+          can_manage_departure_points: tempPermissions.canManageDeparturePoints,
           can_manage_reviews: tempPermissions.canManageReviews,
           can_manage_messages: tempPermissions.canManageMessages,
           can_manage_settings: tempPermissions.canManageSettings,
@@ -223,7 +236,10 @@ const AdminUsers: React.FC = () => {
     setTempPermissions({
       canManageAgencies: false,
       canManageUsers: false,
+      canManageTravelers: false,
       canManageDestinations: false,
+      canManageCategories: false,
+      canManageDeparturePoints: false,
       canManageReviews: false,
       canManageMessages: false,
       canManageSettings: false,
@@ -459,6 +475,16 @@ const AdminUsers: React.FC = () => {
                             onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageDestinations: checked })}
                           />
                           <PermissionCheckbox
+                            label="Gestionar Categorías"
+                            checked={tempPermissions.canManageCategories}
+                            onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageCategories: checked })}
+                          />
+                          <PermissionCheckbox
+                            label="Gestionar Puntos de Partida"
+                            checked={tempPermissions.canManageDeparturePoints}
+                            onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageDeparturePoints: checked })}
+                          />
+                          <PermissionCheckbox
                             label="Gestionar Reseñas"
                             checked={tempPermissions.canManageReviews}
                             onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageReviews: checked })}
@@ -507,6 +533,18 @@ const AdminUsers: React.FC = () => {
                           <PermissionCheckbox
                             label="Gestionar Destinos"
                             checked={user.permissions.canManageDestinations}
+                            onChange={() => {}}
+                            disabled
+                          />
+                          <PermissionCheckbox
+                            label="Gestionar Categorías"
+                            checked={user.permissions.canManageCategories}
+                            onChange={() => {}}
+                            disabled
+                          />
+                          <PermissionCheckbox
+                            label="Gestionar Puntos de Partida"
+                            checked={user.permissions.canManageDeparturePoints}
                             onChange={() => {}}
                             disabled
                           />
@@ -674,6 +712,22 @@ const AdminUsers: React.FC = () => {
                       onChange={(checked) => setNewUser({
                         ...newUser,
                         permissions: { ...newUser.permissions, canManageDestinations: checked }
+                      })}
+                    />
+                    <PermissionCheckbox
+                      label="Gestionar Categorías"
+                      checked={newUser.permissions.canManageCategories}
+                      onChange={(checked) => setNewUser({
+                        ...newUser,
+                        permissions: { ...newUser.permissions, canManageCategories: checked }
+                      })}
+                    />
+                    <PermissionCheckbox
+                      label="Gestionar Puntos de Partida"
+                      checked={newUser.permissions.canManageDeparturePoints}
+                      onChange={(checked) => setNewUser({
+                        ...newUser,
+                        permissions: { ...newUser.permissions, canManageDeparturePoints: checked }
                       })}
                     />
                     <PermissionCheckbox

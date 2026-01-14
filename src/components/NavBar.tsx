@@ -102,7 +102,13 @@ const NavBar: React.FC = () => {
 
       if (isSuperAdmin || permissions?.canManageDestinations) {
         menuItems.push({ to: '/admin/destinations', label: 'Destinos' });
+      }
+
+      if (isSuperAdmin || permissions?.canManageCategories) {
         menuItems.push({ to: '/admin/categories', label: 'Categorías' });
+      }
+
+      if (isSuperAdmin || permissions?.canManageDeparturePoints) {
         menuItems.push({ to: '/admin/departure-points', label: 'Puntos de Partida' });
       }
 

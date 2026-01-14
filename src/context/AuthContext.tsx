@@ -6,6 +6,8 @@ export interface AdminPermissions {
   canManageUsers: boolean;
   canManageTravelers: boolean;
   canManageDestinations: boolean;
+  canManageCategories: boolean;
+  canManageDeparturePoints: boolean;
   canManageReviews: boolean;
   canManageMessages: boolean;
   canManageSettings: boolean;
@@ -198,6 +200,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     canManageUsers: permsData.can_manage_users,
                     canManageTravelers: permsData.can_manage_travelers,
                     canManageDestinations: permsData.can_manage_destinations,
+                    canManageCategories: permsData.can_manage_categories,
+                    canManageDeparturePoints: permsData.can_manage_departure_points,
                     canManageReviews: permsData.can_manage_reviews,
                     canManageMessages: permsData.can_manage_messages,
                     canManageSettings: permsData.can_manage_settings,
