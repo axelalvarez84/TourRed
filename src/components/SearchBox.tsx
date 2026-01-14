@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Tag, Calendar, Building2, DollarSign, Dog, X } from 'lucide-react';
 import { SearchFilters } from '../types';
 import { supabase } from '../lib/supabase';
-import LocationSearchInput from './LocationSearchInput';
 
 interface SearchBoxProps {
   initialFilters?: SearchFilters;
@@ -158,39 +157,6 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
     <div className={`bg-white rounded-lg shadow-lg p-4 md:p-6 ${className}`}>
       <form onSubmit={handleSearch}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Punto de Salida
-            </label>
-            <LocationSearchInput
-              value={locationName}
-              onChange={setLocationName}
-              onLocationSelect={handleLocationSelect}
-              placeholder="Buscar punto de salida (Ej: Monumento a la Revolución)"
-            />
-            {locationCoords && (
-              <div className="mt-3">
-                <label htmlFor="radius" className="block text-sm font-medium text-gray-700 mb-2">
-                  Radio de búsqueda: <span className="font-bold text-blue-600">{radius} km</span>
-                </label>
-                <input
-                  type="range"
-                  id="radius"
-                  min="1"
-                  max="25"
-                  step="1"
-                  value={radius}
-                  onChange={(e) => setRadius(e.target.value)}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                />
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>1 km</span>
-                  <span>25 km</span>
-                </div>
-              </div>
-            )}
-          </div>
-
           <div className="relative">
             <label htmlFor="destination" className="block text-sm font-medium text-gray-700 mb-1">
               Destino (opcional)

@@ -66,6 +66,28 @@ export interface DestinationImage {
   created_at: string;
 }
 
+export interface DeparturePoint {
+  id: string;
+  name: string;
+  city: string;
+  municipality: string;
+  google_maps_url?: string;
+  is_active: boolean;
+  usage_count: number;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TourDeparturePoint {
+  id: string;
+  tour_id: string;
+  departure_point_id: string;
+  display_order: number;
+  created_at: string;
+  departure_points?: DeparturePoint;
+}
+
 export interface Tour {
   id: string;
   agency_id: string;
@@ -88,6 +110,7 @@ export interface Tour {
   includes?: string[];
   excludes?: string[];
   departure_points?: string[];
+  tour_departure_points?: TourDeparturePoint[];
   booking_deadline?: string;
   booking_approval_type?: 'automatic' | 'manual';
   approval_required?: boolean;

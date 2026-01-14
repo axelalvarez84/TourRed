@@ -31,6 +31,7 @@ import AdminTravelers from './pages/admin/AdminTravelers';
 import AdminReviews from './pages/admin/AdminReviews';
 import AdminMessages from './pages/admin/AdminMessages';
 import AdminDestinations from './pages/admin/AdminDestinations';
+import AdminDeparturePoints from './pages/admin/AdminDeparturePoints';
 import AdminCategories from './pages/admin/AdminCategories';
 import AdminProfile from './pages/admin/AdminProfile';
 import AdminSettings from './pages/admin/AdminSettings';
@@ -240,6 +241,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                 <AdminDestinations />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/departure-points"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminDeparturePoints />
               </ProtectedRoute>
             }
           />

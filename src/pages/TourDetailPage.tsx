@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Users, Building, Star, Clock, Globe, MessageCircle, ChevronLeft, ChevronRight, Edit, Heart } from 'lucide-react';
+import { MapPin, Calendar, Users, Building, Star, Clock, Globe, MessageCircle, ChevronLeft, ChevronRight, Edit, Heart, ExternalLink } from 'lucide-react';
 import BookingForm from '../components/BookingForm';
 import AgencyReviews from '../components/AgencyReviews';
 import { Tour } from '../types';
@@ -8,11 +8,21 @@ import { getTourById, supabase, parseDateFromDB } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { format } from 'date-fns';
 
+interface DeparturePointInfo {
+  id: string;
+  name: string;
+  city: string;
+  municipality: string;
+  google_maps_url?: string;
+  display_order: number;
+}
+
 const TourDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user, isAgency } = useAuth();
   const navigate = useNavigate();
   const [tour, setTour] = useState<Tour | null>(null);
+  const [departurePointsInfo, setDeparturePointsInfo] = useState<DeparturePointInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('description');
@@ -81,6 +91,36 @@ const TourDetailPage: React.FC = () => {
         console.log('✅ Tour cargado desde BD:', data);
         setTour(data);
 
+        // Load departure points information
+        try {
+          const { data: tourDeparturePoints, error: dpError } = await supabase
+            .from('tour_departure_points')
+            .select(`
+              display_order,
+              departure_points (
+                id,
+                name,
+                city,
+                municipality,
+                google_maps_url
+              )
+            `)
+            .eq('tour_id', data.id)
+            .order('display_order');
+
+          if (!dpError && tourDeparturePoints) {
+            const pointsInfo: DeparturePointInfo[] = tourDeparturePoints
+              .filter(tdp => tdp.departure_points)
+              .map(tdp => ({
+                ...(tdp.departure_points as any),
+                display_order: tdp.display_order,
+              }));
+            setDeparturePointsInfo(pointsInfo);
+          }
+        } catch (dpErr) {
+          console.error('Error loading departure points:', dpErr);
+        }
+
         // Obtener información de la agencia y verificar propiedad
         const { data: agencyData } = await supabase
           .from('agencies')
@@ -90,7 +130,7 @@ const TourDetailPage: React.FC = () => {
 
         if (agencyData) {
           setAgencyUserId(agencyData.user_id);
-          
+
           // Verificar si el usuario actual es el propietario del tour
           if (user && isAgency && agencyData.user_id === user.id) {
             setIsOwner(true);
@@ -599,22 +639,37 @@ const TourDetailPage: React.FC = () => {
                       ))}
                     </ul>
 
-                    {tour.departure_points && tour.departure_points.length > 0 && (
+                    {departurePointsInfo && departurePointsInfo.length > 0 && (
                       <>
                         <h3 className="text-lg font-semibold mt-6 mb-3 flex items-center">
                           <MapPin className="h-5 w-5 mr-2 text-primary-600" />
-                          Puntos de Partida
+                          Puntos de Salida
                         </h3>
-                        <ul className="space-y-2">
-                          {tour.departure_points.map((point, index) => (
-                            <li key={index} className="flex items-start">
-                              <span className="text-primary-600 mr-2">📍</span>
-                              <span>{point}</span>
-                            </li>
+                        <div className="space-y-3">
+                          {departurePointsInfo.map((point) => (
+                            <div key={point.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                              <div className="flex-shrink-0 w-8 h-8 bg-primary-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">
+                                {point.display_order}
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-medium text-gray-900">{point.name}</p>
+                                <p className="text-sm text-gray-600">{point.city}, {point.municipality}</p>
+                                {point.google_maps_url && (
+                                  <a
+                                    href={point.google_maps_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 mt-1"
+                                  >
+                                    Ver ubicación en Google Maps <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                )}
+                              </div>
+                            </div>
                           ))}
-                        </ul>
-                        <p className="text-sm text-gray-600 mt-2 italic">
-                          El tour sale desde {tour.departure_points.length === 1 ? 'este punto' : 'estos puntos'}. Asegúrate de llegar con tiempo suficiente.
+                        </div>
+                        <p className="text-sm text-gray-600 mt-3 italic">
+                          El tour sale desde {departurePointsInfo.length === 1 ? 'este punto' : 'estos puntos'}. Asegúrate de llegar con tiempo suficiente.
                         </p>
                       </>
                     )}

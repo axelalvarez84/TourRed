@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination, getTourCategories } from '../../lib/supabase';
 import { Plus, Search, X, Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy } from 'lucide-react';
-import { Tour, Destination } from '../../types';
+import { Tour, Destination, DeparturePoint } from '../../types';
 import { format } from 'date-fns';
 import ImageUploader from '../../components/ImageUploader';
-import LocationSearchInput from '../../components/LocationSearchInput';
+import DeparturePointSelector from '../../components/DeparturePointSelector';
+import DeparturePointForm from '../../components/DeparturePointForm';
 
 interface TourCategory {
   id: string;
@@ -14,14 +15,8 @@ interface TourCategory {
   description?: string;
 }
 
-interface DepartureLocation {
-  locationId?: string;
-  name: string;
-  address: string;
-  coordinates?: { lat: number; lng: number };
-  isPrimary: boolean;
-  meetingTime?: string;
-  meetingInstructions?: string;
+interface SelectedDeparturePoint extends DeparturePoint {
+  display_order: number;
 }
 
 const AgencyTours: React.FC = () => {
@@ -76,11 +71,8 @@ const AgencyTours: React.FC = () => {
   const [includes, setIncludes] = useState<string[]>(['']);
   const [excludes, setExcludes] = useState<string[]>(['']);
   const [departurePoints, setDeparturePoints] = useState<string[]>(['']);
-  const [departureLocations, setDepartureLocations] = useState<DepartureLocation[]>([{
-    name: '',
-    address: '',
-    isPrimary: true,
-  }]);
+  const [selectedDeparturePoints, setSelectedDeparturePoints] = useState<SelectedDeparturePoint[]>([]);
+  const [showCreateDepartureForm, setShowCreateDepartureForm] = useState(false);
   const [tourImageData, setTourImageData] = useState<{base64: string, type: string, size: number} | null>(null);
 
   useEffect(() => {
@@ -234,6 +226,7 @@ const AgencyTours: React.FC = () => {
     setIncludes(['']);
     setExcludes(['']);
     setDeparturePoints(['']);
+    setSelectedDeparturePoints([]);
     setTourImageData(null);
   };
 
@@ -247,7 +240,7 @@ const AgencyTours: React.FC = () => {
     setEditingTour(null);
   };
 
-  const handleEdit = (tour: Tour) => {
+  const handleEdit = async (tour: Tour) => {
     // Calcular fecha límite por defecto (14 días antes del inicio)
     const defaultDeadline = new Date(tour.start_date);
     defaultDeadline.setDate(defaultDeadline.getDate() - 14);
@@ -288,6 +281,42 @@ const AgencyTours: React.FC = () => {
     setIncludes(tour.includes && tour.includes.length > 0 ? tour.includes : ['']);
     setExcludes(tour.excludes && tour.excludes.length > 0 ? tour.excludes : ['']);
     setDeparturePoints(tour.departure_points && tour.departure_points.length > 0 ? tour.departure_points : ['']);
+
+    // Load departure points from database
+    try {
+      const { data: tourDeparturePoints, error } = await supabase
+        .from('tour_departure_points')
+        .select(`
+          id,
+          display_order,
+          departure_points (
+            id,
+            name,
+            city,
+            municipality,
+            google_maps_url,
+            is_active,
+            usage_count,
+            created_at,
+            updated_at
+          )
+        `)
+        .eq('tour_id', tour.id)
+        .order('display_order');
+
+      if (!error && tourDeparturePoints) {
+        const selectedPoints: SelectedDeparturePoint[] = tourDeparturePoints
+          .filter(tdp => tdp.departure_points)
+          .map(tdp => ({
+            ...(tdp.departure_points as DeparturePoint),
+            display_order: tdp.display_order,
+          }));
+        setSelectedDeparturePoints(selectedPoints);
+      }
+    } catch (err) {
+      console.error('Error loading departure points:', err);
+    }
+
     setTourImageData(null); // Reset image data when editing
     setEditingTour(tour);
     setIsCreating(false);
@@ -475,51 +504,6 @@ const AgencyTours: React.FC = () => {
     }
   };
 
-  // New handlers for departure locations
-  const handleDepartureLocationChange = (index: number, name: string) => {
-    const newLocations = [...departureLocations];
-    newLocations[index] = { ...newLocations[index], name };
-    setDepartureLocations(newLocations);
-  };
-
-  const handleDepartureLocationSelect = (
-    index: number,
-    location: { name: string; address: string; coordinates: { lat: number; lng: number } }
-  ) => {
-    const newLocations = [...departureLocations];
-    newLocations[index] = {
-      ...newLocations[index],
-      name: location.name,
-      address: location.address,
-      coordinates: location.coordinates,
-    };
-    setDepartureLocations(newLocations);
-  };
-
-  const addDepartureLocation = () => {
-    setDepartureLocations([
-      ...departureLocations,
-      { name: '', address: '', isPrimary: false },
-    ]);
-  };
-
-  const removeDepartureLocation = (index: number) => {
-    if (departureLocations.length > 1) {
-      const newLocations = departureLocations.filter((_, i) => i !== index);
-      if (newLocations.every((loc) => !loc.isPrimary) && newLocations.length > 0) {
-        newLocations[0].isPrimary = true;
-      }
-      setDepartureLocations(newLocations);
-    }
-  };
-
-  const togglePrimaryLocation = (index: number) => {
-    const newLocations = departureLocations.map((loc, i) => ({
-      ...loc,
-      isPrimary: i === index,
-    }));
-    setDepartureLocations(newLocations);
-  };
 
   const handleImageSelect = (base64: string, type: string, size: number) => {
     setTourImageData({ base64, type, size });
@@ -577,13 +561,13 @@ const AgencyTours: React.FC = () => {
       const filteredExcludes = excludes.filter(item => item.trim() !== '');
       const filteredDeparturePoints = departurePoints.filter(item => item.trim() !== '');
 
-      // Validar departure locations (nuevo sistema)
-      const validDepartureLocations = departureLocations.filter(
-        (loc) => loc.name.trim() !== '' && loc.coordinates
-      );
+      // Validar departure points (nuevo sistema)
+      if (selectedDeparturePoints.length === 0) {
+        throw new Error('Debe seleccionar al menos 1 punto de salida para el tour');
+      }
 
-      if (validDepartureLocations.length === 0) {
-        throw new Error('Debe especificar al menos un punto de partida válido para el tour');
+      if (selectedDeparturePoints.length > 4) {
+        throw new Error('No puedes seleccionar más de 4 puntos de salida para el tour');
       }
 
       // Calcular fecha límite por defecto si no se especifica
@@ -640,85 +624,32 @@ const AgencyTours: React.FC = () => {
         console.log('✅ Tour creado correctamente');
       }
 
-      // Geocodificar y guardar departure locations
-      console.log('🌍 Procesando puntos de partida...');
-      const { data: sessionData } = await supabase.auth.getSession();
+      // Guardar departure points
+      console.log('📍 Guardando puntos de salida...');
 
-      if (sessionData?.session) {
-        // Eliminar puntos de partida anteriores del tour
-        await supabase
-          .from('tour_departure_locations')
-          .delete()
-          .eq('tour_id', tourId);
+      // Eliminar puntos de salida anteriores del tour
+      await supabase
+        .from('tour_departure_points')
+        .delete()
+        .eq('tour_id', tourId);
 
-        // Procesar cada ubicación
-        let savedLocationsCount = 0;
-        const locationErrors: string[] = [];
+      // Insertar los nuevos puntos de salida
+      const departurePointsToInsert = selectedDeparturePoints.map(point => ({
+        tour_id: tourId,
+        departure_point_id: point.id,
+        display_order: point.display_order,
+      }));
 
-        for (const location of validDepartureLocations) {
-          try {
-            console.log(`🌍 Geocodificando: ${location.name}`);
-            // Geocodificar la ubicación
-            const geocodeResponse = await fetch(
-              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/geocode-location`,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${sessionData.session.access_token}`,
-                },
-                body: JSON.stringify({ query: location.address || location.name }),
-              }
-            );
+      const { error: insertError } = await supabase
+        .from('tour_departure_points')
+        .insert(departurePointsToInsert);
 
-            if (!geocodeResponse.ok) {
-              const errorData = await geocodeResponse.json();
-              throw new Error(`Error geocodificando "${location.name}": ${errorData.error || geocodeResponse.statusText}`);
-            }
-
-            const geocodeResult = await geocodeResponse.json();
-            console.log('📍 Resultado geocodificación:', geocodeResult);
-
-            if (geocodeResult.success && geocodeResult.location) {
-              // Crear relación entre tour y ubicación
-              console.log(`💾 Guardando relación tour-ubicación: ${location.name} (${geocodeResult.location.id})`);
-              const { data: insertedData, error: relationError } = await supabase
-                .from('tour_departure_locations')
-                .insert({
-                  tour_id: tourId,
-                  location_id: geocodeResult.location.id,
-                  is_primary: location.isPrimary,
-                  meeting_time: location.meetingTime || null,
-                  meeting_instructions: location.meetingInstructions || null,
-                })
-                .select();
-
-              if (relationError) {
-                console.error('❌ Error guardando relación de ubicación:', relationError);
-                throw new Error(`Error guardando punto de partida "${location.name}": ${relationError.message}`);
-              }
-
-              console.log('✅ Relación guardada:', insertedData);
-              savedLocationsCount++;
-            } else {
-              throw new Error(`No se pudo geocodificar "${location.name}"`);
-            }
-          } catch (err: any) {
-            console.error('❌ Error procesando ubicación:', location.name, err);
-            locationErrors.push(`${location.name}: ${err.message}`);
-          }
-        }
-
-        console.log(`📊 Resumen: ${savedLocationsCount} de ${validDepartureLocations.length} puntos guardados`);
-
-        if (locationErrors.length > 0) {
-          console.warn('⚠️ Errores al guardar algunos puntos de partida:', locationErrors);
-          // No lanzar error si al menos uno se guardó correctamente
-          if (savedLocationsCount === 0) {
-            throw new Error(`No se pudieron guardar los puntos de partida:\n${locationErrors.join('\n')}`);
-          }
-        }
+      if (insertError) {
+        console.error('❌ Error guardando puntos de salida:', insertError);
+        throw new Error(`Error guardando puntos de salida: ${insertError.message}`);
       }
+
+      console.log(`✅ ${selectedDeparturePoints.length} puntos de salida guardados correctamente`);
 
       // Recargar destinos disponibles después de crear nuevos
       await fetchAllDestinations();
@@ -1171,92 +1102,25 @@ const AgencyTours: React.FC = () => {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Puntos de Partida * <span className="text-xs text-gray-500">(Al menos uno es obligatorio, máx. 5)</span>
-                </label>
-                <div className="space-y-4">
-                  {departureLocations.map((location, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                      <div className="flex items-start space-x-3">
-                        <div className="flex-1 space-y-3">
-                          <LocationSearchInput
-                            value={location.name}
-                            onChange={(value) => handleDepartureLocationChange(index, value)}
-                            onLocationSelect={(loc) => handleDepartureLocationSelect(index, loc)}
-                            placeholder="Buscar punto de partida (Ej: Monumento a la Revolución)"
-                          />
-                          {location.address && (
-                            <p className="text-xs text-gray-600 flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />
-                              {location.address}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-3">
-                            <label className="flex items-center gap-2 text-sm">
-                              <input
-                                type="checkbox"
-                                checked={location.isPrimary}
-                                onChange={() => togglePrimaryLocation(index)}
-                                className="rounded text-blue-600 focus:ring-blue-500"
-                              />
-                              <span className="text-gray-700">Punto principal</span>
-                            </label>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <input
-                              type="text"
-                              value={location.meetingTime || ''}
-                              onChange={(e) => {
-                                const newLocations = [...departureLocations];
-                                newLocations[index].meetingTime = e.target.value;
-                                setDepartureLocations(newLocations);
-                              }}
-                              placeholder="Hora de salida (opcional)"
-                              className="input text-sm"
-                            />
-                            <input
-                              type="text"
-                              value={location.meetingInstructions || ''}
-                              onChange={(e) => {
-                                const newLocations = [...departureLocations];
-                                newLocations[index].meetingInstructions = e.target.value;
-                                setDepartureLocations(newLocations);
-                              }}
-                              placeholder="Instrucciones (opcional)"
-                              className="input text-sm"
-                            />
-                          </div>
-                        </div>
-                        {departureLocations.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeDepartureLocation(index)}
-                            className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded mt-1"
-                            title="Eliminar punto de partida"
-                          >
-                            <X className="h-5 w-5" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {departureLocations.length < 5 && (
-                    <button
-                      type="button"
-                      onClick={addDepartureLocation}
-                      className="flex items-center space-x-2 text-primary-600 hover:text-primary-800 transition-colors"
-                    >
-                      <Plus className="h-4 w-4" />
-                      <span className="text-sm font-medium">Agregar otro punto de partida</span>
-                    </button>
-                  )}
-                </div>
-                {departureLocations.filter((loc) => loc.name.trim() !== '' && loc.coordinates).length === 0 && (
-                  <p className="text-sm text-red-500 mt-2">⚠️ Debe especificar al menos un punto de partida válido</p>
+                <DeparturePointSelector
+                  selectedPoints={selectedDeparturePoints}
+                  onPointsChange={setSelectedDeparturePoints}
+                  maxPoints={4}
+                  minPoints={1}
+                />
+                {showCreateDepartureForm && (
+                  <DeparturePointForm
+                    onClose={() => setShowCreateDepartureForm(false)}
+                    onSuccess={(newPoint) => {
+                      const newSelected: SelectedDeparturePoint = {
+                        ...newPoint,
+                        display_order: selectedDeparturePoints.length + 1,
+                      };
+                      setSelectedDeparturePoints([...selectedDeparturePoints, newSelected]);
+                      setShowCreateDepartureForm(false);
+                    }}
+                  />
                 )}
-                <p className="text-xs text-gray-500 mt-3">
-                  💡 Los puntos de partida permiten que los viajeros busquen tours cercanos. Geocodificamos automáticamente las ubicaciones.
-                </p>
               </div>
 
               <div>
