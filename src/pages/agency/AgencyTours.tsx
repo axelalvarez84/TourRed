@@ -738,44 +738,103 @@ const AgencyTours: React.FC = () => {
       // Guardar departure points
       console.log('📍 Guardando puntos de salida...');
 
-      // Eliminar puntos de salida anteriores del tour
-      const { error: deleteError } = await supabase
-        .from('tour_departure_points')
-        .delete()
-        .eq('tour_id', tourId);
-
-      if (deleteError) {
-        console.error('❌ Error eliminando puntos de salida anteriores:', deleteError);
-      }
-
       // Validar que no haya duplicados en selectedDeparturePoints
       const uniquePoints = selectedDeparturePoints.filter((point, index, self) =>
         index === self.findIndex((p) => p.id === point.id)
       );
 
       if (uniquePoints.length !== selectedDeparturePoints.length) {
-        console.warn('⚠️  Se encontraron puntos duplicados, removiendo...');
+        console.warn('⚠️ Se encontraron puntos duplicados, removiendo...');
       }
 
-      // Recalcular display_order para evitar conflictos
-      const departurePointsToInsert = uniquePoints.map((point, index) => ({
-        tour_id: tourId,
-        departure_point_id: point.id,
-        display_order: index + 1,
-      }));
+      if (editingTour) {
+        // Para tours existentes: actualizar de forma inteligente
+        // 1. Obtener puntos existentes
+        const { data: existingPoints } = await supabase
+          .from('tour_departure_points')
+          .select('departure_point_id, display_order')
+          .eq('tour_id', tourId);
 
-      console.log('📍 Insertando puntos:', departurePointsToInsert);
+        const existingPointIds = new Set(existingPoints?.map(p => p.departure_point_id) || []);
+        const newPointIds = new Set(uniquePoints.map(p => p.id));
 
-      const { error: insertError } = await supabase
-        .from('tour_departure_points')
-        .insert(departurePointsToInsert);
+        // 2. Identificar puntos a insertar (nuevos)
+        const pointsToInsert = uniquePoints
+          .filter(point => !existingPointIds.has(point.id))
+          .map((point, index) => ({
+            tour_id: tourId,
+            departure_point_id: point.id,
+            display_order: uniquePoints.findIndex(p => p.id === point.id) + 1,
+          }));
 
-      if (insertError) {
-        console.error('❌ Error guardando puntos de salida:', insertError);
-        throw new Error(`Error guardando puntos de salida: ${insertError.message}`);
+        // 3. Identificar puntos a eliminar (ya no seleccionados)
+        const pointIdsToDelete = Array.from(existingPointIds)
+          .filter(id => !newPointIds.has(id));
+
+        // 4. Insertar nuevos puntos primero
+        if (pointsToInsert.length > 0) {
+          console.log('📍 Insertando nuevos puntos:', pointsToInsert);
+          const { error: insertError } = await supabase
+            .from('tour_departure_points')
+            .insert(pointsToInsert);
+
+          if (insertError) {
+            console.error('❌ Error insertando nuevos puntos:', insertError);
+            throw new Error(`Error guardando puntos de salida: ${insertError.message}`);
+          }
+        }
+
+        // 5. Eliminar puntos obsoletos (si hay)
+        if (pointIdsToDelete.length > 0) {
+          console.log('🗑️ Eliminando puntos obsoletos:', pointIdsToDelete);
+          const { error: deleteError } = await supabase
+            .from('tour_departure_points')
+            .delete()
+            .eq('tour_id', tourId)
+            .in('departure_point_id', pointIdsToDelete);
+
+          if (deleteError) {
+            console.error('❌ Error eliminando puntos obsoletos:', deleteError);
+            throw new Error(`Error eliminando puntos de salida: ${deleteError.message}`);
+          }
+        }
+
+        // 6. Actualizar display_order de todos los puntos
+        for (let i = 0; i < uniquePoints.length; i++) {
+          const point = uniquePoints[i];
+          const { error: updateError } = await supabase
+            .from('tour_departure_points')
+            .update({ display_order: i + 1 })
+            .eq('tour_id', tourId)
+            .eq('departure_point_id', point.id);
+
+          if (updateError) {
+            console.error('❌ Error actualizando display_order:', updateError);
+          }
+        }
+
+        console.log(`✅ Puntos de salida actualizados correctamente`);
+      } else {
+        // Para tours nuevos: insertar directamente
+        const departurePointsToInsert = uniquePoints.map((point, index) => ({
+          tour_id: tourId,
+          departure_point_id: point.id,
+          display_order: index + 1,
+        }));
+
+        console.log('📍 Insertando puntos:', departurePointsToInsert);
+
+        const { error: insertError } = await supabase
+          .from('tour_departure_points')
+          .insert(departurePointsToInsert);
+
+        if (insertError) {
+          console.error('❌ Error guardando puntos de salida:', insertError);
+          throw new Error(`Error guardando puntos de salida: ${insertError.message}`);
+        }
+
+        console.log(`✅ ${departurePointsToInsert.length} puntos de salida guardados correctamente`);
       }
-
-      console.log(`✅ ${departurePointsToInsert.length} puntos de salida guardados correctamente`);
 
       // Recargar destinos disponibles después de crear nuevos
       await fetchAllDestinations();
