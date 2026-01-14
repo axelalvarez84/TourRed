@@ -74,12 +74,90 @@ const AgencyTours: React.FC = () => {
   const [selectedDeparturePoints, setSelectedDeparturePoints] = useState<SelectedDeparturePoint[]>([]);
   const [showCreateDepartureForm, setShowCreateDepartureForm] = useState(false);
   const [tourImageData, setTourImageData] = useState<{base64: string, type: string, size: number} | null>(null);
+  const [hasDraft, setHasDraft] = useState(false);
+
+  const DRAFT_KEY = `tour_draft_${user?.id}`;
 
   useEffect(() => {
     fetchAgencyTours();
     fetchAllDestinations();
     fetchCategories();
   }, [user]);
+
+  // Restaurar borrador al cargar
+  useEffect(() => {
+    if (!user) return;
+
+    const savedDraft = localStorage.getItem(DRAFT_KEY);
+    if (savedDraft && !editingTour && !isCreating) {
+      try {
+        const draft = JSON.parse(savedDraft);
+        const draftAge = Date.now() - draft.timestamp;
+        const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 días
+
+        if (draftAge < maxAge) {
+          setHasDraft(true);
+        } else {
+          localStorage.removeItem(DRAFT_KEY);
+        }
+      } catch (error) {
+        console.error('Error loading draft:', error);
+        localStorage.removeItem(DRAFT_KEY);
+      }
+    }
+  }, [user, DRAFT_KEY, editingTour, isCreating]);
+
+  // Autoguardar borrador
+  useEffect(() => {
+    if (!isCreating || !user) return;
+
+    const hasContent = formData.name ||
+                      formData.description ||
+                      formData.itinerary ||
+                      selectedDestinations.length > 0 ||
+                      selectedDeparturePoints.length > 0;
+
+    if (!hasContent) return;
+
+    const draft = {
+      formData,
+      includes,
+      excludes,
+      selectedDestinations,
+      selectedDeparturePoints,
+      timestamp: Date.now(),
+    };
+
+    const timer = setTimeout(() => {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [isCreating, formData, includes, excludes, selectedDestinations, selectedDeparturePoints, user, DRAFT_KEY]);
+
+  // Prevenir pérdida de datos al salir de la página
+  useEffect(() => {
+    if (!isCreating) return;
+
+    const hasContent = formData.name ||
+                      formData.description ||
+                      formData.itinerary ||
+                      selectedDestinations.length > 0 ||
+                      selectedDeparturePoints.length > 0;
+
+    if (!hasContent) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isCreating, formData, selectedDestinations, selectedDeparturePoints]);
 
   useEffect(() => {
     const searchDestinationsDebounced = setTimeout(async () => {
@@ -228,6 +306,39 @@ const AgencyTours: React.FC = () => {
     setDeparturePoints(['']);
     setSelectedDeparturePoints([]);
     setTourImageData(null);
+
+    // Limpiar borrador guardado
+    if (user) {
+      localStorage.removeItem(DRAFT_KEY);
+      setHasDraft(false);
+    }
+  };
+
+  const loadDraft = () => {
+    const savedDraft = localStorage.getItem(DRAFT_KEY);
+    if (savedDraft) {
+      try {
+        const draft = JSON.parse(savedDraft);
+        setFormData(draft.formData);
+        setIncludes(draft.includes || ['']);
+        setExcludes(draft.excludes || ['']);
+        setSelectedDestinations(draft.selectedDestinations || []);
+        setSelectedDeparturePoints(draft.selectedDeparturePoints || []);
+        setHasDraft(false);
+        setIsCreating(true);
+      } catch (error) {
+        console.error('Error loading draft:', error);
+        localStorage.removeItem(DRAFT_KEY);
+        setHasDraft(false);
+      }
+    }
+  };
+
+  const discardDraft = () => {
+    if (confirm('¿Estás seguro de que deseas descartar el borrador guardado?')) {
+      localStorage.removeItem(DRAFT_KEY);
+      setHasDraft(false);
+    }
   };
 
   const handleCreate = () => {
@@ -801,8 +912,8 @@ const AgencyTours: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold">Gestionar Tours</h1>
           <p className="text-gray-600 mt-1">
-            {tours.length === 0 
-              ? 'No tienes tours publicados aún' 
+            {tours.length === 0
+              ? 'No tienes tours publicados aún'
               : `${tours.length} ${tours.length === 1 ? 'tour publicado' : 'tours publicados'}`
             }
           </p>
@@ -832,12 +943,51 @@ const AgencyTours: React.FC = () => {
         </div>
       )}
 
+      {/* Mensaje de Borrador Guardado */}
+      {hasDraft && !isCreating && !editingTour && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <Save className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-medium text-blue-900 mb-1">
+                Borrador guardado
+              </h3>
+              <p className="text-sm text-blue-800 mb-3">
+                Tienes un borrador de tour sin terminar. ¿Deseas continuar editándolo o descartarlo?
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={loadDraft}
+                  className="btn btn-primary btn-sm"
+                >
+                  Continuar editando
+                </button>
+                <button
+                  onClick={discardDraft}
+                  className="btn btn-outline btn-sm"
+                >
+                  Descartar borrador
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Formulario de Crear/Editar */}
       {(isCreating || editingTour) && (
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">
-            {editingTour ? `Editar Tour: ${editingTour.name}` : 'Crear Nuevo Tour'}
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">
+              {editingTour ? `Editar Tour: ${editingTour.name}` : 'Crear Nuevo Tour'}
+            </h2>
+            {isCreating && (
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Save className="w-4 h-4" />
+                <span>Guardado automático activo</span>
+              </div>
+            )}
+          </div>
           
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
