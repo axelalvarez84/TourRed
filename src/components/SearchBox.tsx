@@ -96,9 +96,9 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
     const loadDeparturePoints = async () => {
       const { data } = await supabase
         .from('departure_points')
-        .select('id, location_name, city, state')
+        .select('id, name, city, municipality')
         .eq('is_active', true)
-        .order('location_name');
+        .order('name');
 
       if (data) {
         setDeparturePoints(data);
@@ -114,7 +114,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
       setFilteredDeparturePoints(departurePoints);
     } else {
       const filtered = departurePoints.filter(dp =>
-        dp.location_name.toLowerCase().includes(departurePointSearchText.toLowerCase()) ||
+        dp.name.toLowerCase().includes(departurePointSearchText.toLowerCase()) ||
         (dp.city && dp.city.toLowerCase().includes(departurePointSearchText.toLowerCase()))
       );
       setFilteredDeparturePoints(filtered);
@@ -171,8 +171,8 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
   };
 
   const handleDeparturePointSelect = (selectedPoint: any) => {
-    setDeparturePoint(selectedPoint.location_name);
-    setDeparturePointSearchText(selectedPoint.location_name);
+    setDeparturePoint(selectedPoint.name);
+    setDeparturePointSearchText(selectedPoint.name);
     setShowDeparturePointDropdown(false);
   };
 
@@ -382,15 +382,15 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
                       key={point.id}
                       onClick={() => handleDeparturePointSelect(point)}
                       className={`cursor-pointer select-none relative py-3 px-3 hover:bg-blue-50 transition-colors ${
-                        departurePoint === point.location_name ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
+                        departurePoint === point.name ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
                       }`}
                     >
-                      <div className={`block truncate text-sm ${departurePoint === point.location_name ? 'font-semibold' : 'font-normal'}`}>
-                        {point.location_name}
+                      <div className={`block truncate text-sm ${departurePoint === point.name ? 'font-semibold' : 'font-normal'}`}>
+                        {point.name}
                       </div>
                       {point.city && (
                         <div className="text-xs text-gray-500 truncate mt-0.5">
-                          {point.city}{point.state ? `, ${point.state}` : ''}
+                          {point.city}{point.municipality ? `, ${point.municipality}` : ''}
                         </div>
                       )}
                     </div>

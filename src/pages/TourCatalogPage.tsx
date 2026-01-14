@@ -214,9 +214,9 @@ const TourCatalogPage: React.FC = () => {
 
         const { data: departurePoints, error } = await supabase
           .from('departure_points')
-          .select('id, location_name, city, state')
+          .select('id, name, city, municipality')
           .eq('is_active', true)
-          .order('location_name');
+          .order('name');
 
         if (error) {
           console.error('❌ Error cargando puntos de partida:', error);
@@ -238,9 +238,9 @@ const TourCatalogPage: React.FC = () => {
 
             return {
               id: point.id,
-              location_name: point.location_name,
+              name: point.name,
               city: point.city,
-              state: point.state,
+              municipality: point.municipality,
               tour_count: countError ? 0 : (count || 0)
             };
           })
@@ -381,16 +381,16 @@ const TourCatalogPage: React.FC = () => {
                   popularDeparturePoints.map((point) => (
                     <a
                       key={point.id}
-                      href={`/tours?departurePoint=${encodeURIComponent(point.location_name)}`}
+                      href={`/tours?departurePoint=${encodeURIComponent(point.name)}`}
                       className="flex items-center justify-between text-gray-700 hover:text-primary-600 transition-colors"
                     >
                       <div className="flex items-center min-w-0 flex-1">
                         <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
                         <div className="min-w-0">
-                          <div className="truncate">{point.location_name}</div>
+                          <div className="truncate">{point.name}</div>
                           {point.city && (
                             <div className="text-xs text-gray-500 truncate">
-                              {point.city}{point.state ? `, ${point.state}` : ''}
+                              {point.city}{point.municipality ? `, ${point.municipality}` : ''}
                             </div>
                           )}
                         </div>

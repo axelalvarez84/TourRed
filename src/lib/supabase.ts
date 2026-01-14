@@ -294,7 +294,7 @@ export const getTours = async (filters: any = {}) => {
       const { data: matchingDeparturePoints } = await supabase
         .from('departure_points')
         .select('id')
-        .ilike('location_name', `%${filters.departurePoint}%`);
+        .ilike('name', `%${filters.departurePoint}%`);
 
       if (matchingDeparturePoints && matchingDeparturePoints.length > 0) {
         const departurePointIds = matchingDeparturePoints.map(dp => dp.id);
