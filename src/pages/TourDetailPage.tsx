@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Users, Building, Star, Clock, Globe, MessageCircle, ChevronLeft, ChevronRight, Edit, Heart, ExternalLink } from 'lucide-react';
+import { MapPin, Calendar, Users, Building, Star, Clock, Globe, MessageCircle, ChevronLeft, ChevronRight, Edit, Heart, ExternalLink, Share2 } from 'lucide-react';
 import BookingForm from '../components/BookingForm';
 import AgencyReviews from '../components/AgencyReviews';
+import ShareTourModal from '../components/ShareTourModal';
 import { Tour } from '../types';
 import { getTourById, supabase, parseDateFromDB } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -36,6 +37,7 @@ const TourDetailPage: React.FC = () => {
   const [totalCapacity, setTotalCapacity] = useState<number>(0);
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [categoryMap, setCategoryMap] = useState<{ [key: string]: string }>({});
 
   // Load categories from database
@@ -434,7 +436,8 @@ const TourDetailPage: React.FC = () => {
   };
 
   return (
-    <div className="bg-gray-50 pb-12">
+    <>
+      <div className="bg-gray-50 pb-12">
       {/* Tour Image Gallery */}
       <div className="relative bg-gray-900 h-[300px] md:h-[400px] lg:h-[500px]">
         <img
@@ -503,20 +506,29 @@ const TourDetailPage: React.FC = () => {
               </div>
               <div className="flex items-start justify-between gap-4">
                 <h1 className="text-2xl md:text-3xl font-bold mb-2 flex-1">{tour.name}</h1>
-                {user && !isOwner && (
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={handleSaveToggle}
-                    disabled={isSaving}
-                    className="flex-shrink-0 p-2 hover:bg-gray-100 rounded-full transition-all disabled:opacity-50"
-                    title={isSaved ? 'Quitar de guardados' : 'Guardar tour'}
+                    onClick={() => setIsShareModalOpen(true)}
+                    className="flex-shrink-0 p-2 hover:bg-gray-100 rounded-full transition-all"
+                    title="Compartir tour"
                   >
-                    <Heart
-                      className={`w-7 h-7 transition-all ${
-                        isSaved ? 'fill-red-500 text-red-500' : 'text-gray-400 hover:text-red-500'
-                      }`}
-                    />
+                    <Share2 className="w-6 h-6 text-gray-400 hover:text-gray-700" />
                   </button>
-                )}
+                  {user && !isOwner && (
+                    <button
+                      onClick={handleSaveToggle}
+                      disabled={isSaving}
+                      className="flex-shrink-0 p-2 hover:bg-gray-100 rounded-full transition-all disabled:opacity-50"
+                      title={isSaved ? 'Quitar de guardados' : 'Guardar tour'}
+                    >
+                      <Heart
+                        className={`w-7 h-7 transition-all ${
+                          isSaved ? 'fill-red-500 text-red-500' : 'text-gray-400 hover:text-red-500'
+                        }`}
+                      />
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="flex items-center mb-4">
                 <div className="flex">
@@ -1010,7 +1022,16 @@ const TourDetailPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+
+      <ShareTourModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        tourId={tour.id}
+        tourName={tour.name}
+        tourImage={tour.image_url}
+      />
+    </>
   );
 };
 
