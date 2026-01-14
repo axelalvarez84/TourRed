@@ -291,18 +291,26 @@ export const getTours = async (filters: any = {}) => {
 
     // Si hay filtro de punto de partida, buscar tours por la tabla de relaciones
     if (filters.departurePoint) {
-      const { data: matchingDeparturePoints } = await supabase
+      console.log('🔍 Buscando punto de partida:', filters.departurePoint);
+
+      const { data: matchingDeparturePoints, error: dpError } = await supabase
         .from('departure_points')
-        .select('id')
+        .select('id, name')
         .ilike('name', `%${filters.departurePoint}%`);
+
+      console.log('📍 Puntos de partida encontrados:', matchingDeparturePoints);
+      if (dpError) console.error('❌ Error buscando departure points:', dpError);
 
       if (matchingDeparturePoints && matchingDeparturePoints.length > 0) {
         const departurePointIds = matchingDeparturePoints.map(dp => dp.id);
 
-        const { data: tourDeparturePoints } = await supabase
+        const { data: tourDeparturePoints, error: tdpError } = await supabase
           .from('tour_departure_points')
           .select('tour_id')
           .in('departure_point_id', departurePointIds);
+
+        console.log('🎯 Tours con estos puntos de partida:', tourDeparturePoints);
+        if (tdpError) console.error('❌ Error buscando tour_departure_points:', tdpError);
 
         if (tourDeparturePoints && tourDeparturePoints.length > 0) {
           tourIdsByDeparturePoint = tourDeparturePoints.map(tdp => tdp.tour_id);
@@ -317,18 +325,27 @@ export const getTours = async (filters: any = {}) => {
     // Combinar los IDs de tours filtrados
     let finalTourIds: string[] | null = null;
 
+    console.log('📊 tourIdsByDestination:', tourIdsByDestination);
+    console.log('📊 tourIdsByDeparturePoint:', tourIdsByDeparturePoint);
+
     if (tourIdsByDestination !== null && tourIdsByDeparturePoint !== null) {
       // Intersección: tours que cumplen ambos filtros
       finalTourIds = tourIdsByDestination.filter(id => tourIdsByDeparturePoint!.includes(id));
+      console.log('🔀 Intersección de ambos filtros:', finalTourIds);
     } else if (tourIdsByDestination !== null) {
       finalTourIds = tourIdsByDestination;
+      console.log('📍 Solo filtro de destino:', finalTourIds);
     } else if (tourIdsByDeparturePoint !== null) {
       finalTourIds = tourIdsByDeparturePoint;
+      console.log('🚩 Solo filtro de punto de partida:', finalTourIds);
     }
+
+    console.log('✅ IDs finales a buscar:', finalTourIds);
 
     // Si tenemos IDs filtrados, aplicar filtro .in()
     if (finalTourIds !== null) {
       if (finalTourIds.length === 0) {
+        console.log('❌ No hay tours que cumplan los criterios');
         // No hay tours que cumplan los criterios
         return { data: [], error: null };
       }
