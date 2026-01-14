@@ -18,6 +18,7 @@ interface SelectedDeparturePoint extends DeparturePoint {
 interface DeparturePointSelectorProps {
   selectedPoints: SelectedDeparturePoint[];
   onPointsChange: (points: SelectedDeparturePoint[]) => void;
+  onCreateNew?: () => void;
   maxPoints?: number;
   minPoints?: number;
 }
@@ -25,6 +26,7 @@ interface DeparturePointSelectorProps {
 const DeparturePointSelector: React.FC<DeparturePointSelectorProps> = ({
   selectedPoints,
   onPointsChange,
+  onCreateNew,
   maxPoints = 4,
   minPoints = 1,
 }) => {
@@ -249,7 +251,7 @@ const DeparturePointSelector: React.FC<DeparturePointSelectorProps> = ({
               <p className="text-sm text-gray-600 mb-3">No se encontraron puntos de salida</p>
               <button
                 type="button"
-                onClick={() => setShowCreateForm(true)}
+                onClick={() => onCreateNew?.()}
                 className="text-sm text-primary-600 hover:text-primary-700 font-medium"
               >
                 Crear nuevo punto de salida
@@ -320,7 +322,7 @@ const DeparturePointSelector: React.FC<DeparturePointSelectorProps> = ({
 
       <button
         type="button"
-        onClick={() => setShowCreateForm(true)}
+        onClick={() => onCreateNew?.()}
         className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-2"
         disabled={selectedPoints.length >= maxPoints}
       >

@@ -1105,6 +1105,7 @@ const AgencyTours: React.FC = () => {
                 <DeparturePointSelector
                   selectedPoints={selectedDeparturePoints}
                   onPointsChange={setSelectedDeparturePoints}
+                  onCreateNew={() => setShowCreateDepartureForm(true)}
                   maxPoints={4}
                   minPoints={1}
                 />
