@@ -161,9 +161,11 @@ const AdminAgencies: React.FC = () => {
     try {
       setIsUpdating(userId);
 
+      const newApprovalStatus = !currentApproval;
+
       const { error } = await supabase
         .from('users')
-        .update({ is_approved: !currentApproval })
+        .update({ is_approved: newApprovalStatus })
         .eq('id', userId);
 
       if (error) {
@@ -173,9 +175,43 @@ const AdminAgencies: React.FC = () => {
       // Actualizar el estado local
       setAgencies(agencies.map(agency =>
         agency.user_id === userId
-          ? { ...agency, is_approved: !currentApproval }
+          ? { ...agency, is_approved: newApprovalStatus }
           : agency
       ));
+
+      // Si se aprobó la agencia (pasó de no aprobado a aprobado), enviar email
+      if (newApprovalStatus && !currentApproval) {
+        try {
+          const agency = agencies.find(a => a.user_id === userId);
+
+          if (agency) {
+            const { data: { session } } = await supabase.auth.getSession();
+
+            if (session) {
+              console.log('📧 Enviando email de aprobación a la agencia...');
+              await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-agency-approval`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    email: agency.contact_email,
+                    firstName: agency.users?.first_name || 'Estimado(a)',
+                    agencyName: agency.name,
+                  }),
+                }
+              );
+              console.log('✅ Email de aprobación enviado exitosamente');
+            }
+          }
+        } catch (emailError) {
+          console.error('Error enviando email de aprobación:', emailError);
+          // No detenemos el proceso si falla el envío del email
+        }
+      }
 
       setError('');
     } catch (err: any) {
