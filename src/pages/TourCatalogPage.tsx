@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Filter, MapPin, Calendar, Tag, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import SearchBox from '../components/SearchBox';
@@ -15,8 +15,8 @@ const TourCatalogPage: React.FC = () => {
   const [popularDestinations, setPopularDestinations] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [popularDeparturePoints, setPopularDeparturePoints] = useState<any[]>([]);
-  
-  const initialFilters: SearchFilters = {
+
+  const initialFilters: SearchFilters = useMemo(() => ({
     destination: searchParams.get('destination') || '',
     category: searchParams.get('category') || '',
     startDate: searchParams.get('startDate') || '',
@@ -30,7 +30,7 @@ const TourCatalogPage: React.FC = () => {
     lng: searchParams.get('lng') || '',
     radius: searchParams.get('radius') || '',
     locationName: searchParams.get('locationName') || '',
-  };
+  }), [searchParams]);
 
   const hasGeoSearch = !!(initialFilters.lat && initialFilters.lng);
 
