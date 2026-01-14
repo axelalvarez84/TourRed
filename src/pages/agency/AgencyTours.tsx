@@ -628,17 +628,32 @@ const AgencyTours: React.FC = () => {
       console.log('📍 Guardando puntos de salida...');
 
       // Eliminar puntos de salida anteriores del tour
-      await supabase
+      const { error: deleteError } = await supabase
         .from('tour_departure_points')
         .delete()
         .eq('tour_id', tourId);
 
-      // Insertar los nuevos puntos de salida
-      const departurePointsToInsert = selectedDeparturePoints.map(point => ({
+      if (deleteError) {
+        console.error('❌ Error eliminando puntos de salida anteriores:', deleteError);
+      }
+
+      // Validar que no haya duplicados en selectedDeparturePoints
+      const uniquePoints = selectedDeparturePoints.filter((point, index, self) =>
+        index === self.findIndex((p) => p.id === point.id)
+      );
+
+      if (uniquePoints.length !== selectedDeparturePoints.length) {
+        console.warn('⚠️  Se encontraron puntos duplicados, removiendo...');
+      }
+
+      // Recalcular display_order para evitar conflictos
+      const departurePointsToInsert = uniquePoints.map((point, index) => ({
         tour_id: tourId,
         departure_point_id: point.id,
-        display_order: point.display_order,
+        display_order: index + 1,
       }));
+
+      console.log('📍 Insertando puntos:', departurePointsToInsert);
 
       const { error: insertError } = await supabase
         .from('tour_departure_points')
@@ -649,7 +664,7 @@ const AgencyTours: React.FC = () => {
         throw new Error(`Error guardando puntos de salida: ${insertError.message}`);
       }
 
-      console.log(`✅ ${selectedDeparturePoints.length} puntos de salida guardados correctamente`);
+      console.log(`✅ ${departurePointsToInsert.length} puntos de salida guardados correctamente`);
 
       // Recargar destinos disponibles después de crear nuevos
       await fetchAllDestinations();
