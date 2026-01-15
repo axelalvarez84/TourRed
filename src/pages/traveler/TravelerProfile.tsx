@@ -18,7 +18,14 @@ interface TravelerProfile {
   is_foreign_traveler?: boolean;
   phone_number?: string;
   date_of_birth?: string;
-  address?: string;
+  street?: string;
+  exterior_number?: string;
+  interior_number?: string;
+  colony?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
   booking_count?: number;
   total_spent?: number;
   profile_picture_url?: string;
@@ -38,7 +45,14 @@ const TravelerProfile: React.FC = () => {
     last_name: '',
     phone_number: '',
     date_of_birth: '',
-    address: '',
+    street: '',
+    exterior_number: '',
+    interior_number: '',
+    colony: '',
+    city: '',
+    state: '',
+    postal_code: '',
+    country: 'México',
     curp: '',
     passport_number: ''
   });
@@ -104,7 +118,14 @@ const TravelerProfile: React.FC = () => {
         last_name: profileData.last_name || '',
         phone_number: profileData.phone_number || '',
         date_of_birth: profileData.date_of_birth || '',
-        address: profileData.address || '',
+        street: profileData.street || '',
+        exterior_number: profileData.exterior_number || '',
+        interior_number: profileData.interior_number || '',
+        colony: profileData.colony || '',
+        city: profileData.city || '',
+        state: profileData.state || '',
+        postal_code: profileData.postal_code || '',
+        country: profileData.country || 'México',
         curp: profileData.curp || '',
         passport_number: profileData.passport_number || ''
       });
@@ -132,7 +153,14 @@ const TravelerProfile: React.FC = () => {
         last_name: editForm.last_name?.trim() || null,
         phone_number: editForm.phone_number?.trim() || null,
         date_of_birth: editForm.date_of_birth || null,
-        address: editForm.address?.trim() || null,
+        street: editForm.street?.trim() || null,
+        exterior_number: editForm.exterior_number?.trim() || null,
+        interior_number: editForm.interior_number?.trim() || null,
+        colony: editForm.colony?.trim() || null,
+        city: editForm.city?.trim() || null,
+        state: editForm.state?.trim() || null,
+        postal_code: editForm.postal_code?.trim() || null,
+        country: editForm.country?.trim() || 'México',
         curp: profile?.is_foreign_traveler ? null : (editForm.curp?.trim() || null),
         passport_number: profile?.is_foreign_traveler ? (editForm.passport_number?.trim() || null) : null,
         updated_at: new Date().toISOString()
@@ -170,7 +198,14 @@ const TravelerProfile: React.FC = () => {
       last_name: profile.last_name || '',
       phone_number: profile.phone_number || '',
       date_of_birth: profile.date_of_birth || '',
-      address: profile.address || '',
+      street: profile.street || '',
+      exterior_number: profile.exterior_number || '',
+      interior_number: profile.interior_number || '',
+      colony: profile.colony || '',
+      city: profile.city || '',
+      state: profile.state || '',
+      postal_code: profile.postal_code || '',
+      country: profile.country || 'México',
       curp: profile.curp || '',
       passport_number: profile.passport_number || ''
     });
@@ -433,17 +468,120 @@ const TravelerProfile: React.FC = () => {
                     )}
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Domicilio
-                    </label>
-                    <textarea
-                      value={editForm.address}
-                      onChange={(e) => setEditForm({...editForm, address: e.target.value})}
-                      className="input"
-                      placeholder="Calle, número, colonia, ciudad, estado, código postal"
-                      rows={3}
-                    />
+                  <div className="space-y-3 border-t pt-3">
+                    <h4 className="text-sm font-semibold text-gray-900">Domicilio</h4>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Calle
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.street}
+                        onChange={(e) => setEditForm({...editForm, street: e.target.value})}
+                        className="input"
+                        placeholder="Ej: Av. Insurgentes Sur"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Número Exterior
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.exterior_number}
+                          onChange={(e) => setEditForm({...editForm, exterior_number: e.target.value})}
+                          className="input"
+                          placeholder="Ej: 123"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Número Interior
+                          <span className="text-gray-400 font-normal ml-1">(opcional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.interior_number}
+                          onChange={(e) => setEditForm({...editForm, interior_number: e.target.value})}
+                          className="input"
+                          placeholder="Ej: 4B"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Colonia
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.colony}
+                        onChange={(e) => setEditForm({...editForm, colony: e.target.value})}
+                        className="input"
+                        placeholder="Ej: Roma Norte"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Ciudad
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.city}
+                          onChange={(e) => setEditForm({...editForm, city: e.target.value})}
+                          className="input"
+                          placeholder="Ej: Ciudad de México"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Estado
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.state}
+                          onChange={(e) => setEditForm({...editForm, state: e.target.value})}
+                          className="input"
+                          placeholder="Ej: CDMX"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Código Postal
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.postal_code}
+                          onChange={(e) => setEditForm({...editForm, postal_code: e.target.value})}
+                          className="input"
+                          placeholder="Ej: 06700"
+                          maxLength={5}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          País
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.country}
+                          onChange={(e) => setEditForm({...editForm, country: e.target.value})}
+                          className="input"
+                          placeholder="México"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex justify-end space-x-4 pt-4">
@@ -563,7 +701,29 @@ const TravelerProfile: React.FC = () => {
                       </label>
                       <div className="flex items-start p-3 bg-gray-50 rounded-md">
                         <MapPin className="h-4 w-4 text-gray-400 mr-2 mt-0.5" />
-                        <span>{profile.address || 'No especificado'}</span>
+                        <div className="flex-1">
+                          {profile.street || profile.city || profile.state ? (
+                            <div className="space-y-1">
+                              {profile.street && (
+                                <div>
+                                  <span className="font-medium">{profile.street}</span>
+                                  {profile.exterior_number && <span> #{profile.exterior_number}</span>}
+                                  {profile.interior_number && <span> Int. {profile.interior_number}</span>}
+                                </div>
+                              )}
+                              {profile.colony && <div>{profile.colony}</div>}
+                              <div>
+                                {profile.city && <span>{profile.city}</span>}
+                                {profile.city && profile.state && <span>, </span>}
+                                {profile.state && <span>{profile.state}</span>}
+                                {profile.postal_code && <span> {profile.postal_code}</span>}
+                              </div>
+                              {profile.country && <div className="text-gray-600">{profile.country}</div>}
+                            </div>
+                          ) : (
+                            <span className="text-gray-500">No especificado</span>
+                          )}
+                        </div>
                       </div>
                     </div>
 

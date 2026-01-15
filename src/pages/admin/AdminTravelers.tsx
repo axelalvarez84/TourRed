@@ -18,7 +18,14 @@ interface Traveler {
   has_active_membership: boolean;
   membership_plan_type: string | null;
   date_of_birth: string | null;
-  address: string | null;
+  street: string | null;
+  exterior_number: string | null;
+  interior_number: string | null;
+  colony: string | null;
+  city: string | null;
+  state: string | null;
+  postal_code: string | null;
+  country: string | null;
   curp: string | null;
   passport_number: string | null;
   is_foreign_traveler: boolean;
@@ -677,11 +684,29 @@ export default function AdminTravelers() {
 
                   <div className="flex items-start">
                     <MapPin className="h-5 w-5 text-gray-400 mr-3 mt-0.5" />
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm font-medium text-gray-500">Dirección</p>
-                      <p className="text-gray-900">
-                        {selectedTraveler.address || 'No proporcionada'}
-                      </p>
+                      {selectedTraveler.street || selectedTraveler.city || selectedTraveler.state ? (
+                        <div className="text-gray-900 space-y-1">
+                          {selectedTraveler.street && (
+                            <div>
+                              <span className="font-medium">{selectedTraveler.street}</span>
+                              {selectedTraveler.exterior_number && <span> #{selectedTraveler.exterior_number}</span>}
+                              {selectedTraveler.interior_number && <span> Int. {selectedTraveler.interior_number}</span>}
+                            </div>
+                          )}
+                          {selectedTraveler.colony && <div>{selectedTraveler.colony}</div>}
+                          <div>
+                            {selectedTraveler.city && <span>{selectedTraveler.city}</span>}
+                            {selectedTraveler.city && selectedTraveler.state && <span>, </span>}
+                            {selectedTraveler.state && <span>{selectedTraveler.state}</span>}
+                            {selectedTraveler.postal_code && <span> {selectedTraveler.postal_code}</span>}
+                          </div>
+                          {selectedTraveler.country && <div className="text-gray-600">{selectedTraveler.country}</div>}
+                        </div>
+                      ) : (
+                        <p className="text-gray-900">No proporcionada</p>
+                      )}
                     </div>
                   </div>
 

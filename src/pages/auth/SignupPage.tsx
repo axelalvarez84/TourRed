@@ -21,7 +21,14 @@ const SignupPage: React.FC = () => {
     curp: '',
     passportNumber: '',
     dateOfBirth: '',
-    address: ''
+    street: '',
+    exteriorNumber: '',
+    interiorNumber: '',
+    colony: '',
+    city: '',
+    state: '',
+    postalCode: '',
+    country: 'México'
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -37,7 +44,7 @@ const SignupPage: React.FC = () => {
     setIsLoading(true);
     setError('');
 
-    const { email, password, confirmPassword, firstName, lastName, phoneNumber, curp, passportNumber, dateOfBirth, address } = formData;
+    const { email, password, confirmPassword, firstName, lastName, phoneNumber, curp, passportNumber, dateOfBirth, street, exteriorNumber, interiorNumber, colony, city, state, postalCode, country } = formData;
 
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden');
@@ -84,7 +91,14 @@ const SignupPage: React.FC = () => {
           passport_number: isForeignTraveler ? passportNumber : null,
           is_foreign_traveler: isForeignTraveler,
           date_of_birth: dateOfBirth || null,
-          address: address || null
+          street: street || null,
+          exterior_number: exteriorNumber || null,
+          interior_number: interiorNumber || null,
+          colony: colony || null,
+          city: city || null,
+          state: state || null,
+          postal_code: postalCode || null,
+          country: country || 'México'
         }
       );
 
@@ -342,21 +356,146 @@ const SignupPage: React.FC = () => {
               </div>
             </div>
 
-            <div>
-              <label htmlFor="address" className="block text-sm font-medium text-gray-700">
-                Domicilio
-              </label>
-              <div className="mt-1">
-                <textarea
-                  id="address"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleInputChange}
-                  placeholder="Calle, número, colonia, ciudad, estado, código postal"
-                  required
-                  rows={3}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                />
+            <div className="space-y-4">
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-medium text-gray-900 mb-3">Domicilio</h3>
+
+                <div className="space-y-3">
+                  <div>
+                    <label htmlFor="street" className="block text-sm font-medium text-gray-700">
+                      Calle
+                    </label>
+                    <input
+                      id="street"
+                      name="street"
+                      type="text"
+                      value={formData.street}
+                      onChange={handleInputChange}
+                      placeholder="Ej: Av. Insurgentes Sur"
+                      required
+                      className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="exteriorNumber" className="block text-sm font-medium text-gray-700">
+                        Número Exterior
+                      </label>
+                      <input
+                        id="exteriorNumber"
+                        name="exteriorNumber"
+                        type="text"
+                        value={formData.exteriorNumber}
+                        onChange={handleInputChange}
+                        placeholder="Ej: 123"
+                        required
+                        className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="interiorNumber" className="block text-sm font-medium text-gray-700">
+                        Número Interior
+                        <span className="text-gray-400 font-normal ml-1">(opcional)</span>
+                      </label>
+                      <input
+                        id="interiorNumber"
+                        name="interiorNumber"
+                        type="text"
+                        value={formData.interiorNumber}
+                        onChange={handleInputChange}
+                        placeholder="Ej: 4B"
+                        className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="colony" className="block text-sm font-medium text-gray-700">
+                      Colonia
+                    </label>
+                    <input
+                      id="colony"
+                      name="colony"
+                      type="text"
+                      value={formData.colony}
+                      onChange={handleInputChange}
+                      placeholder="Ej: Roma Norte"
+                      required
+                      className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="city" className="block text-sm font-medium text-gray-700">
+                        Ciudad
+                      </label>
+                      <input
+                        id="city"
+                        name="city"
+                        type="text"
+                        value={formData.city}
+                        onChange={handleInputChange}
+                        placeholder="Ej: Ciudad de México"
+                        required
+                        className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="state" className="block text-sm font-medium text-gray-700">
+                        Estado
+                      </label>
+                      <input
+                        id="state"
+                        name="state"
+                        type="text"
+                        value={formData.state}
+                        onChange={handleInputChange}
+                        placeholder="Ej: CDMX"
+                        required
+                        className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="postalCode" className="block text-sm font-medium text-gray-700">
+                        Código Postal
+                      </label>
+                      <input
+                        id="postalCode"
+                        name="postalCode"
+                        type="text"
+                        value={formData.postalCode}
+                        onChange={handleInputChange}
+                        placeholder="Ej: 06700"
+                        required
+                        maxLength={5}
+                        className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="country" className="block text-sm font-medium text-gray-700">
+                        País
+                      </label>
+                      <input
+                        id="country"
+                        name="country"
+                        type="text"
+                        value={formData.country}
+                        onChange={handleInputChange}
+                        placeholder="México"
+                        required
+                        className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
