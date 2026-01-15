@@ -416,9 +416,9 @@ Deno.serve(async (req) => {
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const subscription = event.data.object;
-        
+
         console.log(`Subscription ${event.type}: ${subscription.id}`);
-        
+
         const userId = subscription.metadata?.user_id;
         if (!userId) {
           console.error('No user_id in subscription metadata');
@@ -437,6 +437,7 @@ Deno.serve(async (req) => {
         };
 
         const mappedStatus = statusMap[subscription.status] || 'cancelled';
+        const isNewSubscription = event.type === 'customer.subscription.created';
 
         const { error: membershipError } = await supabase
           .from('memberships')
@@ -458,6 +459,47 @@ Deno.serve(async (req) => {
           console.error(`Error updating membership: ${membershipError.message}`);
         } else {
           console.log(`Successfully updated membership for user ${userId}`);
+
+          // Send welcome email for new active subscriptions
+          if (isNewSubscription && mappedStatus === 'active') {
+            try {
+              const { data: userData } = await supabase
+                .from('users')
+                .select('email, first_name')
+                .eq('id', userId)
+                .maybeSingle();
+
+              if (userData) {
+                console.log('📧 Sending membership welcome email...');
+                const welcomeResponse = await fetch(
+                  `${supabaseUrl}/functions/v1/send-membership-welcome`,
+                  {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${supabaseServiceKey}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      email: userData.email,
+                      firstName: userData.first_name || 'Viajero',
+                      planType: subscription.metadata?.plan_type || 'monthly',
+                      startDate: new Date(subscription.current_period_start * 1000).toISOString(),
+                      endDate: new Date(subscription.current_period_end * 1000).toISOString(),
+                    }),
+                  }
+                );
+
+                if (welcomeResponse.ok) {
+                  console.log('✅ Membership welcome email sent successfully');
+                } else {
+                  console.error('Failed to send membership welcome email');
+                }
+              }
+            } catch (emailError) {
+              console.error('Error sending membership welcome email:', emailError);
+              // Don't fail the webhook if email fails
+            }
+          }
         }
 
         break;
