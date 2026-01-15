@@ -438,18 +438,12 @@ const TravelerDashboard: React.FC = () => {
             <p className="text-accent-100 text-sm mt-1">MXN</p>
           </div>
         </div>
-        <div className="mt-4 flex gap-3">
+        <div className="mt-4">
           <Link
             to="/traveler/wallet"
-            className="flex-1 bg-white text-accent-600 px-4 py-2.5 rounded-lg font-semibold hover:bg-accent-50 transition-colors text-center text-sm"
+            className="block bg-white text-accent-600 px-4 py-2.5 rounded-lg font-semibold hover:bg-accent-50 transition-colors text-center text-sm"
           >
             Ver Movimientos
-          </Link>
-          <Link
-            to="/traveler/wallet"
-            className="flex-1 bg-white/20 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-white/30 transition-colors text-center text-sm border border-white/40"
-          >
-            Estado de Cuenta
           </Link>
         </div>
         <div className="mt-3 bg-white/10 backdrop-blur-sm rounded-lg p-3 text-xs text-accent-100">
