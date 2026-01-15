@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Compass, Facebook, Instagram, Twitter, Mail, Phone } from 'lucide-react';
+import { Compass, Facebook, Instagram, Linkedin, Mail, Phone } from 'lucide-react';
 
 const Footer: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -69,8 +69,13 @@ const Footer: React.FC = () => {
               <a href="https://www.tiktok.com/@toursredmx" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
                 <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/tiktok.svg" alt="TikTok" className="h-5 w-5" />
               </a>
+              <a href="https://www.linkedin.com/company/toursredmx" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
+                <Linkedin className="h-5 w-5" />
+              </a>
               <a href="https://x.com/ToursRedMX" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
-                <Twitter className="h-5 w-5" />
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                </svg>
               </a>
             </div>
           </div>
