@@ -39,6 +39,7 @@ const MegaTravelPage: React.FC = () => {
     destination: destinations[0].label,
     travel_date: '',
     num_people: 1,
+    tour_code: '',
     message: ''
   });
   const [error, setError] = useState('');
@@ -132,6 +133,7 @@ const MegaTravelPage: React.FC = () => {
           destination: activeDestination.label,
           travel_date: '',
           num_people: 1,
+          tour_code: '',
           message: ''
         });
       }, 2000);
@@ -362,6 +364,29 @@ const MegaTravelPage: React.FC = () => {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label htmlFor="tour_code" className="block text-sm font-medium text-gray-700 mb-2">
+                    Código de Viaje
+                  </label>
+                  <div className="flex items-center">
+                    <span className="inline-flex items-center px-3 py-2 border border-r-0 border-gray-300 bg-gray-50 text-gray-600 text-sm rounded-l-md font-medium">
+                      MT-
+                    </span>
+                    <input
+                      type="text"
+                      id="tour_code"
+                      name="tour_code"
+                      value={formData.tour_code}
+                      onChange={handleInputChange}
+                      placeholder="20293"
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-r-md focus:ring-primary-500 focus:border-primary-500"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Si ya conoces el código del tour, ingrésalo aquí para una cotización más precisa
+                  </p>
                 </div>
 
                 <div>

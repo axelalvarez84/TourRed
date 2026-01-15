@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, Filter, X, Mail, Phone, Calendar, Users, MapPin, MessageSquare, ExternalLink, TrendingUp, Clock, CheckCircle } from 'lucide-react';
+import { Search, Filter, X, Mail, Phone, Calendar, Users, MapPin, MessageSquare, ExternalLink, TrendingUp, Clock, CheckCircle, Hash } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -13,6 +13,7 @@ interface Inquiry {
   destination: string;
   travel_date: string | null;
   num_people: number;
+  tour_code: string | null;
   message: string | null;
   source: string;
   status: 'pending' | 'contacted' | 'converted' | 'no_convertido';
@@ -356,8 +357,11 @@ const AdminInternationalInquiries: React.FC = () => {
                         <div className="text-sm font-medium text-gray-900">{inquiry.name}</div>
                         <div className="text-sm text-gray-500">{inquiry.email}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {inquiry.destination}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{inquiry.destination}</div>
+                        {inquiry.tour_code && (
+                          <div className="text-xs font-bold text-accent-600 mt-0.5">{inquiry.tour_code}</div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {inquiry.num_people}
@@ -467,6 +471,15 @@ const AdminInternationalInquiries: React.FC = () => {
                         <p className="font-medium">{selectedInquiry.destination}</p>
                       </div>
                     </div>
+                    {selectedInquiry.tour_code && (
+                      <div className="flex items-start space-x-2">
+                        <Hash className="h-5 w-5 text-accent-500 mt-0.5" />
+                        <div>
+                          <p className="text-sm text-gray-500">Código de Viaje</p>
+                          <p className="font-bold text-accent-600 text-lg">{selectedInquiry.tour_code}</p>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex items-start space-x-2">
                       <Calendar className="h-5 w-5 text-gray-400 mt-0.5" />
                       <div>

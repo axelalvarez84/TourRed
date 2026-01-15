@@ -14,6 +14,7 @@ interface InquiryData {
   destination: string;
   travel_date?: string;
   num_people: number;
+  tour_code?: string;
   message?: string;
   source?: string;
   user_id?: string;
@@ -33,7 +34,7 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const inquiryData: InquiryData = await req.json();
-    const { name, email, phone, destination, travel_date, num_people, message, source, user_id } = inquiryData;
+    const { name, email, phone, destination, travel_date, num_people, tour_code, message, source, user_id } = inquiryData;
 
     if (!name || !email || !phone || !destination || !num_people) {
       return new Response(
@@ -44,6 +45,9 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
+
+    // Format tour code with MT- prefix if provided
+    const formattedTourCode = tour_code ? `MT-${tour_code}` : null;
 
     // Insert inquiry into database
     const { data: inquiry, error: insertError } = await supabase
@@ -56,6 +60,7 @@ Deno.serve(async (req: Request) => {
         destination,
         travel_date: travel_date || null,
         num_people,
+        tour_code: formattedTourCode,
         message: message || null,
         source: source || "mega_travel",
         status: "pending"
@@ -113,6 +118,7 @@ Teléfono: ${phone}
 
 Detalles del Viaje:
 Destino: ${destination}
+${formattedTourCode ? `Código de Viaje: ${formattedTourCode}` : ''}
 Fecha Aproximada: ${travel_date || "No especificada"}
 Número de Personas: ${num_people}
 Fuente: ${source || "mega_travel"}
@@ -146,62 +152,68 @@ ID de Cotización: ${inquiry.id}
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
+  <div class=\"container\">
+    <div class=\"header\">
       <h1>Nueva Cotización Internacional</h1>
-      <p style="margin: 0; font-size: 18px;">${destination}</p>
+      <p style=\"margin: 0; font-size: 18px;\">${destination}</p>
     </div>
-    <div class="content">
-      <div class="section">
-        <h3 style="color: #2563eb; margin-top: 0;">Información del Viajero</h3>
-        <div class="field">
-          <span class="label">Nombre Completo:</span>
-          <span class="value">${name}</span>
+    <div class=\"content\">
+      <div class=\"section\">
+        <h3 style=\"color: #2563eb; margin-top: 0;\">Información del Viajero</h3>
+        <div class=\"field\">
+          <span class=\"label\">Nombre Completo:</span>
+          <span class=\"value\">${name}</span>
         </div>
-        <div class="field">
-          <span class="label">Email:</span>
-          <span class="value"><a href="mailto:${email}">${email}</a></span>
+        <div class=\"field\">
+          <span class=\"label\">Email:</span>
+          <span class=\"value\"><a href=\"mailto:${email}\">${email}</a></span>
         </div>
-        <div class="field">
-          <span class="label">Teléfono:</span>
-          <span class="value"><a href="tel:${phone}">${phone}</a></span>
+        <div class=\"field\">
+          <span class=\"label\">Teléfono:</span>
+          <span class=\"value\"><a href=\"tel:${phone}\">${phone}</a></span>
         </div>
       </div>
       
-      <div class="section">
-        <h3 style="color: #2563eb;">Detalles del Viaje</h3>
-        <div class="field">
-          <span class="label">Destino de Interés:</span>
-          <span class="value">${destination}</span>
+      <div class=\"section\">
+        <h3 style=\"color: #2563eb;\">Detalles del Viaje</h3>
+        <div class=\"field\">
+          <span class=\"label\">Destino de Interés:</span>
+          <span class=\"value\">${destination}</span>
         </div>
-        <div class="field">
-          <span class="label">Fecha Aproximada:</span>
-          <span class="value">${travel_date || "No especificada"}</span>
+        ${formattedTourCode ? `
+        <div class=\"field\">
+          <span class=\"label\">Código de Viaje:</span>
+          <span class=\"value\"><strong style=\"color: #f59e0b; font-size: 16px;\">${formattedTourCode}</strong></span>
         </div>
-        <div class="field">
-          <span class="label">Número de Personas:</span>
-          <span class="value">${num_people}</span>
+        ` : ''}
+        <div class=\"field\">
+          <span class=\"label\">Fecha Aproximada:</span>
+          <span class=\"value\">${travel_date || "No especificada"}</span>
         </div>
-        <div class="field">
-          <span class="label">Fuente:</span>
-          <span class="value"><span class="badge">${source || "mega_travel"}</span></span>
+        <div class=\"field\">
+          <span class=\"label\">Número de Personas:</span>
+          <span class=\"value\">${num_people}</span>
+        </div>
+        <div class=\"field\">
+          <span class=\"label\">Fuente:</span>
+          <span class=\"value\"><span class=\"badge\">${source || "mega_travel"}</span></span>
         </div>
       </div>
       
       ${message ? `
-      <div class="section">
-        <h3 style="color: #2563eb;">Mensaje/Comentarios</h3>
-        <div class="message-box">
+      <div class=\"section\">
+        <h3 style=\"color: #2563eb;\">Mensaje/Comentarios</h3>
+        <div class=\"message-box\">
           ${message.replace(/\n/g, "<br>")}
         </div>
       </div>
       ` : ''}
       
-      <div style="text-align: center; margin-top: 30px;">
-        <a href="mailto:${email}" class="btn">Responder al Viajero</a>
+      <div style=\"text-align: center; margin-top: 30px;\">
+        <a href=\"mailto:${email}\" class=\"btn\">Responder al Viajero</a>
       </div>
     </div>
-    <div class="footer">
+    <div class=\"footer\">
       <p>ID de Cotización: ${inquiry.id}</p>
       <p>Recibida el ${new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
     </div>
@@ -253,6 +265,7 @@ Hemos recibido tu solicitud de cotización para: ${destination}
 
 Resumen de tu solicitud:
 - Destino: ${destination}
+${formattedTourCode ? `- Código de Viaje: ${formattedTourCode}` : ''}
 - Fecha aproximada: ${travel_date || "Por definir"}
 - Número de personas: ${num_people}
 
@@ -284,12 +297,12 @@ Equipo ToursRed
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
+  <div class=\"container\">
+    <div class=\"header\">
       <h1>¡Solicitud Recibida!</h1>
     </div>
-    <div class="content">
-      <div class="greeting">
+    <div class=\"content\">
+      <div class=\"greeting\">
         Hola <strong>${name}</strong>,
       </div>
       
@@ -297,21 +310,26 @@ Equipo ToursRed
       
       <p>Hemos recibido tu solicitud de cotización para <strong>${destination}</strong>.</p>
       
-      <div class="info-box">
-        <h3 style="margin-top: 0; color: #2563eb;">Resumen de tu Solicitud</h3>
-        <div class="info-item">
-          <span class="label">Destino:</span> ${destination}
+      <div class=\"info-box\">
+        <h3 style=\"margin-top: 0; color: #2563eb;\">Resumen de tu Solicitud</h3>
+        <div class=\"info-item\">
+          <span class=\"label\">Destino:</span> ${destination}
         </div>
-        <div class="info-item">
-          <span class="label">Fecha aproximada:</span> ${travel_date || "Por definir"}
+        ${formattedTourCode ? `
+        <div class=\"info-item\">
+          <span class=\"label\">Código de Viaje:</span> <strong style=\"color: #f59e0b; font-size: 16px;\">${formattedTourCode}</strong>
         </div>
-        <div class="info-item">
-          <span class="label">Número de personas:</span> ${num_people}
+        ` : ''}
+        <div class=\"info-item\">
+          <span class=\"label\">Fecha aproximada:</span> ${travel_date || "Por definir"}
+        </div>
+        <div class=\"info-item\">
+          <span class=\"label\">Número de personas:</span> ${num_people}
         </div>
       </div>
       
-      <div class="highlight">
-        <p style="margin: 0; font-size: 16px;">
+      <div class=\"highlight\">
+        <p style=\"margin: 0; font-size: 16px;\">
           <strong>⏱️ Tiempo de respuesta: Máximo 24 horas</strong>
         </p>
       </div>
@@ -320,16 +338,16 @@ Equipo ToursRed
       
       <p>Mientras tanto, si tienes alguna pregunta urgente, no dudes en responder a este correo.</p>
       
-      <p style="margin-top: 30px;">
+      <p style=\"margin-top: 30px;\">
         ¡Gracias por elegir ToursRed para tu próxima aventura internacional!
       </p>
       
-      <p style="margin-top: 20px; font-weight: 600;">
+      <p style=\"margin-top: 20px; font-weight: 600;\">
         Saludos,<br>
         Equipo ToursRed
       </p>
     </div>
-    <div class="footer">
+    <div class=\"footer\">
       <p>Este es un correo automático, por favor no respondas directamente.</p>
       <p>Si tienes preguntas, espera nuestro contacto o escribe a ${emailSettings.contact_email}</p>
     </div>
