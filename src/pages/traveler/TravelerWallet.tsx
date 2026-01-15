@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Wallet, TrendingUp, TrendingDown, Calendar, DollarSign, Gift, RefreshCw, Award, AlertCircle, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Calendar, DollarSign, Gift, RefreshCw, Award, AlertCircle, ArrowUpCircle, ArrowDownCircle, Check, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -31,6 +32,11 @@ const TravelerWallet: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const [showRedeemModal, setShowRedeemModal] = useState(false);
+  const [giftCardCode, setGiftCardCode] = useState('');
+  const [isRedeeming, setIsRedeeming] = useState(false);
+  const [redeemError, setRedeemError] = useState<string | null>(null);
+  const [redeemSuccess, setRedeemSuccess] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -66,6 +72,65 @@ const TravelerWallet: React.FC = () => {
       console.error('Error loading wallet data:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const formatCodeInput = (value: string) => {
+    const cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const chunks = [];
+    for (let i = 0; i < cleaned.length && i < 16; i += 4) {
+      chunks.push(cleaned.slice(i, i + 4));
+    }
+    return chunks.join('-');
+  };
+
+  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCodeInput(e.target.value);
+    setGiftCardCode(formatted);
+    setRedeemError(null);
+  };
+
+  const handleRedeemGiftCard = async () => {
+    if (!giftCardCode || giftCardCode.replace(/-/g, '').length !== 16) {
+      setRedeemError('Por favor ingresa un código válido de 16 caracteres');
+      return;
+    }
+
+    setRedeemError(null);
+    setIsRedeeming(true);
+
+    try {
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+
+      const { data, error } = await supabase.functions.invoke('redeem-gift-card', {
+        body: {
+          code: giftCardCode,
+          action: 'redeem',
+        },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        setRedeemSuccess(true);
+        setGiftCardCode('');
+        setTimeout(() => {
+          setRedeemSuccess(false);
+          setShowRedeemModal(false);
+          loadWalletData();
+        }, 3000);
+      } else {
+        setRedeemError(data?.error || 'Error al canjear la tarjeta');
+      }
+    } catch (err: any) {
+      console.error('Error redeeming gift card:', err);
+      setRedeemError(err.message || 'Error al canjear la tarjeta');
+    } finally {
+      setIsRedeeming(false);
     }
   };
 
@@ -185,6 +250,121 @@ const TravelerWallet: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Gift Card Redeem Section */}
+        <div className="mb-8 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl shadow-md p-6 border border-purple-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="bg-purple-100 rounded-full p-3">
+                <Gift className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">¿Tienes una Tarjeta de Regalo?</h3>
+                <p className="text-sm text-gray-600">Canjea tu código y agrega saldo a tu monedero</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowRedeemModal(true)}
+              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all shadow-md hover:shadow-lg"
+            >
+              Canjear Código
+            </button>
+          </div>
+        </div>
+
+        {/* Redeem Modal */}
+        {showRedeemModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold text-gray-900">Canjear Tarjeta de Regalo</h3>
+                <button
+                  onClick={() => {
+                    setShowRedeemModal(false);
+                    setGiftCardCode('');
+                    setRedeemError(null);
+                    setRedeemSuccess(false);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              {redeemSuccess ? (
+                <div className="text-center py-8">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+                    <Check className="h-8 w-8 text-green-600" />
+                  </div>
+                  <h4 className="text-xl font-bold text-gray-900 mb-2">¡Canjeada Exitosamente!</h4>
+                  <p className="text-gray-600">El saldo se ha agregado a tu monedero</p>
+                </div>
+              ) : (
+                <>
+                  {redeemError && (
+                    <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+                      <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-red-800">{redeemError}</p>
+                    </div>
+                  )}
+
+                  <div className="mb-6">
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      Código de Tarjeta de Regalo
+                    </label>
+                    <input
+                      type="text"
+                      value={giftCardCode}
+                      onChange={handleCodeChange}
+                      placeholder="XXXX-XXXX-XXXX-XXXX"
+                      maxLength={19}
+                      className="w-full px-4 py-3 text-xl font-mono text-center border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent tracking-widest"
+                    />
+                    <p className="text-xs text-gray-500 text-center mt-2">
+                      Ingresa el código de 16 caracteres de tu tarjeta
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setShowRedeemModal(false);
+                        setGiftCardCode('');
+                        setRedeemError(null);
+                      }}
+                      className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleRedeemGiftCard}
+                      disabled={isRedeeming || giftCardCode.replace(/-/g, '').length !== 16}
+                      className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isRedeeming ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Canjeando...</span>
+                        </>
+                      ) : (
+                        <span>Canjear</span>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="mt-4 text-center">
+                    <Link
+                      to="/gift-cards"
+                      className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                    >
+                      ¿No tienes una tarjeta? Compra aquí
+                    </Link>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Transaction History */}
         <div className="bg-white rounded-lg shadow-md">

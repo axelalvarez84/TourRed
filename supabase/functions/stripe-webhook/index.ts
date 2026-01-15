@@ -122,8 +122,56 @@ Deno.serve(async (req) => {
         const session = event.data.object;
 
         const bookingId = session.metadata?.booking_id;
+        const giftCardId = session.metadata?.gift_card_id;
+        const transactionType = session.metadata?.type;
+
+        if (transactionType === 'gift_card' && giftCardId) {
+          console.log(`Processing gift card purchase: ${giftCardId}`);
+
+          const paymentStatus = session.payment_status;
+
+          if (paymentStatus === 'paid') {
+            const { error: giftCardError } = await supabase
+              .from('gift_cards')
+              .update({
+                stripe_payment_intent_id: session.payment_intent,
+                purchased_at: new Date().toISOString(),
+              })
+              .eq('id', giftCardId);
+
+            if (giftCardError) {
+              console.error(`Error updating gift card: ${giftCardError.message}`);
+            } else {
+              console.log(`Successfully updated gift card ${giftCardId}`);
+
+              try {
+                const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-gift-card-email`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${supabaseServiceKey}`,
+                  },
+                  body: JSON.stringify({ giftCardId: giftCardId }),
+                });
+
+                const emailResult = await emailResponse.json();
+
+                if (emailResult.success) {
+                  console.log('Gift card emails sent successfully');
+                } else {
+                  console.error('Error sending gift card emails:', emailResult);
+                }
+              } catch (emailError) {
+                console.error('Error calling gift card email function:', emailError);
+              }
+            }
+          }
+
+          break;
+        }
+
         if (!bookingId) {
-          console.error("No booking ID in session metadata");
+          console.error("No booking ID or gift card ID in session metadata");
           break;
         }
 

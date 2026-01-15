@@ -217,6 +217,9 @@ const NavBar: React.FC = () => {
               <Link to="/contact" className="border-transparent text-gray-500 hover:border-primary-500 hover:text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                 Contacto
               </Link>
+              <Link to="/gift-cards" className="border-transparent text-gray-500 hover:border-primary-500 hover:text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                Tarjetas de Regalo
+              </Link>
             </div>
           </div>
           <div className="hidden sm:ml-6 sm:flex sm:items-center">
@@ -427,6 +430,13 @@ const NavBar: React.FC = () => {
               onClick={toggleMenu}
             >
               Contacto
+            </Link>
+            <Link
+              to="/gift-cards"
+              className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+              onClick={toggleMenu}
+            >
+              Tarjetas de Regalo
             </Link>
           </div>
           <div className="pt-4 pb-3 border-t border-gray-200">

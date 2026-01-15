@@ -108,6 +108,9 @@ const Footer: React.FC = () => {
                 <Link to="/signup" className="text-gray-400 hover:text-white transition-colors">Registrarse</Link>
               </li>
               <li>
+                <Link to="/gift-cards" className="text-gray-400 hover:text-white transition-colors">Tarjetas de Regalo</Link>
+              </li>
+              <li>
                 <Link to="/booking-guide" className="text-gray-400 hover:text-white transition-colors">Cómo Reservar</Link>
               </li>
               <li>
