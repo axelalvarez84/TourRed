@@ -75,6 +75,22 @@ Deno.serve(async (req: Request) => {
       day: 'numeric'
     });
 
+    const monthlyBenefitsText = `
+✓ Exención de $500 MXN mensuales en Cargos por Servicio en reservas nacionales
+✓ Ahorra hasta un 5% en cada Reserva Nacional
+✓ Acceso prioritario a nuevos tours
+✓ Soporte premium
+`;
+
+    const annualBenefitsText = `
+✓ Todo lo del plan mensual (Exención de $500 MXN + 5% descuento + acceso prioritario + soporte premium)
+✓ 2 meses gratis de la membresía
+✓ Descuentos exclusivos en tours selectos
+✓ Invitaciones a eventos especiales
+`;
+
+    const benefitsText = planType === 'monthly' ? monthlyBenefitsText : annualBenefitsText;
+
     const textContent = `
 Hola ${firstName},
 
@@ -107,12 +123,7 @@ IMPORTANTE: Si cancelas tu membresía, mantendrás acceso a todos tus beneficios
 
 ¡Excelente! No necesitas hacer nada. El cargo se procesará automáticamente y seguirás disfrutando de:
 
-✓ Exención de $500 MXN mensuales en comisiones de servicio
-✓ Descuentos exclusivos de hasta 20% en tours seleccionados
-✓ Acceso prioritario a nuevos tours
-✓ Soporte prioritario 24/7
-✓ Acumulación de puntos doble
-✓ Cancelaciones flexibles sin cargo
+${benefitsText}
 
 ¿Tienes preguntas?
 Contáctanos en: contacto@toursred.com
@@ -224,12 +235,17 @@ Equipo ToursRed
           <h3>✅ ¿Deseas Continuar con tu Membresía?</h3>
           <p><strong>¡Excelente!</strong> No necesitas hacer nada. El cargo se procesará automáticamente y seguirás disfrutando de:</p>
           <ul class=\"benefits-list\">
-            <li>✓ Exención de $500 MXN mensuales en comisiones</li>
-            <li>✓ Descuentos exclusivos hasta 20%</li>
+            ${planType === 'monthly' ? `
+            <li>✓ Exención de $500 MXN mensuales en Cargos por Servicio</li>
+            <li>✓ Ahorra hasta un 5% en cada Reserva Nacional</li>
             <li>✓ Acceso prioritario a nuevos tours</li>
-            <li>✓ Soporte prioritario 24/7</li>
-            <li>✓ Acumulación de puntos doble</li>
-            <li>✓ Cancelaciones flexibles sin cargo</li>
+            <li>✓ Soporte premium</li>
+            ` : `
+            <li>✓ Todo lo del plan mensual incluido</li>
+            <li>✓ 2 meses gratis de la membresía</li>
+            <li>✓ Descuentos exclusivos en tours selectos</li>
+            <li>✓ Invitaciones a eventos especiales</li>
+            `}
           </ul>
           <div style=\"text-align: center; margin-top: 20px;\">
             <a href=\"https://www.toursred.com/tours\" class=\"button button-primary\">Explorar Tours</a>

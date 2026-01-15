@@ -82,6 +82,36 @@ Deno.serve(async (req: Request) => {
       day: 'numeric'
     });
 
+    const monthlyBenefits = `
+✓ Exención de $500 MXN mensuales en Cargos por Servicio en reservas nacionales
+  Ahorra en comisiones cada mes
+
+✓ Ahorra hasta un 5% en cada Reserva Nacional
+  Descuento aplicado automáticamente en tours dentro de México
+
+✓ Acceso prioritario a nuevos tours
+  Sé el primero en reservar experiencias exclusivas
+
+✓ Soporte premium
+  Atención preferencial para miembros ToursRed+
+`;
+
+    const annualBenefits = `
+✓ Todo lo del plan mensual incluido
+  Exención de $500 MXN mensuales + 5% de descuento + acceso prioritario + soporte premium
+
+✓ 2 meses gratis de la membresía
+  Paga 10 meses y recibe 12 meses completos
+
+✓ Descuentos exclusivos en tours selectos
+  Ofertas especiales adicionales en experiencias seleccionadas
+
+✓ Invitaciones a eventos especiales
+  Acceso VIP a eventos y experiencias exclusivas para miembros anuales
+`;
+
+    const benefitsText = planType === 'monthly' ? monthlyBenefits : annualBenefits;
+
     const textContent = `
 ¡Bienvenido a ToursRed+ ${firstName}!
 
@@ -94,24 +124,7 @@ Fecha de inicio: ${formattedStartDate}
 Fecha de renovación: ${formattedEndDate}
 
 BENEFICIOS INCLUIDOS:
-
-✓ Exención de $500 MXN mensuales en comisiones de servicio
-  Ahorra hasta $6,000 MXN al año en tus reservas
-
-✓ Descuentos exclusivos de hasta 20% en tours seleccionados
-  Acceso a ofertas especiales solo para miembros
-
-✓ Acceso prioritario a nuevos tours
-  Sé el primero en reservar experiencias exclusivas
-
-✓ Soporte prioritario 24/7
-  Asistencia rápida cuando más lo necesitas
-
-✓ Acumulación de puntos doble
-  Gana el doble de recompensas en cada reserva
-
-✓ Cancelaciones flexibles sin cargo
-  Cambios de último minuto sin penalizaciones
+${benefitsText}
 
 RENOVACIÓN AUTOMÁTICA:
 Tu membresía se renovará automáticamente el ${formattedEndDate}.
@@ -203,19 +216,20 @@ Equipo ToursRed
       <div class=\"benefits-section\">
         <h2 style=\"color: #f59e0b; text-align: center;\">Tus Beneficios Exclusivos</h2>
 
+        ${planType === 'monthly' ? `
         <div class=\"benefit-item\">
           <div class=\"benefit-icon\">💰</div>
           <div class=\"benefit-content\">
             <h4>Exención de $500 MXN mensuales</h4>
-            <p>Ahorra hasta $6,000 MXN al año en comisiones de servicio</p>
+            <p>Ahorra en Cargos por Servicio en reservas nacionales cada mes</p>
           </div>
         </div>
 
         <div class=\"benefit-item\">
           <div class=\"benefit-icon\">🎯</div>
           <div class=\"benefit-content\">
-            <h4>Descuentos exclusivos hasta 20%</h4>
-            <p>Acceso a ofertas especiales solo para miembros ToursRed+</p>
+            <h4>Ahorra hasta un 5% en cada Reserva Nacional</h4>
+            <p>Descuento aplicado automáticamente en tours dentro de México</p>
           </div>
         </div>
 
@@ -223,33 +237,50 @@ Equipo ToursRed
           <div class=\"benefit-icon\">⚡</div>
           <div class=\"benefit-content\">
             <h4>Acceso prioritario a nuevos tours</h4>
-            <p>Sé el primero en reservar experiencias exclusivas antes que nadie</p>
+            <p>Sé el primero en reservar experiencias exclusivas</p>
           </div>
         </div>
 
         <div class=\"benefit-item\">
           <div class=\"benefit-icon\">🎧</div>
           <div class=\"benefit-content\">
-            <h4>Soporte prioritario 24/7</h4>
-            <p>Asistencia rápida y preferencial cuando más lo necesitas</p>
+            <h4>Soporte premium</h4>
+            <p>Atención preferencial para miembros ToursRed+</p>
+          </div>
+        </div>
+        ` : `
+        <div class=\"benefit-item\">
+          <div class=\"benefit-icon\">✨</div>
+          <div class=\"benefit-content\">
+            <h4>Todo lo del plan mensual incluido</h4>
+            <p>Exención de $500 MXN mensuales + 5% de descuento + acceso prioritario + soporte premium</p>
           </div>
         </div>
 
         <div class=\"benefit-item\">
-          <div class=\"benefit-icon\">⭐</div>
+          <div class=\"benefit-icon\">🎁</div>
           <div class=\"benefit-content\">
-            <h4>Acumulación de puntos doble</h4>
-            <p>Gana el doble de recompensas en cada reserva que realices</p>
+            <h4>2 meses gratis de la membresía</h4>
+            <p>Paga 10 meses y recibe 12 meses completos</p>
           </div>
         </div>
 
         <div class=\"benefit-item\">
-          <div class=\"benefit-icon\">🔄</div>
+          <div class=\"benefit-icon\">🏆</div>
           <div class=\"benefit-content\">
-            <h4>Cancelaciones flexibles sin cargo</h4>
-            <p>Realiza cambios de último minuto sin penalizaciones</p>
+            <h4>Descuentos exclusivos en tours selectos</h4>
+            <p>Ofertas especiales adicionales en experiencias seleccionadas</p>
           </div>
         </div>
+
+        <div class=\"benefit-item\">
+          <div class=\"benefit-icon\">🎉</div>
+          <div class=\"benefit-content\">
+            <h4>Invitaciones a eventos especiales</h4>
+            <p>Acceso VIP a eventos y experiencias exclusivas para miembros anuales</p>
+          </div>
+        </div>
+        `}
       </div>
 
       <div class=\"renewal-box\">
