@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Heart, Clock, CheckCircle, Crown, Sparkles } from 'lucide-react';
+import { Calendar, MapPin, Heart, Clock, CheckCircle, Crown, Sparkles, Wallet } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Link } from 'react-router-dom';
@@ -55,6 +55,7 @@ const TravelerDashboard: React.FC = () => {
   const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
   const [savedTours, setSavedTours] = useState<SavedTour[]>([]);
   const [membership, setMembership] = useState<Membership | null>(null);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -142,6 +143,18 @@ const TravelerDashboard: React.FC = () => {
         console.error('Error fetching membership:', membershipError);
       } else {
         setMembership(membershipData);
+      }
+
+      const { data: walletData, error: walletError } = await supabase
+        .from('toursred_cash_wallets')
+        .select('balance')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (walletError) {
+        console.error('Error fetching wallet:', walletError);
+      } else {
+        setWalletBalance(walletData?.balance ? Number(walletData.balance) : 0);
       }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -405,6 +418,44 @@ const TravelerDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* ToursRed Cash Wallet */}
+      <div className="mb-8 bg-gradient-to-br from-accent-500 via-accent-600 to-orange-600 rounded-xl shadow-lg p-6 text-white">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
+              <Wallet className="h-8 w-8" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold">ToursRed Cash</h3>
+              <p className="text-accent-100 text-sm">Saldo disponible en tu monedero</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-4xl font-bold">
+              ${walletBalance.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            <p className="text-accent-100 text-sm mt-1">MXN</p>
+          </div>
+        </div>
+        <div className="mt-4 flex gap-3">
+          <Link
+            to="/traveler/wallet"
+            className="flex-1 bg-white text-accent-600 px-4 py-2.5 rounded-lg font-semibold hover:bg-accent-50 transition-colors text-center text-sm"
+          >
+            Ver Movimientos
+          </Link>
+          <Link
+            to="/traveler/wallet"
+            className="flex-1 bg-white/20 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-white/30 transition-colors text-center text-sm border border-white/40"
+          >
+            Estado de Cuenta
+          </Link>
+        </div>
+        <div className="mt-3 bg-white/10 backdrop-blur-sm rounded-lg p-3 text-xs text-accent-100">
+          <p>Usa tu saldo ToursRed Cash para pagar tus próximas reservas o recibe reembolsos y bonificaciones directamente aquí.</p>
+        </div>
+      </div>
 
       <div className="mb-12">
         <div className="flex items-center justify-between mb-6">
