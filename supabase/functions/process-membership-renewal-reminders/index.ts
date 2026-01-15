@@ -80,7 +80,7 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
-        const planAmount = membership.plan_type === 'monthly' ? '$199 MXN' : '$1,990 MXN';
+        const planAmount = membership.plan_type === 'monthly' ? '$49 MXN' : '$490 MXN';
 
         console.log(`📧 Sending renewal reminder to ${membership.users.email}...`);
 
