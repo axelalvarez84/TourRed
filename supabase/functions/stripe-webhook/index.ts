@@ -148,7 +148,6 @@ Deno.serve(async (req) => {
           } else {
             console.log(`Successfully updated booking ${bookingId} to paid status`);
 
-            // Update membership exemption usage if user has active membership
             try {
               const { data: booking } = await supabase
                 .from('bookings')
@@ -165,7 +164,6 @@ Deno.serve(async (req) => {
                   .maybeSingle();
 
                 if (membership && booking.service_charge === 0) {
-                  // Calculate what the service charge would have been (5% default)
                   const { data: settings } = await supabase
                     .from('platform_settings')
                     .select('service_charge_percentage')
@@ -174,7 +172,6 @@ Deno.serve(async (req) => {
                   const serviceChargeRate = settings?.service_charge_percentage || 5;
                   const wouldBeServiceCharge = (booking.total_price * serviceChargeRate) / 100;
 
-                  // Update membership exemption usage
                   const { error: membershipError } = await supabase
                     .from('memberships')
                     .update({
@@ -317,7 +314,6 @@ Deno.serve(async (req) => {
           } else {
             console.log(`Successfully confirmed booking ${bookingId} after payment`);
 
-            // Update membership exemption usage if user has active membership
             try {
               const { data: booking } = await supabase
                 .from('bookings')
@@ -334,7 +330,6 @@ Deno.serve(async (req) => {
                   .maybeSingle();
 
                 if (membership && booking.service_charge === 0) {
-                  // Calculate what the service charge would have been (5% default)
                   const { data: settings } = await supabase
                     .from('platform_settings')
                     .select('service_charge_percentage')
@@ -343,7 +338,6 @@ Deno.serve(async (req) => {
                   const serviceChargeRate = settings?.service_charge_percentage || 5;
                   const wouldBeServiceCharge = (booking.total_price * serviceChargeRate) / 100;
 
-                  // Update membership exemption usage
                   const { error: membershipError } = await supabase
                     .from('memberships')
                     .update({
@@ -417,7 +411,7 @@ Deno.serve(async (req) => {
       case 'customer.subscription.updated': {
         const subscription = event.data.object;
 
-        console.log(`Subscription ${event.type}: ${subscription.id}`);
+        console.log(`Subscription ${event.type}: ${subscription.id}, status: ${subscription.status}`);
 
         const userId = subscription.metadata?.user_id;
         if (!userId) {
@@ -439,29 +433,44 @@ Deno.serve(async (req) => {
         const mappedStatus = statusMap[subscription.status] || 'cancelled';
         const isNewSubscription = event.type === 'customer.subscription.created';
 
-        const { error: membershipError } = await supabase
+        const { data: existingMembership } = await supabase
           .from('memberships')
-          .upsert({
-            user_id: userId,
-            stripe_customer_id: subscription.customer,
-            stripe_subscription_id: subscription.id,
-            plan_type: subscription.metadata?.plan_type || 'monthly',
-            status: mappedStatus,
-            current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-            cancel_at_period_end: subscription.cancel_at_period_end || false,
-            cancelled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
-          }, {
+          .select('id, status, stripe_subscription_id')
+          .eq('stripe_subscription_id', subscription.id)
+          .maybeSingle();
+
+        const wasNotActive = !existingMembership || existingMembership.status !== 'active';
+        const isNowActive = mappedStatus === 'active';
+
+        const membershipData = {
+          user_id: userId,
+          stripe_customer_id: subscription.customer,
+          stripe_subscription_id: subscription.id,
+          plan_type: subscription.metadata?.plan_type || 'monthly',
+          status: mappedStatus,
+          start_date: new Date(subscription.start_date * 1000).toISOString(),
+          current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+          cancel_at_period_end: subscription.cancel_at_period_end || false,
+          cancelled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
+        };
+
+        console.log('Upserting membership:', membershipData);
+
+        const { data: membershipResult, error: membershipError } = await supabase
+          .from('memberships')
+          .upsert(membershipData, {
             onConflict: 'stripe_subscription_id'
-          });
+          })
+          .select()
+          .single();
 
         if (membershipError) {
-          console.error(`Error updating membership: ${membershipError.message}`);
+          console.error(`Error updating membership: ${membershipError.message}`, membershipError);
         } else {
-          console.log(`Successfully updated membership for user ${userId}`);
+          console.log(`Successfully updated membership for user ${userId}:`, membershipResult);
 
-          // Send welcome email for new active subscriptions
-          if (isNewSubscription && mappedStatus === 'active') {
+          if (wasNotActive && isNowActive) {
             try {
               const { data: userData } = await supabase
                 .from('users')
@@ -470,7 +479,7 @@ Deno.serve(async (req) => {
                 .maybeSingle();
 
               if (userData) {
-                console.log('📧 Sending membership welcome email...');
+                console.log('📧 Sending membership welcome email (subscription became active)...');
                 const welcomeResponse = await fetch(
                   `${supabaseUrl}/functions/v1/send-membership-welcome`,
                   {
@@ -492,12 +501,12 @@ Deno.serve(async (req) => {
                 if (welcomeResponse.ok) {
                   console.log('✅ Membership welcome email sent successfully');
                 } else {
-                  console.error('Failed to send membership welcome email');
+                  const errorText = await welcomeResponse.text();
+                  console.error('Failed to send membership welcome email:', errorText);
                 }
               }
             } catch (emailError) {
               console.error('Error sending membership welcome email:', emailError);
-              // Don't fail the webhook if email fails
             }
           }
         }
