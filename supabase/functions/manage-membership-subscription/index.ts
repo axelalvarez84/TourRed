@@ -70,10 +70,46 @@ Deno.serve(async (req: Request) => {
         })
         .eq('id', membership.id);
 
+      try {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('email, first_name')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (userData) {
+          console.log('📧 Sending membership cancellation email...');
+          const cancellationResponse = await fetch(
+            `${supabaseUrl}/functions/v1/send-membership-cancellation`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                email: userData.email,
+                firstName: userData.first_name || 'Viajero',
+                planType: membership.plan_type,
+                endDate: membership.current_period_end,
+              }),
+            }
+          );
+
+          if (cancellationResponse.ok) {
+            console.log('✅ Cancellation email sent successfully');
+          } else {
+            const errorText = await cancellationResponse.text();
+            console.error('Failed to send cancellation email:', errorText);
+          }
+        }
+      } catch (emailError) {
+        console.error('Error sending cancellation email:', emailError);
+      }
+
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           message: 'Subscription will be cancelled at the end of the billing period',
-          end_date: membership.current_period_end 
+          end_date: membership.current_period_end
         }),
         {
           status: 200,
