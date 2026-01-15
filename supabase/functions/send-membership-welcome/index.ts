@@ -68,7 +68,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const planName = planType === 'monthly' ? 'Mensual' : 'Anual';
-    const planPrice = planType === 'monthly' ? '$199 MXN/mes' : '$1,990 MXN/año';
+    const planPrice = planType === 'monthly' ? '$49 MXN/mes' : '$490 MXN/año';
 
     const formattedStartDate = new Date(startDate).toLocaleDateString('es-MX', {
       year: 'numeric',
