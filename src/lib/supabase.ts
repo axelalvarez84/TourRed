@@ -89,6 +89,22 @@ export const signUp = async (
       }
     }
 
+    // Check if passport number already exists (for foreign travelers with passport)
+    if (role === UserRole.TRAVELER && profileData.passport_number) {
+      const { data: existingPassport } = await supabase
+        .from('users')
+        .select('id, email, first_name, last_name')
+        .eq('passport_number', profileData.passport_number.toUpperCase())
+        .maybeSingle();
+
+      if (existingPassport) {
+        console.log('⚠️ Número de pasaporte ya existe en la base de datos:', existingPassport);
+        const error = new Error('PASAPORTE_DUPLICADO');
+        (error as any).details = existingPassport;
+        throw error;
+      }
+    }
+
     // Create new user
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -104,9 +120,12 @@ export const signUp = async (
       throw new Error('No se pudo crear el usuario');
     }
 
-    // Normalize CURP to uppercase if provided
+    // Normalize CURP and passport number to uppercase if provided
     if (profileData.curp) {
       profileData.curp = profileData.curp.toUpperCase();
+    }
+    if (profileData.passport_number) {
+      profileData.passport_number = profileData.passport_number.toUpperCase();
     }
 
     // Create user profile
@@ -127,6 +146,12 @@ export const signUp = async (
       // Check if it's a unique constraint violation on CURP
       if (profileError.code === '23505' && profileError.message.includes('curp')) {
         const error = new Error('CURP_DUPLICADO');
+        throw error;
+      }
+
+      // Check if it's a unique constraint violation on passport number
+      if (profileError.code === '23505' && profileError.message.includes('passport_number')) {
+        const error = new Error('PASAPORTE_DUPLICADO');
         throw error;
       }
 

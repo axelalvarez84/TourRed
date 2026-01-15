@@ -92,6 +92,9 @@ const SignupPage: React.FC = () => {
         if (error.message === 'CURP_DUPLICADO') {
           throw new Error('Este CURP ya se encuentra asociado a otra cuenta. Si ya tienes una cuenta, por favor inicia sesión.');
         }
+        if (error.message === 'PASAPORTE_DUPLICADO') {
+          throw new Error('Este número de pasaporte ya se encuentra asociado a otra cuenta. Si ya tienes una cuenta, por favor inicia sesión.');
+        }
         throw error;
       }
 
