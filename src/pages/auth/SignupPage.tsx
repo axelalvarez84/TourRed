@@ -28,7 +28,7 @@ const SignupPage: React.FC = () => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: name === 'curp' || name === 'passportNumber' ? value.toUpperCase() : value
     }));
   };
 
@@ -87,8 +87,11 @@ const SignupPage: React.FC = () => {
           address: address || null
         }
       );
-      
+
       if (error) {
+        if (error.message === 'CURP_DUPLICADO') {
+          throw new Error('Este CURP ya se encuentra asociado a otra cuenta. Si ya tienes una cuenta, por favor inicia sesión.');
+        }
         throw error;
       }
 

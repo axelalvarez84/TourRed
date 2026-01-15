@@ -43,36 +43,52 @@ export const signUp = async (
 ) => {
   try {
     console.log('🔐 Registrando usuario con email:', email, 'y rol:', role);
-    
+
     // Check if user already exists
     const { data: existingUser } = await supabase
       .from('users')
       .select('id, email')
       .eq('email', email)
       .maybeSingle();
-    
+
     let isExistingUser = false;
-    
+
     if (existingUser) {
       console.log('⚠️ Usuario ya existe en la tabla users:', existingUser);
       isExistingUser = true;
-      
+
       // Sign in instead
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-      
+
       if (error) throw error;
-      
+
       // Update user metadata with role
       await supabase.auth.updateUser({
         data: { role }
       });
-      
+
       return { data, error: null, profileData: existingUser, isExistingUser };
     }
-    
+
+    // Check if CURP already exists (for travelers with CURP)
+    if (role === UserRole.TRAVELER && profileData.curp) {
+      const { data: existingCurp } = await supabase
+        .from('users')
+        .select('id, email, first_name, last_name')
+        .eq('curp', profileData.curp.toUpperCase())
+        .maybeSingle();
+
+      if (existingCurp) {
+        console.log('⚠️ CURP ya existe en la base de datos:', existingCurp);
+        const error = new Error('CURP_DUPLICADO');
+        (error as any).details = existingCurp;
+        throw error;
+      }
+    }
+
     // Create new user
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -81,13 +97,18 @@ export const signUp = async (
         data: { role }
       }
     });
-    
+
     if (error) throw error;
-    
+
     if (!data.user) {
       throw new Error('No se pudo crear el usuario');
     }
-    
+
+    // Normalize CURP to uppercase if provided
+    if (profileData.curp) {
+      profileData.curp = profileData.curp.toUpperCase();
+    }
+
     // Create user profile
     const { data: profile, error: profileError } = await supabase
       .from('users')
@@ -99,11 +120,19 @@ export const signUp = async (
       })
       .select()
       .single();
-    
+
     if (profileError) {
       console.error('❌ Error creando perfil:', profileError);
+
+      // Check if it's a unique constraint violation on CURP
+      if (profileError.code === '23505' && profileError.message.includes('curp')) {
+        const error = new Error('CURP_DUPLICADO');
+        throw error;
+      }
+
+      throw profileError;
     }
-    
+
     return { data, error: null, profileData: profile, isExistingUser };
   } catch (error: any) {
     console.error('❌ Error en signUp:', error);
