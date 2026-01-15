@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Calendar, Save, CreditCard as Edit, X, MapPin, CreditCard, Globe, Phone } from 'lucide-react';
+import { User, Mail, Calendar, Save, CreditCard as Edit, X, MapPin, CreditCard, Globe, Phone, Wallet } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import TravelerReviewsDisplay from '../../components/TravelerReviewsDisplay';
@@ -28,6 +28,7 @@ interface TravelerProfile {
   country?: string;
   booking_count?: number;
   total_spent?: number;
+  wallet_balance?: number;
   profile_picture_url?: string;
 }
 
@@ -86,28 +87,36 @@ const TravelerProfile: React.FC = () => {
       console.log('✅ Perfil de viajero cargado:', profileData);
 
       // Obtener estadísticas del viajero
-      const [bookingsResult, spentResult] = await Promise.all([
+      const [bookingsResult, spentResult, walletResult] = await Promise.all([
         // Contar reservas
         supabase
           .from('bookings')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id),
-        
+
         // Calcular total gastado (suma de user_payment de reservas exitosas)
         supabase
           .from('bookings')
           .select('user_payment')
           .eq('user_id', user.id)
-          .eq('payment_status', 'succeeded')
+          .eq('payment_status', 'succeeded'),
+
+        // Obtener saldo del monedero
+        supabase
+          .from('toursred_cash_wallets')
+          .select('balance')
+          .eq('user_id', user.id)
+          .maybeSingle()
       ]);
 
-      const totalSpent = spentResult.data?.reduce((sum, booking) => 
+      const totalSpent = spentResult.data?.reduce((sum, booking) =>
         sum + (booking.user_payment || 0), 0) || 0;
 
       const profileWithStats = {
         ...profileData,
         booking_count: bookingsResult.count || 0,
-        total_spent: totalSpent
+        total_spent: totalSpent,
+        wallet_balance: walletResult.data?.balance ? Number(walletResult.data.balance) : 0
       };
 
       setProfile(profileWithStats);
@@ -334,7 +343,7 @@ const TravelerProfile: React.FC = () => {
 
           {/* Estadísticas */}
           <div className="bg-gray-50 px-6 py-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-primary-600">{profile.booking_count || 0}</div>
                 <div className="text-sm text-gray-500">Reservas Realizadas</div>
@@ -343,8 +352,18 @@ const TravelerProfile: React.FC = () => {
                 <div className="text-2xl font-bold text-success-600">${(profile.total_spent || 0).toLocaleString()}</div>
                 <div className="text-sm text-gray-500">Total Invertido en Viajes</div>
               </div>
+              <div className="text-center bg-gradient-to-br from-accent-50 to-accent-100 rounded-lg py-3 border-2 border-accent-200">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <Wallet className="h-5 w-5 text-accent-600" />
+                  <div className="text-2xl font-bold text-accent-600">
+                    ${(profile.wallet_balance || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div className="text-xs font-semibold text-accent-700">ToursRed Cash</div>
+                <div className="text-xs text-accent-600 mt-0.5">Saldo disponible</div>
+              </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-accent-600">
+                <div className="text-2xl font-bold text-gray-700">
                   {new Date(profile.created_at).getFullYear()}
                 </div>
                 <div className="text-sm text-gray-500">Miembro desde</div>

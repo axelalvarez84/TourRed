@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { User, Mail, Phone, Calendar, MapPin, Shield, ShieldOff, Edit2, Star, ShoppingBag, X, DollarSign, CreditCard, Crown, TrendingUp, Users, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { User, Mail, Phone, Calendar, MapPin, Shield, ShieldOff, Edit2, Star, ShoppingBag, X, DollarSign, CreditCard, Crown, TrendingUp, Users, ArrowUpDown, ArrowUp, ArrowDown, Wallet } from 'lucide-react';
 
 interface Traveler {
   id: string;
@@ -14,6 +14,7 @@ interface Traveler {
   total_bookings: number;
   total_spent: number;
   total_service_charges: number;
+  wallet_balance: number;
   last_booking_date: string | null;
   has_active_membership: boolean;
   membership_plan_type: string | null;
@@ -38,6 +39,7 @@ interface SummaryStats {
   totalBookings: number;
   totalRevenue: number;
   totalServiceCharges: number;
+  totalWalletBalance: number;
   travelersWithMembership: number;
 }
 
@@ -50,6 +52,7 @@ export default function AdminTravelers() {
     totalBookings: 0,
     totalRevenue: 0,
     totalServiceCharges: 0,
+    totalWalletBalance: 0,
     travelersWithMembership: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -99,11 +102,18 @@ export default function AdminTravelers() {
             .eq('status', 'active')
             .maybeSingle();
 
+          const { data: walletData } = await supabase
+            .from('toursred_cash_wallets')
+            .select('balance')
+            .eq('user_id', traveler.id)
+            .maybeSingle();
+
           return {
             ...traveler,
             total_bookings: totalBookings,
             total_spent: totalSpent,
             total_service_charges: totalServiceCharges,
+            wallet_balance: walletData?.balance ? Number(walletData.balance) : 0,
             last_booking_date: lastBookingDate,
             has_active_membership: !!membershipData,
             membership_plan_type: membershipData?.plan_type || null,
@@ -120,6 +130,7 @@ export default function AdminTravelers() {
         totalBookings: travelersWithDetails.reduce((sum, t) => sum + t.total_bookings, 0),
         totalRevenue: travelersWithDetails.reduce((sum, t) => sum + t.total_spent, 0),
         totalServiceCharges: travelersWithDetails.reduce((sum, t) => sum + t.total_service_charges, 0),
+        totalWalletBalance: travelersWithDetails.reduce((sum, t) => sum + t.wallet_balance, 0),
         travelersWithMembership: travelersWithDetails.filter(t => t.has_active_membership).length,
       };
 
@@ -226,6 +237,10 @@ export default function AdminTravelers() {
           aValue = a.total_service_charges;
           bValue = b.total_service_charges;
           break;
+        case 'wallet_balance':
+          aValue = a.wallet_balance;
+          bValue = b.wallet_balance;
+          break;
         case 'last_booking':
           aValue = a.last_booking_date ? new Date(a.last_booking_date).getTime() : 0;
           bValue = b.last_booking_date ? new Date(b.last_booking_date).getTime() : 0;
@@ -288,7 +303,7 @@ export default function AdminTravelers() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4 mb-8">
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -350,6 +365,14 @@ export default function AdminTravelers() {
             <div className="flex items-center text-sm text-gray-500">
               <CreditCard className="h-4 w-4 mr-1 text-purple-600" />
               Cargos por Servicio
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="text-2xl font-bold text-gray-900 mb-2">{formatCurrency(summaryStats.totalWalletBalance)}</div>
+            <div className="flex items-center text-sm text-gray-500">
+              <Wallet className="h-4 w-4 mr-1 text-accent-600" />
+              ToursRed Cash
             </div>
           </div>
 
@@ -428,6 +451,15 @@ export default function AdminTravelers() {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <button
+                      onClick={() => handleSort('wallet_balance')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      ToursRed Cash
+                      {getSortIcon('wallet_balance')}
+                    </button>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <button
                       onClick={() => handleSort('last_booking')}
                       className="flex items-center gap-1 hover:text-gray-700"
                     >
@@ -461,7 +493,7 @@ export default function AdminTravelers() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredAndSortedTravelers.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={10} className="px-6 py-12 text-center text-gray-500">
                       {searchTerm ? 'No se encontraron viajeros con ese criterio' : 'No hay viajeros registrados'}
                     </td>
                   </tr>
@@ -508,6 +540,12 @@ export default function AdminTravelers() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
                           {formatCurrency(traveler.total_service_charges)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center text-sm font-medium text-accent-600">
+                          <Wallet className="h-4 w-4 mr-1" />
+                          {formatCurrency(traveler.wallet_balance)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
