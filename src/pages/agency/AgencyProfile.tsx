@@ -17,6 +17,15 @@ interface AgencyProfile {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  street?: string;
+  exterior_number?: string;
+  interior_number?: string;
+  colony?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+  domicilio_fiscal?: string;
   users?: {
     first_name?: string;
     last_name?: string;
@@ -42,6 +51,14 @@ const AgencyProfile: React.FC = () => {
     razon_social: '',
     regimen_fiscal: '',
     domicilio_fiscal: '',
+    street: '',
+    exterior_number: '',
+    interior_number: '',
+    colony: '',
+    city: '',
+    state: '',
+    postal_code: '',
+    country: 'México',
     banco: '',
     cuenta_clabe: '',
     titular_cuenta: '',
@@ -117,6 +134,14 @@ const AgencyProfile: React.FC = () => {
         razon_social: agencyData.razon_social || '',
         regimen_fiscal: agencyData.regimen_fiscal || '',
         domicilio_fiscal: agencyData.domicilio_fiscal || '',
+        street: agencyData.street || '',
+        exterior_number: agencyData.exterior_number || '',
+        interior_number: agencyData.interior_number || '',
+        colony: agencyData.colony || '',
+        city: agencyData.city || '',
+        state: agencyData.state || '',
+        postal_code: agencyData.postal_code || '',
+        country: agencyData.country || 'México',
         banco: agencyData.banco || '',
         cuenta_clabe: agencyData.cuenta_clabe || '',
         titular_cuenta: agencyData.titular_cuenta || '',
@@ -158,6 +183,14 @@ const AgencyProfile: React.FC = () => {
           razon_social: editForm.razon_social,
           regimen_fiscal: editForm.regimen_fiscal,
           domicilio_fiscal: editForm.domicilio_fiscal,
+          street: editForm.street || null,
+          exterior_number: editForm.exterior_number || null,
+          interior_number: editForm.interior_number || null,
+          colony: editForm.colony || null,
+          city: editForm.city || null,
+          state: editForm.state || null,
+          postal_code: editForm.postal_code || null,
+          country: editForm.country || 'México',
           banco: editForm.banco,
           cuenta_clabe: editForm.cuenta_clabe,
           titular_cuenta: editForm.titular_cuenta,
@@ -410,16 +443,122 @@ const AgencyProfile: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Domicilio Fiscal
+                    <label className="block text-sm font-semibold text-gray-900 mb-3">
+                      Domicilio de la Agencia
                     </label>
-                    <textarea
-                      value={editForm.domicilio_fiscal || ''}
-                      onChange={(e) => setEditForm({ ...editForm, domicilio_fiscal: e.target.value })}
-                      className="input"
-                      rows={3}
-                      placeholder="Dirección fiscal completa"
-                    />
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Calle
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.street || ''}
+                          onChange={(e) => setEditForm({ ...editForm, street: e.target.value })}
+                          className="input"
+                          placeholder="Ej: Av. Insurgentes Sur"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Número Exterior
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.exterior_number || ''}
+                            onChange={(e) => setEditForm({ ...editForm, exterior_number: e.target.value })}
+                            className="input"
+                            placeholder="Ej: 123"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Número Interior
+                            <span className="text-gray-400 font-normal ml-1">(opcional)</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.interior_number || ''}
+                            onChange={(e) => setEditForm({ ...editForm, interior_number: e.target.value })}
+                            className="input"
+                            placeholder="Ej: 4B"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Colonia
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.colony || ''}
+                          onChange={(e) => setEditForm({ ...editForm, colony: e.target.value })}
+                          className="input"
+                          placeholder="Ej: Roma Norte"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Ciudad
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.city || ''}
+                            onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                            className="input"
+                            placeholder="Ej: Ciudad de México"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Estado
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.state || ''}
+                            onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
+                            className="input"
+                            placeholder="Ej: CDMX"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Código Postal
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.postal_code || ''}
+                            onChange={(e) => setEditForm({ ...editForm, postal_code: e.target.value })}
+                            className="input"
+                            placeholder="Ej: 06700"
+                            maxLength={5}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            País
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.country || ''}
+                            onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
+                            className="input"
+                            placeholder="México"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div>
@@ -474,14 +613,30 @@ const AgencyProfile: React.FC = () => {
                     </div>
                   </div>
 
-                  {agency.domicilio_fiscal && (
+                  {(agency.street || agency.city || agency.state) && (
                     <div className="flex items-start">
                       <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3 mt-1">
                         <MapPin className="h-4 w-4" />
                       </div>
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">Domicilio Fiscal</div>
-                        <div className="text-sm text-gray-600">{agency.domicilio_fiscal}</div>
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-gray-900">Domicilio de la Agencia</div>
+                        <div className="text-sm text-gray-600 space-y-0.5">
+                          {agency.street && (
+                            <div>
+                              <span className="font-medium">{agency.street}</span>
+                              {agency.exterior_number && <span> #{agency.exterior_number}</span>}
+                              {agency.interior_number && <span> Int. {agency.interior_number}</span>}
+                            </div>
+                          )}
+                          {agency.colony && <div>{agency.colony}</div>}
+                          <div>
+                            {agency.city && <span>{agency.city}</span>}
+                            {agency.city && agency.state && <span>, </span>}
+                            {agency.state && <span>{agency.state}</span>}
+                            {agency.postal_code && <span> {agency.postal_code}</span>}
+                          </div>
+                          {agency.country && <div>{agency.country}</div>}
+                        </div>
                       </div>
                     </div>
                   )}

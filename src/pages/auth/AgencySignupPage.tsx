@@ -23,7 +23,15 @@ const AgencySignupPage: React.FC = () => {
     website: '',
     rfc: '',
     razonSocial: '',
-    rnt: ''
+    rnt: '',
+    street: '',
+    exteriorNumber: '',
+    interiorNumber: '',
+    colony: '',
+    city: '',
+    state: '',
+    postalCode: '',
+    country: 'México'
   });
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -31,7 +39,7 @@ const AgencySignupPage: React.FC = () => {
     setIsLoading(true);
     setError('');
 
-    const { firstName, lastName, email, password, confirmPassword, agencyName, phoneNumber, website, rfc, razonSocial, rnt } = formData;
+    const { firstName, lastName, email, password, confirmPassword, agencyName, phoneNumber, website, rfc, razonSocial, rnt, street, exteriorNumber, interiorNumber, colony, city, state, postalCode, country } = formData;
 
     if (password.trim() !== confirmPassword.trim()) {
       setError('Las contraseñas no coinciden');
@@ -119,6 +127,14 @@ const AgencySignupPage: React.FC = () => {
           rfc: rfc || null,
           razon_social: razonSocial.trim(),
           rnt: rnt || null,
+          street: street || null,
+          exterior_number: exteriorNumber || null,
+          interior_number: interiorNumber || null,
+          colony: colony || null,
+          city: city || null,
+          state: state || null,
+          postal_code: postalCode || null,
+          country: country || 'México',
           is_active: true
         })
         .select()
@@ -457,6 +473,163 @@ const AgencySignupPage: React.FC = () => {
                   <p className="mt-1 text-xs text-gray-500">
                     Nombre legal completo del propietario (persona física) o razón social de la empresa (persona moral)
                   </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Domicilio de la Agencia */}
+            <div className="border-b border-gray-200 pb-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Domicilio de la Agencia</h3>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="street" className="block text-sm font-medium text-gray-700">
+                    Calle *
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="street"
+                      name="street"
+                      type="text"
+                      value={formData.street}
+                      onChange={(e) => handleInputChange('street', e.target.value)}
+                      required
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      placeholder="Ej: Av. Insurgentes Sur"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="exteriorNumber" className="block text-sm font-medium text-gray-700">
+                      Número Exterior *
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        id="exteriorNumber"
+                        name="exteriorNumber"
+                        type="text"
+                        value={formData.exteriorNumber}
+                        onChange={(e) => handleInputChange('exteriorNumber', e.target.value)}
+                        required
+                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                        placeholder="Ej: 123"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="interiorNumber" className="block text-sm font-medium text-gray-700">
+                      Número Interior
+                      <span className="text-gray-400 font-normal ml-1">(opcional)</span>
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        id="interiorNumber"
+                        name="interiorNumber"
+                        type="text"
+                        value={formData.interiorNumber}
+                        onChange={(e) => handleInputChange('interiorNumber', e.target.value)}
+                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                        placeholder="Ej: 4B"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="colony" className="block text-sm font-medium text-gray-700">
+                    Colonia *
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="colony"
+                      name="colony"
+                      type="text"
+                      value={formData.colony}
+                      onChange={(e) => handleInputChange('colony', e.target.value)}
+                      required
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      placeholder="Ej: Roma Norte"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="city" className="block text-sm font-medium text-gray-700">
+                      Ciudad *
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        id="city"
+                        name="city"
+                        type="text"
+                        value={formData.city}
+                        onChange={(e) => handleInputChange('city', e.target.value)}
+                        required
+                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                        placeholder="Ej: Ciudad de México"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="state" className="block text-sm font-medium text-gray-700">
+                      Estado *
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        id="state"
+                        name="state"
+                        type="text"
+                        value={formData.state}
+                        onChange={(e) => handleInputChange('state', e.target.value)}
+                        required
+                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                        placeholder="Ej: CDMX"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="postalCode" className="block text-sm font-medium text-gray-700">
+                      Código Postal *
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        id="postalCode"
+                        name="postalCode"
+                        type="text"
+                        value={formData.postalCode}
+                        onChange={(e) => handleInputChange('postalCode', e.target.value)}
+                        required
+                        maxLength={5}
+                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                        placeholder="Ej: 06700"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="country" className="block text-sm font-medium text-gray-700">
+                      País *
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        id="country"
+                        name="country"
+                        type="text"
+                        value={formData.country}
+                        onChange={(e) => handleInputChange('country', e.target.value)}
+                        required
+                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                        placeholder="México"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
