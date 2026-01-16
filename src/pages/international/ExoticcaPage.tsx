@@ -163,6 +163,21 @@ const ExoticcaPage: React.FC = () => {
           </div>
         </div>
 
+        <div className="bg-gray-100 border border-gray-300 rounded-lg shadow-sm p-6 mb-8">
+          <h3 className="text-lg font-bold text-gray-900 mb-4">Aviso Legal</h3>
+          <div className="space-y-3 text-sm text-gray-700 leading-relaxed">
+            <p>
+              Los paquetes y servicios turísticos internacionales ofrecidos en esta sección son prestados, operados y administrados directamente por <span className="font-semibold">Exoticca</span>, quien actúa como proveedor final del servicio.
+            </p>
+            <p>
+              Exoticca es el único responsable de la ejecución del viaje, calidad de los servicios, atención al cliente, políticas de cancelación, modificaciones, reembolsos y cualquier reclamación relacionada con la experiencia de viaje.
+            </p>
+            <p>
+              ToursRed no opera, organiza ni administra los viajes, y participa exclusivamente como intermediario de referencia, limitando su responsabilidad a la promoción y canalización del usuario hacia el proveedor externo.
+            </p>
+          </div>
+        </div>
+
         <div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-lg shadow-lg p-8 text-white text-center">
           <h2 className="text-2xl font-bold mb-4">¿Listo para tu próxima aventura?</h2>
           <p className="text-gray-300 mb-6 max-w-2xl mx-auto">
