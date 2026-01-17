@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import Stripe from "npm:stripe@14.14.0";
+import Stripe from "npm:stripe@12.18.0";
 import { createClient } from "npm:@supabase/supabase-js@2.39.6";
 
 const corsHeaders = {
@@ -100,6 +100,14 @@ Deno.serve(async (req: Request) => {
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card", "oxxo", "customer_balance"],
+      payment_method_options: {
+        customer_balance: {
+          funding_type: "bank_transfer",
+          bank_transfer: {
+            type: "mx_bank_transfer",
+          },
+        },
+      },
       line_items: [
         {
           price_data: {
