@@ -63,6 +63,25 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    let customerId: string;
+    const existingCustomers = await stripe.customers.list({
+      email: purchaserEmail,
+      limit: 1
+    });
+
+    if (existingCustomers.data.length > 0) {
+      customerId = existingCustomers.data[0].id;
+    } else {
+      const customer = await stripe.customers.create({
+        email: purchaserEmail,
+        name: purchaserName,
+        metadata: {
+          source: 'gift_card_purchase'
+        },
+      });
+      customerId = customer.id;
+    }
+
     const code = await generateGiftCardCode(supabase);
     const expiresAt = new Date();
     expiresAt.setFullYear(expiresAt.getFullYear() + 1);
@@ -99,6 +118,7 @@ Deno.serve(async (req: Request) => {
     const stripeAmount = Math.round(amount * 100);
 
     const session = await stripe.checkout.sessions.create({
+      customer: customerId,
       payment_method_types: ["card", "oxxo", "customer_balance"],
       payment_method_options: {
         customer_balance: {
@@ -126,7 +146,6 @@ Deno.serve(async (req: Request) => {
       mode: "payment",
       success_url: `${req.headers.get("origin")}/gift-card/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.get("origin")}/gift-cards`,
-      customer_email: purchaserEmail,
       metadata: {
         gift_card_id: giftCard.id,
         gift_card_code: code,
