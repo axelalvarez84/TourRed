@@ -76,7 +76,7 @@ Deno.serve(async (req: Request) => {
           error: "Código de tarjeta de regalo inválido"
         }),
         {
-          status: 404,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
@@ -99,7 +99,7 @@ Deno.serve(async (req: Request) => {
           error: "Esta tarjeta de regalo ya ha sido canjeada"
         }),
         {
-          status: 400,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
@@ -122,7 +122,7 @@ Deno.serve(async (req: Request) => {
           error: "Esta tarjeta de regalo ha expirado"
         }),
         {
-          status: 400,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
@@ -145,7 +145,7 @@ Deno.serve(async (req: Request) => {
           error: "Esta tarjeta de regalo ha sido cancelada"
         }),
         {
-          status: 400,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
@@ -192,7 +192,7 @@ Deno.serve(async (req: Request) => {
             error: "Solo los viajeros pueden canjear tarjetas de regalo"
           }),
           {
-            status: 403,
+            status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           }
         );
@@ -211,7 +211,7 @@ Deno.serve(async (req: Request) => {
             error: "No se pudo encontrar tu monedero ToursRed Cash"
           }),
           {
-            status: 404,
+            status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           }
         );
@@ -244,7 +244,7 @@ Deno.serve(async (req: Request) => {
             error: "Error al actualizar tu monedero. Por favor intenta nuevamente"
           }),
           {
-            status: 500,
+            status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           }
         );
