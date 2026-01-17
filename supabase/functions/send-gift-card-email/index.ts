@@ -165,14 +165,14 @@ async function sendGiftCardEmail(
     : "Hola,";
 
   const introMessage = isPurchaserCopy
-    ? `<p>Gracias por comprar una Tarjeta de Regalo ToursRed de <strong>${formattedAmount}</strong>.</p>`
+    ? `<p>🎁 Gracias por comprar una Tarjeta de Regalo ToursRed de <strong>${formattedAmount}</strong>.</p>`
     : giftCard.personal_message
-    ? `<p><strong>${giftCard.purchaser_name}</strong> te ha enviado una Tarjeta de Regalo ToursRed de <strong>${formattedAmount}</strong>.</p>
-       <div style="background: #FFF8E6; border-left: 4px solid #F59E0B; padding: 16px; margin: 20px 0; border-radius: 4px;">
-         <p style="margin: 0; font-style: italic; color: #92400E;">"${giftCard.personal_message}"</p>
-         <p style="margin: 8px 0 0 0; font-size: 14px; color: #92400E;">- ${giftCard.purchaser_name}</p>
+    ? `<p>🎁 <strong>${giftCard.purchaser_name}</strong> te ha enviado una Tarjeta de Regalo ToursRed de <strong>${formattedAmount}</strong>.</p>
+       <div style="background: #EFF6FF; border-left: 4px solid #3B82F6; padding: 16px; margin: 20px 0; border-radius: 4px;">
+         <p style="margin: 0; font-style: italic; color: #1E40AF;">"${giftCard.personal_message}"</p>
+         <p style="margin: 8px 0 0 0; font-size: 14px; color: #1E40AF;">- ${giftCard.purchaser_name}</p>
        </div>`
-    : `<p><strong>${giftCard.purchaser_name}</strong> te ha enviado una Tarjeta de Regalo ToursRed de <strong>${formattedAmount}</strong>.</p>`;
+    : `<p>🎁 <strong>${giftCard.purchaser_name}</strong> te ha enviado una Tarjeta de Regalo ToursRed de <strong>${formattedAmount}</strong>.</p>`;
 
   const recipientInfo = isPurchaserCopy && giftCard.recipient_email
     ? `<p style="color: #6B7280; font-size: 14px; margin-top: 20px;">Esta tarjeta de regalo fue enviada a: <strong>${giftCard.recipient_email}</strong></p>`
@@ -213,8 +213,8 @@ async function sendGiftCardEmail(
           <tr>
             <td class="header">
               <img src="https://www.toursred.com/logo.png" alt="ToursRed Logo" class="logo" style="max-width: 180px; height: auto; margin-bottom: 15px;" />
-              <h1 style="color: #FFFFFF; margin: 10px 0 0 0; font-size: 32px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">🎁 Tarjeta de Regalo</h1>
-              <p style="color: #FEF3C7; margin: 10px 0 0 0; font-size: 18px; font-weight: 500;">¡El regalo perfecto para los amantes de viajar!</p>
+              <h1 style="color: #FFFFFF; margin: 10px 0 0 0; font-size: 32px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">Tarjeta de Regalo</h1>
+              <p style="color: #FEF3C7; margin: 10px 0 0 0; font-size: 18px; font-weight: 500;">🎁 ¡El regalo perfecto para los amantes de viajar!</p>
             </td>
           </tr>
 
