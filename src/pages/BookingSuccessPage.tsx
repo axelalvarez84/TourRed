@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { CheckCircle, Calendar, MapPin, Users, DollarSign, ArrowRight, CreditCard, Mail } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, Users, DollarSign, ArrowRight, CreditCard, Mail, Wallet } from 'lucide-react';
 import { supabase, parseDateFromDB } from '../lib/supabase';
 import { Booking, Tour } from '../types';
 import { format } from 'date-fns';
@@ -316,24 +316,47 @@ const BookingSuccessPage: React.FC = () => {
                     <span className="text-gray-600">Precio Total del Tour:</span>
                     <span className="font-medium">${booking.total_price?.toLocaleString()}</span>
                   </div>
-                  
+
                   <div className="flex justify-between">
                     <span className="text-gray-600">Depósito Pagado:</span>
                     <span className="font-medium">${booking.deposit_amount?.toLocaleString()}</span>
                   </div>
-                  
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Cargo por Servicio:</span>
-                    <span className="font-medium">${booking.service_charge?.toLocaleString()}</span>
-                  </div>
-                  
+
+                  {booking.service_charge !== undefined && booking.service_charge !== null && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Cargo por Servicio:</span>
+                      <span className="font-medium">
+                        {booking.service_charge === 0 ? (
+                          <span className="text-green-600">$0</span>
+                        ) : (
+                          `$${booking.service_charge.toLocaleString()}`
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+                  {booking.toursred_cash_used && booking.toursred_cash_used > 0 && (
+                    <div className="flex justify-between bg-amber-50 border border-amber-200 rounded px-2 py-1.5 -mx-1">
+                      <span className="text-amber-700 font-medium flex items-center">
+                        <Wallet className="h-4 w-4 mr-1" />
+                        ToursRed Cash Aplicado:
+                      </span>
+                      <span className="font-bold text-amber-600">-${booking.toursred_cash_used.toLocaleString()}</span>
+                    </div>
+                  )}
+
                   <div className="border-t border-gray-200 pt-2 mt-2">
                     <div className="flex justify-between text-lg font-bold">
                       <span className="text-green-600">Total Pagado:</span>
                       <span className="text-green-600">${booking.user_payment?.toLocaleString()}</span>
                     </div>
+                    {booking.toursred_cash_used && booking.toursred_cash_used > 0 && (
+                      <div className="text-xs text-gray-500 mt-1 text-right">
+                        (${booking.toursred_cash_used.toLocaleString()} ToursRed Cash + ${((booking.user_payment || 0) - (booking.toursred_cash_used || 0)).toLocaleString()} Stripe)
+                      </div>
+                    )}
                   </div>
-                  
+
                   <div className="flex justify-between text-sm text-gray-500 mt-2">
                     <span>Saldo Restante:</span>
                     <span>${((booking.total_price || 0) - (booking.deposit_amount || 0)).toLocaleString()}</span>

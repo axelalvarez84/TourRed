@@ -158,6 +158,7 @@ export interface Booking {
   count_adultos_mayores?: number;
   count_mascotas?: number;
   booking_approval_type?: 'automatic' | 'manual';
+  toursred_cash_used?: number;
 }
 
 export interface BookingTraveler {
