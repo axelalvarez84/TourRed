@@ -218,12 +218,12 @@ Deno.serve(async (req: Request) => {
       }
 
       const { error: updateBalanceError } = await supabase.rpc("update_wallet_balance", {
-        p_wallet_id: wallet.id,
+        p_user_id: userId,
         p_amount: giftCard.amount,
-        p_transaction_type: "gift_card",
+        p_type: "gift_card",
         p_description: `Tarjeta de regalo canjeada: ${giftCard.code}`,
-        p_reference_type: "gift_card",
         p_reference_id: giftCard.id,
+        p_reference_type: "gift_card",
       });
 
       if (updateBalanceError) {
