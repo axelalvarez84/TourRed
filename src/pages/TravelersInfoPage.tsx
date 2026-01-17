@@ -318,6 +318,10 @@ const TravelersInfoPage: React.FC = () => {
         throw new Error('No hay sesión activa');
       }
 
+      // Calcular el monto a cobrar después de aplicar ToursRed Cash
+      const toursRedCashUsed = booking?.toursred_cash_used || 0;
+      const amountToCharge = (booking?.user_payment || 0) - toursRedCashUsed;
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`,
         {
@@ -329,10 +333,11 @@ const TravelersInfoPage: React.FC = () => {
           body: JSON.stringify({
             bookingId: bookingId,
             customerEmail: user?.email,
-            amount: booking?.user_payment,
+            amount: amountToCharge,
             description: `Depósito para ${tour?.name}`,
             success_url: `${window.location.origin}/booking-success?booking_id=${bookingId}`,
             cancel_url: `${window.location.origin}/booking-cancel?booking_id=${bookingId}`,
+            toursRedCashUsed: toursRedCashUsed,
           }),
         }
       );

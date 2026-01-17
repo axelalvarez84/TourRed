@@ -129,6 +129,10 @@ const TravelerBookings: React.FC = () => {
         throw new Error('No hay sesión activa');
       }
 
+      // Calcular el monto a cobrar después de aplicar ToursRed Cash
+      const toursRedCashUsed = booking.toursred_cash_used || 0;
+      const amountToCharge = (booking.user_payment || booking.deposit_amount) - toursRedCashUsed;
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`,
         {
@@ -139,11 +143,12 @@ const TravelerBookings: React.FC = () => {
           },
           body: JSON.stringify({
             bookingId: booking.id,
-            amount: booking.user_payment || booking.deposit_amount,
+            amount: amountToCharge,
             currency: 'mxn',
             description: `Pago de reserva - ${booking.tours?.name || 'Tour'}`,
             success_url: `${window.location.origin}/booking-success?booking_id=${booking.id}`,
             cancel_url: `${window.location.origin}/traveler/bookings`,
+            toursRedCashUsed: toursRedCashUsed,
           }),
         }
       );
