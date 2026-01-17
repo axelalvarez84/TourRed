@@ -26,7 +26,8 @@ Deno.serve(async (req) => {
       success_url,
       cancel_url,
       addMembership = false,
-      membershipPlan = 'monthly'
+      membershipPlan = 'monthly',
+      toursRedCashUsed = 0
     } = await req.json();
 
     if (!amount || !bookingId) {
@@ -223,6 +224,7 @@ Deno.serve(async (req) => {
         booking_id: bookingId,
         add_membership: addMembership ? 'true' : 'false',
         membership_plan: membershipPlan,
+        toursred_cash_used: toursRedCashUsed.toString(),
         ...metadata,
       },
     };
@@ -310,6 +312,7 @@ Deno.serve(async (req) => {
       sessionConfig.payment_intent_data = {
         metadata: {
           booking_id: bookingId,
+          toursred_cash_used: toursRedCashUsed.toString(),
           ...metadata,
         },
       };

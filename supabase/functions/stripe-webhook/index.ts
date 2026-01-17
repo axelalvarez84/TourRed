@@ -196,6 +196,37 @@ Deno.serve(async (req) => {
           } else {
             console.log(`Successfully updated booking ${bookingId} to paid status`);
 
+            // Deduct ToursRed Cash from wallet if used
+            const toursRedCashUsed = parseFloat(session.metadata?.toursred_cash_used || '0');
+            if (toursRedCashUsed > 0) {
+              try {
+                const { data: booking } = await supabase
+                  .from('bookings')
+                  .select('user_id')
+                  .eq('id', bookingId)
+                  .single();
+
+                if (booking) {
+                  const { error: walletError } = await supabase.rpc('update_wallet_balance', {
+                    p_user_id: booking.user_id,
+                    p_amount: -toursRedCashUsed,
+                    p_type: 'debit',
+                    p_description: `Aplicado a reserva #${bookingId}`,
+                    p_reference_id: bookingId,
+                    p_reference_type: 'booking',
+                  });
+
+                  if (walletError) {
+                    console.error(`Error deducting ToursRed Cash: ${walletError.message}`);
+                  } else {
+                    console.log(`Successfully deducted ${toursRedCashUsed} MXN from user wallet`);
+                  }
+                }
+              } catch (walletErr) {
+                console.error('Error processing ToursRed Cash deduction:', walletErr);
+              }
+            }
+
             try {
               const { data: booking } = await supabase
                 .from('bookings')

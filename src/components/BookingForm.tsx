@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles } from 'lucide-react';
+import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet } from 'lucide-react';
 import { Tour } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { createBooking, formatDateForDB, supabase } from '../lib/supabase';
@@ -31,6 +31,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [isLoadingMembership, setIsLoadingMembership] = useState(true);
   const [addMembershipToBooking, setAddMembershipToBooking] = useState(false);
   const [selectedMembershipPlan, setSelectedMembershipPlan] = useState<'monthly' | 'annual'>('monthly');
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [isLoadingWallet, setIsLoadingWallet] = useState(true);
+  const [useToursRedCash, setUseToursRedCash] = useState(false);
 
   const [travelerCounts, setTravelerCounts] = useState<TravelerCounts>({
     adultos: 1,
@@ -96,6 +99,39 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     };
 
     checkMembership();
+  }, [user, isTraveler]);
+
+  React.useEffect(() => {
+    const loadWalletBalance = async () => {
+      if (!user || !isTraveler) {
+        setIsLoadingWallet(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('toursred_cash_wallets')
+          .select('balance')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error loading wallet:', error);
+          setWalletBalance(0);
+        } else {
+          setWalletBalance(data?.balance || 0);
+          console.log('✅ Saldo ToursRed Cash:', data?.balance || 0);
+        }
+      } catch (err) {
+        console.error('Error loading wallet:', err);
+        setWalletBalance(0);
+      } finally {
+        setIsLoadingWallet(false);
+      }
+    };
+
+    loadWalletBalance();
   }, [user, isTraveler]);
 
   React.useEffect(() => {
@@ -216,7 +252,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
   const userPayment = depositAmount + serviceCharge;
 
-  const totalToPayNow = userPayment + membershipCost;
+  // Calcular ToursRed Cash aplicado
+  const toursRedCashApplied = useToursRedCash ? Math.min(walletBalance, userPayment) : 0;
+  const amountAfterToursRedCash = userPayment - toursRedCashApplied;
+
+  const totalToPayNow = amountAfterToursRedCash + membershipCost;
 
   const agencyReceives = depositAmount - agencyCommission;
 
@@ -290,6 +330,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         count_infantes: travelerCounts.infantes,
         count_adultos_mayores: travelerCounts.adultos_mayores,
         count_mascotas: travelerCounts.mascotas,
+        toursred_cash_used: toursRedCashApplied,
       };
 
       console.log('📝 Creando reserva con datos:', bookingData);
@@ -340,6 +381,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
             description: `Depósito para ${tour.name}`,
             addMembership: addMembershipToBooking,
             membershipPlan: selectedMembershipPlan,
+            toursRedCashUsed: toursRedCashApplied,
           }),
         }
       );
@@ -672,6 +714,51 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           </div>
         )}
 
+        {!isLoadingWallet && walletBalance > 0 && totalTravelers > 0 && (
+          <div className="mb-4 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-lg p-4">
+            <div className="flex items-start mb-3">
+              <Wallet className="h-5 w-5 text-amber-600 mr-2 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-sm font-bold text-gray-900 mb-1">
+                  Saldo ToursRed Cash Disponible
+                </h4>
+                <p className="text-xs text-gray-700">
+                  Tienes ${walletBalance.toLocaleString()} MXN disponibles. Úsalos para reducir el total a pagar.
+                </p>
+              </div>
+            </div>
+
+            <label className="flex items-start cursor-pointer">
+              <input
+                type="checkbox"
+                checked={useToursRedCash}
+                onChange={(e) => setUseToursRedCash(e.target.checked)}
+                className="mt-1 h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
+              />
+              <span className="ml-3 text-sm font-medium text-gray-900">
+                Usar mi saldo de ToursRed Cash
+              </span>
+            </label>
+
+            {useToursRedCash && (
+              <div className="mt-3 bg-white rounded-md p-3 border border-amber-200">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-700">Se aplicarán:</span>
+                  <span className="font-bold text-amber-600">
+                    -${toursRedCashApplied.toLocaleString()} MXN
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs text-gray-600 mt-1">
+                  <span>Saldo restante después de esta reserva:</span>
+                  <span className="font-medium">
+                    ${(walletBalance - toursRedCashApplied).toLocaleString()} MXN
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {totalTravelers > 0 && (
           <div className="mb-4 bg-gray-50 p-4 rounded-md space-y-2">
             <h4 className="text-sm font-semibold text-gray-900">Desglose de Costos</h4>
@@ -743,6 +830,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     Membresía ToursRed+ ({selectedMembershipPlan === 'monthly' ? 'Mensual' : 'Anual'}):
                   </span>
                   <span className="font-medium">+${membershipCost.toLocaleString()}</span>
+                </div>
+              )}
+
+              {useToursRedCash && toursRedCashApplied > 0 && (
+                <div className="flex justify-between text-sm text-amber-600 mt-1">
+                  <span className="flex items-center">
+                    <Wallet className="h-3 w-3 mr-1" />
+                    ToursRed Cash aplicado:
+                  </span>
+                  <span className="font-medium">-${toursRedCashApplied.toLocaleString()}</span>
                 </div>
               )}
             </div>
