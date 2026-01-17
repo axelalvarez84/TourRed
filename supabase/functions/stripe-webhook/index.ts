@@ -350,6 +350,8 @@ Deno.serve(async (req) => {
       case 'payment_intent.succeeded': {
         const paymentIntent = event.data.object;
         const bookingId = paymentIntent.metadata?.booking_id;
+        const giftCardId = paymentIntent.metadata?.gift_card_id;
+        const transactionType = paymentIntent.metadata?.type;
 
         console.log(`Payment intent succeeded: ${paymentIntent.id}`);
 
@@ -374,6 +376,47 @@ Deno.serve(async (req) => {
           }
         } catch (error) {
           console.error(`Error retrieving payment method: ${error.message}`);
+        }
+
+        if (transactionType === 'gift_card' && giftCardId) {
+          console.log(`Processing delayed gift card payment completion: ${giftCardId}`);
+
+          const { error: giftCardError } = await supabase
+            .from('gift_cards')
+            .update({
+              stripe_payment_intent_id: paymentIntent.id,
+              purchased_at: new Date().toISOString(),
+            })
+            .eq('id', giftCardId);
+
+          if (giftCardError) {
+            console.error(`Error updating gift card: ${giftCardError.message}`);
+          } else {
+            console.log(`Successfully updated gift card ${giftCardId} after delayed payment`);
+
+            try {
+              const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-gift-card-email`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${supabaseServiceKey}`,
+                },
+                body: JSON.stringify({ giftCardId: giftCardId }),
+              });
+
+              const emailResult = await emailResponse.json();
+
+              if (emailResult.success) {
+                console.log('Gift card emails sent successfully after delayed payment');
+              } else {
+                console.error('Error sending gift card emails:', emailResult);
+              }
+            } catch (emailError) {
+              console.error('Error calling gift card email function:', emailError);
+            }
+          }
+
+          break;
         }
 
         if (bookingId) {
