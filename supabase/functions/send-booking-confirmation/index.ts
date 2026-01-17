@@ -124,8 +124,10 @@ Deno.serve(async (req: Request) => {
     const depositPercentage = booking.tour.deposit_percentage;
     const serviceChargePercentage = platformSettings.service_charge_percentage;
     const agencyCommissionPercentage = platformSettings.agency_commission_percentage;
-    const serviceCharge = booking.service_charge || (totalPrice * (serviceChargePercentage / 100));
-    const userPayment = depositAmount + serviceCharge;
+    const serviceCharge = booking.service_charge || 0;
+    const toursRedCashUsed = booking.toursred_cash_used || 0;
+    const userPayment = booking.user_payment || (depositAmount + serviceCharge);
+    const stripePayment = userPayment - toursRedCashUsed;
     const remainingAmount = totalPrice - depositAmount;
 
     const agencyCommission = totalPrice * (agencyCommissionPercentage / 100);
@@ -214,10 +216,23 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">Anticipo (${depositPercentage}%):</span>
           <span class="info-value">${formatCurrency(depositAmount)}</span>
         </div>
+        ${serviceCharge > 0 ? `
         <div class="info-row">
           <span class="info-label">Cargo por uso de plataforma (${serviceChargePercentage}%):</span>
           <span class="info-value">${formatCurrency(serviceCharge)}</span>
         </div>
+        ` : `
+        <div class="info-row">
+          <span class="info-label">Cargo por uso de plataforma:</span>
+          <span class="info-value" style="color: #059669;">$0.00 (ToursRed Plus)</span>
+        </div>
+        `}
+        ${toursRedCashUsed > 0 ? `
+        <div class="info-row" style="background-color: #fef3c7; margin: 5px -5px; padding: 8px 5px;">
+          <span class="info-label" style="font-weight: 600;">💰 ToursRed Cash Aplicado:</span>
+          <span class="info-value" style="color: #d97706;">-${formatCurrency(toursRedCashUsed)}</span>
+        </div>
+        ` : ''}
         <div class="info-row">
           <span class="info-label">Método de pago:</span>
           <span class="info-value">${paymentMethod}</span>
@@ -227,6 +242,11 @@ Deno.serve(async (req: Request) => {
             <span>Total pagado:</span>
             <span style="color: #059669;">${formatCurrency(userPayment)}</span>
           </div>
+          ${toursRedCashUsed > 0 ? `
+          <div style="font-size: 12px; color: #6b7280; text-align: right; margin-top: 5px;">
+            (${formatCurrency(toursRedCashUsed)} ToursRed Cash + ${formatCurrency(stripePayment)} Stripe)
+          </div>
+          ` : ''}
         </div>
         <div class="info-row">
           <span class="info-label">Monto restante a pagar a la agencia:</span>
