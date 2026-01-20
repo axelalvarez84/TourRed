@@ -326,7 +326,40 @@ const AgencyBookings: React.FC = () => {
       ));
 
       console.log(`✅ Reserva ${bookingId} marcada como No Show`);
-      alert('El viajero ha sido marcado como No Show. Su contador ha sido actualizado.');
+
+      // Enviar email de notificación al viajero
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (session) {
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-no-show-notification`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({
+                booking_id: bookingId,
+              }),
+            }
+          );
+
+          const result = await response.json();
+
+          if (result.success) {
+            console.log('✅ Email de notificación de No Show enviado al viajero');
+          } else {
+            console.warn('⚠️ No se pudo enviar el email de notificación:', result);
+          }
+        }
+      } catch (emailError: any) {
+        console.error('❌ Error enviando email de notificación:', emailError);
+        // No lanzamos error aquí porque el No Show ya fue registrado
+      }
+
+      alert('El viajero ha sido marcado como No Show. Su contador ha sido actualizado y se le ha notificado por email.');
     } catch (err: any) {
       console.error('❌ Error marcando No Show:', err);
       setError(err.message || 'Error al marcar como No Show');
