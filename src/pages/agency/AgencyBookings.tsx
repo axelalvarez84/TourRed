@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter, Star, X, User, MessageSquare, UserCheck } from 'lucide-react';
+import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter, Star, X, User, MessageSquare, UserCheck, UserX } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getAgencyBookings, supabase, parseDateFromDB } from '../../lib/supabase';
 import { Booking } from '../../types';
@@ -269,7 +269,7 @@ const AgencyBookings: React.FC = () => {
     try {
       const { error } = await supabase
         .from('bookings')
-        .update({ 
+        .update({
           status: newStatus,
           updated_at: new Date().toISOString()
         })
@@ -280,8 +280,8 @@ const AgencyBookings: React.FC = () => {
       }
 
       // Actualizar el estado local
-      setBookings(bookings.map(booking => 
-        booking.id === bookingId 
+      setBookings(bookings.map(booking =>
+        booking.id === bookingId
           ? { ...booking, status: newStatus as any }
           : booking
       ));
@@ -290,6 +290,46 @@ const AgencyBookings: React.FC = () => {
     } catch (err: any) {
       console.error('❌ Error actualizando estado de reserva:', err);
       setError(err.message || 'Error al actualizar el estado de la reserva');
+    }
+  };
+
+  const handleMarkNoShow = async (bookingId: string) => {
+    if (!confirm('¿Confirmas que el viajero NO se presentó a este tour?\n\nEsto incrementará el contador de No Show del viajero. Si acumula más de 3 No Shows, se le cobrará el 100% en futuras reservas.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({
+          is_no_show: true,
+          no_show_marked_at: new Date().toISOString(),
+          no_show_marked_by: user?.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', bookingId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Actualizar el estado local
+      setBookings(bookings.map(booking =>
+        booking.id === bookingId
+          ? {
+              ...booking,
+              is_no_show: true,
+              no_show_marked_at: new Date().toISOString(),
+              no_show_marked_by: user?.id
+            }
+          : booking
+      ));
+
+      console.log(`✅ Reserva ${bookingId} marcada como No Show`);
+      alert('El viajero ha sido marcado como No Show. Su contador ha sido actualizado.');
+    } catch (err: any) {
+      console.error('❌ Error marcando No Show:', err);
+      setError(err.message || 'Error al marcar como No Show');
     }
   };
 
@@ -546,10 +586,16 @@ const AgencyBookings: React.FC = () => {
                       alt={booking.tours?.name || 'Tour'}
                       className="w-full h-full object-cover"
                     />
-                    <div className="absolute top-4 left-4">
+                    <div className="absolute top-4 left-4 flex flex-wrap gap-2">
                       {getStatusBadge(booking.status, booking.payment_status)}
                       {getPaymentStatusBadge(booking.payment_status)}
                       {getApprovalStatusBadge(booking.approval_status)}
+                      {(booking as any).is_no_show && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                          <UserX className="h-3 w-3 mr-1" />
+                          No Show
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -737,11 +783,48 @@ const AgencyBookings: React.FC = () => {
                           <Star className="h-4 w-4 mr-2" />
                           Calificar Viajero
                         </button>
+                        {!(booking as any).is_no_show && (
+                          <button
+                            onClick={() => handleMarkNoShow(booking.id)}
+                            className="btn bg-orange-600 text-white hover:bg-orange-700 flex items-center justify-center"
+                          >
+                            <UserX className="h-4 w-4 mr-2" />
+                            No Show
+                          </button>
+                        )}
                       </>
+                    )}
+
+                    {booking.status === 'completed' && !(booking as any).is_no_show && (
+                      <button
+                        onClick={() => handleMarkNoShow(booking.id)}
+                        className="btn bg-orange-600 text-white hover:bg-orange-700 flex items-center justify-center"
+                      >
+                        <UserX className="h-4 w-4 mr-2" />
+                        Marcar No Show
+                      </button>
                     )}
                   </div>
 
                   {/* Important Notes */}
+                  {(booking as any).is_no_show && (
+                    <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-md">
+                      <div className="flex items-start gap-2">
+                        <UserX className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm text-orange-800">
+                            <strong>No Show:</strong> El viajero no se presentó a este tour. El contador de No Show del viajero ha sido actualizado.
+                          </p>
+                          {(booking as any).no_show_marked_at && (
+                            <p className="text-xs text-orange-700 mt-1">
+                              Marcado el {formatDate((booking as any).no_show_marked_at)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {booking.approval_status === 'pending' && (
                     <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                       <p className="text-sm text-yellow-800">

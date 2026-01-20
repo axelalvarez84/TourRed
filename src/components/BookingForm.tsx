@@ -34,6 +34,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [walletBalance, setWalletBalance] = useState(0);
   const [isLoadingWallet, setIsLoadingWallet] = useState(true);
   const [useToursRedCash, setUseToursRedCash] = useState(false);
+  const [noShowCount, setNoShowCount] = useState(0);
+  const [isLoadingNoShowCount, setIsLoadingNoShowCount] = useState(true);
+  const [isHighRisk, setIsHighRisk] = useState(false);
 
   const [travelerCounts, setTravelerCounts] = useState<TravelerCounts>({
     adultos: 1,
@@ -132,6 +135,44 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     };
 
     loadWalletBalance();
+  }, [user, isTraveler]);
+
+  React.useEffect(() => {
+    const checkNoShowHistory = async () => {
+      if (!user || !isTraveler) {
+        setIsLoadingNoShowCount(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('no_show_count')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error checking no show count:', error);
+          setNoShowCount(0);
+          setIsHighRisk(false);
+        } else {
+          const count = data?.no_show_count || 0;
+          setNoShowCount(count);
+          setIsHighRisk(count > 3);
+          if (count > 3) {
+            console.log('⚠️ VIAJERO DE ALTO RIESGO: Tiene', count, 'no shows. Se cobrará el 100% del tour.');
+          }
+        }
+      } catch (err) {
+        console.error('Error loading no show count:', err);
+        setNoShowCount(0);
+        setIsHighRisk(false);
+      } finally {
+        setIsLoadingNoShowCount(false);
+      }
+    };
+
+    checkNoShowHistory();
   }, [user, isTraveler]);
 
   React.useEffect(() => {
@@ -234,7 +275,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
   // Precio total del tour
   const totalPrice = precioAdultos + precioNinos + precioInfantes + precioAdultosMayores + precioMascotas;
-  const depositAmount = totalPrice * (tour.deposit_percentage / 100);
+
+  // Si el usuario es de alto riesgo (más de 3 no shows), debe pagar el 100%
+  const effectiveDepositPercentage = isHighRisk ? 100 : tour.deposit_percentage;
+  const depositAmount = totalPrice * (effectiveDepositPercentage / 100);
 
   // Comisiones
   const agencyCommission = totalPrice * (agencyCommissionPercentage / 100);
@@ -428,9 +472,27 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         <div className="text-sm text-gray-500 mb-1">Precio por persona</div>
         <div className="text-2xl font-bold text-primary-600">${tour.price.toLocaleString()}</div>
         <div className="text-sm text-gray-500 mt-1">
-          Depósito: ${depositAmount.toLocaleString()} ({tour.deposit_percentage}%)
+          Depósito: ${depositAmount.toLocaleString()} ({effectiveDepositPercentage}%)
         </div>
       </div>
+
+      {isHighRisk && (
+        <div className="mb-4 p-4 bg-orange-50 border-l-4 border-orange-500 rounded-md">
+          <div className="flex items-start">
+            <AlertCircle className="h-5 w-5 text-orange-600 mr-2 flex-shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-sm font-semibold text-orange-800 mb-1">
+                Pago del 100% Requerido
+              </h4>
+              <p className="text-sm text-orange-700">
+                Debido a que has acumulado más de 3 ausencias (No Shows) en tours anteriores,
+                se requiere el pago del 100% del tour por adelantado. Esto protege a nuestras
+                agencias de posibles pérdidas.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mb-4 bg-gray-50 p-3 rounded-md">
         <div className="text-sm font-medium mb-2">Fechas del Tour</div>
