@@ -647,6 +647,15 @@ const AgencyTours: React.FC = () => {
         throw new Error('Debe proporcionar una imagen para el tour');
       }
 
+      // Validar porcentaje de depósito
+      const depositPercentage = parseInt(formData.deposit_percentage);
+      if (depositPercentage < 30) {
+        throw new Error('El porcentaje de anticipo no puede ser menor al 30%');
+      }
+      if (depositPercentage > 100) {
+        throw new Error('El porcentaje de anticipo no puede ser mayor al 100%');
+      }
+
       // Crear destinos nuevos si es necesario
       const processedDestinations = [];
       
@@ -1373,10 +1382,13 @@ const AgencyTours: React.FC = () => {
                   value={formData.deposit_percentage}
                   onChange={(e) => setFormData({...formData, deposit_percentage: e.target.value})}
                   className="input"
-                  min="0"
+                  min="30"
                   max="100"
                   required
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  El porcentaje de anticipo debe estar entre 30% y 100%
+                </p>
               </div>
 
               <div className="md:col-span-2 border-t pt-4">
