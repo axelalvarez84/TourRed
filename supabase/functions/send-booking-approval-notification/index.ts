@@ -93,127 +93,168 @@ Deno.serve(async (req: Request) => {
     if (approved) {
       subject = `¡Tu reserva ha sido aprobada! - ${booking.tour.name}`;
       travelerEmailHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background-color: #10b981; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-            .content { background-color: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-            .info-box { background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981; }
-            .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
-            .button { display: inline-block; padding: 12px 24px; background-color: #10b981; color: white; text-decoration: none; border-radius: 6px; margin: 10px 5px; }
-            h1 { margin: 0; font-size: 24px; }
-            h2 { color: #10b981; font-size: 20px; }
-            .success-icon { font-size: 48px; text-align: center; margin: 20px 0; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>✅ ¡Reserva Aprobada!</h1>
-            </div>
-            <div class="content">
-              <div class="success-icon">🎉</div>
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: #b8dfe6; padding: 30px 20px; text-align: center; }
+    .logo { max-width: 200px; height: auto; margin-bottom: 10px; }
+    .content { background-color: #ffffff; padding: 30px 20px; border: 1px solid #e5e7eb; }
+    .title { font-size: 24px; font-weight: bold; color: #10b981; margin-bottom: 20px; }
+    .section { margin-bottom: 25px; }
+    .section-title { font-weight: bold; color: #1e40af; margin-bottom: 10px; font-size: 16px; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
+    .info-label { color: #6b7280; }
+    .info-value { font-weight: 600; }
+    .highlight { background-color: #d1fae5; padding: 15px; border-left: 4px solid #10b981; margin: 20px 0; }
+    .button { display: inline-block; padding: 12px 24px; background-color: #10b981; color: white; text-decoration: none; border-radius: 6px; margin: 10px 5px; }
+    .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
+    .success-icon { font-size: 48px; text-align: center; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://www.toursred.com/logo.png" alt="ToursRed Logo" class="logo" />
+      <h1 style="margin: 0; color: #10b981;">¡Reserva Aprobada!</h1>
+    </div>
+    <div class="content">
+      <div class="success-icon">🎉</div>
+      <div class="title">¡Excelentes Noticias!</div>
 
-              <p>Estimado/a ${booking.traveler.first_name} ${booking.traveler.last_name},</p>
+      <p>Estimado/a ${booking.traveler.first_name} ${booking.traveler.last_name},</p>
 
-              <p><strong>¡Excelentes noticias!</strong> Tu solicitud de reserva ha sido aprobada por ${booking.agency.agency_name}.</p>
+      <p>Tu solicitud de reserva ha sido aprobada por <strong>${booking.agency.name}</strong>.</p>
 
-              <div class="info-box">
-                <h2>Detalles de tu Reserva</h2>
-                <p><strong>Tour:</strong> ${booking.tour.name}</p>
-                <p><strong>ID de Reserva:</strong> ${booking.id}</p>
-                <p><strong>Fecha del Tour:</strong> ${bookingDate}</p>
-                <p><strong>Número de Viajeros:</strong> ${booking.travelers_count}</p>
-                <p><strong>Monto Total:</strong> $${booking.total_price?.toLocaleString() || '0'} MXN</p>
-              </div>
+      <div class="section">
+        <div class="section-title">📍 Detalles de tu Reserva</div>
+        <div class="info-row">
+          <span class="info-label">Tour:</span>
+          <span class="info-value">${booking.tour.name}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">ID de Reserva:</span>
+          <span class="info-value">${booking.id}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Fecha del Tour:</span>
+          <span class="info-value">${bookingDate}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Número de Viajeros:</span>
+          <span class="info-value">${booking.travelers_count}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Monto Total:</span>
+          <span class="info-value">$${booking.total_price?.toLocaleString() || '0'} MXN</span>
+        </div>
+      </div>
 
-              <div class="info-box">
-                <h2>Siguiente Paso: Completar el Pago</h2>
-                <p>Para confirmar tu reserva, por favor completa el pago haciendo clic en el botón de abajo.</p>
-                <p>Puedes usar tu saldo de ToursRed Cash si tienes disponible.</p>
-              </div>
+      <div class="highlight">
+        <strong>📝 Siguiente Paso: Completar el Pago</strong><br>
+        Para confirmar tu reserva, por favor completa el pago haciendo clic en el botón de abajo. Puedes usar tu saldo de ToursRed Cash si tienes disponible.
+      </div>
 
-              <p style="text-align: center; margin-top: 30px;">
-                <a href="${supabaseUrl.replace('//', '//www.')}/traveler/bookings" class="button">
-                  Completar Pago
-                </a>
-              </p>
+      <p style="text-align: center; margin-top: 30px;">
+        <a href="https://www.toursred.com/traveler/bookings" class="button">
+          Completar Pago
+        </a>
+      </p>
 
-              <p style="margin-top: 30px; font-size: 14px; color: #6b7280;">
-                Si tienes alguna pregunta, no dudes en contactar a ${booking.agency.agency_name}.
-              </p>
-            </div>
-            <div class="footer">
-              <p>Este es un correo automático de ToursRed. Por favor, no respondas a este mensaje.</p>
-            </div>
-          </div>
-        </body>
-        </html>
+      <p style="margin-top: 30px; font-size: 14px; color: #6b7280;">
+        Si tienes alguna pregunta, no dudes en contactar a ${booking.agency.name}.
+      </p>
+    </div>
+    <div class="footer">
+      <p>Este es un correo automático de ToursRed. Por favor, no respondas a este mensaje.</p>
+    </div>
+  </div>
+</body>
+</html>
       `;
     } else {
       subject = `Tu reserva no fue aprobada - ${booking.tour.name}`;
       travelerEmailHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background-color: #ef4444; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-            .content { background-color: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-            .info-box { background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444; }
-            .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
-            .button { display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 6px; margin: 10px 5px; }
-            h1 { margin: 0; font-size: 24px; }
-            h2 { color: #ef4444; font-size: 20px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>Actualización de tu Reserva</h1>
-            </div>
-            <div class="content">
-              <p>Estimado/a ${booking.traveler.first_name} ${booking.traveler.last_name},</p>
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: #b8dfe6; padding: 30px 20px; text-align: center; }
+    .logo { max-width: 200px; height: auto; margin-bottom: 10px; }
+    .content { background-color: #ffffff; padding: 30px 20px; border: 1px solid #e5e7eb; }
+    .title { font-size: 24px; font-weight: bold; color: #ef4444; margin-bottom: 20px; }
+    .section { margin-bottom: 25px; }
+    .section-title { font-weight: bold; color: #1e40af; margin-bottom: 10px; font-size: 16px; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
+    .info-label { color: #6b7280; }
+    .info-value { font-weight: 600; }
+    .highlight { background-color: #fee2e2; padding: 15px; border-left: 4px solid #ef4444; margin: 20px 0; }
+    .button { display: inline-block; padding: 12px 24px; background-color: #1e40af; color: white; text-decoration: none; border-radius: 6px; margin: 10px 5px; }
+    .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://www.toursred.com/logo.png" alt="ToursRed Logo" class="logo" />
+      <h1 style="margin: 0; color: #ef4444;">Actualización de tu Reserva</h1>
+    </div>
+    <div class="content">
+      <div class="title">Sobre tu solicitud de reserva</div>
 
-              <p>Lamentablemente, tu solicitud de reserva no pudo ser aprobada por ${booking.agency.agency_name}.</p>
+      <p>Estimado/a ${booking.traveler.first_name} ${booking.traveler.last_name},</p>
 
-              <div class="info-box">
-                <h2>Detalles de la Reserva</h2>
-                <p><strong>Tour:</strong> ${booking.tour.name}</p>
-                <p><strong>ID de Reserva:</strong> ${booking.id}</p>
-                <p><strong>Fecha del Tour:</strong> ${bookingDate}</p>
-                <p><strong>Número de Viajeros:</strong> ${booking.travelers_count}</p>
-              </div>
+      <p>Lamentablemente, tu solicitud de reserva no pudo ser aprobada por <strong>${booking.agency.name}</strong>.</p>
 
-              ${rejection_reason ? `
-                <div class="info-box">
-                  <h2>Motivo</h2>
-                  <p>${rejection_reason}</p>
-                </div>
-              ` : ''}
+      <div class="section">
+        <div class="section-title">📍 Detalles de la Reserva</div>
+        <div class="info-row">
+          <span class="info-label">Tour:</span>
+          <span class="info-value">${booking.tour.name}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">ID de Reserva:</span>
+          <span class="info-value">${booking.id}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Fecha del Tour:</span>
+          <span class="info-value">${bookingDate}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Número de Viajeros:</span>
+          <span class="info-value">${booking.travelers_count}</span>
+        </div>
+      </div>
 
-              <p>Te invitamos a explorar otros tours disponibles en nuestra plataforma.</p>
+      ${rejection_reason ? `
+        <div class="highlight">
+          <strong>Motivo:</strong><br>
+          ${rejection_reason}
+        </div>
+      ` : ''}
 
-              <p style="text-align: center; margin-top: 30px;">
-                <a href="${supabaseUrl.replace('//', '//www.')}/tours" class="button">
-                  Ver Otros Tours
-                </a>
-              </p>
+      <p>Te invitamos a explorar otros tours disponibles en nuestra plataforma.</p>
 
-              <p style="margin-top: 30px; font-size: 14px; color: #6b7280;">
-                Si tienes alguna pregunta, no dudes en contactar a ${booking.agency.agency_name}.
-              </p>
-            </div>
-            <div class="footer">
-              <p>Este es un correo automático de ToursRed. Por favor, no respondas a este mensaje.</p>
-            </div>
-          </div>
-        </body>
-        </html>
+      <p style="text-align: center; margin-top: 30px;">
+        <a href="https://www.toursred.com/tours" class="button">
+          Ver Otros Tours
+        </a>
+      </p>
+
+      <p style="margin-top: 30px; font-size: 14px; color: #6b7280;">
+        Si tienes alguna pregunta, no dudes en contactar a ${booking.agency.name}.
+      </p>
+    </div>
+    <div class="footer">
+      <p>Este es un correo automático de ToursRed. Por favor, no respondas a este mensaje.</p>
+    </div>
+  </div>
+</body>
+</html>
       `;
     }
 
