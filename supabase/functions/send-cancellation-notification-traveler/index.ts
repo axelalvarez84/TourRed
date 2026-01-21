@@ -57,8 +57,8 @@ Deno.serve(async (req: Request) => {
     const currentBalance = wallet?.balance || 0;
 
     const { data: settings } = await supabase
-      .from('platform_settings')
-      .select('smtp_host, smtp_port, smtp_user, smtp_password, smtp_from_email, smtp_from_name')
+      .from('email_settings')
+      .select('contact_email, smtp_host, smtp_port, smtp_user, smtp_password, smtp_api_key')
       .single();
 
     if (!settings || !settings.smtp_host) {
@@ -235,17 +235,18 @@ Deno.serve(async (req: Request) => {
     `;
 
     const emailData = {
-      from: `${settings.smtp_from_name} <${settings.smtp_from_email}>`,
+      from: `ToursRed <${settings.contact_email}>`,
       to: user.email,
       subject: `Confirmación de Cancelación - ${tour.name}`,
       html: emailHtml,
     };
 
+    const apiKey = settings.smtp_api_key || settings.smtp_password;
     const sendEmailResponse = await fetch('https://api.smtp2go.com/v3/email/send', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Smtp2go-Api-Key': settings.smtp_password,
+        'X-Smtp2go-Api-Key': apiKey,
       },
       body: JSON.stringify({
         sender: emailData.from,

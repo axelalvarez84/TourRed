@@ -1510,7 +1510,9 @@ export const processCancellation = async (
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-      await Promise.all([
+      console.log('📧 Enviando emails de notificación...');
+
+      const responses = await Promise.all([
         fetch(`${supabaseUrl}/functions/v1/send-cancellation-notification-traveler`, {
           method: 'POST',
           headers: {
@@ -1537,12 +1539,27 @@ export const processCancellation = async (
         })
       ]);
 
+      const results = await Promise.all(
+        responses.map(async (response, index) => {
+          const type = ['traveler', 'agency', 'admin'][index];
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`❌ Error enviando email a ${type}:`, response.status, errorText);
+            return false;
+          }
+          console.log(`✅ Email enviado a ${type}`);
+          return true;
+        })
+      );
+
+      const allSent = results.every(r => r);
+
       await supabase
         .from('booking_cancellations')
-        .update({ emails_sent: true })
+        .update({ emails_sent: allSent })
         .eq('id', cancellation.id);
 
-      console.log('📧 Emails de notificación enviados');
+      console.log(`📧 Resultado envío emails: ${results.filter(r => r).length}/${results.length} exitosos`);
     } catch (emailError) {
       console.error('⚠️ Error enviando emails (no crítico):', emailError);
     }
