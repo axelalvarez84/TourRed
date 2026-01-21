@@ -284,21 +284,32 @@ Deno.serve(async (req) => {
             }
 
             try {
-              const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-booking-confirmation`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${supabaseServiceKey}`,
-                },
-                body: JSON.stringify({ booking_id: bookingId }),
-              });
+              // Check if confirmation email was already sent to prevent duplicates
+              const { data: bookingCheck } = await supabase
+                .from('bookings')
+                .select('confirmation_email_sent_at')
+                .eq('id', bookingId)
+                .single();
 
-              const emailResult = await emailResponse.json();
-
-              if (emailResult.success) {
-                console.log('Booking confirmation emails sent successfully');
+              if (bookingCheck?.confirmation_email_sent_at) {
+                console.log(`⚠️ Confirmation email already sent for booking ${bookingId}, skipping...`);
               } else {
-                console.error('Error sending booking confirmation emails:', emailResult);
+                const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-booking-confirmation`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${supabaseServiceKey}`,
+                  },
+                  body: JSON.stringify({ booking_id: bookingId }),
+                });
+
+                const emailResult = await emailResponse.json();
+
+                if (emailResult.success) {
+                  console.log('Booking confirmation emails sent successfully');
+                } else {
+                  console.error('Error sending booking confirmation emails:', emailResult);
+                }
               }
             } catch (emailError) {
               console.error('Error calling booking confirmation function:', emailError);
@@ -493,21 +504,32 @@ Deno.serve(async (req) => {
             }
 
             try {
-              const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-booking-confirmation`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${supabaseServiceKey}`,
-                },
-                body: JSON.stringify({ booking_id: bookingId }),
-              });
+              // Check if confirmation email was already sent to prevent duplicates
+              const { data: bookingCheck } = await supabase
+                .from('bookings')
+                .select('confirmation_email_sent_at')
+                .eq('id', bookingId)
+                .single();
 
-              const emailResult = await emailResponse.json();
-
-              if (emailResult.success) {
-                console.log('Booking confirmation emails sent successfully');
+              if (bookingCheck?.confirmation_email_sent_at) {
+                console.log(`⚠️ Confirmation email already sent for booking ${bookingId}, skipping...`);
               } else {
-                console.error('Error sending booking confirmation emails:', emailResult);
+                const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-booking-confirmation`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${supabaseServiceKey}`,
+                  },
+                  body: JSON.stringify({ booking_id: bookingId }),
+                });
+
+                const emailResult = await emailResponse.json();
+
+                if (emailResult.success) {
+                  console.log('Booking confirmation emails sent successfully');
+                } else {
+                  console.error('Error sending booking confirmation emails:', emailResult);
+                }
               }
             } catch (emailError) {
               console.error('Error calling booking confirmation function:', emailError);
