@@ -917,7 +917,7 @@ const AgencyBookings: React.FC = () => {
                           <Star className="h-4 w-4 mr-2" />
                           Calificar Viajero
                         </button>
-                        {!(booking as any).is_no_show && (
+                        {!(booking as any).is_no_show && !(booking as any).cancelled_at && (
                           <button
                             onClick={() => handleMarkNoShow(booking.id)}
                             className="btn bg-orange-600 text-white hover:bg-orange-700 flex items-center justify-center"
@@ -929,7 +929,7 @@ const AgencyBookings: React.FC = () => {
                       </>
                     )}
 
-                    {booking.status === 'completed' && !(booking as any).is_no_show && (
+                    {booking.status === 'completed' && !(booking as any).is_no_show && !(booking as any).cancelled_at && (
                       <button
                         onClick={() => handleMarkNoShow(booking.id)}
                         className="btn bg-orange-600 text-white hover:bg-orange-700 flex items-center justify-center"
@@ -941,6 +941,41 @@ const AgencyBookings: React.FC = () => {
                   </div>
 
                   {/* Important Notes */}
+                  {(booking as any).cancelled_at && (
+                    <div className="mt-4 p-3 bg-red-50 border-l-4 border-red-500 rounded-md">
+                      <div className="flex items-start gap-2">
+                        <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm text-red-800 font-semibold mb-2">
+                            Reserva Cancelada por el Viajero
+                          </p>
+                          <div className="text-xs text-red-700 space-y-1">
+                            <p>
+                              <strong>Cancelado el:</strong> {formatDate((booking as any).cancelled_at)}
+                            </p>
+                            {(booking as any).cancellation_type && (
+                              <p>
+                                <strong>Política aplicada:</strong> {
+                                  (booking as any).cancellation_type === '100_percent' ? 'Reembolso del 100%' :
+                                  (booking as any).cancellation_type === '50_percent' ? 'Reembolso del 50%' :
+                                  (booking as any).cancellation_type === 'no_refund' ? 'Sin reembolso' :
+                                  (booking as any).cancellation_type === 'no_show' ? 'Cancelación tardía (No Show)' :
+                                  (booking as any).cancellation_type === 'pending_approval' ? 'Reserva pendiente' :
+                                  'N/A'
+                                }
+                              </p>
+                            )}
+                            {(booking as any).cancellation_refund_amount !== null && (booking as any).cancellation_refund_amount !== undefined && (
+                              <p>
+                                <strong>Reembolsado al viajero:</strong> ${Number((booking as any).cancellation_refund_amount).toFixed(2)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {(booking as any).is_no_show && (
                     <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-md">
                       <div className="flex items-start gap-2">

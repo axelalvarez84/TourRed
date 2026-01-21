@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X, Edit, UserCheck } from 'lucide-react';
+import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X, Edit, UserCheck, XCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { getUserBookings, parseDateFromDB, supabase } from '../../lib/supabase';
+import { getUserBookings, parseDateFromDB, supabase, calculateCancellationPolicy, processCancellation } from '../../lib/supabase';
 import { Booking } from '../../types';
 import { format } from 'date-fns';
 import { Link, useNavigate } from 'react-router-dom';
@@ -23,6 +23,27 @@ const TravelerBookings: React.FC = () => {
     booking: Booking | null;
     travelers: any[];
   }>({ open: false, booking: null, travelers: [] });
+  const [cancellationModal, setCancellationModal] = useState<{
+    open: boolean;
+    booking: Booking | null;
+    policy: any;
+    isCalculating: boolean;
+    isCancelling: boolean;
+    cancellationReason: string;
+    acceptPolicy: boolean;
+    error: string;
+    success: boolean;
+  }>({
+    open: false,
+    booking: null,
+    policy: null,
+    isCalculating: false,
+    isCancelling: false,
+    cancellationReason: '',
+    acceptPolicy: false,
+    error: '',
+    success: false,
+  });
 
   useEffect(() => {
     if (user?.id) {
@@ -115,6 +136,127 @@ const TravelerBookings: React.FC = () => {
 
   const handleCloseTravelersModal = () => {
     setTravelersModal({ open: false, booking: null, travelers: [] });
+  };
+
+  const handleOpenCancellationModal = async (booking: Booking) => {
+    setCancellationModal({
+      open: true,
+      booking,
+      policy: null,
+      isCalculating: true,
+      isCancelling: false,
+      cancellationReason: '',
+      acceptPolicy: false,
+      error: '',
+      success: false,
+    });
+
+    try {
+      const { data: fullBooking, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          tours:tour_id(id, name, start_date, cancellation_not_allowed)
+        `)
+        .eq('id', booking.id)
+        .single();
+
+      if (error || !fullBooking) {
+        throw new Error('No se pudo cargar la información de la reserva');
+      }
+
+      const policy = await calculateCancellationPolicy(fullBooking);
+
+      setCancellationModal(prev => ({
+        ...prev,
+        policy,
+        isCalculating: false,
+      }));
+    } catch (err: any) {
+      setCancellationModal(prev => ({
+        ...prev,
+        error: err.message || 'Error al calcular la política de cancelación',
+        isCalculating: false,
+      }));
+    }
+  };
+
+  const handleCloseCancellationModal = () => {
+    setCancellationModal({
+      open: false,
+      booking: null,
+      policy: null,
+      isCalculating: false,
+      isCancelling: false,
+      cancellationReason: '',
+      acceptPolicy: false,
+      error: '',
+      success: false,
+    });
+  };
+
+  const handleCancelBooking = async () => {
+    if (!cancellationModal.booking || !cancellationModal.policy || !user?.id) return;
+
+    if (!cancellationModal.acceptPolicy) {
+      setCancellationModal(prev => ({
+        ...prev,
+        error: 'Debes aceptar la política de cancelación para continuar',
+      }));
+      return;
+    }
+
+    setCancellationModal(prev => ({
+      ...prev,
+      isCancelling: true,
+      error: '',
+    }));
+
+    try {
+      const result = await processCancellation(
+        cancellationModal.booking.id,
+        user.id,
+        cancellationModal.cancellationReason || undefined
+      );
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      setCancellationModal(prev => ({
+        ...prev,
+        isCancelling: false,
+        success: true,
+      }));
+
+      await fetchBookings();
+
+      setTimeout(() => {
+        handleCloseCancellationModal();
+      }, 3000);
+    } catch (err: any) {
+      setCancellationModal(prev => ({
+        ...prev,
+        isCancelling: false,
+        error: err.message || 'Error al procesar la cancelación',
+      }));
+    }
+  };
+
+  const canCancelBooking = (booking: Booking) => {
+    if (!booking.tours) return false;
+
+    if (booking.status === 'cancelled') return false;
+    if ((booking as any).is_no_show) return false;
+    if (!['pending', 'confirmed'].includes(booking.status)) return false;
+
+    const tourStartDate = parseDateFromDB((booking.tours as any).start_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (tourStartDate < today) return false;
+
+    return true;
   };
 
   const handleEditTravelers = (bookingId: string) => {
@@ -489,6 +631,16 @@ const TravelerBookings: React.FC = () => {
                       </button>
                     )}
 
+                    {canCancelBooking(booking) && (
+                      <button
+                        onClick={() => handleOpenCancellationModal(booking)}
+                        className="btn btn-outline border-red-300 text-red-700 hover:bg-red-50 flex items-center justify-center"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Cancelar Reserva
+                      </button>
+                    )}
+
                     {booking.agencies?.name && (
                       <div className="text-sm text-gray-600 flex items-center">
                         <span>Operado por: <strong>{booking.agencies.name}</strong></span>
@@ -683,6 +835,211 @@ const TravelerBookings: React.FC = () => {
                 onCancel={handleCloseReviewModal}
                 existingReview={reviewModal.existingReview}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancellation Modal */}
+      {cancellationModal.open && cancellationModal.booking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {!cancellationModal.success ? (
+                <>
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h2 className="text-2xl font-bold mb-2 text-red-600">
+                        {cancellationModal.policy?.policyType === '100_percent' && 'Cancelación con Reembolso del 100%'}
+                        {cancellationModal.policy?.policyType === '50_percent' && 'Cancelación con Reembolso del 50%'}
+                        {cancellationModal.policy?.policyType === 'no_refund' && 'Cancelación sin Reembolso'}
+                        {cancellationModal.policy?.policyType === 'no_show' && 'Advertencia: Se Marcará como No Show'}
+                        {cancellationModal.policy?.policyType === 'pending_approval' && 'Cancelar Reserva Pendiente'}
+                        {!cancellationModal.policy && 'Cancelar Reserva'}
+                      </h2>
+                      <p className="text-gray-600">
+                        {cancellationModal.booking.tours?.name}
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleCloseCancellationModal}
+                      className="text-gray-400 hover:text-gray-600"
+                      disabled={cancellationModal.isCancelling}
+                    >
+                      <X className="h-6 w-6" />
+                    </button>
+                  </div>
+
+                  {cancellationModal.isCalculating ? (
+                    <div className="flex justify-center py-8">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+                    </div>
+                  ) : cancellationModal.policy ? (
+                    <>
+                      <div className="mb-6">
+                        <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-gray-600">Días antes del tour:</span>
+                            <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                              cancellationModal.policy.daysBeforeTour >= 15 ? 'bg-green-100 text-green-800' :
+                              cancellationModal.policy.daysBeforeTour >= 7 ? 'bg-yellow-100 text-yellow-800' :
+                              cancellationModal.policy.daysBeforeTour >= 1 ? 'bg-orange-100 text-orange-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {cancellationModal.policy.daysBeforeTour} día(s)
+                            </span>
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            Fecha del tour: {formatFullDate((cancellationModal.booking.tours as any).start_date)}
+                          </div>
+                        </div>
+
+                        {cancellationModal.policy.warningMessage && (
+                          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                            <div className="flex items-start">
+                              <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 mr-2 flex-shrink-0" />
+                              <p className="text-sm text-red-800 font-medium">
+                                {cancellationModal.policy.warningMessage}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className={`p-4 rounded-lg mb-4 ${
+                          cancellationModal.policy.policyType === '100_percent' ? 'bg-green-50 border-2 border-green-200' :
+                          cancellationModal.policy.policyType === '50_percent' ? 'bg-yellow-50 border-2 border-yellow-200' :
+                          cancellationModal.policy.policyType === 'pending_approval' ? 'bg-gray-50 border-2 border-gray-200' :
+                          'bg-red-50 border-2 border-red-200'
+                        }`}>
+                          <h3 className={`font-semibold mb-2 ${
+                            cancellationModal.policy.policyType === '100_percent' ? 'text-green-800' :
+                            cancellationModal.policy.policyType === '50_percent' ? 'text-yellow-800' :
+                            cancellationModal.policy.policyType === 'pending_approval' ? 'text-gray-800' :
+                            'text-red-800'
+                          }`}>
+                            Política de Reembolso
+                          </h3>
+                          <p className={`text-sm ${
+                            cancellationModal.policy.policyType === '100_percent' ? 'text-green-700' :
+                            cancellationModal.policy.policyType === '50_percent' ? 'text-yellow-700' :
+                            cancellationModal.policy.policyType === 'pending_approval' ? 'text-gray-700' :
+                            'text-red-700'
+                          }`}>
+                            {cancellationModal.policy.refundMessage}
+                          </p>
+                        </div>
+
+                        {cancellationModal.policy.originalServiceCharge > 0 && (
+                          <div className="bg-orange-50 border-l-4 border-orange-400 p-4 mb-4">
+                            <p className="text-sm text-orange-800">
+                              <strong>Nota importante:</strong> El cargo por servicio de ${cancellationModal.policy.originalServiceCharge.toFixed(2)} no es reembolsable. Si utilizaste beneficios de ToursRed+, estos tampoco son recuperables ya que fueron cobrados por Stripe.
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Motivo de cancelación (opcional)
+                          </label>
+                          <textarea
+                            value={cancellationModal.cancellationReason}
+                            onChange={(e) => setCancellationModal(prev => ({
+                              ...prev,
+                              cancellationReason: e.target.value
+                            }))}
+                            rows={3}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="¿Por qué deseas cancelar esta reserva?"
+                            disabled={cancellationModal.isCancelling}
+                          />
+                        </div>
+
+                        <div className="mb-4">
+                          <label className="flex items-start">
+                            <input
+                              type="checkbox"
+                              checked={cancellationModal.acceptPolicy}
+                              onChange={(e) => setCancellationModal(prev => ({
+                                ...prev,
+                                acceptPolicy: e.target.checked,
+                                error: ''
+                              }))}
+                              className="mt-1 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                              disabled={cancellationModal.isCancelling}
+                            />
+                            <span className="ml-2 text-sm text-gray-700">
+                              He leído y acepto la política de cancelación aplicable. Entiendo que esta acción no se puede deshacer.
+                            </span>
+                          </label>
+                        </div>
+
+                        {cancellationModal.error && (
+                          <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3">
+                            <div className="flex items-start">
+                              <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 mr-2 flex-shrink-0" />
+                              <p className="text-sm text-red-800">{cancellationModal.error}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <button
+                          onClick={handleCloseCancellationModal}
+                          className="btn btn-outline flex-1"
+                          disabled={cancellationModal.isCancelling}
+                        >
+                          Mantener Mi Reserva
+                        </button>
+                        <button
+                          onClick={handleCancelBooking}
+                          className="btn bg-red-600 hover:bg-red-700 text-white flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={!cancellationModal.acceptPolicy || cancellationModal.isCancelling}
+                        >
+                          {cancellationModal.isCancelling ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                              Procesando...
+                            </>
+                          ) : (
+                            <>
+                              <XCircle className="h-4 w-4 mr-2" />
+                              Cancelar Reserva
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-red-600">{cancellationModal.error || 'Error al cargar la información'}</p>
+                      <button
+                        onClick={handleCloseCancellationModal}
+                        className="btn btn-outline mt-4"
+                      >
+                        Cerrar
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="mb-4 inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100">
+                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-green-600 mb-2">Cancelación Exitosa</h3>
+                  <p className="text-gray-600 mb-4">
+                    Tu reserva ha sido cancelada exitosamente. Recibirás un correo electrónico con los detalles.
+                  </p>
+                  {cancellationModal.policy?.refundAmountToTraveler > 0 && (
+                    <p className="text-sm text-gray-600">
+                      El reembolso de ${cancellationModal.policy.refundAmountToTraveler.toFixed(2)} ha sido depositado en tu ToursRed Cash.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
