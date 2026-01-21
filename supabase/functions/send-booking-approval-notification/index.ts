@@ -258,18 +258,20 @@ Deno.serve(async (req: Request) => {
       `;
     }
 
+    const emailPayload = {
+      api_key: emailSettings.smtp_api_key,
+      to: [booking.traveler.email],
+      sender: emailSettings.contact_email,
+      subject: subject,
+      html_body: travelerEmailHtml,
+    };
+
     const emailResponse = await fetch('https://api.smtp2go.com/v3/email/send', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Smtp2go-Api-Key': emailSettings.smtp_api_key,
       },
-      body: JSON.stringify({
-        sender: emailSettings.smtp_from_email,
-        to: [booking.traveler.email],
-        subject: subject,
-        html_body: travelerEmailHtml,
-      }),
+      body: JSON.stringify(emailPayload),
     });
 
     if (!emailResponse.ok) {
