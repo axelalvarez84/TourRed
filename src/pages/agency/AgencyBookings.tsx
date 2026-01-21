@@ -150,6 +150,7 @@ const AgencyBookings: React.FC = () => {
     if (!booking.tours?.start_date) return false;
     if ((booking as any).is_no_show) return false;
     if ((booking as any).cancelled_at) return false;
+    if (booking.status !== 'confirmed') return false;
 
     try {
       const tourStartDate = parseDateFromDB(booking.tours.start_date);
@@ -162,6 +163,33 @@ const AgencyBookings: React.FC = () => {
       console.error('Error validating No Show eligibility:', error);
       return false;
     }
+  };
+
+  const canMarkAsCompleted = (booking: Booking) => {
+    if (!booking.tours?.start_date) return false;
+    if (booking.status !== 'confirmed') return false;
+    if ((booking as any).is_no_show) return false;
+    if ((booking as any).cancelled_at) return false;
+
+    try {
+      const tourStartDate = parseDateFromDB(booking.tours.start_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      tourStartDate.setHours(0, 0, 0, 0);
+
+      return tourStartDate <= today;
+    } catch (error) {
+      console.error('Error validating completion eligibility:', error);
+      return false;
+    }
+  };
+
+  const canReviewTraveler = (booking: Booking) => {
+    if (booking.status !== 'completed') return false;
+    if ((booking as any).is_no_show) return false;
+    if ((booking as any).cancelled_at) return false;
+
+    return true;
   };
 
   const getStatusBadge = (status: string, paymentStatus?: string) => {
@@ -317,6 +345,19 @@ const AgencyBookings: React.FC = () => {
 
   const handleStatusUpdate = async (bookingId: string, newStatus: string) => {
     try {
+      if (newStatus === 'completed') {
+        const booking = bookings.find(b => b.id === bookingId);
+        if (!booking) {
+          alert('No se encontró la reserva');
+          return;
+        }
+
+        if (!canMarkAsCompleted(booking)) {
+          alert('Solo puedes marcar como completada el día del viaje o después. El tour aún no ha ocurrido.');
+          return;
+        }
+      }
+
       const { error } = await supabase
         .from('bookings')
         .update({
@@ -930,22 +971,17 @@ const AgencyBookings: React.FC = () => {
                       </button>
                     )}
 
-                    {booking.status === 'confirmed' && (
+                    {booking.status === 'confirmed' && !(booking as any).is_no_show && (
                       <>
-                        <button
-                          onClick={() => handleStatusUpdate(booking.id, 'completed')}
-                          className="btn btn-primary flex items-center justify-center"
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Marcar Completada
-                        </button>
-                        <button
-                          onClick={() => handleOpenReviewModal(booking)}
-                          className="btn btn-outline flex items-center justify-center"
-                        >
-                          <Star className="h-4 w-4 mr-2" />
-                          Calificar Viajero
-                        </button>
+                        {canMarkAsCompleted(booking) && (
+                          <button
+                            onClick={() => handleStatusUpdate(booking.id, 'completed')}
+                            className="btn btn-primary flex items-center justify-center"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Marcar Completada
+                          </button>
+                        )}
                         {canMarkAsNoShow(booking) && (
                           <button
                             onClick={() => handleMarkNoShow(booking.id)}
@@ -958,13 +994,13 @@ const AgencyBookings: React.FC = () => {
                       </>
                     )}
 
-                    {booking.status === 'completed' && canMarkAsNoShow(booking) && (
+                    {canReviewTraveler(booking) && (
                       <button
-                        onClick={() => handleMarkNoShow(booking.id)}
-                        className="btn bg-orange-600 text-white hover:bg-orange-700 flex items-center justify-center"
+                        onClick={() => handleOpenReviewModal(booking)}
+                        className="btn btn-primary flex items-center justify-center"
                       >
-                        <UserX className="h-4 w-4 mr-2" />
-                        Marcar No Show
+                        <Star className="h-4 w-4 mr-2" />
+                        Calificar Viajero
                       </button>
                     )}
                   </div>
@@ -1058,10 +1094,24 @@ const AgencyBookings: React.FC = () => {
                     </div>
                   )}
 
-                  {booking.status === 'confirmed' && (
+                  {booking.status === 'confirmed' && !(booking as any).is_no_show && (
                     <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
                       <p className="text-sm text-green-800">
                         <strong>Reserva confirmada:</strong> Coordina con el cliente el pago del saldo restante y los detalles del viaje.
+                        {!canMarkAsCompleted(booking) && !canMarkAsNoShow(booking) && (
+                          <span className="block mt-1">Los botones de completar/no show estarán disponibles el día del viaje.</span>
+                        )}
+                        {(canMarkAsCompleted(booking) || canMarkAsNoShow(booking)) && (
+                          <span className="block mt-1">Marca como completada una vez que el viajero se haya presentado, o como No Show si no se presentó.</span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+
+                  {booking.status === 'completed' && !(booking as any).is_no_show && (
+                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                      <p className="text-sm text-blue-800">
+                        <strong>Tour completado exitosamente:</strong> Ahora puedes calificar al viajero para ayudar a otras agencias.
                       </p>
                     </div>
                   )}
