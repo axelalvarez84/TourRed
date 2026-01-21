@@ -29,29 +29,43 @@ Deno.serve(async (req: Request) => {
 
     const { data: cancellation, error: cancellationError } = await supabase
       .from('booking_cancellations')
-      .select(`
-        *,
-        bookings!booking_id (
-          *,
-          tours!tour_id (id, name, start_date),
-          users!user_id (id, first_name, last_name, email)
-        )
-      `)
+      .select('*')
       .eq('id', cancellation_id)
       .single();
 
     if (cancellationError || !cancellation) {
-      throw new Error('No se encontró la cancelación');
+      throw new Error('Cancelación no encontrada');
     }
 
-    const booking = (cancellation as any).bookings;
-    if (!booking) throw new Error('No se encontró la reserva');
+    const { data: booking, error: bookingError } = await supabase
+      .from('bookings')
+      .select('user_id, tour_id')
+      .eq('id', cancellation.booking_id)
+      .single();
 
-    const tour = booking.tours;
-    if (!tour) throw new Error('No se encontró el tour');
+    if (bookingError || !booking) {
+      throw new Error('Reserva no encontrada');
+    }
 
-    const user = booking.users;
-    if (!user || !user.email) throw new Error('No se encontró el usuario o email');
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, first_name, last_name, email')
+      .eq('id', booking.user_id)
+      .single();
+
+    if (userError || !user || !user.email) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    const { data: tour, error: tourError } = await supabase
+      .from('tours')
+      .select('id, name, start_date')
+      .eq('id', booking.tour_id)
+      .single();
+
+    if (tourError || !tour) {
+      throw new Error('Tour no encontrado');
+    }
 
     const { data: wallet } = await supabase
       .from('toursred_cash_wallets')
