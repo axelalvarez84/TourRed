@@ -269,10 +269,10 @@ const AgencyBookings: React.FC = () => {
   const handleApprovalAction = async (bookingId: string, action: 'approve' | 'reject', notes?: string) => {
     try {
       const approvalStatus = action === 'approve' ? 'approved' : 'rejected';
-      
+
       const { error } = await supabase
         .from('bookings')
-        .update({ 
+        .update({
           approval_status: approvalStatus,
           approval_notes: notes || null,
           approved_at: action === 'approve' ? new Date().toISOString() : null,
@@ -286,10 +286,10 @@ const AgencyBookings: React.FC = () => {
       }
 
       // Actualizar el estado local
-      setBookings(bookings.map(booking => 
-        booking.id === bookingId 
-          ? { 
-              ...booking, 
+      setBookings(bookings.map(booking =>
+        booking.id === bookingId
+          ? {
+              ...booking,
               approval_status: approvalStatus as any,
               approval_notes: notes || null,
               approved_at: action === 'approve' ? new Date().toISOString() : null,
@@ -297,6 +297,30 @@ const AgencyBookings: React.FC = () => {
             }
           : booking
       ));
+
+      // Enviar notificación por email al viajero
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-approval-notification`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({
+                booking_id: bookingId,
+                approved: action === 'approve',
+                rejection_reason: notes
+              }),
+            }
+          );
+        }
+      } catch (emailError) {
+        console.error('Error enviando notificación al viajero:', emailError);
+      }
 
       console.log(`✅ Reserva ${bookingId} ${action === 'approve' ? 'aprobada' : 'rechazada'}`);
     } catch (err: any) {

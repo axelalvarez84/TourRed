@@ -297,6 +297,25 @@ const TravelersInfoPage: React.FC = () => {
       if (isEditingExisting) {
         navigate('/traveler/bookings');
       } else if (tour?.booking_approval_type === 'manual') {
+        // Enviar notificación por email a la agencia
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-request-notification`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({ booking_id: bookingId }),
+              }
+            );
+          }
+        } catch (emailError) {
+          console.error('Error enviando notificación a la agencia:', emailError);
+        }
         navigate(`/booking-pending/${bookingId}`);
       } else {
         proceedToPayment();

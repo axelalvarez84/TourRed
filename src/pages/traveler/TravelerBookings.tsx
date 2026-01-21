@@ -44,6 +44,19 @@ const TravelerBookings: React.FC = () => {
     error: '',
     success: false,
   });
+  const [paymentModal, setPaymentModal] = useState<{
+    open: boolean;
+    booking: Booking | null;
+    walletBalance: number;
+    toursRedCashToUse: number;
+    isProcessing: boolean;
+  }>({
+    open: false,
+    booking: null,
+    walletBalance: 0,
+    toursRedCashToUse: 0,
+    isProcessing: false,
+  });
 
   useEffect(() => {
     if (user?.id) {
@@ -276,16 +289,104 @@ const TravelerBookings: React.FC = () => {
 
   const handleCompletePayment = async (booking: Booking) => {
     try {
+      // Obtener el saldo de ToursRed Cash del usuario
+      const { data: walletData } = await supabase
+        .from('toursred_cash_wallets')
+        .select('balance')
+        .eq('user_id', user?.id)
+        .maybeSingle();
+
+      const walletBalance = walletData?.balance || 0;
+
+      // Abrir el modal de pago
+      setPaymentModal({
+        open: true,
+        booking: booking,
+        walletBalance: walletBalance,
+        toursRedCashToUse: 0,
+        isProcessing: false,
+      });
+    } catch (err: any) {
+      console.error('Error al abrir modal de pago:', err);
+      alert(`Error: ${err.message}`);
+    }
+  };
+
+  const handleProceedWithPayment = async () => {
+    const { booking, toursRedCashToUse } = paymentModal;
+
+    if (!booking) return;
+
+    try {
+      setPaymentModal(prev => ({ ...prev, isProcessing: true }));
+
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
         throw new Error('No hay sesión activa');
       }
 
-      // Calcular el monto a cobrar después de aplicar ToursRed Cash
-      const toursRedCashUsed = booking.toursred_cash_used || 0;
-      const amountToCharge = (booking.user_payment || booking.deposit_amount) - toursRedCashUsed;
+      // Actualizar la reserva con el ToursRed Cash aplicado
+      if (toursRedCashToUse > 0) {
+        const { error: updateError } = await supabase
+          .from('bookings')
+          .update({
+            toursred_cash_used: toursRedCashToUse,
+          })
+          .eq('id', booking.id);
 
+        if (updateError) {
+          throw new Error(`Error al actualizar la reserva: ${updateError.message}`);
+        }
+      }
+
+      // Calcular el monto a cobrar después de aplicar ToursRed Cash
+      const amountToCharge = (booking.user_payment || booking.deposit_amount || 0) - toursRedCashToUse;
+
+      // Si el monto es 0 o menor, confirmar directamente
+      if (amountToCharge <= 0) {
+        const { error: confirmError } = await supabase
+          .from('bookings')
+          .update({
+            payment_status: 'succeeded',
+            status: 'confirmed',
+            payment_method: 'toursred_cash',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', booking.id);
+
+        if (confirmError) {
+          throw new Error(`Error al confirmar la reserva: ${confirmError.message}`);
+        }
+
+        // Crear registro en wallet_transactions
+        if (toursRedCashToUse > 0) {
+          await supabase
+            .from('wallet_transactions')
+            .insert({
+              user_id: user?.id,
+              transaction_type: 'use',
+              amount: toursRedCashToUse,
+              booking_id: booking.id,
+              description: `Pago de reserva para ${booking.tours?.name}`,
+            });
+        }
+
+        // Cerrar modal y recargar reservas
+        setPaymentModal({
+          open: false,
+          booking: null,
+          walletBalance: 0,
+          toursRedCashToUse: 0,
+          isProcessing: false,
+        });
+
+        fetchBookings();
+        alert('¡Pago completado exitosamente con ToursRed Cash!');
+        return;
+      }
+
+      // Si hay monto pendiente, ir a Stripe
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`,
         {
@@ -301,7 +402,7 @@ const TravelerBookings: React.FC = () => {
             description: `Pago de reserva - ${booking.tours?.name || 'Tour'}`,
             success_url: `${window.location.origin}/booking-success?booking_id=${booking.id}`,
             cancel_url: `${window.location.origin}/traveler/bookings`,
-            toursRedCashUsed: toursRedCashUsed,
+            toursRedCashUsed: toursRedCashToUse,
           }),
         }
       );
@@ -322,6 +423,7 @@ const TravelerBookings: React.FC = () => {
     } catch (err: any) {
       console.error('Error al proceder al pago:', err);
       alert(`Error al proceder al pago: ${err.message}`);
+      setPaymentModal(prev => ({ ...prev, isProcessing: false }));
     }
   };
 
@@ -1082,6 +1184,150 @@ const TravelerBookings: React.FC = () => {
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal with ToursRed Cash */}
+      {paymentModal.open && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Completar Pago</h2>
+                <button
+                  onClick={() => setPaymentModal({ open: false, booking: null, walletBalance: 0, toursRedCashToUse: 0, isProcessing: false })}
+                  className="text-gray-400 hover:text-gray-500"
+                  disabled={paymentModal.isProcessing}
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Booking Details */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="font-semibold text-gray-900 mb-2">{paymentModal.booking?.tours?.name}</h3>
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <p>Fecha del Tour: {paymentModal.booking?.booking_date && formatDate(paymentModal.booking.booking_date)}</p>
+                    <p>Viajeros: {paymentModal.booking?.travelers_count}</p>
+                  </div>
+                </div>
+
+                {/* Payment Summary */}
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Monto a Pagar:</span>
+                    <span className="font-semibold">${(paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0).toLocaleString()}</span>
+                  </div>
+
+                  {/* ToursRed Cash Section */}
+                  {paymentModal.walletBalance > 0 && (
+                    <>
+                      <div className="border-t pt-3">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-sm font-medium text-gray-700">Tu Saldo ToursRed Cash:</span>
+                          <span className="text-lg font-bold text-green-600">${paymentModal.walletBalance.toLocaleString()}</span>
+                        </div>
+
+                        <div className="mt-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Usar ToursRed Cash
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              min="0"
+                              max={Math.min(paymentModal.walletBalance, paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0)}
+                              value={paymentModal.toursRedCashToUse}
+                              onChange={(e) => {
+                                const value = parseFloat(e.target.value) || 0;
+                                const maxAmount = Math.min(
+                                  paymentModal.walletBalance,
+                                  paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0
+                                );
+                                setPaymentModal(prev => ({
+                                  ...prev,
+                                  toursRedCashToUse: Math.min(Math.max(0, value), maxAmount)
+                                }));
+                              }}
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                              disabled={paymentModal.isProcessing}
+                            />
+                            <button
+                              onClick={() => {
+                                const maxAmount = Math.min(
+                                  paymentModal.walletBalance,
+                                  paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0
+                                );
+                                setPaymentModal(prev => ({
+                                  ...prev,
+                                  toursRedCashToUse: maxAmount
+                                }));
+                              }}
+                              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                              disabled={paymentModal.isProcessing}
+                            >
+                              Usar Todo
+                            </button>
+                          </div>
+                          <p className="mt-1 text-xs text-gray-500">
+                            Máximo: ${Math.min(paymentModal.walletBalance, paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      {paymentModal.toursRedCashToUse > 0 && (
+                        <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-green-800">ToursRed Cash Aplicado:</span>
+                            <span className="font-semibold text-green-800">-${paymentModal.toursRedCashToUse.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  <div className="border-t pt-3">
+                    <div className="flex justify-between text-lg font-bold">
+                      <span>Total a Pagar{paymentModal.toursRedCashToUse > 0 ? ' con Stripe' : ''}:</span>
+                      <span className="text-primary-600">
+                        ${Math.max(0, (paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0) - paymentModal.toursRedCashToUse).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={() => setPaymentModal({ open: false, booking: null, walletBalance: 0, toursRedCashToUse: 0, isProcessing: false })}
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    disabled={paymentModal.isProcessing}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleProceedWithPayment}
+                    className="flex-1 px-4 py-3 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={paymentModal.isProcessing}
+                  >
+                    {paymentModal.isProcessing ? (
+                      <>
+                        <div className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                        Procesando...
+                      </>
+                    ) : (
+                      <>
+                        {((paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0) - paymentModal.toursRedCashToUse) <= 0
+                          ? 'Confirmar Pago'
+                          : 'Proceder a Stripe'}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
