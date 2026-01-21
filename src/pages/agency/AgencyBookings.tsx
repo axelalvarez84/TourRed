@@ -136,13 +136,31 @@ const AgencyBookings: React.FC = () => {
   const formatFullDate = (dateString: string) => {
     try {
       // Check if it's a full ISO 8601 timestamp (contains 'T')
-      const date = dateString.includes('T') 
-        ? new Date(dateString) 
+      const date = dateString.includes('T')
+        ? new Date(dateString)
         : parseDateFromDB(dateString);
       return format(date, 'EEEE, d \'de\' MMMM \'de\' yyyy');
     } catch (error) {
       console.error('Error formatting full date:', dateString, error);
       return format(new Date(dateString), 'dd/MM/yyyy');
+    }
+  };
+
+  const canMarkAsNoShow = (booking: Booking) => {
+    if (!booking.tours?.start_date) return false;
+    if ((booking as any).is_no_show) return false;
+    if ((booking as any).cancelled_at) return false;
+
+    try {
+      const tourStartDate = parseDateFromDB(booking.tours.start_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      tourStartDate.setHours(0, 0, 0, 0);
+
+      return tourStartDate <= today;
+    } catch (error) {
+      console.error('Error validating No Show eligibility:', error);
+      return false;
     }
   };
 
@@ -326,6 +344,17 @@ const AgencyBookings: React.FC = () => {
   };
 
   const handleMarkNoShow = async (bookingId: string) => {
+    const booking = bookings.find(b => b.id === bookingId);
+    if (!booking) {
+      alert('No se encontró la reserva');
+      return;
+    }
+
+    if (!canMarkAsNoShow(booking)) {
+      alert('Solo puedes marcar como No Show el día del viaje o después. Aún no ha llegado la fecha del tour.');
+      return;
+    }
+
     if (!confirm('¿Confirmas que el viajero NO se presentó a este tour?\n\nEsto incrementará el contador de No Show del viajero. Si acumula más de 3 No Shows, se le cobrará el 100% en futuras reservas.')) {
       return;
     }
@@ -917,7 +946,7 @@ const AgencyBookings: React.FC = () => {
                           <Star className="h-4 w-4 mr-2" />
                           Calificar Viajero
                         </button>
-                        {!(booking as any).is_no_show && !(booking as any).cancelled_at && (
+                        {canMarkAsNoShow(booking) && (
                           <button
                             onClick={() => handleMarkNoShow(booking.id)}
                             className="btn bg-orange-600 text-white hover:bg-orange-700 flex items-center justify-center"
@@ -929,7 +958,7 @@ const AgencyBookings: React.FC = () => {
                       </>
                     )}
 
-                    {booking.status === 'completed' && !(booking as any).is_no_show && !(booking as any).cancelled_at && (
+                    {booking.status === 'completed' && canMarkAsNoShow(booking) && (
                       <button
                         onClick={() => handleMarkNoShow(booking.id)}
                         className="btn bg-orange-600 text-white hover:bg-orange-700 flex items-center justify-center"
