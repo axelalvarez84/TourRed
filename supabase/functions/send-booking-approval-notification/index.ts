@@ -258,26 +258,17 @@ Deno.serve(async (req: Request) => {
       `;
     }
 
-    const emailResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
+    const emailResponse = await fetch('https://api.smtp2go.com/v3/email/send', {
       method: 'POST',
       headers: {
-        'accept': 'application/json',
-        'api-key': emailSettings.smtp_api_key,
-        'content-type': 'application/json',
+        'Content-Type': 'application/json',
+        'X-Smtp2go-Api-Key': emailSettings.smtp_api_key,
       },
       body: JSON.stringify({
-        sender: {
-          name: emailSettings.smtp_from_name || 'ToursRed',
-          email: emailSettings.smtp_from_email
-        },
-        to: [
-          {
-            email: booking.traveler.email,
-            name: `${booking.traveler.first_name} ${booking.traveler.last_name}`
-          }
-        ],
+        sender: emailSettings.smtp_from_email,
+        to: [booking.traveler.email],
         subject: subject,
-        htmlContent: travelerEmailHtml,
+        html_body: travelerEmailHtml,
       }),
     });
 
