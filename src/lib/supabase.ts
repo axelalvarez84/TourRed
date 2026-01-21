@@ -1358,51 +1358,25 @@ export const addCancellationRefund = async (
   tourName: string
 ) => {
   try {
-    let { data: wallet, error: walletError } = await supabase
-      .from('toursred_cash_wallets')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
+    const { data, error } = await supabase.rpc('update_wallet_balance', {
+      p_user_id: userId,
+      p_amount: refundAmount,
+      p_type: 'refund',
+      p_description: `Reembolso por cancelación de ${tourName}`,
+      p_reference_id: bookingId,
+      p_reference_type: 'booking_cancellation'
+    });
 
-    if (walletError) throw walletError;
+    if (error) throw error;
 
-    if (!wallet) {
-      const { data: newWallet, error: createError } = await supabase
-        .from('toursred_cash_wallets')
-        .insert({ user_id: userId, balance: 0 })
-        .select()
-        .single();
-
-      if (createError) throw createError;
-      wallet = newWallet;
-    }
-
-    const newBalance = Number(wallet.balance) + refundAmount;
-
-    const { data: transaction, error: transactionError } = await supabase
-      .from('toursred_cash_transactions')
-      .insert({
-        wallet_id: wallet.id,
-        type: 'refund',
-        amount: refundAmount,
-        balance_after: newBalance,
-        description: `Reembolso por cancelación de ${tourName}`,
-        reference_id: bookingId,
-        reference_type: 'booking_cancellation'
-      })
-      .select()
-      .single();
-
-    if (transactionError) throw transactionError;
-
-    const { error: updateError } = await supabase
-      .from('toursred_cash_wallets')
-      .update({ balance: newBalance })
-      .eq('id', wallet.id);
-
-    if (updateError) throw updateError;
-
-    return { data: transaction, error: null };
+    return {
+      data: {
+        id: data.transaction_id,
+        amount: data.amount,
+        balance_after: data.new_balance
+      },
+      error: null
+    };
   } catch (error: any) {
     console.error('❌ Error en addCancellationRefund:', error);
     return { data: null, error };
