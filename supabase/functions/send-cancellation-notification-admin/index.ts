@@ -288,16 +288,15 @@ Deno.serve(async (req: Request) => {
       html: emailHtml,
     };
 
-    const apiKey = emailSettings.smtp_api_key || emailSettings.smtp_password;
     const sendEmailResponse = await fetch('https://api.smtp2go.com/v3/email/send', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Smtp2go-Api-Key': apiKey,
       },
       body: JSON.stringify({
-        sender: emailData.from,
-        recipients: [emailData.to],
+        api_key: emailSettings.smtp_api_key,
+        to: [emailSettings.contact_email],
+        sender: emailSettings.contact_email,
         subject: emailData.subject,
         html_body: emailData.html,
       }),

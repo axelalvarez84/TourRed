@@ -262,26 +262,18 @@ Deno.serve(async (req: Request) => {
       html: emailHtml,
     };
 
-    console.log('DEBUG - emailData.to:', emailData.to);
-    console.log('DEBUG - user.email:', user.email);
-
-    const apiKey = settings.smtp_api_key || settings.smtp_password;
-    const requestBody = {
-      sender: emailData.from,
-      recipients: [emailData.to],
-      subject: emailData.subject,
-      html_body: emailData.html,
-    };
-
-    console.log('DEBUG - SMTP2GO Request:', JSON.stringify(requestBody));
-
     const sendEmailResponse = await fetch('https://api.smtp2go.com/v3/email/send', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Smtp2go-Api-Key': apiKey,
       },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({
+        api_key: settings.smtp_api_key,
+        to: [user.email],
+        sender: settings.contact_email,
+        subject: emailData.subject,
+        html_body: emailData.html,
+      }),
     });
 
     if (!sendEmailResponse.ok) {
