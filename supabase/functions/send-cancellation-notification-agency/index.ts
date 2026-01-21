@@ -146,9 +146,10 @@ Deno.serve(async (req: Request) => {
         <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 
           <tr>
-            <td style="background: linear-gradient(135deg, #ef4444 0%, #991b1b 100%); padding: 40px 30px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 28px;">Cancelación de Reserva</h1>
-              <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Un viajero ha cancelado su reserva</p>
+            <td style="background-color: #b8dfe6; padding: 30px 20px; text-align: center;">
+              <img src="https://www.toursred.com/logo.png" alt="ToursRed Logo" style="max-width: 200px; height: auto; margin-bottom: 10px;" />
+              <h1 style="color: #1e40af; margin: 0; font-size: 28px;">Cancelación de Reserva</h1>
+              <p style="color: #1e40af; margin: 10px 0 0 0; font-size: 16px;">Un viajero ha cancelado su reserva</p>
             </td>
           </tr>
 
