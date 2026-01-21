@@ -372,6 +372,23 @@ const TravelerBookings: React.FC = () => {
             });
         }
 
+        // Enviar notificación por email a la agencia
+        try {
+          await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-request-notification`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({ booking_id: booking.id }),
+            }
+          );
+        } catch (emailError) {
+          console.error('Error enviando notificación a la agencia:', emailError);
+        }
+
         // Cerrar modal y recargar reservas
         setPaymentModal({
           open: false,

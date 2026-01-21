@@ -374,6 +374,23 @@ const TravelersInfoPage: React.FC = () => {
           }
         }
 
+        // Enviar notificación por email a la agencia
+        try {
+          await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-request-notification`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({ booking_id: bookingId }),
+            }
+          );
+        } catch (emailError) {
+          console.error('Error enviando notificación a la agencia:', emailError);
+        }
+
         // Redirigir a la página de éxito
         navigate(`/booking-success?booking_id=${bookingId}`);
         return;
