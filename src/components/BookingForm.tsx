@@ -365,7 +365,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         service_charge: serviceCharge,
         user_payment: userPayment,
         platform_revenue: platformRevenue,
-        booking_date: formatDateForDB(tour.start_date),
+        booking_date: tour.start_date,
         status: initialStatus,
         payment_status: initialPaymentStatus,
         approval_status: initialApprovalStatus,
