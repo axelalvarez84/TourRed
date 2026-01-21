@@ -503,9 +503,37 @@ Deno.serve(async (req) => {
               console.error('Error processing membership exemption:', membershipError);
             }
 
-            // NOTE: Emails are sent in checkout.session.completed event only
-            // to prevent duplicate emails when both events fire for card payments
-            console.log(`✅ Booking ${bookingId} confirmed via payment_intent.succeeded (emails sent via checkout.session.completed)`);
+            // Send confirmation email - check if already sent to prevent duplicates
+            try {
+              const { data: bookingCheck } = await supabase
+                .from('bookings')
+                .select('confirmation_email_sent')
+                .eq('id', bookingId)
+                .single();
+
+              if (bookingCheck?.confirmation_email_sent) {
+                console.log(`⚠️ Confirmation email already sent for booking ${bookingId}, skipping...`);
+              } else {
+                const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-booking-confirmation`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${supabaseServiceKey}`,
+                  },
+                  body: JSON.stringify({ booking_id: bookingId }),
+                });
+
+                const emailResult = await emailResponse.json();
+
+                if (emailResult.success) {
+                  console.log('Booking confirmation emails sent successfully from payment_intent.succeeded');
+                } else {
+                  console.error('Error sending booking confirmation emails:', emailResult);
+                }
+              }
+            } catch (emailError) {
+              console.error('Error calling booking confirmation function:', emailError);
+            }
           }
 
           const { data: existingTransaction } = await supabase
