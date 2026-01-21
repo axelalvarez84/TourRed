@@ -756,6 +756,113 @@ export const getAgencyBookings = async (agencyId: string) => {
   }
 };
 
+export const getTourBookingReport = async (tourId: string, agencyId: string) => {
+  try {
+    const { data: tour, error: tourError } = await supabase
+      .from('tours')
+      .select('id, name, destination, start_date, end_date')
+      .eq('id', tourId)
+      .eq('agency_id', agencyId)
+      .maybeSingle();
+
+    if (tourError || !tour) {
+      return { data: null, error: tourError || new Error('Tour no encontrado') };
+    }
+
+    const { data: bookings, error: bookingsError } = await supabase
+      .from('bookings')
+      .select(`
+        id,
+        user_id,
+        deposit_amount,
+        total_price,
+        user_payment,
+        payment_method,
+        booking_date,
+        created_at,
+        status,
+        count_adultos,
+        count_ninos,
+        count_infantes,
+        count_adultos_mayores,
+        count_mascotas,
+        toursred_cash_used,
+        users:user_id(id, first_name, last_name, email, phone_number)
+      `)
+      .eq('tour_id', tourId)
+      .in('status', ['confirmed', 'completed'])
+      .order('created_at', { ascending: true });
+
+    if (bookingsError) {
+      return { data: null, error: bookingsError };
+    }
+
+    const bookingsWithTravelers = await Promise.all(
+      (bookings || []).map(async (booking) => {
+        const { data: travelers, error: travelersError } = await supabase
+          .from('booking_travelers')
+          .select('*')
+          .eq('booking_id', booking.id)
+          .order('created_at', { ascending: true });
+
+        let paymentMethod = booking.payment_method || null;
+        if (!paymentMethod) {
+          const { data: transaction } = await supabase
+            .from('payment_transactions')
+            .select('payment_method_type')
+            .eq('booking_id', booking.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          paymentMethod = transaction?.payment_method_type || null;
+        }
+
+        return {
+          ...booking,
+          travelers: travelers || [],
+          payment_method: paymentMethod
+        };
+      })
+    );
+
+    const totalTravelers = bookingsWithTravelers.reduce((sum, b) => {
+      return sum + (b.travelers?.length || 0);
+    }, 0);
+
+    const totalsByCategory = {
+      adultos: bookingsWithTravelers.reduce((sum, b) => sum + (b.count_adultos || 0), 0),
+      ninos: bookingsWithTravelers.reduce((sum, b) => sum + (b.count_ninos || 0), 0),
+      infantes: bookingsWithTravelers.reduce((sum, b) => sum + (b.count_infantes || 0), 0),
+      adultos_mayores: bookingsWithTravelers.reduce((sum, b) => sum + (b.count_adultos_mayores || 0), 0),
+      mascotas: bookingsWithTravelers.reduce((sum, b) => sum + (b.count_mascotas || 0), 0)
+    };
+
+    const totalDeposit = bookingsWithTravelers.reduce((sum, b) => sum + Number(b.deposit_amount || 0), 0);
+    const totalRemaining = bookingsWithTravelers.reduce((sum, b) => sum + (Number(b.total_price || 0) - Number(b.deposit_amount || 0)), 0);
+    const totalRevenue = bookingsWithTravelers.reduce((sum, b) => sum + Number(b.total_price || 0), 0);
+
+    return {
+      data: {
+        tour,
+        bookings: bookingsWithTravelers,
+        summary: {
+          totalBookings: bookingsWithTravelers.length,
+          totalTravelers,
+          totalsByCategory,
+          totalDeposit,
+          totalRemaining,
+          totalRevenue
+        }
+      },
+      error: null
+    };
+  } catch (error: any) {
+    console.error('❌ Error en getTourBookingReport:', error);
+    return { data: null, error };
+  }
+};
+
 // Review functions
 export const getTourReviews = async (tourId: string) => {
   try {

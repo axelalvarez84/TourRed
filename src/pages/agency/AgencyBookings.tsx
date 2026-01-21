@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter, Star, X, User, MessageSquare, UserCheck, UserX } from 'lucide-react';
+import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter, Star, X, User, MessageSquare, UserCheck, UserX, FileSpreadsheet, FileText, Download } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { getAgencyBookings, supabase, parseDateFromDB } from '../../lib/supabase';
+import { getAgencyBookings, getTourBookingReport, supabase, parseDateFromDB } from '../../lib/supabase';
 import { Booking } from '../../types';
 import { format } from 'date-fns';
 import { Link, useNavigate } from 'react-router-dom';
 import ReviewForm from '../../components/ReviewForm';
+import { exportTourReportToExcel, exportTourReportToPDF } from '../../utils/reportExports';
 
 const AgencyBookings: React.FC = () => {
   const { user } = useAuth();
@@ -30,6 +31,12 @@ const AgencyBookings: React.FC = () => {
     booking: Booking | null;
     travelers: any[];
   }>({ open: false, booking: null, travelers: [] });
+  const [activeTab, setActiveTab] = useState<'bookings' | 'reports'>('bookings');
+  const [availableTours, setAvailableTours] = useState<any[]>([]);
+  const [selectedTourForReport, setSelectedTourForReport] = useState<string>('');
+  const [reportData, setReportData] = useState<any>(null);
+  const [isLoadingReport, setIsLoadingReport] = useState(false);
+  const [agencyName, setAgencyName] = useState<string>('');
 
   useEffect(() => {
     if (user?.id) {
@@ -45,11 +52,11 @@ const AgencyBookings: React.FC = () => {
       setError('');
       
       console.log('🏢 Obteniendo ID de agencia para usuario:', user.id);
-      
-      // Primero obtener el ID de la agencia
+
+      // Primero obtener el ID y nombre de la agencia
       const { data: agencyData, error: agencyError } = await supabase
         .from('agencies')
-        .select('id')
+        .select('id, name')
         .eq('user_id', user.id)
         .single();
 
@@ -68,16 +75,41 @@ const AgencyBookings: React.FC = () => {
 
       console.log('✅ ID de agencia encontrado:', agencyData.id);
       setAgencyId(agencyData.id);
+      setAgencyName(agencyData.name);
 
       // Obtener reservas de la agencia
       const { data: bookingsData, error: bookingsError } = await getAgencyBookings(agencyData.id);
-      
+
       if (bookingsError) {
         throw new Error(bookingsError.message);
       }
-      
+
       console.log('✅ Reservas de agencia cargadas:', bookingsData);
       setBookings(bookingsData || []);
+
+      // Obtener tours con reservas confirmadas
+      const { data: toursData, error: toursError } = await supabase
+        .from('tours')
+        .select('id, name, destination, start_date')
+        .eq('agency_id', agencyData.id)
+        .order('start_date', { ascending: false });
+
+      if (!toursError && toursData) {
+        const toursWithBookings = await Promise.all(
+          toursData.map(async (tour) => {
+            const { count } = await supabase
+              .from('bookings')
+              .select('*', { count: 'exact', head: true })
+              .eq('tour_id', tour.id)
+              .in('status', ['confirmed', 'completed']);
+
+            return { ...tour, bookingsCount: count || 0 };
+          })
+        );
+
+        const toursFiltered = toursWithBookings.filter(t => t.bookingsCount > 0);
+        setAvailableTours(toursFiltered);
+      }
       
     } catch (err: any) {
       console.error('❌ Error cargando reservas de agencia:', err);
@@ -465,6 +497,45 @@ const AgencyBookings: React.FC = () => {
     return labels[categoria] || categoria;
   };
 
+  const handleGenerateReport = async () => {
+    if (!selectedTourForReport || !agencyId) {
+      alert('Por favor selecciona un tour');
+      return;
+    }
+
+    try {
+      setIsLoadingReport(true);
+      const { data, error } = await getTourBookingReport(selectedTourForReport, agencyId);
+
+      if (error || !data) {
+        throw new Error(error?.message || 'Error al generar reporte');
+      }
+
+      setReportData(data);
+    } catch (err: any) {
+      console.error('Error generating report:', err);
+      alert(err.message || 'Error al generar el reporte');
+    } finally {
+      setIsLoadingReport(false);
+    }
+  };
+
+  const handleExportExcel = () => {
+    if (!reportData) {
+      alert('Primero genera el reporte');
+      return;
+    }
+    exportTourReportToExcel(reportData, agencyName);
+  };
+
+  const handleExportPDF = () => {
+    if (!reportData) {
+      alert('Primero genera el reporte');
+      return;
+    }
+    exportTourReportToPDF(reportData, agencyName);
+  };
+
   // Filtrar reservas
   const filteredBookings = bookings.filter(booking => {
     const matchesSearch = 
@@ -507,12 +578,40 @@ const AgencyBookings: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold">Gestionar Reservas</h1>
           <p className="text-gray-600 mt-1">
-            {bookings.length === 0 
-              ? 'No tienes reservas aún' 
+            {bookings.length === 0
+              ? 'No tienes reservas aún'
               : `${bookings.length} ${bookings.length === 1 ? 'reserva' : 'reservas'} en total`
             }
           </p>
         </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="mb-6 border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('bookings')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'bookings'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <Users className="inline-block h-5 w-5 mr-2" />
+            Reservas
+          </button>
+          <button
+            onClick={() => setActiveTab('reports')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'reports'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <FileText className="inline-block h-5 w-5 mr-2" />
+            Reportes por Tour
+          </button>
+        </nav>
       </div>
 
       {error && (
@@ -521,7 +620,7 @@ const AgencyBookings: React.FC = () => {
           <div>
             <p className="font-medium">Error al cargar reservas</p>
             <p className="text-sm">{error}</p>
-            <button 
+            <button
               onClick={fetchAgencyData}
               className="text-sm underline mt-1 hover:no-underline"
             >
@@ -531,7 +630,9 @@ const AgencyBookings: React.FC = () => {
         </div>
       )}
 
-      {/* Estadísticas */}
+      {activeTab === 'bookings' && (
+        <>
+          {/* Estadísticas */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow-md p-4">
           <div className="text-2xl font-bold text-primary-600">{stats.total}</div>
@@ -912,6 +1013,196 @@ const AgencyBookings: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+        </>
+      )}
+
+      {activeTab === 'reports' && (
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-2xl font-bold mb-4">Reportes de Asistentes por Tour</h2>
+          <p className="text-gray-600 mb-6">
+            Genera reportes detallados con la lista de asistentes y acompañantes para cada tour.
+            Exporta en Excel o PDF para el día del tour.
+          </p>
+
+          {/* Tour Selector */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Selecciona un Tour
+            </label>
+            <div className="flex gap-4">
+              <select
+                value={selectedTourForReport}
+                onChange={(e) => setSelectedTourForReport(e.target.value)}
+                className="flex-1 border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">-- Selecciona un tour --</option>
+                {availableTours.map((tour) => (
+                  <option key={tour.id} value={tour.id}>
+                    {tour.name} - {formatDate(tour.start_date)} ({tour.bookingsCount} reservas confirmadas)
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleGenerateReport}
+                disabled={!selectedTourForReport || isLoadingReport}
+                className="btn btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoadingReport ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                    Generando...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-5 w-5" />
+                    Generar Reporte
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Report Preview */}
+          {reportData && (
+            <div>
+              <div className="mb-4 flex justify-between items-center">
+                <h3 className="text-xl font-bold">Vista Previa del Reporte</h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleExportExcel}
+                    className="btn btn-primary flex items-center gap-2"
+                  >
+                    <FileSpreadsheet className="h-5 w-5" />
+                    Descargar Excel
+                  </button>
+                  <button
+                    onClick={handleExportPDF}
+                    className="btn btn-outline flex items-center gap-2"
+                  >
+                    <FileText className="h-5 w-5" />
+                    Descargar PDF
+                  </button>
+                </div>
+              </div>
+
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-primary-50 rounded-lg p-4">
+                  <div className="text-2xl font-bold text-primary-600">
+                    {reportData.summary.totalBookings}
+                  </div>
+                  <div className="text-sm text-gray-600">Total Reservas</div>
+                </div>
+                <div className="bg-green-50 rounded-lg p-4">
+                  <div className="text-2xl font-bold text-green-600">
+                    {reportData.summary.totalTravelers}
+                  </div>
+                  <div className="text-sm text-gray-600">Total Viajeros</div>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <div className="text-2xl font-bold text-blue-600">
+                    ${reportData.summary.totalDeposit.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-sm text-gray-600">Anticipo Recibido</div>
+                </div>
+                <div className="bg-orange-50 rounded-lg p-4">
+                  <div className="text-2xl font-bold text-orange-600">
+                    ${reportData.summary.totalRemaining.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-sm text-gray-600">Saldo Pendiente</div>
+                </div>
+              </div>
+
+              {/* Travelers by Category */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <h4 className="font-semibold mb-3">Viajeros por Categoría</h4>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <div>
+                    <div className="text-lg font-bold">{reportData.summary.totalsByCategory.adultos}</div>
+                    <div className="text-sm text-gray-600">Adultos</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold">{reportData.summary.totalsByCategory.ninos}</div>
+                    <div className="text-sm text-gray-600">Niños</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold">{reportData.summary.totalsByCategory.infantes}</div>
+                    <div className="text-sm text-gray-600">Infantes</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold">{reportData.summary.totalsByCategory.adultos_mayores}</div>
+                    <div className="text-sm text-gray-600">Adultos Mayores</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold">{reportData.summary.totalsByCategory.mascotas}</div>
+                    <div className="text-sm text-gray-600">Mascotas</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detailed List */}
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Viajeros</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Anticipo</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pendiente</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Método Pago</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {reportData.bookings.map((booking: any) => (
+                      <tr key={booking.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-4">
+                          <div className="font-medium">{booking.users.first_name} {booking.users.last_name}</div>
+                          <div className="text-sm text-gray-500">{booking.users.email}</div>
+                          <div className="text-sm text-gray-500">{booking.users.phone_number || 'Sin teléfono'}</div>
+                        </td>
+                        <td className="px-4 py-4">
+                          {booking.travelers.length > 0 ? (
+                            <div className="space-y-1">
+                              {booking.travelers.map((traveler: any) => (
+                                <div key={traveler.id} className="text-sm">
+                                  <span className="font-medium">{traveler.nombre}</span>
+                                  <span className="text-gray-500 ml-2">({getCategoryLabel(traveler.categoria_viajero)})</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-500">Sin acompañantes</div>
+                          )}
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="font-medium">
+                            ${Number(booking.deposit_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="font-medium text-orange-600">
+                            ${(Number(booking.total_price) - Number(booking.deposit_amount)).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="text-sm">{booking.payment_method || 'N/A'}</div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {!reportData && !isLoadingReport && (
+            <div className="text-center py-12 text-gray-500">
+              <FileText className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+              <p>Selecciona un tour y genera el reporte para ver los detalles</p>
+            </div>
+          )}
         </div>
       )}
 
