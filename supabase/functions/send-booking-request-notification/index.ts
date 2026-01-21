@@ -24,9 +24,14 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    console.log('📧 Iniciando envío de notificación de solicitud de reserva...');
+
     const { booking_id }: BookingRequestNotificationRequest = await req.json();
 
+    console.log('📋 Booking ID recibido:', booking_id);
+
     if (!booking_id) {
+      console.error('❌ No se proporcionó booking_id');
       return new Response(
         JSON.stringify({ error: "El ID de reserva es requerido" }),
         {
@@ -35,6 +40,8 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
+
+    console.log('🔍 Consultando datos de la reserva...');
 
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")
@@ -48,7 +55,7 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (bookingError || !booking) {
-      console.error("Error fetching booking:", bookingError);
+      console.error("❌ Error fetching booking:", bookingError);
       return new Response(
         JSON.stringify({ error: "No se encontró la reserva" }),
         {
@@ -57,6 +64,9 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
+
+    console.log('✅ Datos de la reserva obtenidos correctamente');
+    console.log('📧 Email destino:', booking.agency.contact_email);
 
     const [emailSettingsResult] = await Promise.all([
       supabase.from("email_settings").select("*").maybeSingle(),
