@@ -31,11 +31,11 @@ Deno.serve(async (req: Request) => {
       .from('booking_cancellations')
       .select(`
         *,
-        bookings:booking_id (
+        bookings!booking_id (
           *,
-          tours:tour_id (id, name, start_date),
-          users:user_id (id, first_name, last_name, email, phone_number),
-          agencies:agency_id (id, name, contact_email)
+          tours!tour_id (id, name, start_date),
+          users!user_id (id, first_name, last_name, email, phone_number),
+          agencies!agency_id (id, name, contact_email)
         )
       `)
       .eq('id', cancellation_id)
