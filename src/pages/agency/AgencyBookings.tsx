@@ -876,17 +876,19 @@ const AgencyBookings: React.FC = () => {
                             {booking.users?.first_name} {booking.users?.last_name}
                           </div>
                         </div>
-                        <div>
-                          <div className="text-gray-500">Email:</div>
-                          <div className="font-medium">
-                            <a
-                              href={`mailto:${booking.users?.email}`}
-                              className="text-primary-600 hover:text-primary-700"
-                            >
-                              {booking.users?.email}
-                            </a>
+                        {booking.approval_status !== 'pending' && booking.payment_status !== 'pending' && (
+                          <div>
+                            <div className="text-gray-500">Email:</div>
+                            <div className="font-medium">
+                              <a
+                                href={`mailto:${booking.users?.email}`}
+                                className="text-primary-600 hover:text-primary-700"
+                              >
+                                {booking.users?.email}
+                              </a>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -945,21 +947,25 @@ const AgencyBookings: React.FC = () => {
                       Ver Tour
                     </Link>
 
-                    <button
-                      onClick={() => handleOpenTravelersModal(booking)}
-                      className="btn btn-outline flex items-center justify-center"
-                    >
-                      <UserCheck className="h-4 w-4 mr-2" />
-                      Ver Acompañantes
-                    </button>
+                    {booking.approval_status !== 'pending' && booking.payment_status !== 'pending' && (
+                      <>
+                        <button
+                          onClick={() => handleOpenTravelersModal(booking)}
+                          className="btn btn-outline flex items-center justify-center"
+                        >
+                          <UserCheck className="h-4 w-4 mr-2" />
+                          Ver Acompañantes
+                        </button>
 
-                    <button
-                      onClick={() => handleOpenContactModal(booking)}
-                      className="btn btn-outline flex items-center justify-center"
-                    >
-                      <Mail className="h-4 w-4 mr-2" />
-                      Contactar Cliente
-                    </button>
+                        <button
+                          onClick={() => handleOpenContactModal(booking)}
+                          className="btn btn-outline flex items-center justify-center"
+                        >
+                          <Mail className="h-4 w-4 mr-2" />
+                          Contactar Cliente
+                        </button>
+                      </>
+                    )}
 
                     {booking.approval_status === 'pending' && (
                       <>
