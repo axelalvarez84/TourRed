@@ -1265,10 +1265,10 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
 
   const { data: platformSettings } = await supabase
     .from('platform_settings')
-    .select('commission_rate')
+    .select('agency_commission_percentage')
     .single();
 
-  const commissionRate = platformSettings?.commission_rate || 0.10;
+  const commissionRate = (platformSettings?.agency_commission_percentage || 15) / 100;
 
   if (isPending) {
     return {

@@ -88,13 +88,13 @@ Deno.serve(async (req: Request) => {
         policyTitle = 'Sin Reembolso (1-6 días)';
         policyColor = '#ef4444';
         policyDescription = 'El viajero canceló entre 1 y 6 días antes del tour. No hay reembolso para el viajero.';
-        paymentInfo = `<strong>Recibirá $${cancellation.amount_to_agency.toFixed(2)}</strong> (anticipo menos comisión del ${(settings.commission_rate * 100).toFixed(0)}%) en su próximo depósito de comisiones.`;
+        paymentInfo = `<strong>Recibirá $${cancellation.amount_to_agency.toFixed(2)}</strong> (anticipo menos comisión del ${commissionRate.toFixed(0)}%) en su próximo depósito de comisiones.`;
         break;
       case 'no_show':
         policyTitle = 'Cancelación Tardía - No Show';
         policyColor = '#991b1b';
         policyDescription = 'El viajero canceló con menos de 1 día de anticipación y se marcó como No Show.';
-        paymentInfo = `<strong>Recibirá $${cancellation.amount_to_agency.toFixed(2)}</strong> (anticipo menos comisión del ${(settings.commission_rate * 100).toFixed(0)}%) en su próximo depósito de comisiones.`;
+        paymentInfo = `<strong>Recibirá $${cancellation.amount_to_agency.toFixed(2)}</strong> (anticipo menos comisión del ${commissionRate.toFixed(0)}%) en su próximo depósito de comisiones.`;
         break;
       case 'pending_approval':
         policyTitle = 'Reserva Pendiente Cancelada';
