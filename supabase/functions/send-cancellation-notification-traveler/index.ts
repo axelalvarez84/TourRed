@@ -57,6 +57,8 @@ Deno.serve(async (req: Request) => {
       throw new Error('Usuario no encontrado');
     }
 
+    console.log('DEBUG - Usuario:', JSON.stringify({ id: user.id, email: user.email, name: user.first_name }));
+
     const { data: tour, error: tourError } = await supabase
       .from('tours')
       .select('id, name, start_date')
@@ -260,19 +262,26 @@ Deno.serve(async (req: Request) => {
       html: emailHtml,
     };
 
+    console.log('DEBUG - emailData.to:', emailData.to);
+    console.log('DEBUG - user.email:', user.email);
+
     const apiKey = settings.smtp_api_key || settings.smtp_password;
+    const requestBody = {
+      sender: emailData.from,
+      recipients: [emailData.to],
+      subject: emailData.subject,
+      html_body: emailData.html,
+    };
+
+    console.log('DEBUG - SMTP2GO Request:', JSON.stringify(requestBody));
+
     const sendEmailResponse = await fetch('https://api.smtp2go.com/v3/email/send', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Smtp2go-Api-Key': apiKey,
       },
-      body: JSON.stringify({
-        sender: emailData.from,
-        recipients: [emailData.to],
-        subject: emailData.subject,
-        html_body: emailData.html,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!sendEmailResponse.ok) {
