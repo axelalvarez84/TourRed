@@ -1333,7 +1333,7 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
       warningMessage: tour.cancellation_not_allowed
         ? 'Este tour NO permite cancelaciones con reembolso. Solo puedes cancelar para evitar la penalización de No Show.'
         : undefined,
-      refundMessage: 'No hay reembolso. El anticipo completo se pagará a la agencia (menos la comisión de la plataforma). Sin embargo, no se te marcará como No Show.'
+      refundMessage: 'Si cancelas tu reserva, no se realizará ningún reembolso del anticipo pagado. Sin embargo, si no podrás asistir, cancelar tu reserva evita que sea considerada como No Show, lo cual podría afectar tus futuras reservas.'
     };
   }
 
