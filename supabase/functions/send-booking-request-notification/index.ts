@@ -156,33 +156,29 @@ Deno.serve(async (req: Request) => {
       </html>
     `;
 
-    const emailResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
+    const emailPayload = {
+      api_key: emailSettings.smtp_api_key,
+      to: [booking.agency.contact_email],
+      sender: emailSettings.contact_email,
+      subject: `Nueva Solicitud de Reserva - ${booking.tour.name}`,
+      html_body: agencyEmailHtml,
+    };
+
+    console.log(`📧 Enviando email a ${booking.agency.contact_email}...`);
+
+    const emailResponse = await fetch('https://api.smtp2go.com/v3/email/send', {
       method: 'POST',
       headers: {
-        'accept': 'application/json',
-        'api-key': emailSettings.smtp_api_key,
-        'content-type': 'application/json',
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        sender: {
-          name: emailSettings.smtp_from_name || 'ToursRed',
-          email: emailSettings.smtp_from_email
-        },
-        to: [
-          {
-            email: booking.agency.contact_email,
-            name: booking.agency.agency_name
-          }
-        ],
-        subject: `Nueva Solicitud de Reserva - ${booking.tour.name}`,
-        htmlContent: agencyEmailHtml,
-      }),
+      body: JSON.stringify(emailPayload),
     });
 
-    if (!emailResponse.ok) {
-      const errorText = await emailResponse.text();
-      console.error('Error sending agency email:', errorText);
-      throw new Error(`Failed to send agency email: ${errorText}`);
+    const result = await emailResponse.json();
+
+    if (!emailResponse.ok || result.data?.error) {
+      console.error('❌ Error sending agency email:', result);
+      throw new Error(`Failed to send agency email: ${JSON.stringify(result)}`);
     }
 
     console.log(`✅ Email de solicitud enviado a la agencia ${booking.agency.agency_name}`);
