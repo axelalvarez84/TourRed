@@ -678,17 +678,25 @@ export const getUserBookings = async (userId: string) => {
 
     const bookingsWithPaymentMethod = await Promise.all(
       bookings.map(async (booking) => {
-        const { data: transaction } = await supabase
-          .from('payment_transactions')
-          .select('payment_method_type')
-          .eq('booking_id', booking.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        // Primero intentar usar el payment_method de la tabla bookings
+        let paymentMethod = (booking as any).payment_method || null;
+
+        // Si no existe, buscar en payment_transactions como respaldo
+        if (!paymentMethod) {
+          const { data: transaction } = await supabase
+            .from('payment_transactions')
+            .select('payment_method_type')
+            .eq('booking_id', booking.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          paymentMethod = transaction?.payment_method_type || null;
+        }
 
         return {
           ...booking,
-          payment_method: transaction?.payment_method_type || null
+          payment_method: paymentMethod
         };
       })
     );
@@ -718,17 +726,25 @@ export const getAgencyBookings = async (agencyId: string) => {
 
     const bookingsWithPaymentMethod = await Promise.all(
       bookings.map(async (booking) => {
-        const { data: transaction } = await supabase
-          .from('payment_transactions')
-          .select('payment_method_type')
-          .eq('booking_id', booking.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        // Primero intentar usar el payment_method de la tabla bookings
+        let paymentMethod = (booking as any).payment_method || null;
+
+        // Si no existe, buscar en payment_transactions como respaldo
+        if (!paymentMethod) {
+          const { data: transaction } = await supabase
+            .from('payment_transactions')
+            .select('payment_method_type')
+            .eq('booking_id', booking.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          paymentMethod = transaction?.payment_method_type || null;
+        }
 
         return {
           ...booking,
-          payment_method: transaction?.payment_method_type || null
+          payment_method: paymentMethod
         };
       })
     );
