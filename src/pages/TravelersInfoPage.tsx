@@ -329,6 +329,7 @@ const TravelersInfoPage: React.FC = () => {
           .update({
             payment_status: 'succeeded',
             status: 'confirmed',
+            payment_method: 'toursred_cash',
             updated_at: new Date().toISOString(),
           })
           .eq('id', bookingId);

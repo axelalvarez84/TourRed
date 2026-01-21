@@ -339,10 +339,11 @@ const TravelerBookings: React.FC = () => {
   // Helper function to format dates consistently
   const formatDate = (dateString: string) => {
     try {
-      // Check if it's a full ISO 8601 timestamp (contains 'T')
-      const date = dateString.includes('T') 
-        ? new Date(dateString) 
-        : parseDateFromDB(dateString);
+      // Extract date part if it's a timestamp (contains 'T')
+      const datePart = dateString.includes('T')
+        ? dateString.split('T')[0]
+        : dateString;
+      const date = parseDateFromDB(datePart);
       return format(date, 'dd/MM/yyyy');
     } catch (error) {
       console.error('Error formatting date:', dateString, error);
@@ -352,15 +353,29 @@ const TravelerBookings: React.FC = () => {
 
   const formatFullDate = (dateString: string) => {
     try {
-      // Check if it's a full ISO 8601 timestamp (contains 'T')
-      const date = dateString.includes('T') 
-        ? new Date(dateString) 
-        : parseDateFromDB(dateString);
+      // Extract date part if it's a timestamp (contains 'T')
+      const datePart = dateString.includes('T')
+        ? dateString.split('T')[0]
+        : dateString;
+      const date = parseDateFromDB(datePart);
       return format(date, 'EEEE, d \'de\' MMMM \'de\' yyyy');
     } catch (error) {
       console.error('Error formatting full date:', dateString, error);
       return format(new Date(dateString), 'dd/MM/yyyy');
     }
+  };
+
+  const getPaymentMethodLabel = (method: string | null | undefined): string => {
+    if (!method) return 'N/A';
+
+    const labels: Record<string, string> = {
+      'card': 'Tarjeta',
+      'oxxo': 'OXXO',
+      'customer_balance': 'Transferencia Bancaria',
+      'toursred_cash': 'ToursRed Cash',
+    };
+
+    return labels[method] || method;
   };
 
   const getStatusBadge = (status: string, paymentStatus?: string, approvalStatus?: string, isNoShow?: boolean) => {
@@ -529,7 +544,7 @@ const TravelerBookings: React.FC = () => {
                       </div>
                       <div className="flex items-center text-gray-600">
                         <Calendar className="h-4 w-4 mr-1" />
-                        <span>Reservado para: {formatDate(booking.booking_date)}</span>
+                        <span>Fecha del Tour: {formatDate(booking.booking_date)}</span>
                       </div>
                     </div>
                     <div className="text-right">
@@ -569,7 +584,7 @@ const TravelerBookings: React.FC = () => {
                       <DollarSign className="h-4 w-4 text-gray-400 mr-2" />
                       <div>
                         <div className="text-sm text-gray-500">Método de Pago</div>
-                        <div className="font-medium">{(booking as any).payment_method || 'N/A'}</div>
+                        <div className="font-medium">{getPaymentMethodLabel((booking as any).payment_method)}</div>
                       </div>
                     </div>
                   </div>
@@ -594,7 +609,7 @@ const TravelerBookings: React.FC = () => {
                       )}
                       <div>
                         <div className="text-gray-500">Método de Pago:</div>
-                        <div className="font-medium">{(booking as any).payment_method || 'N/A'}</div>
+                        <div className="font-medium">{getPaymentMethodLabel((booking as any).payment_method)}</div>
                       </div>
                       <div>
                         <div className="text-gray-500">Saldo Restante:</div>
