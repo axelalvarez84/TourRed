@@ -209,7 +209,7 @@ Deno.serve(async (req: Request) => {
               </p>
 
               <div style="text-align: center; margin-top: 30px;">
-                <a href="${Deno.env.get('VITE_APP_URL') || 'https://toursred.com'}/traveler/bookings"
+                <a href="https://toursred.com/traveler/bookings"
                    style="display: inline-block; background-color: #667eea; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; font-size: 15px;">
                   Ver Mis Reservas
                 </a>

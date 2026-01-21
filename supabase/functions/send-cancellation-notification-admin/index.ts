@@ -218,11 +218,11 @@ Deno.serve(async (req: Request) => {
               </div>
 
               <div style="text-align: center; margin-top: 30px;">
-                <a href="${Deno.env.get('VITE_APP_URL') || 'https://toursred.com'}/admin/dashboard"
+                <a href="https://toursred.com/admin/dashboard"
                    style="display: inline-block; background-color: #667eea; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; font-size: 15px; margin-right: 10px;">
                   Ver Dashboard
                 </a>
-                <a href="${Deno.env.get('VITE_APP_URL') || 'https://toursred.com'}/admin/agencies"
+                <a href="https://toursred.com/admin/agencies"
                    style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; font-size: 15px;">
                   Gestionar Agencias
                 </a>
