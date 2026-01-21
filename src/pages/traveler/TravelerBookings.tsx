@@ -144,6 +144,11 @@ const TravelerBookings: React.FC = () => {
       return;
     }
 
+    if ((booking as any).approval_status === 'rejected') {
+      alert('Esta reserva fue rechazada por la agencia y no puede ser cancelada.');
+      return;
+    }
+
     setCancellationModal({
       open: true,
       booking,
@@ -253,6 +258,7 @@ const TravelerBookings: React.FC = () => {
 
     if (booking.status === 'cancelled') return false;
     if ((booking as any).is_no_show) return false;
+    if ((booking as any).approval_status === 'rejected') return false;
     if (!['pending', 'confirmed'].includes(booking.status)) return false;
 
     const tourStartDate = parseDateFromDB((booking.tours as any).start_date);

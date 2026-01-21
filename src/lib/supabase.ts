@@ -1217,6 +1217,14 @@ export const validateCancellationEligibility = async (bookingId: string) => {
       };
     }
 
+    if (booking.approval_status === 'rejected') {
+      return {
+        eligible: false,
+        error: 'Esta reserva fue rechazada por la agencia y no puede ser cancelada',
+        booking
+      };
+    }
+
     if (!['pending', 'confirmed'].includes(booking.status)) {
       return {
         eligible: false,
