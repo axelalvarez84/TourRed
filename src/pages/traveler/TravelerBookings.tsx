@@ -139,6 +139,11 @@ const TravelerBookings: React.FC = () => {
   };
 
   const handleOpenCancellationModal = async (booking: Booking) => {
+    if ((booking as any).is_no_show) {
+      alert('Esta reserva ya está marcada como No Show y no puede ser cancelada.');
+      return;
+    }
+
     setCancellationModal({
       open: true,
       booking,
@@ -352,11 +357,14 @@ const TravelerBookings: React.FC = () => {
     }
   };
 
-  const getStatusBadge = (status: string, paymentStatus?: string, approvalStatus?: string) => {
+  const getStatusBadge = (status: string, paymentStatus?: string, approvalStatus?: string, isNoShow?: boolean) => {
     let statusText = '';
     let statusClass = '';
 
-    if (approvalStatus === 'rejected') {
+    if (isNoShow) {
+      statusText = 'No Show';
+      statusClass = 'bg-gray-900 text-white';
+    } else if (approvalStatus === 'rejected') {
       statusText = 'Rechazada';
       statusClass = 'bg-red-100 text-red-800';
     } else if (approvalStatus === 'pending') {
@@ -496,7 +504,7 @@ const TravelerBookings: React.FC = () => {
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute top-4 left-4">
-                      {getStatusBadge(booking.status, booking.payment_status, (booking as any).approval_status)}
+                      {getStatusBadge(booking.status, booking.payment_status, (booking as any).approval_status, (booking as any).is_no_show)}
                       {getPaymentStatusBadge(booking.payment_status)}
                     </div>
                   </div>
@@ -649,6 +657,19 @@ const TravelerBookings: React.FC = () => {
                   </div>
 
                   {/* Important Notes */}
+                  {(booking as any).is_no_show && (
+                    <div className="mt-4 p-3 bg-gray-900 border border-gray-800 rounded-md">
+                      <p className="text-sm text-white">
+                        <strong>⚠️ Marcada como No Show.</strong> Esta reserva fue marcada como No Show porque no te presentaste al tour. Esta acción ha sido registrada en tu historial y puede afectar futuras reservas.
+                        {(booking as any).no_show_marked_at && (
+                          <span className="block mt-2 text-gray-300">
+                            <strong>Fecha:</strong> {formatDate((booking as any).no_show_marked_at)}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+
                   {(booking as any).approval_status === 'pending' && (
                     <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                       <p className="text-sm text-yellow-800">

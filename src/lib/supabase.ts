@@ -664,6 +664,8 @@ export const getUserBookings = async (userId: string) => {
         approval_status,
         approval_notes,
         approved_at,
+        is_no_show,
+        no_show_marked_at,
         created_at,
         updated_at,
         tours:tour_id(id, name, destination, image_url, start_date, end_date),
