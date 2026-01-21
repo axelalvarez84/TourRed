@@ -322,6 +322,43 @@ const TravelersInfoPage: React.FC = () => {
       const toursRedCashUsed = booking?.toursred_cash_used || 0;
       const amountToCharge = (booking?.user_payment || 0) - toursRedCashUsed;
 
+      // Si el monto a cobrar es 0 o menor, marcar la reserva como pagada directamente
+      if (amountToCharge <= 0) {
+        const { error: updateError } = await supabase
+          .from('bookings')
+          .update({
+            payment_status: 'succeeded',
+            status: 'confirmed',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', bookingId);
+
+        if (updateError) {
+          throw new Error(`Error al confirmar la reserva: ${updateError.message}`);
+        }
+
+        // Crear registro en wallet_transactions para el uso de ToursRed Cash
+        if (toursRedCashUsed > 0) {
+          const { error: transactionError } = await supabase
+            .from('wallet_transactions')
+            .insert({
+              user_id: user?.id,
+              transaction_type: 'use',
+              amount: toursRedCashUsed,
+              booking_id: bookingId,
+              description: `Pago de reserva para ${tour?.name}`,
+            });
+
+          if (transactionError) {
+            console.error('Error registrando transacción de ToursRed Cash:', transactionError);
+          }
+        }
+
+        // Redirigir a la página de éxito
+        navigate(`/booking-success?booking_id=${bookingId}`);
+        return;
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`,
         {
