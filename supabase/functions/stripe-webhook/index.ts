@@ -287,11 +287,11 @@ Deno.serve(async (req) => {
               // Check if confirmation email was already sent to prevent duplicates
               const { data: bookingCheck } = await supabase
                 .from('bookings')
-                .select('confirmation_email_sent_at')
+                .select('confirmation_email_sent')
                 .eq('id', bookingId)
                 .single();
 
-              if (bookingCheck?.confirmation_email_sent_at) {
+              if (bookingCheck?.confirmation_email_sent) {
                 console.log(`⚠️ Confirmation email already sent for booking ${bookingId}, skipping...`);
               } else {
                 const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-booking-confirmation`, {
@@ -507,11 +507,11 @@ Deno.serve(async (req) => {
               // Check if confirmation email was already sent to prevent duplicates
               const { data: bookingCheck } = await supabase
                 .from('bookings')
-                .select('confirmation_email_sent_at')
+                .select('confirmation_email_sent')
                 .eq('id', bookingId)
                 .single();
 
-              if (bookingCheck?.confirmation_email_sent_at) {
+              if (bookingCheck?.confirmation_email_sent) {
                 console.log(`⚠️ Confirmation email already sent for booking ${bookingId}, skipping...`);
               } else {
                 const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-booking-confirmation`, {
