@@ -207,19 +207,33 @@ Deno.serve(async (req) => {
                   .single();
 
                 if (booking) {
-                  const { error: walletError } = await supabase.rpc('update_wallet_balance', {
-                    p_user_id: booking.user_id,
-                    p_amount: -toursRedCashUsed,
-                    p_type: 'debit',
-                    p_description: `Aplicado a reserva #${bookingId}`,
-                    p_reference_id: bookingId,
-                    p_reference_type: 'booking',
-                  });
+                  // Check if this transaction already exists to prevent duplicate deductions
+                  const { data: existingWalletTransaction } = await supabase
+                    .from('wallet_transactions')
+                    .select('id')
+                    .eq('user_id', booking.user_id)
+                    .eq('reference_id', bookingId)
+                    .eq('reference_type', 'booking')
+                    .eq('type', 'debit')
+                    .maybeSingle();
 
-                  if (walletError) {
-                    console.error(`Error deducting ToursRed Cash: ${walletError.message}`);
+                  if (existingWalletTransaction) {
+                    console.log(`⚠️ ToursRed Cash already deducted for booking ${bookingId}, skipping...`);
                   } else {
-                    console.log(`Successfully deducted ${toursRedCashUsed} MXN from user wallet`);
+                    const { error: walletError } = await supabase.rpc('update_wallet_balance', {
+                      p_user_id: booking.user_id,
+                      p_amount: -toursRedCashUsed,
+                      p_type: 'debit',
+                      p_description: `Aplicado a reserva #${bookingId}`,
+                      p_reference_id: bookingId,
+                      p_reference_type: 'booking',
+                    });
+
+                    if (walletError) {
+                      console.error(`Error deducting ToursRed Cash: ${walletError.message}`);
+                    } else {
+                      console.log(`Successfully deducted ${toursRedCashUsed} MXN from user wallet`);
+                    }
                   }
                 }
               } catch (walletErr) {
