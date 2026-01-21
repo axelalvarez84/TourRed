@@ -45,8 +45,13 @@ Deno.serve(async (req: Request) => {
     }
 
     const booking = (cancellation as any).bookings;
+    if (!booking) throw new Error('No se encontró la reserva');
+
     const tour = booking.tours;
+    if (!tour) throw new Error('No se encontró el tour');
+
     const user = booking.users;
+    if (!user || !user.email) throw new Error('No se encontró el usuario o email');
 
     const { data: wallet } = await supabase
       .from('toursred_cash_wallets')

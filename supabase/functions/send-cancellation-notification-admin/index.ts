@@ -46,9 +46,16 @@ Deno.serve(async (req: Request) => {
     }
 
     const booking = (cancellation as any).bookings;
+    if (!booking) throw new Error('No se encontró la reserva');
+
     const tour = booking.tours;
+    if (!tour) throw new Error('No se encontró el tour');
+
     const user = booking.users;
+    if (!user) throw new Error('No se encontró el usuario');
+
     const agency = booking.agencies;
+    if (!agency) throw new Error('No se encontró la agencia');
 
     const { data: emailSettings } = await supabase
       .from('email_settings')
