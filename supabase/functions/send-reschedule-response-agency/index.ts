@@ -331,51 +331,35 @@ Deno.serve(async (req: Request) => {
       `;
     }
 
-    const emailData = {
-      personalizations: [
-        {
-          to: [{ email: agencyEmail, name: agencyName }],
-          subject: subject,
-        },
-      ],
-      from: {
-        email: emailSettings.from_email,
-        name: emailSettings.from_name || "ToursRed",
-      },
-      content: [
-        {
-          type: "text/html",
-          value: htmlContent,
-        },
-      ],
-    };
-
-    console.log("\n🚀 ENVIANDO A SENDGRID...");
+    console.log("\n🚀 ENVIANDO CON SMTP2GO...");
     console.log("📧 Destinatario:", agencyEmail);
     console.log("📧 Asunto:", subject);
-    console.log("📧 API Key (primeros 10 chars):", emailSettings.smtp_api_key.substring(0, 10) + "...");
 
-    const emailResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    const emailResponse = await fetch("https://api.smtp2go.com/v3/email/send", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${emailSettings.smtp_api_key}`,
         "Content-Type": "application/json",
+        "X-Smtp2go-Api-Key": emailSettings.smtp_api_key,
       },
-      body: JSON.stringify(emailData),
+      body: JSON.stringify({
+        sender: emailSettings.contact_email,
+        to: [agencyEmail],
+        subject: subject,
+        html_body: htmlContent,
+      }),
     });
 
-    console.log("📧 SendGrid status:", emailResponse.status);
-    console.log("📧 SendGrid ok:", emailResponse.ok);
+    const emailResult = await emailResponse.json();
 
-    if (!emailResponse.ok) {
-      const errorText = await emailResponse.text();
-      console.error("❌ SendGrid error response:", errorText);
-      console.error("❌ SendGrid status:", emailResponse.status);
-      console.error("❌ Email data enviada:", JSON.stringify(emailData, null, 2));
-      throw new Error(`Failed to send email: ${emailResponse.status}`);
+    console.log("📧 SMTP2GO status:", emailResponse.status);
+    console.log("📧 SMTP2GO response:", emailResult);
+
+    if (!emailResponse.ok || emailResult.data?.error) {
+      console.error("❌ SMTP2GO error:", emailResult);
+      throw new Error(emailResult.data?.error || "Failed to send email");
     }
 
-    console.log("✅ Email enviado exitosamente a la agencia!");
+    console.log("✅✅✅ Email enviado exitosamente a la agencia!");
 
     return new Response(
       JSON.stringify({ success: true }),
