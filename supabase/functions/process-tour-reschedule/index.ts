@@ -52,7 +52,7 @@ Deno.serve(async (req: Request) => {
     // Obtener información del tour y verificar que pertenece a la agencia del usuario
     const { data: tour, error: tourError } = await supabase
       .from("tours")
-      .select("*, agency:agencies!tours_agency_id_fkey(id, user_id, name)")
+      .select("*, agency:agencies!tours_agency_id_fkey(id, user_id, name, contact_email)")
       .eq("id", tour_id)
       .single();
 
