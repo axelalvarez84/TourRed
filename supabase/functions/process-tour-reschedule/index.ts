@@ -102,14 +102,13 @@ Deno.serve(async (req: Request) => {
       throw new Error("Ya existe un reagendamiento activo para este tour");
     }
 
-    // Obtener todas las reservas activas del tour (confirmed o pending con aprobación)
+    // Obtener todas las reservas activas del tour (confirmed o pending, que no estén canceladas)
     const { data: activeBookings, error: bookingsError } = await supabase
       .from("bookings")
       .select("*, user:users!bookings_user_id_fkey(id, first_name, last_name, email)")
       .eq("tour_id", tour_id)
       .in("status", ["confirmed", "pending"])
-      .eq("is_no_show", false)
-      .neq("cancellation_type", "no_show");
+      .is("cancelled_at", null);
 
     if (bookingsError) {
       throw new Error("Error al obtener reservas");
