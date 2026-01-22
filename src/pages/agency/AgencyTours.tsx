@@ -583,16 +583,19 @@ const AgencyTours: React.FC = () => {
 
   const handleOpenReschedule = async (tour: Tour) => {
     const today = new Date();
-    const startDate = new Date(tour.start_date);
+    today.setHours(0, 0, 0, 0);
+
+    const startDate = new Date(tour.start_date + 'T00:00:00');
+    startDate.setHours(0, 0, 0, 0);
 
     if (startDate < today) {
       alert('No puedes reagendar un tour que ya ha iniciado o finalizado.');
       return;
     }
 
-    const hoursUntilStart = (startDate.getTime() - today.getTime()) / (1000 * 60 * 60);
-    if (hoursUntilStart < 48) {
-      alert('No puedes reagendar un tour con menos de 48 horas de anticipación.');
+    const daysUntilStart = Math.floor((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysUntilStart < 2) {
+      alert('No puedes reagendar un tour con menos de 48 horas (2 días) de anticipación.');
       return;
     }
 
