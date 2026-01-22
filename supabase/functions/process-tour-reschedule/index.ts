@@ -262,7 +262,7 @@ Deno.serve(async (req: Request) => {
         error: error.message || "Error al procesar el reagendamiento"
       }),
       {
-        status: 400,
+        status: 200,
         headers: {
           ...corsHeaders,
           "Content-Type": "application/json",
