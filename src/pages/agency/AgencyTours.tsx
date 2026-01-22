@@ -708,7 +708,15 @@ const AgencyTours: React.FC = () => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Edge function error:', error);
+        throw error;
+      }
+
+      if (data && !data.success) {
+        console.error('Function returned error:', data);
+        throw new Error(data.error || 'Error al procesar el reagendamiento');
+      }
 
       setRescheduleModal(prev => ({
         ...prev,
@@ -722,10 +730,11 @@ const AgencyTours: React.FC = () => {
       }, 2000);
     } catch (err: any) {
       console.error('Error rescheduling tour:', err);
+      const errorMessage = err.message || err.error || 'Error al procesar el reagendamiento';
       setRescheduleModal(prev => ({
         ...prev,
         isSubmitting: false,
-        error: err.message || 'Error al procesar el reagendamiento',
+        error: errorMessage,
       }));
     }
   };
