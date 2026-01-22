@@ -52,53 +52,35 @@ Deno.serve(async (req: Request) => {
       throw new Error("Invalid response value");
     }
 
-    // Obtener la reserva con información completa
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")
-      .select("*")
+      .select(`
+        *,
+        booking_code,
+        user:users!bookings_user_id_fkey(first_name, last_name, email),
+        tour:tours!bookings_tour_id_fkey(name, destination, start_date, end_date),
+        agency:agencies!bookings_agency_id_fkey(name, contact_email, contact_phone, user_id)
+      `)
       .eq("id", booking_id)
-      .maybeSingle();
+      .single();
 
     if (bookingError || !booking) {
       console.error("Booking error:", bookingError);
       throw new Error("Booking not found");
     }
 
-    // Obtener información adicional
-    const { data: tour } = await supabase
-      .from("tours")
-      .select("id, name, start_date, end_date")
-      .eq("id", booking.tour_id)
-      .maybeSingle();
+    console.log("✅ Booking encontrado:", booking.booking_code);
+    console.log("✅ Agencia:", booking.agency.name);
+    console.log("✅ Email agencia:", booking.agency.contact_email || "NO TIENE EMAIL");
 
-    const { data: agency } = await supabase
-      .from("agencies")
-      .select("id, name, commission_rate, user_id")
-      .eq("id", booking.agency_id)
-      .maybeSingle();
-
-    const { data: userInfo } = await supabase
-      .from("users")
-      .select("id, first_name, last_name, email")
-      .eq("id", booking.user_id)
-      .maybeSingle();
-
-    // Agregar la información al booking
-    booking.tour = tour;
-    booking.agency = agency;
-    booking.user = userInfo;
-
-    // Verificar que la reserva pertenece al usuario
     if (booking.user_id !== user.id) {
       throw new Error("No tienes permiso para responder a esta reserva");
     }
 
-    // Verificar que la reserva tiene un reagendamiento pendiente
     if (!booking.has_pending_reschedule) {
       throw new Error("Esta reserva no tiene un reagendamiento pendiente");
     }
 
-    // Obtener la respuesta de reagendamiento
     const { data: rescheduleResponse, error: responseError } = await supabase
       .from("booking_reschedule_responses")
       .select(`
@@ -113,13 +95,11 @@ Deno.serve(async (req: Request) => {
       throw new Error("No se encontró el reagendamiento pendiente");
     }
 
-    // Verificar que no haya expirado la fecha límite
     const deadline = new Date(rescheduleResponse.reschedule.response_deadline);
     if (deadline < new Date()) {
       throw new Error("La fecha límite para responder ha expirado");
     }
 
-    // Verificar que no haya respondido ya
     if (rescheduleResponse.response !== "pending") {
       throw new Error("Ya has respondido a este reagendamiento");
     }
@@ -127,9 +107,8 @@ Deno.serve(async (req: Request) => {
     const now = new Date().toISOString();
 
     if (response === "accepted") {
-      // ACEPTAR: Actualizar la reserva con la nueva fecha
+      console.log("💚 PROCESANDO ACEPTACIÓN...");
 
-      // Actualizar respuesta de reagendamiento
       await supabase
         .from("booking_reschedule_responses")
         .update({
@@ -138,7 +117,6 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", rescheduleResponse.id);
 
-      // Actualizar booking con nueva fecha
       await supabase
         .from("bookings")
         .update({
@@ -149,7 +127,6 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", booking_id);
 
-      // Crear notificaciones
       await supabase
         .from("notifications")
         .insert([
@@ -168,7 +145,7 @@ Deno.serve(async (req: Request) => {
             user_id: booking.agency.user_id,
             type: "booking_confirmed",
             title: "Reagendamiento Aceptado",
-            message: `${userInfo.first_name} ${userInfo.last_name} aceptó el reagendamiento del tour "${booking.tour.name}". La reserva continúa con la nueva fecha.`,
+            message: `${booking.user.first_name} ${booking.user.last_name} aceptó el reagendamiento del tour "${booking.tour.name}". La reserva continúa con la nueva fecha.`,
             data: {
               booking_id: booking_id,
               tour_id: booking.tour_id,
@@ -177,68 +154,70 @@ Deno.serve(async (req: Request) => {
           }
         ]);
 
-      // Enviar emails de confirmación
-      console.log("=== ENVIANDO EMAILS DE CONFIRMACIÓN ===");
+      console.log("\n🔥🔥🔥 ENVIANDO CORREOS 🔥🔥🔥\n");
 
-      const supabaseUrl = Deno.env.get("SUPABASE_URL");
-      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      const apiUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-      console.log("Supabase URL:", supabaseUrl);
-      console.log("Service Role Key disponible:", supabaseKey ? "SÍ" : "NO");
-
-      const serviceRoleClient = createClient(supabaseUrl!, supabaseKey!);
-
-      // Enviar email al viajero
-      console.log("\n[1/2] Enviando email de confirmación al viajero...");
-      console.log("Función: send-reschedule-response-confirmation");
-      console.log("Booking ID:", booking_id);
-
+      console.log("[1/2] 📧 Enviando email al VIAJERO...");
       try {
-        const travelerResult = await serviceRoleClient.functions.invoke("send-reschedule-response-confirmation", {
-          body: {
+        const travelerResponse = await fetch(`${apiUrl}/functions/v1/send-reschedule-response-confirmation`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
             booking_id: booking_id,
             response: "accepted"
-          }
+          })
         });
 
-        console.log("Resultado viajero:", JSON.stringify(travelerResult, null, 2));
+        const travelerResult = await travelerResponse.text();
+        console.log("Respuesta viajero:", travelerResult);
 
-        if (travelerResult.error) {
-          console.error("❌ ERROR en email al viajero:", travelerResult.error);
+        if (!travelerResponse.ok) {
+          console.error("❌ ERROR al enviar email al viajero:", travelerResponse.status, travelerResult);
         } else {
-          console.log("✅ Email al viajero enviado exitosamente");
+          console.log("✅ Email al viajero enviado");
         }
       } catch (err) {
-        console.error("❌ EXCEPCIÓN al enviar email al viajero:");
-        console.error(err);
+        console.error("❌ EXCEPCIÓN email viajero:", err);
       }
 
-      // Enviar email a la agencia
-      console.log("\n[2/2] Enviando email de confirmación a la agencia...");
-      console.log("Función: send-reschedule-response-agency");
-      console.log("Booking ID:", booking_id);
+      console.log("\n[2/2] 📧 Enviando email a la AGENCIA...");
+      console.log("Email destino:", booking.agency.contact_email);
 
-      try {
-        const agencyResult = await serviceRoleClient.functions.invoke("send-reschedule-response-agency", {
-          body: {
-            booking_id: booking_id,
-            response: "accepted"
+      if (!booking.agency.contact_email) {
+        console.error("❌❌❌ LA AGENCIA NO TIENE EMAIL CONFIGURADO ❌❌❌");
+      } else {
+        try {
+          const agencyResponse = await fetch(`${apiUrl}/functions/v1/send-reschedule-response-agency`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${serviceKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              booking_id: booking_id,
+              response: "accepted"
+            })
+          });
+
+          const agencyResult = await agencyResponse.text();
+          console.log("Respuesta agencia:", agencyResult);
+
+          if (!agencyResponse.ok) {
+            console.error("❌ ERROR al enviar email a agencia:", agencyResponse.status, agencyResult);
+          } else {
+            console.log("✅✅✅ EMAIL A LA AGENCIA ENVIADO ✅✅✅");
           }
-        });
-
-        console.log("Resultado agencia:", JSON.stringify(agencyResult, null, 2));
-
-        if (agencyResult.error) {
-          console.error("❌ ERROR en email a la agencia:", agencyResult.error);
-        } else {
-          console.log("✅ Email a la agencia enviado exitosamente");
+        } catch (err) {
+          console.error("❌ EXCEPCIÓN email agencia:", err);
         }
-      } catch (err) {
-        console.error("❌ EXCEPCIÓN al enviar email a la agencia:");
-        console.error(err);
       }
 
-      console.log("\n=== PROCESO DE EMAILS COMPLETADO ===");
+      console.log("\n🔥🔥🔥 PROCESO COMPLETADO 🔥🔥🔥\n");
 
       return new Response(
         JSON.stringify({
@@ -257,16 +236,12 @@ Deno.serve(async (req: Request) => {
       );
 
     } else if (response === "rejected") {
-      // RECHAZAR: Procesar reembolso 100% y cancelar la reserva
+      console.log("🔴 PROCESANDO RECHAZO...");
 
-      // Calcular monto de reembolso (100% del depósito pagado)
       const refundAmount = Number(booking.deposit_amount);
-
-      // Si usó ToursRed Cash, también se reembolsa
       const toursredCashUsed = Number(booking.toursred_cash_used || 0);
       const totalRefund = refundAmount + toursredCashUsed;
 
-      // Procesar reembolso a ToursRed Cash
       const { data: walletUpdate, error: walletError } = await supabase.rpc(
         "update_wallet_balance",
         {
@@ -285,7 +260,6 @@ Deno.serve(async (req: Request) => {
 
       const transactionId = walletUpdate;
 
-      // Actualizar respuesta de reagendamiento
       await supabase
         .from("booking_reschedule_responses")
         .update({
@@ -296,7 +270,6 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", rescheduleResponse.id);
 
-      // Actualizar booking como cancelado
       await supabase
         .from("bookings")
         .update({
@@ -310,22 +283,15 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", booking_id);
 
-      // Revertir comisiones - la agencia no recibe nada
-      const commissionRate = Number(booking.agency.commission_rate);
-      const agencyAmount = refundAmount * (1 - commissionRate);
-      const platformCommission = refundAmount * commissionRate;
-
-      // Actualizar commission_records
       await supabase
         .from("commission_records")
         .update({
           status: "disputed",
-          agency_net_amount: 0, // La agencia no recibe nada
-          platform_total_revenue: 0 // La plataforma tampoco
+          agency_net_amount: 0,
+          platform_total_revenue: 0
         })
         .eq("booking_id", booking_id);
 
-      // Crear notificaciones de reembolso
       await supabase
         .from("notifications")
         .insert([
@@ -345,7 +311,7 @@ Deno.serve(async (req: Request) => {
             user_id: booking.agency.user_id,
             type: "booking_cancelled",
             title: "Reagendamiento Rechazado",
-            message: `${userInfo.first_name} ${userInfo.last_name} rechazó el reagendamiento del tour "${booking.tour.name}". La reserva fue cancelada y se procesó el reembolso completo.`,
+            message: `${booking.user.first_name} ${booking.user.last_name} rechazó el reagendamiento del tour "${booking.tour.name}". La reserva fue cancelada y se procesó el reembolso completo.`,
             data: {
               booking_id: booking_id,
               tour_id: booking.tour_id,
@@ -354,68 +320,70 @@ Deno.serve(async (req: Request) => {
           }
         ]);
 
-      // Enviar emails de confirmación de reembolso
-      console.log("=== ENVIANDO EMAILS DE REEMBOLSO ===");
+      console.log("\n🔥🔥🔥 ENVIANDO CORREOS 🔥🔥🔥\n");
 
-      const supabaseUrl = Deno.env.get("SUPABASE_URL");
-      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      const apiUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-      console.log("Supabase URL:", supabaseUrl);
-      console.log("Service Role Key disponible:", supabaseKey ? "SÍ" : "NO");
-
-      const serviceRoleClient = createClient(supabaseUrl!, supabaseKey!);
-
-      // Enviar email al viajero
-      console.log("\n[1/2] Enviando email de reembolso al viajero...");
-      console.log("Función: send-reschedule-response-confirmation");
-      console.log("Booking ID:", booking_id);
-
+      console.log("[1/2] 📧 Enviando email al VIAJERO...");
       try {
-        const travelerResult = await serviceRoleClient.functions.invoke("send-reschedule-response-confirmation", {
-          body: {
+        const travelerResponse = await fetch(`${apiUrl}/functions/v1/send-reschedule-response-confirmation`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
             booking_id: booking_id,
             response: "rejected"
-          }
+          })
         });
 
-        console.log("Resultado viajero:", JSON.stringify(travelerResult, null, 2));
+        const travelerResult = await travelerResponse.text();
+        console.log("Respuesta viajero:", travelerResult);
 
-        if (travelerResult.error) {
-          console.error("❌ ERROR en email al viajero:", travelerResult.error);
+        if (!travelerResponse.ok) {
+          console.error("❌ ERROR al enviar email al viajero:", travelerResponse.status, travelerResult);
         } else {
-          console.log("✅ Email de reembolso al viajero enviado exitosamente");
+          console.log("✅ Email al viajero enviado");
         }
       } catch (err) {
-        console.error("❌ EXCEPCIÓN al enviar email al viajero:");
-        console.error(err);
+        console.error("❌ EXCEPCIÓN email viajero:", err);
       }
 
-      // Enviar email a la agencia
-      console.log("\n[2/2] Enviando email de rechazo a la agencia...");
-      console.log("Función: send-reschedule-response-agency");
-      console.log("Booking ID:", booking_id);
+      console.log("\n[2/2] 📧 Enviando email a la AGENCIA...");
+      console.log("Email destino:", booking.agency.contact_email);
 
-      try {
-        const agencyResult = await serviceRoleClient.functions.invoke("send-reschedule-response-agency", {
-          body: {
-            booking_id: booking_id,
-            response: "rejected"
+      if (!booking.agency.contact_email) {
+        console.error("❌❌❌ LA AGENCIA NO TIENE EMAIL CONFIGURADO ❌❌❌");
+      } else {
+        try {
+          const agencyResponse = await fetch(`${apiUrl}/functions/v1/send-reschedule-response-agency`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${serviceKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              booking_id: booking_id,
+              response: "rejected"
+            })
+          });
+
+          const agencyResult = await agencyResponse.text();
+          console.log("Respuesta agencia:", agencyResult);
+
+          if (!agencyResponse.ok) {
+            console.error("❌ ERROR al enviar email a agencia:", agencyResponse.status, agencyResult);
+          } else {
+            console.log("✅✅✅ EMAIL A LA AGENCIA ENVIADO ✅✅✅");
           }
-        });
-
-        console.log("Resultado agencia:", JSON.stringify(agencyResult, null, 2));
-
-        if (agencyResult.error) {
-          console.error("❌ ERROR en email a la agencia:", agencyResult.error);
-        } else {
-          console.log("✅ Email de rechazo a la agencia enviado exitosamente");
+        } catch (err) {
+          console.error("❌ EXCEPCIÓN email agencia:", err);
         }
-      } catch (err) {
-        console.error("❌ EXCEPCIÓN al enviar email a la agencia:");
-        console.error(err);
       }
 
-      console.log("\n=== PROCESO DE EMAILS DE REEMBOLSO COMPLETADO ===");
+      console.log("\n🔥🔥🔥 PROCESO COMPLETADO 🔥🔥🔥\n");
 
       return new Response(
         JSON.stringify({
@@ -436,7 +404,7 @@ Deno.serve(async (req: Request) => {
     }
 
   } catch (error: any) {
-    console.error("Error in respond-to-reschedule:", error);
+    console.error("❌❌❌ ERROR GENERAL:", error);
 
     return new Response(
       JSON.stringify({
