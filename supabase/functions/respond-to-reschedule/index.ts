@@ -287,7 +287,7 @@ Deno.serve(async (req: Request) => {
         error: error.message || "Error al procesar la respuesta"
       }),
       {
-        status: 400,
+        status: 200,
         headers: {
           ...corsHeaders,
           "Content-Type": "application/json",
