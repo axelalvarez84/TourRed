@@ -669,9 +669,9 @@ const TravelerBookings: React.FC = () => {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm text-gray-500">ID de Reserva</div>
-                      <div className="text-xs font-mono text-gray-600 break-all max-w-32">
-                        {booking.id}
+                      <div className="text-sm text-gray-500">Código de Reserva</div>
+                      <div className="text-lg font-bold text-blue-600 tracking-wide">
+                        {booking.booking_code}
                       </div>
                     </div>
                   </div>
@@ -882,8 +882,8 @@ const TravelerBookings: React.FC = () => {
                   <p className="text-gray-600">
                     {travelersModal.booking.tours?.name}
                   </p>
-                  <p className="text-sm text-gray-500">
-                    Reserva ID: {travelersModal.booking.id.substring(0, 8)}...
+                  <p className="text-sm text-gray-500 font-mono">
+                    Código de Reserva: {travelersModal.booking.booking_code}
                   </p>
                 </div>
                 <button

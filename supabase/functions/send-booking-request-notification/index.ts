@@ -130,14 +130,18 @@ Deno.serve(async (req: Request) => {
       <p>Has recibido una nueva solicitud de reserva que requiere tu aprobación.</p>
 
       <div class="section">
+        <div class="section-title">🎫 Código de Reserva</div>
+        <div style="background-color: #dcfce7; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px;">
+          <div style="font-size: 12px; color: #166534; margin-bottom: 5px;">Código de referencia</div>
+          <div style="font-size: 28px; font-weight: bold; color: #166534; letter-spacing: 2px;">${booking.booking_code}</div>
+        </div>
+      </div>
+
+      <div class="section">
         <div class="section-title">📍 Detalles de la Reserva</div>
         <div class="info-row">
           <span class="info-label">Tour:</span>
           <span class="info-value">${booking.tour.name}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">ID de Reserva:</span>
-          <span class="info-value">${booking.id}</span>
         </div>
         <div class="info-row">
           <span class="info-label">Fecha del Tour:</span>

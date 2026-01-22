@@ -183,6 +183,15 @@ Deno.serve(async (req: Request) => {
       <p>Tu pago ha sido procesado exitosamente. A continuación encontrarás los detalles de tu reserva:</p>
 
       <div class="section">
+        <div class="section-title">🎫 Código de Reserva</div>
+        <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px;">
+          <div style="font-size: 12px; color: #92400e; margin-bottom: 5px;">Tu código de referencia</div>
+          <div style="font-size: 28px; font-weight: bold; color: #92400e; letter-spacing: 2px;">${booking.booking_code}</div>
+          <div style="font-size: 12px; color: #92400e; margin-top: 5px;">Usa este código para cualquier consulta sobre tu reserva</div>
+        </div>
+      </div>
+
+      <div class="section">
         <div class="section-title">📍 Detalles del Tour</div>
         <div class="info-row">
           <span class="info-label">Tour:</span>
@@ -322,6 +331,15 @@ Deno.serve(async (req: Request) => {
       <p>Te informamos que se ha confirmado una nueva reserva para uno de tus tours:</p>
 
       <div class="section">
+        <div class="section-title">🎫 Código de Reserva</div>
+        <div style="background-color: #dcfce7; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px;">
+          <div style="font-size: 12px; color: #166534; margin-bottom: 5px;">Código de referencia</div>
+          <div style="font-size: 28px; font-weight: bold; color: #166534; letter-spacing: 2px;">${booking.booking_code}</div>
+          <div style="font-size: 12px; color: #166534; margin-top: 5px;">Usa este código para identificar esta reserva</div>
+        </div>
+      </div>
+
+      <div class="section">
         <div class="section-title">📍 Detalles del Tour</div>
         <div class="info-row">
           <span class="info-label">Tour:</span>
@@ -440,6 +458,14 @@ Deno.serve(async (req: Request) => {
       <div class="title">Resumen de Reserva Confirmada</div>
 
       <p>Se ha procesado una nueva reserva en la plataforma:</p>
+
+      <div class="section">
+        <div class="section-title">🎫 Código de Reserva</div>
+        <div style="background-color: #dbeafe; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px;">
+          <div style="font-size: 12px; color: #1e3a8a; margin-bottom: 5px;">Código de referencia</div>
+          <div style="font-size: 28px; font-weight: bold; color: #1e3a8a; letter-spacing: 2px;">${booking.booking_code}</div>
+        </div>
+      </div>
 
       <div class="section">
         <div class="section-title">📍 Detalles del Tour</div>

@@ -175,8 +175,8 @@ const BookingPendingPage: React.FC = () => {
                   <div className="flex items-start">
                     <div className="h-5 w-5 text-gray-400 mr-3 mt-1 text-sm font-bold">🎫</div>
                     <div>
-                      <div className="text-sm text-gray-500">ID de Solicitud</div>
-                      <div className="font-medium font-mono text-xs break-all">{booking.id}</div>
+                      <div className="text-sm text-gray-500">Código de Reserva</div>
+                      <div className="font-bold text-blue-600 text-lg tracking-wide">{booking.booking_code}</div>
                     </div>
                   </div>
                 </div>

@@ -650,6 +650,7 @@ export const getUserBookings = async (userId: string) => {
       .from('bookings')
       .select(`
         id,
+        booking_code,
         user_id,
         tour_id,
         agency_id,
@@ -777,6 +778,7 @@ export const getTourBookingReport = async (tourId: string, agencyId: string) => 
       .from('bookings')
       .select(`
         id,
+        booking_code,
         user_id,
         deposit_amount,
         total_price,

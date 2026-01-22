@@ -129,14 +129,18 @@ Deno.serve(async (req: Request) => {
       <p>Tu solicitud de reserva ha sido aprobada por <strong>${booking.agency.name}</strong>.</p>
 
       <div class="section">
+        <div class="section-title">🎫 Código de Reserva</div>
+        <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px;">
+          <div style="font-size: 12px; color: #92400e; margin-bottom: 5px;">Tu código de referencia</div>
+          <div style="font-size: 28px; font-weight: bold; color: #92400e; letter-spacing: 2px;">${booking.booking_code}</div>
+        </div>
+      </div>
+
+      <div class="section">
         <div class="section-title">📍 Detalles de tu Reserva</div>
         <div class="info-row">
           <span class="info-label">Tour:</span>
           <span class="info-value">${booking.tour.name}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">ID de Reserva:</span>
-          <span class="info-value">${booking.id}</span>
         </div>
         <div class="info-row">
           <span class="info-label">Fecha del Tour:</span>
@@ -211,14 +215,18 @@ Deno.serve(async (req: Request) => {
       <p>Lamentablemente, tu solicitud de reserva no pudo ser aprobada por <strong>${booking.agency.name}</strong>.</p>
 
       <div class="section">
+        <div class="section-title">🎫 Código de Reserva</div>
+        <div style="background-color: #fee2e2; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px;">
+          <div style="font-size: 12px; color: #991b1b; margin-bottom: 5px;">Código de referencia</div>
+          <div style="font-size: 28px; font-weight: bold; color: #991b1b; letter-spacing: 2px;">${booking.booking_code}</div>
+        </div>
+      </div>
+
+      <div class="section">
         <div class="section-title">📍 Detalles de la Reserva</div>
         <div class="info-row">
           <span class="info-label">Tour:</span>
           <span class="info-value">${booking.tour.name}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">ID de Reserva:</span>
-          <span class="info-value">${booking.id}</span>
         </div>
         <div class="info-row">
           <span class="info-label">Fecha del Tour:</span>

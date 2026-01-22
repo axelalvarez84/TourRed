@@ -845,9 +845,9 @@ const AgencyBookings: React.FC = () => {
                       </div>
                     </div>
                     <div className="text-right ml-4">
-                      <div className="text-sm text-gray-500">ID de Reserva</div>
-                      <div className="text-xs font-mono text-gray-600 break-all max-w-32">
-                        {booking.id}
+                      <div className="text-sm text-gray-500">Código de Reserva</div>
+                      <div className="text-lg font-bold text-blue-600 tracking-wide">
+                        {booking.booking_code}
                       </div>
                     </div>
                   </div>
@@ -1395,7 +1395,7 @@ const AgencyBookings: React.FC = () => {
                       <div className="flex-1 min-w-0">
                         <div className="text-sm text-gray-500 mb-1">Email</div>
                         <a
-                          href={`mailto:${contactModal.booking.users.email}?subject=Reserva ${contactModal.booking.id} - ${contactModal.booking.tours?.name}`}
+                          href={`mailto:${contactModal.booking.users.email}?subject=Reserva ${contactModal.booking.booking_code} - ${contactModal.booking.tours?.name}`}
                           className="text-primary-600 hover:text-primary-700 break-all"
                         >
                           {contactModal.booking.users.email}
@@ -1458,8 +1458,8 @@ const AgencyBookings: React.FC = () => {
                   <p className="text-gray-600">
                     {travelersModal.booking.tours?.name}
                   </p>
-                  <p className="text-sm text-gray-500">
-                    Reserva ID: {travelersModal.booking.id.substring(0, 8)}...
+                  <p className="text-sm text-gray-500 font-mono">
+                    Código de Reserva: {travelersModal.booking.booking_code}
                   </p>
                 </div>
                 <button

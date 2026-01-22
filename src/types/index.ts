@@ -128,6 +128,7 @@ export interface Tour {
 
 export interface Booking {
   id: string;
+  booking_code: string;
   user_id: string;
   tour_id: string;
   agency_id: string;
