@@ -83,10 +83,14 @@ const AdminAgencies: React.FC = () => {
           name,
           is_active,
           created_at,
-          phone,
-          whatsapp,
+          contact_phone,
+          contact_email,
+          website,
           rating,
           commission_rate,
+          description,
+          rfc,
+          razon_social,
           user_id,
           users(first_name, last_name, email, is_approved)
         `)

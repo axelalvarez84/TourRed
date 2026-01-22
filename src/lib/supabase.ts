@@ -302,8 +302,9 @@ export const getAllAgencies = async () => {
         name,
         is_active,
         created_at,
-        phone,
-        whatsapp,
+        contact_phone,
+        contact_email,
+        website,
         rating,
         commission_rate,
         users(first_name, last_name, email)
