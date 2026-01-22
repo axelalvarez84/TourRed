@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination, getTourCategories } from '../../lib/supabase';
-import { Plus, Search, X, Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy } from 'lucide-react';
+import { Plus, Search, X, Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle } from 'lucide-react';
 import { Tour, Destination, DeparturePoint } from '../../types';
 import { format } from 'date-fns';
 import ImageUploader from '../../components/ImageUploader';
@@ -42,6 +42,30 @@ const AgencyTours: React.FC = () => {
     start_date: '',
     end_date: '',
     booking_deadline: '',
+  });
+
+  const [rescheduleModal, setRescheduleModal] = useState<{
+    open: boolean;
+    tour: Tour | null;
+    activeBookingsCount: number;
+    isLoading: boolean;
+    isSubmitting: boolean;
+    error: string;
+    success: boolean;
+  }>({
+    open: false,
+    tour: null,
+    activeBookingsCount: 0,
+    isLoading: false,
+    isSubmitting: false,
+    error: '',
+    success: false,
+  });
+
+  const [rescheduleFormData, setRescheduleFormData] = useState({
+    new_start_date: '',
+    new_end_date: '',
+    reschedule_reason: '',
   });
 
   const [formData, setFormData] = useState({
@@ -554,6 +578,152 @@ const AgencyTours: React.FC = () => {
       setError(err.message || 'Error al duplicar el tour');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleOpenReschedule = async (tour: Tour) => {
+    const today = new Date();
+    const startDate = new Date(tour.start_date);
+
+    if (startDate < today) {
+      alert('No puedes reagendar un tour que ya ha iniciado o finalizado.');
+      return;
+    }
+
+    const hoursUntilStart = (startDate.getTime() - today.getTime()) / (1000 * 60 * 60);
+    if (hoursUntilStart < 48) {
+      alert('No puedes reagendar un tour con menos de 48 horas de anticipación.');
+      return;
+    }
+
+    setRescheduleModal({
+      open: true,
+      tour,
+      activeBookingsCount: 0,
+      isLoading: true,
+      isSubmitting: false,
+      error: '',
+      success: false,
+    });
+
+    const minNewDate = new Date();
+    minNewDate.setDate(minNewDate.getDate() + 7);
+
+    setRescheduleFormData({
+      new_start_date: minNewDate.toISOString().split('T')[0],
+      new_end_date: '',
+      reschedule_reason: '',
+    });
+
+    try {
+      const { count, error } = await supabase
+        .from('bookings')
+        .select('*', { count: 'exact', head: true })
+        .eq('tour_id', tour.id)
+        .in('status', ['confirmed', 'pending']);
+
+      if (error) throw error;
+
+      setRescheduleModal(prev => ({
+        ...prev,
+        activeBookingsCount: count || 0,
+        isLoading: false,
+      }));
+    } catch (err: any) {
+      console.error('Error loading bookings count:', err);
+      setRescheduleModal(prev => ({
+        ...prev,
+        error: 'Error al cargar el número de reservas',
+        isLoading: false,
+      }));
+    }
+  };
+
+  const handleCloseReschedule = () => {
+    setRescheduleModal({
+      open: false,
+      tour: null,
+      activeBookingsCount: 0,
+      isLoading: false,
+      isSubmitting: false,
+      error: '',
+      success: false,
+    });
+    setRescheduleFormData({
+      new_start_date: '',
+      new_end_date: '',
+      reschedule_reason: '',
+    });
+  };
+
+  const handleSubmitReschedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!rescheduleModal.tour || !user) return;
+
+    const today = new Date();
+    const newStartDate = new Date(rescheduleFormData.new_start_date);
+    const daysUntilNewStart = (newStartDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+
+    if (daysUntilNewStart < 7) {
+      setRescheduleModal(prev => ({
+        ...prev,
+        error: 'La nueva fecha debe ser al menos 7 días en el futuro',
+      }));
+      return;
+    }
+
+    if (rescheduleFormData.reschedule_reason.trim().length < 20) {
+      setRescheduleModal(prev => ({
+        ...prev,
+        error: 'El motivo del reagendamiento debe tener al menos 20 caracteres y ser descriptivo',
+      }));
+      return;
+    }
+
+    if (!rescheduleFormData.new_end_date) {
+      setRescheduleModal(prev => ({
+        ...prev,
+        error: 'Debe especificar la fecha de finalización',
+      }));
+      return;
+    }
+
+    setRescheduleModal(prev => ({
+      ...prev,
+      isSubmitting: true,
+      error: '',
+    }));
+
+    try {
+      const { data, error } = await supabase.functions.invoke('process-tour-reschedule', {
+        body: {
+          tour_id: rescheduleModal.tour.id,
+          new_start_date: rescheduleFormData.new_start_date,
+          new_end_date: rescheduleFormData.new_end_date,
+          reschedule_reason: rescheduleFormData.reschedule_reason.trim(),
+        },
+      });
+
+      if (error) throw error;
+
+      setRescheduleModal(prev => ({
+        ...prev,
+        isSubmitting: false,
+        success: true,
+      }));
+
+      setTimeout(() => {
+        handleCloseReschedule();
+        fetchAgencyTours();
+      }, 2000);
+    } catch (err: any) {
+      console.error('Error rescheduling tour:', err);
+      setRescheduleModal(prev => ({
+        ...prev,
+        isSubmitting: false,
+        error: err.message || 'Error al procesar el reagendamiento',
+      }));
     }
   };
 
@@ -1750,6 +1920,171 @@ const AgencyTours: React.FC = () => {
         </div>
       )}
 
+      {/* Modal de Reagendar Tour */}
+      {rescheduleModal.open && rescheduleModal.tour && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center mb-4">
+              <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center mr-3">
+                <CalendarX className="h-6 w-6 text-amber-600" />
+              </div>
+              <h2 className="text-xl font-semibold">Reagendar Tour</h2>
+            </div>
+
+            {rescheduleModal.success ? (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Reagendamiento Procesado
+                </h3>
+                <p className="text-gray-600">
+                  Se ha notificado a todos los viajeros sobre el cambio de fechas.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                  <h3 className="font-semibold text-blue-900 mb-2">{rescheduleModal.tour.name}</h3>
+                  <div className="text-sm text-blue-800 space-y-1">
+                    <p>
+                      <span className="font-medium">Fechas actuales:</span> {formatDate(rescheduleModal.tour.start_date)} - {formatDate(rescheduleModal.tour.end_date)}
+                    </p>
+                    <p>
+                      <span className="font-medium">Destino:</span> {rescheduleModal.tour.destination}
+                    </p>
+                  </div>
+                </div>
+
+                {rescheduleModal.isLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600"></div>
+                  </div>
+                ) : (
+                  <>
+                    {rescheduleModal.activeBookingsCount > 0 && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                        <div className="flex items-start">
+                          <AlertCircle className="h-5 w-5 text-amber-600 mr-2 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-amber-900">
+                              {rescheduleModal.activeBookingsCount} {rescheduleModal.activeBookingsCount === 1 ? 'viajero será notificado' : 'viajeros serán notificados'}
+                            </p>
+                            <p className="text-xs text-amber-800 mt-1">
+                              Los viajeros podrán aceptar las nuevas fechas o solicitar un reembolso completo (100%).
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {rescheduleModal.error && (
+                      <div className="bg-error-50 border border-error-200 rounded-lg p-4 mb-6">
+                        <p className="text-sm text-error-800">{rescheduleModal.error}</p>
+                      </div>
+                    )}
+
+                    <form onSubmit={handleSubmitReschedule} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Nueva Fecha de Inicio *
+                          </label>
+                          <input
+                            type="date"
+                            value={rescheduleFormData.new_start_date}
+                            onChange={(e) => setRescheduleFormData({ ...rescheduleFormData, new_start_date: e.target.value })}
+                            className="input"
+                            min={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                            required
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Debe ser al menos 7 días en el futuro
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Nueva Fecha de Fin *
+                          </label>
+                          <input
+                            type="date"
+                            value={rescheduleFormData.new_end_date}
+                            onChange={(e) => setRescheduleFormData({ ...rescheduleFormData, new_end_date: e.target.value })}
+                            className="input"
+                            min={rescheduleFormData.new_start_date}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Motivo del Reagendamiento *
+                        </label>
+                        <textarea
+                          value={rescheduleFormData.reschedule_reason}
+                          onChange={(e) => setRescheduleFormData({ ...rescheduleFormData, reschedule_reason: e.target.value })}
+                          className="input"
+                          rows={4}
+                          placeholder="Por ejemplo: Debido a condiciones climáticas adversas, hemos decidido reprogramar el tour para garantizar la seguridad y comodidad de todos los participantes..."
+                          minLength={20}
+                          required
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Mínimo 20 caracteres. Este mensaje será visible para los viajeros.
+                        </p>
+                      </div>
+
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <h4 className="font-medium text-gray-900 mb-2">Política de Reagendamiento</h4>
+                        <ul className="text-sm text-gray-600 space-y-1">
+                          <li>• Los viajeros tendrán 7 días para responder</li>
+                          <li>• Pueden aceptar las nuevas fechas sin costo adicional</li>
+                          <li>• O solicitar un reembolso completo (100%)</li>
+                          <li>• Se enviará una notificación por correo electrónico a cada viajero</li>
+                        </ul>
+                      </div>
+
+                      <div className="flex justify-end space-x-3 pt-4 border-t">
+                        <button
+                          type="button"
+                          onClick={handleCloseReschedule}
+                          className="btn btn-outline"
+                          disabled={rescheduleModal.isSubmitting}
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={rescheduleModal.isSubmitting}
+                          className="btn bg-amber-600 hover:bg-amber-700 text-white"
+                        >
+                          {rescheduleModal.isSubmitting ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                              Procesando...
+                            </>
+                          ) : (
+                            <>
+                              <CalendarX className="h-4 w-4 mr-2" />
+                              Confirmar Reagendamiento
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Lista de Tours */}
       {tours.length === 0 && !isLoading ? (
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
@@ -1844,6 +2179,14 @@ const AgencyTours: React.FC = () => {
                       disabled={isSubmitting || isCreating || editingTour || duplicatingTour}
                     >
                       <Edit className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleOpenReschedule(tour)}
+                      className="p-2 text-gray-400 hover:text-amber-600 transition-colors"
+                      title="Reagendar tour"
+                      disabled={isSubmitting || isCreating || editingTour || duplicatingTour || new Date(tour.start_date) < new Date()}
+                    >
+                      <CalendarX className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDuplicate(tour)}
