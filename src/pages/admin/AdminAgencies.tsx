@@ -193,36 +193,70 @@ const AdminAgencies: React.FC = () => {
       ));
 
       // Si se aprobó la agencia (pasó de no aprobado a aprobado), enviar email
+      console.log('🔍 Verificando si enviar email de aprobación...', {
+        newApprovalStatus,
+        currentApproval,
+        willSendEmail: newApprovalStatus && !currentApproval
+      });
+
       if (newApprovalStatus && !currentApproval) {
         try {
           const agency = agencies.find(a => a.user_id === userId);
+          console.log('🏢 Agencia encontrada:', agency ? `${agency.name} (${agency.contact_email})` : 'NO ENCONTRADA');
 
-          if (agency) {
-            const { data: { session } } = await supabase.auth.getSession();
-
-            if (session) {
-              console.log('📧 Enviando email de aprobación a la agencia...');
-              await fetch(
-                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-agency-approval`,
-                {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${session.access_token}`,
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    email: agency.contact_email,
-                    firstName: agency.users?.first_name || 'Estimado(a)',
-                    agencyName: agency.name,
-                  }),
-                }
-              );
-              console.log('✅ Email de aprobación enviado exitosamente');
-            }
+          if (!agency) {
+            console.error('❌ No se encontró la agencia con user_id:', userId);
+            return;
           }
-        } catch (emailError) {
-          console.error('Error enviando email de aprobación:', emailError);
-          // No detenemos el proceso si falla el envío del email
+
+          if (!agency.contact_email) {
+            console.error('❌ La agencia no tiene contact_email');
+            return;
+          }
+
+          const { data: { session } } = await supabase.auth.getSession();
+          console.log('🔐 Session obtenida:', session ? 'SÍ' : 'NO');
+
+          if (!session) {
+            console.error('❌ No hay sesión activa');
+            return;
+          }
+
+          console.log('📧 Enviando email de aprobación a:', {
+            email: agency.contact_email,
+            firstName: agency.users?.first_name || 'Estimado(a)',
+            agencyName: agency.name
+          });
+
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-agency-approval`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                email: agency.contact_email,
+                firstName: agency.users?.first_name || 'Estimado(a)',
+                agencyName: agency.name,
+              }),
+            }
+          );
+
+          console.log('📬 Respuesta del servidor:', response.status);
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error('❌ Error en la respuesta:', errorData);
+            throw new Error(`Error ${response.status}: ${JSON.stringify(errorData)}`);
+          }
+
+          const result = await response.json();
+          console.log('✅ Email de aprobación enviado exitosamente:', result);
+        } catch (emailError: any) {
+          console.error('❌ Error enviando email de aprobación:', emailError);
+          console.error('Stack:', emailError.stack);
         }
       }
 
