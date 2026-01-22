@@ -46,18 +46,38 @@ Deno.serve(async (req: Request) => {
     // Obtener la reserva con información completa
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")
-      .select(`
-        *,
-        user:users(id, first_name, last_name, email),
-        tour:tours(id, name, start_date, end_date),
-        agency:agencies(id, name, commission_rate)
-      `)
+      .select("*")
       .eq("id", booking_id)
-      .single();
+      .maybeSingle();
 
     if (bookingError || !booking) {
+      console.error("Booking error:", bookingError);
       throw new Error("Booking not found");
     }
+
+    // Obtener información adicional
+    const { data: tour } = await supabase
+      .from("tours")
+      .select("id, name, start_date, end_date")
+      .eq("id", booking.tour_id)
+      .maybeSingle();
+
+    const { data: agency } = await supabase
+      .from("agencies")
+      .select("id, name, commission_rate")
+      .eq("id", booking.agency_id)
+      .maybeSingle();
+
+    const { data: userInfo } = await supabase
+      .from("users")
+      .select("id, first_name, last_name, email")
+      .eq("id", booking.user_id)
+      .maybeSingle();
+
+    // Agregar la información al booking
+    booking.tour = tour;
+    booking.agency = agency;
+    booking.user = userInfo;
 
     // Verificar que la reserva pertenece al usuario
     if (booking.user_id !== user.id) {
