@@ -169,17 +169,21 @@ Deno.serve(async (req: Request) => {
         ]);
 
       // Enviar emails de confirmación
-      console.log("🔔 Iniciando envío de emails de confirmación...");
-      console.log("📧 Email 1: Viajero");
-      console.log("📧 Email 2: Agencia");
+      console.log("=== ENVIANDO EMAILS DE CONFIRMACIÓN ===");
 
-      const serviceRoleClient = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-      );
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+      console.log("Supabase URL:", supabaseUrl);
+      console.log("Service Role Key disponible:", supabaseKey ? "SÍ" : "NO");
+
+      const serviceRoleClient = createClient(supabaseUrl!, supabaseKey!);
 
       // Enviar email al viajero
-      console.log("📤 Enviando email al viajero...");
+      console.log("\n[1/2] Enviando email de confirmación al viajero...");
+      console.log("Función: send-reschedule-response-confirmation");
+      console.log("Booking ID:", booking_id);
+
       try {
         const travelerResult = await serviceRoleClient.functions.invoke("send-reschedule-response-confirmation", {
           body: {
@@ -188,17 +192,23 @@ Deno.serve(async (req: Request) => {
           }
         });
 
+        console.log("Resultado viajero:", JSON.stringify(travelerResult, null, 2));
+
         if (travelerResult.error) {
-          console.error("❌ Error en email al viajero:", travelerResult.error);
+          console.error("❌ ERROR en email al viajero:", travelerResult.error);
         } else {
           console.log("✅ Email al viajero enviado exitosamente");
         }
       } catch (err) {
-        console.error("❌ Excepción al enviar email al viajero:", err);
+        console.error("❌ EXCEPCIÓN al enviar email al viajero:");
+        console.error(err);
       }
 
       // Enviar email a la agencia
-      console.log("📤 Enviando email a la agencia...");
+      console.log("\n[2/2] Enviando email de confirmación a la agencia...");
+      console.log("Función: send-reschedule-response-agency");
+      console.log("Booking ID:", booking_id);
+
       try {
         const agencyResult = await serviceRoleClient.functions.invoke("send-reschedule-response-agency", {
           body: {
@@ -207,16 +217,19 @@ Deno.serve(async (req: Request) => {
           }
         });
 
+        console.log("Resultado agencia:", JSON.stringify(agencyResult, null, 2));
+
         if (agencyResult.error) {
-          console.error("❌ Error en email a la agencia:", agencyResult.error);
+          console.error("❌ ERROR en email a la agencia:", agencyResult.error);
         } else {
           console.log("✅ Email a la agencia enviado exitosamente");
         }
       } catch (err) {
-        console.error("❌ Excepción al enviar email a la agencia:", err);
+        console.error("❌ EXCEPCIÓN al enviar email a la agencia:");
+        console.error(err);
       }
 
-      console.log("✅ Proceso de envío de emails completado");
+      console.log("\n=== PROCESO DE EMAILS COMPLETADO ===");
 
       return new Response(
         JSON.stringify({
@@ -333,17 +346,21 @@ Deno.serve(async (req: Request) => {
         ]);
 
       // Enviar emails de confirmación de reembolso
-      console.log("🔔 Iniciando envío de emails de reembolso...");
-      console.log("📧 Email 1: Viajero");
-      console.log("📧 Email 2: Agencia");
+      console.log("=== ENVIANDO EMAILS DE REEMBOLSO ===");
 
-      const serviceRoleClient = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-      );
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+      console.log("Supabase URL:", supabaseUrl);
+      console.log("Service Role Key disponible:", supabaseKey ? "SÍ" : "NO");
+
+      const serviceRoleClient = createClient(supabaseUrl!, supabaseKey!);
 
       // Enviar email al viajero
-      console.log("📤 Enviando email de reembolso al viajero...");
+      console.log("\n[1/2] Enviando email de reembolso al viajero...");
+      console.log("Función: send-reschedule-response-confirmation");
+      console.log("Booking ID:", booking_id);
+
       try {
         const travelerResult = await serviceRoleClient.functions.invoke("send-reschedule-response-confirmation", {
           body: {
@@ -352,17 +369,23 @@ Deno.serve(async (req: Request) => {
           }
         });
 
+        console.log("Resultado viajero:", JSON.stringify(travelerResult, null, 2));
+
         if (travelerResult.error) {
-          console.error("❌ Error en email al viajero:", travelerResult.error);
+          console.error("❌ ERROR en email al viajero:", travelerResult.error);
         } else {
           console.log("✅ Email de reembolso al viajero enviado exitosamente");
         }
       } catch (err) {
-        console.error("❌ Excepción al enviar email al viajero:", err);
+        console.error("❌ EXCEPCIÓN al enviar email al viajero:");
+        console.error(err);
       }
 
       // Enviar email a la agencia
-      console.log("📤 Enviando email de rechazo a la agencia...");
+      console.log("\n[2/2] Enviando email de rechazo a la agencia...");
+      console.log("Función: send-reschedule-response-agency");
+      console.log("Booking ID:", booking_id);
+
       try {
         const agencyResult = await serviceRoleClient.functions.invoke("send-reschedule-response-agency", {
           body: {
@@ -371,16 +394,19 @@ Deno.serve(async (req: Request) => {
           }
         });
 
+        console.log("Resultado agencia:", JSON.stringify(agencyResult, null, 2));
+
         if (agencyResult.error) {
-          console.error("❌ Error en email a la agencia:", agencyResult.error);
+          console.error("❌ ERROR en email a la agencia:", agencyResult.error);
         } else {
           console.log("✅ Email de rechazo a la agencia enviado exitosamente");
         }
       } catch (err) {
-        console.error("❌ Excepción al enviar email a la agencia:", err);
+        console.error("❌ EXCEPCIÓN al enviar email a la agencia:");
+        console.error(err);
       }
 
-      console.log("✅ Proceso de envío de emails de reembolso completado");
+      console.log("\n=== PROCESO DE EMAILS DE REEMBOLSO COMPLETADO ===");
 
       return new Response(
         JSON.stringify({
