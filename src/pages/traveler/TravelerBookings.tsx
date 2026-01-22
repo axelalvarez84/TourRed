@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X, Edit, UserCheck, XCircle } from 'lucide-react';
+import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X, Edit, UserCheck, XCircle, CalendarX, Check, Wallet } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getUserBookings, parseDateFromDB, supabase, calculateCancellationPolicy, processCancellation } from '../../lib/supabase';
-import { Booking } from '../../types';
+import { Booking, PendingReschedule } from '../../types';
 import { format } from 'date-fns';
 import { Link, useNavigate } from 'react-router-dom';
 import ReviewForm from '../../components/ReviewForm';
@@ -57,6 +57,26 @@ const TravelerBookings: React.FC = () => {
     toursRedCashToUse: 0,
     isProcessing: false,
   });
+  const [rescheduleModal, setRescheduleModal] = useState<{
+    open: boolean;
+    booking: Booking | null;
+    rescheduleInfo: PendingReschedule | null;
+    isLoading: boolean;
+    isProcessing: boolean;
+    error: string;
+    success: boolean;
+    action: 'accept' | 'reject' | null;
+  }>({
+    open: false,
+    booking: null,
+    rescheduleInfo: null,
+    isLoading: false,
+    isProcessing: false,
+    error: '',
+    success: false,
+    action: null,
+  });
+  const [pendingReschedules, setPendingReschedules] = useState<{ [bookingId: string]: PendingReschedule }>({});
 
   useEffect(() => {
     if (user?.id) {
@@ -82,11 +102,121 @@ const TravelerBookings: React.FC = () => {
       console.log('✅ Reservas cargadas:', data);
       setBookings(data || []);
 
+      // Load pending reschedules for bookings that have them
+      if (data && data.length > 0) {
+        await loadPendingReschedules(data);
+      }
+
     } catch (err: any) {
       console.error('❌ Error cargando reservas:', err);
       setError(err.message || 'Error al cargar las reservas');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadPendingReschedules = async (bookingsList: Booking[]) => {
+    const reschedules: { [bookingId: string]: PendingReschedule } = {};
+
+    for (const booking of bookingsList) {
+      if (booking.has_pending_reschedule) {
+        try {
+          const { data, error } = await supabase.rpc('get_pending_reschedule_for_booking', {
+            p_booking_id: booking.id
+          });
+
+          if (!error && data) {
+            reschedules[booking.id] = data;
+          }
+        } catch (err) {
+          console.error(`Error loading reschedule for booking ${booking.id}:`, err);
+        }
+      }
+    }
+
+    setPendingReschedules(reschedules);
+  };
+
+  const handleOpenRescheduleModal = (booking: Booking, action: 'accept' | 'reject') => {
+    const rescheduleInfo = pendingReschedules[booking.id];
+
+    if (!rescheduleInfo) {
+      alert('No se encontró información del reagendamiento');
+      return;
+    }
+
+    setRescheduleModal({
+      open: true,
+      booking,
+      rescheduleInfo,
+      isLoading: false,
+      isProcessing: false,
+      error: '',
+      success: false,
+      action,
+    });
+  };
+
+  const handleCloseRescheduleModal = () => {
+    setRescheduleModal({
+      open: false,
+      booking: null,
+      rescheduleInfo: null,
+      isLoading: false,
+      isProcessing: false,
+      error: '',
+      success: false,
+      action: null,
+    });
+  };
+
+  const handleRespondToReschedule = async () => {
+    if (!rescheduleModal.booking || !rescheduleModal.action) return;
+
+    setRescheduleModal(prev => ({
+      ...prev,
+      isProcessing: true,
+      error: '',
+    }));
+
+    try {
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+
+      const { data, error } = await supabase.functions.invoke('respond-to-reschedule', {
+        body: {
+          booking_id: rescheduleModal.booking.id,
+          response: rescheduleModal.action
+        },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        setRescheduleModal(prev => ({
+          ...prev,
+          isProcessing: false,
+          success: true,
+        }));
+
+        await fetchBookings();
+
+        setTimeout(() => {
+          handleCloseRescheduleModal();
+        }, 3000);
+      } else {
+        throw new Error(data?.error || 'Error al procesar la respuesta');
+      }
+    } catch (err: any) {
+      console.error('Error responding to reschedule:', err);
+      setRescheduleModal(prev => ({
+        ...prev,
+        isProcessing: false,
+        error: err.message || 'Error al procesar la respuesta',
+      }));
     }
   };
 
@@ -798,6 +928,93 @@ const TravelerBookings: React.FC = () => {
                     )}
                   </div>
 
+                  {/* Reschedule Banner */}
+                  {booking.has_pending_reschedule && pendingReschedules[booking.id] && (
+                    <div className="mt-4 p-4 bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-400 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <CalendarX className="h-6 w-6 text-orange-600 flex-shrink-0 mt-1" />
+                        <div className="flex-1">
+                          <h4 className="font-bold text-orange-900 text-lg mb-2">⚠️ Tour Reagendado - Respuesta Requerida</h4>
+                          <p className="text-sm text-orange-800 mb-3">
+                            <strong>Motivo:</strong> {pendingReschedules[booking.id].reschedule.reason}
+                          </p>
+
+                          <div className="grid grid-cols-2 gap-4 mb-4 bg-white/50 p-3 rounded-md">
+                            <div>
+                              <div className="text-xs text-gray-600 mb-1">Fecha Original:</div>
+                              <div className="font-semibold text-gray-900 line-through">
+                                {formatDate(pendingReschedules[booking.id].reschedule.original_start_date)}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-600 mb-1">Nueva Fecha:</div>
+                              <div className="font-semibold text-green-700">
+                                {formatDate(pendingReschedules[booking.id].reschedule.new_start_date)}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
+                            <p className="text-xs text-yellow-900">
+                              <strong>Fecha límite para responder:</strong>{' '}
+                              {formatFullDate(pendingReschedules[booking.id].reschedule.response_deadline)}
+                            </p>
+                            <p className="text-xs text-yellow-800 mt-1">
+                              Si no respondes antes de esta fecha, se aceptará automáticamente la nueva fecha.
+                            </p>
+                          </div>
+
+                          <div className="flex gap-3">
+                            <button
+                              onClick={() => handleOpenRescheduleModal(booking, 'accept')}
+                              className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors"
+                            >
+                              <Check className="h-4 w-4" />
+                              Acepto Nueva Fecha
+                            </button>
+                            <button
+                              onClick={() => handleOpenRescheduleModal(booking, 'reject')}
+                              className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors"
+                            >
+                              <X className="h-4 w-4" />
+                              No Puedo Asistir
+                            </button>
+                          </div>
+
+                          <p className="text-xs text-gray-600 mt-3 italic">
+                            💰 Si no puedes asistir, recibirás un reembolso del 100% sin penalización en tu monedero ToursRed Cash.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Reschedule Response Status */}
+                  {booking.reschedule_response && (
+                    <div className={`mt-4 p-3 rounded-md border ${
+                      booking.reschedule_response === 'accepted' ? 'bg-green-50 border-green-200' :
+                      booking.reschedule_response === 'rejected' ? 'bg-red-50 border-red-200' :
+                      'bg-blue-50 border-blue-200'
+                    }`}>
+                      <p className={`text-sm ${
+                        booking.reschedule_response === 'accepted' ? 'text-green-800' :
+                        booking.reschedule_response === 'rejected' ? 'text-red-800' :
+                        'text-blue-800'
+                      }`}>
+                        <strong>
+                          {booking.reschedule_response === 'accepted' && '✓ Has aceptado la nueva fecha'}
+                          {booking.reschedule_response === 'rejected' && '✗ Rechazaste el reagendamiento y recibiste reembolso'}
+                          {booking.reschedule_response === 'auto_accepted' && '↻ La nueva fecha fue aceptada automáticamente'}
+                        </strong>
+                        {booking.reschedule_responded_at && (
+                          <span className="block mt-1 text-xs">
+                            Fecha de respuesta: {formatDate(booking.reschedule_responded_at)}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Important Notes */}
                   {(booking as any).is_no_show && (
                     <div className="mt-4 p-3 bg-gray-900 border border-gray-800 rounded-md">
@@ -1347,6 +1564,217 @@ const TravelerBookings: React.FC = () => {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reschedule Modal */}
+      {rescheduleModal.open && rescheduleModal.booking && rescheduleModal.rescheduleInfo && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {!rescheduleModal.success ? (
+                <>
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="flex items-start gap-4">
+                      <div className={`p-3 rounded-full ${
+                        rescheduleModal.action === 'accept' ? 'bg-green-100' : 'bg-red-100'
+                      }`}>
+                        {rescheduleModal.action === 'accept' ? (
+                          <Check className={`h-8 w-8 text-green-600`} />
+                        ) : (
+                          <X className={`h-8 w-8 text-red-600`} />
+                        )}
+                      </div>
+                      <div>
+                        <h2 className={`text-2xl font-bold mb-2 ${
+                          rescheduleModal.action === 'accept' ? 'text-green-900' : 'text-red-900'
+                        }`}>
+                          {rescheduleModal.action === 'accept' ? 'Aceptar Nueva Fecha' : 'Rechazar Reagendamiento'}
+                        </h2>
+                        <p className="text-gray-600">{rescheduleModal.booking.tours?.name}</p>
+                        <p className="text-sm text-gray-500 font-mono">
+                          Código: {rescheduleModal.booking.booking_code}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleCloseRescheduleModal}
+                      className="text-gray-400 hover:text-gray-600"
+                      disabled={rescheduleModal.isProcessing}
+                    >
+                      <X className="h-6 w-6" />
+                    </button>
+                  </div>
+
+                  {/* Date Comparison */}
+                  <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-sm text-gray-600 mb-2">Fecha Original</div>
+                        <div className="font-semibold text-gray-900 line-through">
+                          {formatFullDate(rescheduleModal.rescheduleInfo.reschedule.original_start_date)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-600 mb-2">Nueva Fecha</div>
+                        <div className="font-semibold text-green-700">
+                          {formatFullDate(rescheduleModal.rescheduleInfo.reschedule.new_start_date)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Reason */}
+                  <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+                    <h3 className="font-semibold text-blue-900 mb-2">Motivo del cambio:</h3>
+                    <p className="text-sm text-blue-800">
+                      {rescheduleModal.rescheduleInfo.reschedule.reason}
+                    </p>
+                  </div>
+
+                  {/* Action-specific information */}
+                  {rescheduleModal.action === 'accept' ? (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                      <h3 className="font-semibold text-green-900 mb-3">✓ Al aceptar la nueva fecha:</h3>
+                      <ul className="space-y-2 text-sm text-green-800">
+                        <li className="flex items-start gap-2">
+                          <Check className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          <span>Tu reserva se actualizará automáticamente con la nueva fecha</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Check className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          <span>No hay cargos adicionales, tu pago sigue siendo válido</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Check className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          <span>Recibirás un email de confirmación con los nuevos detalles</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Check className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          <span>No necesitas realizar ninguna acción adicional</span>
+                        </li>
+                      </ul>
+                    </div>
+                  ) : (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                      <h3 className="font-semibold text-red-900 mb-3">💰 Al rechazar el reagendamiento:</h3>
+                      <ul className="space-y-2 text-sm text-red-800">
+                        <li className="flex items-start gap-2">
+                          <DollarSign className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                          <span>
+                            Recibirás un <strong>reembolso del 100%</strong> de tu depósito (
+                            ${rescheduleModal.booking.deposit_amount?.toLocaleString()} MXN)
+                          </span>
+                        </li>
+                        {Number(rescheduleModal.booking.toursred_cash_used || 0) > 0 && (
+                          <li className="flex items-start gap-2">
+                            <DollarSign className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                            <span>
+                              También se reembolsará el ToursRed Cash utilizado (
+                              ${Number(rescheduleModal.booking.toursred_cash_used).toLocaleString()} MXN)
+                            </span>
+                          </li>
+                        )}
+                        <li className="flex items-start gap-2">
+                          <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                          <span>
+                            <strong>No hay penalización</strong> por rechazar debido al reagendamiento de la agencia
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Wallet className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                          <span>
+                            El reembolso se depositará en tu monedero ToursRed Cash y podrás usarlo en futuras reservas
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <XCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                          <span>Tu reserva será cancelada automáticamente</span>
+                        </li>
+                      </ul>
+                    </div>
+                  )}
+
+                  {rescheduleModal.error && (
+                    <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-red-800">{rescheduleModal.error}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                    <button
+                      onClick={handleCloseRescheduleModal}
+                      className="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-semibold disabled:opacity-50"
+                      disabled={rescheduleModal.isProcessing}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleRespondToReschedule}
+                      className={`flex-1 px-6 py-3 rounded-lg text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                        rescheduleModal.action === 'accept'
+                          ? 'bg-green-600 hover:bg-green-700'
+                          : 'bg-red-600 hover:bg-red-700'
+                      }`}
+                      disabled={rescheduleModal.isProcessing}
+                    >
+                      {rescheduleModal.isProcessing ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                          <span>Procesando...</span>
+                        </>
+                      ) : rescheduleModal.action === 'accept' ? (
+                        <>
+                          <Check className="h-5 w-5" />
+                          <span>Confirmar: Acepto Nueva Fecha</span>
+                        </>
+                      ) : (
+                        <>
+                          <X className="h-5 w-5" />
+                          <span>Confirmar: Solicitar Reembolso</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-12">
+                  <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full mb-6 ${
+                    rescheduleModal.action === 'accept' ? 'bg-green-100' : 'bg-blue-100'
+                  }`}>
+                    {rescheduleModal.action === 'accept' ? (
+                      <Check className="h-10 w-10 text-green-600" />
+                    ) : (
+                      <DollarSign className="h-10 w-10 text-blue-600" />
+                    )}
+                  </div>
+
+                  <h3 className={`text-2xl font-bold mb-3 ${
+                    rescheduleModal.action === 'accept' ? 'text-green-600' : 'text-blue-600'
+                  }`}>
+                    {rescheduleModal.action === 'accept' ? '¡Nueva Fecha Aceptada!' : '¡Reembolso Procesado!'}
+                  </h3>
+
+                  <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                    {rescheduleModal.action === 'accept'
+                      ? 'Tu reserva ha sido actualizada exitosamente con la nueva fecha. Recibirás un email de confirmación.'
+                      : 'Tu reembolso ha sido procesado y depositado en tu monedero ToursRed Cash. Recibirás un email con los detalles.'}
+                  </p>
+
+                  <div className="bg-gray-50 rounded-lg p-4 max-w-md mx-auto">
+                    <p className="text-sm text-gray-600">
+                      {rescheduleModal.action === 'accept'
+                        ? `Nueva fecha del tour: ${formatFullDate(rescheduleModal.rescheduleInfo.reschedule.new_start_date)}`
+                        : 'Puedes ver tu nuevo saldo en la sección de ToursRed Cash'}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

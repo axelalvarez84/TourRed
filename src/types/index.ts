@@ -160,6 +160,10 @@ export interface Booking {
   count_mascotas?: number;
   booking_approval_type?: 'automatic' | 'manual';
   toursred_cash_used?: number;
+  has_pending_reschedule?: boolean;
+  reschedule_response?: 'accepted' | 'rejected' | 'auto_accepted';
+  reschedule_responded_at?: string;
+  original_booking_date?: string;
 }
 
 export interface BookingTraveler {
@@ -188,7 +192,7 @@ export interface FrequentCompanion {
 export interface Notification {
   id: string;
   user_id: string;
-  type: 'booking_pending_approval' | 'booking_approved' | 'booking_rejected' | 'booking_confirmed' | 'booking_cancelled' | 'message_received' | 'tour_updated' | 'system_announcement';
+  type: 'booking_pending_approval' | 'booking_approved' | 'booking_rejected' | 'booking_confirmed' | 'booking_cancelled' | 'message_received' | 'tour_updated' | 'system_announcement' | 'tour_rescheduled';
   title: string;
   message: string;
   data?: any;
@@ -309,4 +313,58 @@ export interface TravelerCategory {
   categoria: 'infante' | 'nino' | 'adulto' | 'adulto_mayor';
   cantidad: number;
   precio: number;
+}
+
+export interface TourReschedule {
+  id: string;
+  tour_id: string;
+  agency_id: string;
+  original_start_date: string;
+  original_end_date: string;
+  new_start_date: string;
+  new_end_date: string;
+  reason: string;
+  created_by: string;
+  affected_bookings_count: number;
+  status: 'pending_responses' | 'completed' | 'cancelled';
+  response_deadline: string;
+  created_at: string;
+}
+
+export interface BookingRescheduleResponse {
+  id: string;
+  tour_reschedule_id: string;
+  booking_id: string;
+  user_id: string;
+  response: 'pending' | 'accepted' | 'rejected' | 'auto_accepted';
+  responded_at?: string;
+  refund_processed: boolean;
+  refund_transaction_id?: string;
+  notification_sent: boolean;
+  email_sent: boolean;
+  reminder_sent_at?: string;
+  created_at: string;
+  reschedule?: TourReschedule;
+}
+
+export interface PendingReschedule {
+  reschedule: {
+    id: string;
+    tour_id: string;
+    tour_name: string;
+    original_start_date: string;
+    original_end_date: string;
+    new_start_date: string;
+    new_end_date: string;
+    reason: string;
+    response_deadline: string;
+    created_at: string;
+  };
+  response: {
+    id: string;
+    response: string;
+    responded_at?: string;
+    notification_sent: boolean;
+    email_sent: boolean;
+  };
 }
