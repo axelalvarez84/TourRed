@@ -168,43 +168,55 @@ Deno.serve(async (req: Request) => {
           }
         ]);
 
-      // Enviar emails de confirmación usando service role client
+      // Enviar emails de confirmación
+      console.log("🔔 Iniciando envío de emails de confirmación...");
+      console.log("📧 Email 1: Viajero");
+      console.log("📧 Email 2: Agencia");
+
       const serviceRoleClient = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
       );
 
+      // Enviar email al viajero
+      console.log("📤 Enviando email al viajero...");
       try {
-        const emailPromises = [
-          serviceRoleClient.functions.invoke("send-reschedule-response-confirmation", {
-            body: {
-              booking_id: booking_id,
-              response: "accepted"
-            }
-          }),
-          serviceRoleClient.functions.invoke("send-reschedule-response-agency", {
-            body: {
-              booking_id: booking_id,
-              response: "accepted"
-            }
-          })
-        ];
-
-        const results = await Promise.allSettled(emailPromises);
-
-        results.forEach((result, index) => {
-          const functionName = index === 0 ? "send-reschedule-response-confirmation" : "send-reschedule-response-agency";
-          if (result.status === "rejected") {
-            console.error(`Error sending email via ${functionName}:`, result.reason);
-          } else if (result.value.error) {
-            console.error(`Error response from ${functionName}:`, result.value.error);
-          } else {
-            console.log(`✅ Email sent successfully via ${functionName}`);
+        const travelerResult = await serviceRoleClient.functions.invoke("send-reschedule-response-confirmation", {
+          body: {
+            booking_id: booking_id,
+            response: "accepted"
           }
         });
-      } catch (emailErr) {
-        console.error("Error sending confirmation emails:", emailErr);
+
+        if (travelerResult.error) {
+          console.error("❌ Error en email al viajero:", travelerResult.error);
+        } else {
+          console.log("✅ Email al viajero enviado exitosamente");
+        }
+      } catch (err) {
+        console.error("❌ Excepción al enviar email al viajero:", err);
       }
+
+      // Enviar email a la agencia
+      console.log("📤 Enviando email a la agencia...");
+      try {
+        const agencyResult = await serviceRoleClient.functions.invoke("send-reschedule-response-agency", {
+          body: {
+            booking_id: booking_id,
+            response: "accepted"
+          }
+        });
+
+        if (agencyResult.error) {
+          console.error("❌ Error en email a la agencia:", agencyResult.error);
+        } else {
+          console.log("✅ Email a la agencia enviado exitosamente");
+        }
+      } catch (err) {
+        console.error("❌ Excepción al enviar email a la agencia:", err);
+      }
+
+      console.log("✅ Proceso de envío de emails completado");
 
       return new Response(
         JSON.stringify({
@@ -320,43 +332,55 @@ Deno.serve(async (req: Request) => {
           }
         ]);
 
-      // Enviar emails de confirmación de reembolso usando service role client
+      // Enviar emails de confirmación de reembolso
+      console.log("🔔 Iniciando envío de emails de reembolso...");
+      console.log("📧 Email 1: Viajero");
+      console.log("📧 Email 2: Agencia");
+
       const serviceRoleClient = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
       );
 
+      // Enviar email al viajero
+      console.log("📤 Enviando email de reembolso al viajero...");
       try {
-        const emailPromises = [
-          serviceRoleClient.functions.invoke("send-reschedule-response-confirmation", {
-            body: {
-              booking_id: booking_id,
-              response: "rejected"
-            }
-          }),
-          serviceRoleClient.functions.invoke("send-reschedule-response-agency", {
-            body: {
-              booking_id: booking_id,
-              response: "rejected"
-            }
-          })
-        ];
-
-        const results = await Promise.allSettled(emailPromises);
-
-        results.forEach((result, index) => {
-          const functionName = index === 0 ? "send-reschedule-response-confirmation" : "send-reschedule-response-agency";
-          if (result.status === "rejected") {
-            console.error(`Error sending email via ${functionName}:`, result.reason);
-          } else if (result.value.error) {
-            console.error(`Error response from ${functionName}:`, result.value.error);
-          } else {
-            console.log(`✅ Email sent successfully via ${functionName}`);
+        const travelerResult = await serviceRoleClient.functions.invoke("send-reschedule-response-confirmation", {
+          body: {
+            booking_id: booking_id,
+            response: "rejected"
           }
         });
-      } catch (emailErr) {
-        console.error("Error sending refund emails:", emailErr);
+
+        if (travelerResult.error) {
+          console.error("❌ Error en email al viajero:", travelerResult.error);
+        } else {
+          console.log("✅ Email de reembolso al viajero enviado exitosamente");
+        }
+      } catch (err) {
+        console.error("❌ Excepción al enviar email al viajero:", err);
       }
+
+      // Enviar email a la agencia
+      console.log("📤 Enviando email de rechazo a la agencia...");
+      try {
+        const agencyResult = await serviceRoleClient.functions.invoke("send-reschedule-response-agency", {
+          body: {
+            booking_id: booking_id,
+            response: "rejected"
+          }
+        });
+
+        if (agencyResult.error) {
+          console.error("❌ Error en email a la agencia:", agencyResult.error);
+        } else {
+          console.log("✅ Email de rechazo a la agencia enviado exitosamente");
+        }
+      } catch (err) {
+        console.error("❌ Excepción al enviar email a la agencia:", err);
+      }
+
+      console.log("✅ Proceso de envío de emails de reembolso completado");
 
       return new Response(
         JSON.stringify({
