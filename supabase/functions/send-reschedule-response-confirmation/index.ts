@@ -117,6 +117,7 @@ Deno.serve(async (req: Request) => {
           <!-- Header -->
           <tr>
             <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 20px; text-align: center;">
+              <img src="https://huzsedewwzjywcpbkjkm.supabase.co/storage/v1/object/public/images/email-logo.png" alt="ToursRed Logo" style="width: 120px; height: auto; margin-bottom: 20px;" />
               <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">✓ Confirmación Exitosa</h1>
               <p style="color: #d1fae5; margin: 10px 0 0 0; font-size: 14px;">Tu respuesta ha sido registrada</p>
             </td>
@@ -247,6 +248,7 @@ Deno.serve(async (req: Request) => {
           <!-- Header -->
           <tr>
             <td style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 40px 20px; text-align: center;">
+              <img src="https://huzsedewwzjywcpbkjkm.supabase.co/storage/v1/object/public/images/email-logo.png" alt="ToursRed Logo" style="width: 120px; height: auto; margin-bottom: 20px;" />
               <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">💰 Reembolso Procesado</h1>
               <p style="color: #dbeafe; margin: 10px 0 0 0; font-size: 14px;">Tu dinero ha sido acreditado</p>
             </td>
