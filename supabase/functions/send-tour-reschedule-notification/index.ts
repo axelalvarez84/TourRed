@@ -114,6 +114,7 @@ Deno.serve(async (req: Request) => {
           <!-- Header -->
           <tr>
             <td style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); padding: 40px 20px; text-align: center;">
+              <img src="https://kkzppymjxaizxuumkaxs.supabase.co/storage/v1/object/public/images/LogoFinal.jpg" alt="ToursRed Logo" style="max-width: 180px; height: auto; margin-bottom: 15px; display: block; margin-left: auto; margin-right: auto;">
               <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">ToursRed</h1>
               <p style="color: #fed7aa; margin: 10px 0 0 0; font-size: 14px;">Plataforma de Tours y Experiencias</p>
             </td>
