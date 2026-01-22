@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination, getTourCategories } from '../../lib/supabase';
-import { Plus, Search, X, Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle } from 'lucide-react';
+import { Plus, Search, X, Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle } from 'lucide-react';
 import { Tour, Destination, DeparturePoint } from '../../types';
 import { format } from 'date-fns';
 import ImageUploader from '../../components/ImageUploader';
@@ -66,6 +66,28 @@ const AgencyTours: React.FC = () => {
     new_start_date: '',
     new_end_date: '',
     reschedule_reason: '',
+  });
+
+  const [cancelModal, setCancelModal] = useState<{
+    open: boolean;
+    tour: Tour | null;
+    activeBookingsCount: number;
+    isLoading: boolean;
+    isSubmitting: boolean;
+    error: string;
+    success: boolean;
+  }>({
+    open: false,
+    tour: null,
+    activeBookingsCount: 0,
+    isLoading: false,
+    isSubmitting: false,
+    error: '',
+    success: false,
+  });
+
+  const [cancelFormData, setCancelFormData] = useState({
+    cancellation_reason: '',
   });
 
   const [formData, setFormData] = useState({
@@ -732,6 +754,145 @@ const AgencyTours: React.FC = () => {
       console.error('Error rescheduling tour:', err);
       const errorMessage = err.message || err.error || 'Error al procesar el reagendamiento';
       setRescheduleModal(prev => ({
+        ...prev,
+        isSubmitting: false,
+        error: errorMessage,
+      }));
+    }
+  };
+
+  const handleOpenCancel = async (tour: Tour) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const startDate = new Date(tour.start_date + 'T00:00:00');
+    startDate.setHours(0, 0, 0, 0);
+
+    if (startDate <= today) {
+      alert('No puedes cancelar un tour que ya ha iniciado o finalizado.');
+      return;
+    }
+
+    if (tour.cancelled_by_agency) {
+      alert('Este tour ya fue cancelado por la agencia.');
+      return;
+    }
+
+    setCancelModal({
+      open: true,
+      tour,
+      activeBookingsCount: 0,
+      isLoading: true,
+      isSubmitting: false,
+      error: '',
+      success: false,
+    });
+
+    setCancelFormData({
+      cancellation_reason: '',
+    });
+
+    try {
+      const { count, error } = await supabase
+        .from('bookings')
+        .select('*', { count: 'exact', head: true })
+        .eq('tour_id', tour.id)
+        .in('status', ['confirmed', 'pending'])
+        .eq('payment_status', 'succeeded')
+        .is('cancelled_at', null);
+
+      if (error) throw error;
+
+      if (count === 0) {
+        setCancelModal(prev => ({
+          ...prev,
+          error: 'No hay reservas activas para cancelar en este tour',
+          isLoading: false,
+        }));
+        return;
+      }
+
+      setCancelModal(prev => ({
+        ...prev,
+        activeBookingsCount: count || 0,
+        isLoading: false,
+      }));
+    } catch (err: any) {
+      console.error('Error loading bookings count:', err);
+      setCancelModal(prev => ({
+        ...prev,
+        error: 'Error al cargar el número de reservas',
+        isLoading: false,
+      }));
+    }
+  };
+
+  const handleCloseCancel = () => {
+    setCancelModal({
+      open: false,
+      tour: null,
+      activeBookingsCount: 0,
+      isLoading: false,
+      isSubmitting: false,
+      error: '',
+      success: false,
+    });
+    setCancelFormData({
+      cancellation_reason: '',
+    });
+  };
+
+  const handleSubmitCancel = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!cancelModal.tour || !user) return;
+
+    if (cancelFormData.cancellation_reason.trim().length < 50) {
+      setCancelModal(prev => ({
+        ...prev,
+        error: 'El motivo de cancelación debe tener al menos 50 caracteres y ser descriptivo',
+      }));
+      return;
+    }
+
+    setCancelModal(prev => ({
+      ...prev,
+      isSubmitting: true,
+      error: '',
+    }));
+
+    try {
+      const { data, error } = await supabase.functions.invoke('process-tour-cancellation', {
+        body: {
+          tour_id: cancelModal.tour.id,
+          cancellation_reason: cancelFormData.cancellation_reason.trim(),
+        },
+      });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        throw error;
+      }
+
+      if (data && !data.success) {
+        console.error('Function returned error:', data);
+        throw new Error(data.error || 'Error al procesar la cancelación');
+      }
+
+      setCancelModal(prev => ({
+        ...prev,
+        isSubmitting: false,
+        success: true,
+      }));
+
+      setTimeout(() => {
+        handleCloseCancel();
+        fetchAgencyTours();
+      }, 2500);
+    } catch (err: any) {
+      console.error('Error cancelling tour:', err);
+      const errorMessage = err.message || err.error || 'Error al procesar la cancelación del tour';
+      setCancelModal(prev => ({
         ...prev,
         isSubmitting: false,
         error: errorMessage,
@@ -2097,6 +2258,151 @@ const AgencyTours: React.FC = () => {
         </div>
       )}
 
+      {/* Modal de Cancelar Tour */}
+      {cancelModal.open && cancelModal.tour && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center mb-4">
+              <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mr-3">
+                <XCircle className="h-6 w-6 text-orange-600" />
+              </div>
+              <h2 className="text-xl font-semibold">Cancelar Tour Completo</h2>
+            </div>
+
+            {cancelModal.success ? (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Tour Cancelado Exitosamente
+                </h3>
+                <p className="text-gray-600">
+                  Se ha notificado a todos los viajeros y se han procesado los reembolsos.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+                  <h3 className="font-semibold text-orange-900 mb-2">{cancelModal.tour.name}</h3>
+                  <div className="text-sm text-orange-800 space-y-1">
+                    <p>
+                      <span className="font-medium">Fechas:</span> {formatDate(cancelModal.tour.start_date)} - {formatDate(cancelModal.tour.end_date)}
+                    </p>
+                    <p>
+                      <span className="font-medium">Destino:</span> {cancelModal.tour.destination}
+                    </p>
+                  </div>
+                </div>
+
+                {cancelModal.isLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600"></div>
+                  </div>
+                ) : (
+                  <>
+                    {cancelModal.activeBookingsCount > 0 && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                        <div className="flex items-start">
+                          <AlertCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium text-red-900">
+                              {cancelModal.activeBookingsCount} {cancelModal.activeBookingsCount === 1 ? 'viajero será afectado' : 'viajeros serán afectados'}
+                            </p>
+                            <p className="text-xs text-red-800 mt-1">
+                              Todos los viajeros recibirán un reembolso del 100% del anticipo pagado en su monedero ToursRed Cash. Los cargos por servicio no son reembolsables ya que fueron cobrados por Stripe.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {cancelModal.error && (
+                      <div className="bg-error-50 border border-error-200 rounded-lg p-4 mb-6">
+                        <p className="text-sm text-error-800">{cancelModal.error}</p>
+                      </div>
+                    )}
+
+                    <form onSubmit={handleSubmitCancel} className="space-y-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Motivo de la Cancelación *
+                        </label>
+                        <textarea
+                          value={cancelFormData.cancellation_reason}
+                          onChange={(e) => setCancelFormData({ cancellation_reason: e.target.value })}
+                          className="input"
+                          rows={5}
+                          placeholder="Por favor, explica detalladamente el motivo de la cancelación del tour. Este mensaje será visible para los viajeros afectados y el administrador de la plataforma..."
+                          minLength={50}
+                          required
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Mínimo 50 caracteres. Este mensaje será visible para todos los viajeros afectados.
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Caracteres actuales: {cancelFormData.cancellation_reason.length}
+                        </p>
+                      </div>
+
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <h4 className="font-medium text-gray-900 mb-2">Política de Cancelación por Agencia</h4>
+                        <ul className="text-sm text-gray-600 space-y-1">
+                          <li>• Todos los viajeros con reservas activas serán notificados por correo electrónico</li>
+                          <li>• Cada viajero recibirá un reembolso del 100% del anticipo en ToursRed Cash</li>
+                          <li>• Los cargos por servicio NO son reembolsables (ya fueron cobrados por Stripe)</li>
+                          <li>• El tour quedará marcado como cancelado y no podrá recibir nuevas reservas</li>
+                          <li>• El administrador recibirá un reporte detallado de la cancelación</li>
+                        </ul>
+                      </div>
+
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <div className="flex items-start">
+                          <AlertCircle className="h-5 w-5 text-amber-600 mr-2 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm text-amber-900">
+                            <span className="font-semibold">Importante:</span> Esta acción no se puede deshacer. Una vez procesada la cancelación, todos los viajeros serán notificados y reembolsados automáticamente.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end space-x-3 pt-4 border-t">
+                        <button
+                          type="button"
+                          onClick={handleCloseCancel}
+                          className="btn btn-outline"
+                          disabled={cancelModal.isSubmitting}
+                        >
+                          Volver
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={cancelModal.isSubmitting || cancelFormData.cancellation_reason.trim().length < 50}
+                          className="btn bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {cancelModal.isSubmitting ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                              Procesando...
+                            </>
+                          ) : (
+                            <>
+                              <XCircle className="h-4 w-4 mr-2" />
+                              Confirmar Cancelación del Tour
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Lista de Tours */}
       {tours.length === 0 && !isLoading ? (
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
@@ -2196,9 +2502,17 @@ const AgencyTours: React.FC = () => {
                       onClick={() => handleOpenReschedule(tour)}
                       className="p-2 text-gray-400 hover:text-amber-600 transition-colors"
                       title="Reagendar tour"
-                      disabled={isSubmitting || isCreating || editingTour || duplicatingTour || new Date(tour.start_date) < new Date()}
+                      disabled={isSubmitting || isCreating || editingTour || duplicatingTour || new Date(tour.start_date) < new Date() || tour.cancelled_by_agency}
                     >
                       <CalendarX className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleOpenCancel(tour)}
+                      className="p-2 text-gray-400 hover:text-orange-600 transition-colors"
+                      title="Cancelar tour completo"
+                      disabled={isSubmitting || isCreating || editingTour || duplicatingTour || new Date(tour.start_date) <= new Date() || tour.cancelled_by_agency}
+                    >
+                      <XCircle className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDuplicate(tour)}
