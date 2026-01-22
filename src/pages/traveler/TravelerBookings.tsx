@@ -4,12 +4,13 @@ import { useAuth } from '../../context/AuthContext';
 import { getUserBookings, parseDateFromDB, supabase, calculateCancellationPolicy, processCancellation } from '../../lib/supabase';
 import { Booking, PendingReschedule } from '../../types';
 import { format } from 'date-fns';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import ReviewForm from '../../components/ReviewForm';
 
 const TravelerBookings: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -83,6 +84,22 @@ const TravelerBookings: React.FC = () => {
       fetchBookings();
     }
   }, [user]);
+
+  useEffect(() => {
+    const action = searchParams.get('action');
+    const bookingId = searchParams.get('booking');
+
+    if (action && bookingId && !isLoading && bookings.length > 0) {
+      const booking = bookings.find(b => b.id === bookingId);
+
+      if (booking && booking.has_pending_reschedule && pendingReschedules[bookingId]) {
+        if (action === 'accept' || action === 'reject') {
+          handleOpenRescheduleModal(booking, action);
+          setSearchParams({});
+        }
+      }
+    }
+  }, [searchParams, bookings, isLoading, pendingReschedules]);
 
   const fetchBookings = async () => {
     if (!user?.id) return;

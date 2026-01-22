@@ -93,8 +93,9 @@ Deno.serve(async (req: Request) => {
     });
 
     // URLs para aceptar/rechazar (apuntan a la página de reservas del viajero)
-    const acceptUrl = `${Deno.env.get("SUPABASE_URL")?.replace('//', '//')}/traveler/bookings?action=accept&booking=${booking_id}`;
-    const rejectUrl = `${Deno.env.get("SUPABASE_URL")?.replace('//', '//')}/traveler/bookings?action=reject&booking=${booking_id}`;
+    const appUrl = Deno.env.get("APP_URL") || Deno.env.get("VITE_APP_URL") || "http://localhost:5173";
+    const acceptUrl = `${appUrl}/traveler/bookings?action=accept&booking=${booking_id}`;
+    const rejectUrl = `${appUrl}/traveler/bookings?action=reject&booking=${booking_id}`;
 
     // Crear HTML del email
     const htmlContent = `
