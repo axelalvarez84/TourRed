@@ -97,7 +97,7 @@ Este mensaje fue enviado desde el formulario de contacto de ToursRed.
 <body>
   <div class="container">
     <div class="header">
-      <img src="https://www.toursred.com/logo.png" alt="ToursRed Logo" class="logo" />
+      <img src="https://toursred.netlify.app/logo.png" alt="ToursRed Logo" class="logo" />
       <h1>Nuevo Mensaje de Contacto</h1>
     </div>
     <div class="content">

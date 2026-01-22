@@ -118,7 +118,7 @@ Deno.serve(async (req: Request) => {
 <body>
   <div class="container">
     <div class="header">
-      <img src="https://www.toursred.com/logo.png" alt="ToursRed Logo" class="logo" />
+      <img src="https://toursred.netlify.app/logo.png" alt="ToursRed Logo" class="logo" />
       <h1 style="margin: 0; color: #ea580c;">⚠️ Notificación de No Show</h1>
     </div>
     <div class="content">

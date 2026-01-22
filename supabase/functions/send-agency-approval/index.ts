@@ -145,7 +145,7 @@ Equipo ToursRed
 <body>
   <div class="container">
     <div class="header">
-      <img src="https://www.toursred.com/logo.png" alt="ToursRed Logo" class="logo" />
+      <img src="https://toursred.netlify.app/logo.png" alt="ToursRed Logo" class="logo" />
       <h1 style="margin: 10px 0;">¡Tu Agencia ha sido Aprobada!</h1>
       <p style="margin: 0; font-size: 16px; opacity: 0.9;">Ya puedes comenzar a publicar tus tours</p>
     </div>

@@ -135,7 +135,7 @@ Deno.serve(async (req: Request) => {
 
           <tr>
             <td style="background-color: #b8dfe6; padding: 30px 20px; text-align: center;">
-              <img src="https://www.toursred.com/logo.png" alt="ToursRed Logo" style="max-width: 200px; height: auto; margin-bottom: 10px;" />
+              <img src="https://toursred.netlify.app/logo.png" alt="ToursRed Logo" style="max-width: 200px; height: auto; margin-bottom: 10px;" />
               <h1 style="color: #1e40af; margin: 0; font-size: 28px;">📊 Reporte de Cancelación</h1>
               <p style="color: #1e40af; margin: 10px 0 0 0; font-size: 16px;">Notificación para Administración</p>
             </td>

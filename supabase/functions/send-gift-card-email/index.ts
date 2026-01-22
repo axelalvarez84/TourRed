@@ -212,7 +212,7 @@ async function sendGiftCardEmail(
           <!-- Header con Logo -->
           <tr>
             <td class="header">
-              <img src="https://www.toursred.com/logo.png" alt="ToursRed Logo" class="logo" style="max-width: 180px; height: auto; margin-bottom: 15px;" />
+              <img src="https://toursred.netlify.app/logo.png" alt="ToursRed Logo" class="logo" style="max-width: 180px; height: auto; margin-bottom: 15px;" />
               <h1 style="color: #1F2937; margin: 10px 0 0 0; font-size: 32px; font-weight: bold;">Tarjeta de Regalo</h1>
               <p style="color: #DC2626; margin: 10px 0 0 0; font-size: 18px; font-weight: 600;">🎁 ¡El regalo perfecto para los amantes de viajar!</p>
             </td>

@@ -178,7 +178,7 @@ Equipo ToursRed
 <body>
   <div class=\"container\">
     <div class=\"header\">
-      <img src=\"https://www.toursred.com/logo.png\" alt=\"ToursRed Logo\" class=\"logo\" />
+      <img src=\"https://toursred.netlify.app/logo.png\" alt=\"ToursRed Logo\" class=\"logo\" />
       <div class=\"plus-badge\">ToursRed+</div>
       <h1 style=\"margin: 15px 0 5px 0;\">Recordatorio de Renovación</h1>
       <p style=\"margin: 0; font-size: 16px; opacity: 0.9;\">Tu membresía está próxima a renovarse</p>

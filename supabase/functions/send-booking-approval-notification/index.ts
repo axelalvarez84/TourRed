@@ -117,7 +117,7 @@ Deno.serve(async (req: Request) => {
 <body>
   <div class="container">
     <div class="header">
-      <img src="https://www.toursred.com/logo.png" alt="ToursRed Logo" class="logo" />
+      <img src="https://toursred.netlify.app/logo.png" alt="ToursRed Logo" class="logo" />
       <h1 style="margin: 0; color: #10b981;">¡Reserva Aprobada!</h1>
     </div>
     <div class="content">
@@ -204,7 +204,7 @@ Deno.serve(async (req: Request) => {
 <body>
   <div class="container">
     <div class="header">
-      <img src="https://www.toursred.com/logo.png" alt="ToursRed Logo" class="logo" />
+      <img src="https://toursred.netlify.app/logo.png" alt="ToursRed Logo" class="logo" />
       <h1 style="margin: 0; color: #ef4444;">Actualización de tu Reserva</h1>
     </div>
     <div class="content">
