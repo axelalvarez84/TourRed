@@ -203,7 +203,7 @@ const TravelerBookings: React.FC = () => {
       const { data, error } = await supabase.functions.invoke('respond-to-reschedule', {
         body: {
           booking_id: rescheduleModal.booking.id,
-          response: rescheduleModal.action
+          response: rescheduleModal.action === 'accept' ? 'accepted' : 'rejected'
         },
         headers: {
           Authorization: `Bearer ${token}`,
