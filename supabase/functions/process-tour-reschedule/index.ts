@@ -74,9 +74,10 @@ Deno.serve(async (req: Request) => {
     }
 
     // Validar que quedan al menos 48 horas para el inicio
-    const hoursUntilStart = (tourStartDate.getTime() - today.getTime()) / (1000 * 60 * 60);
+    const now = new Date();
+    const hoursUntilStart = (tourStartDate.getTime() - now.getTime()) / (1000 * 60 * 60);
     if (hoursUntilStart < 48) {
-      throw new Error("Deben quedar al menos 48 horas para reagendar un tour");
+      throw new Error(`Deben quedar al menos 48 horas para reagendar un tour. Quedan ${Math.round(hoursUntilStart)} horas.`);
     }
 
     // Validar que la nueva fecha sea al menos 4 días en el futuro
