@@ -716,30 +716,36 @@ export const getUserBookings = async (userId: string) => {
       return { data: bookings, error };
     }
 
-    const bookingsWithPaymentMethod = await Promise.all(
-      bookings.map(async (booking) => {
-        // Primero intentar usar el payment_method de la tabla bookings
-        let paymentMethod = (booking as any).payment_method || null;
+    // OPTIMIZED: Get all payment transactions in ONE query instead of N queries
+    const bookingIds = bookings.map(b => b.id);
+    const { data: allTransactions } = await supabase
+      .from('payment_transactions')
+      .select('booking_id, payment_method_type, created_at')
+      .in('booking_id', bookingIds);
 
-        // Si no existe, buscar en payment_transactions como respaldo
-        if (!paymentMethod) {
-          const { data: transaction } = await supabase
-            .from('payment_transactions')
-            .select('payment_method_type')
-            .eq('booking_id', booking.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+    // Group transactions by booking_id and get the most recent
+    const transactionsByBooking: Record<string, any> = {};
+    (allTransactions || []).forEach((tx: any) => {
+      if (!transactionsByBooking[tx.booking_id] ||
+          new Date(tx.created_at) > new Date(transactionsByBooking[tx.booking_id].created_at)) {
+        transactionsByBooking[tx.booking_id] = tx;
+      }
+    });
 
-          paymentMethod = transaction?.payment_method_type || null;
-        }
+    // Map bookings with payment methods (no more N+1!)
+    const bookingsWithPaymentMethod = bookings.map((booking) => {
+      let paymentMethod = (booking as any).payment_method || null;
 
-        return {
-          ...booking,
-          payment_method: paymentMethod
-        };
-      })
-    );
+      // If no payment_method, use the most recent transaction
+      if (!paymentMethod && transactionsByBooking[booking.id]) {
+        paymentMethod = transactionsByBooking[booking.id].payment_method_type || null;
+      }
+
+      return {
+        ...booking,
+        payment_method: paymentMethod
+      };
+    });
 
     return { data: bookingsWithPaymentMethod, error: null };
   } catch (error: any) {
@@ -764,30 +770,36 @@ export const getAgencyBookings = async (agencyId: string) => {
       return { data: bookings, error };
     }
 
-    const bookingsWithPaymentMethod = await Promise.all(
-      bookings.map(async (booking) => {
-        // Primero intentar usar el payment_method de la tabla bookings
-        let paymentMethod = (booking as any).payment_method || null;
+    // OPTIMIZED: Get all payment transactions in ONE query instead of N queries
+    const bookingIds = bookings.map(b => b.id);
+    const { data: allTransactions } = await supabase
+      .from('payment_transactions')
+      .select('booking_id, payment_method_type, created_at')
+      .in('booking_id', bookingIds);
 
-        // Si no existe, buscar en payment_transactions como respaldo
-        if (!paymentMethod) {
-          const { data: transaction } = await supabase
-            .from('payment_transactions')
-            .select('payment_method_type')
-            .eq('booking_id', booking.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+    // Group transactions by booking_id and get the most recent
+    const transactionsByBooking: Record<string, any> = {};
+    (allTransactions || []).forEach((tx: any) => {
+      if (!transactionsByBooking[tx.booking_id] ||
+          new Date(tx.created_at) > new Date(transactionsByBooking[tx.booking_id].created_at)) {
+        transactionsByBooking[tx.booking_id] = tx;
+      }
+    });
 
-          paymentMethod = transaction?.payment_method_type || null;
-        }
+    // Map bookings with payment methods (no more N+1!)
+    const bookingsWithPaymentMethod = bookings.map((booking) => {
+      let paymentMethod = (booking as any).payment_method || null;
 
-        return {
-          ...booking,
-          payment_method: paymentMethod
-        };
-      })
-    );
+      // If no payment_method, use the most recent transaction
+      if (!paymentMethod && transactionsByBooking[booking.id]) {
+        paymentMethod = transactionsByBooking[booking.id].payment_method_type || null;
+      }
+
+      return {
+        ...booking,
+        payment_method: paymentMethod
+      };
+    });
 
     return { data: bookingsWithPaymentMethod, error: null };
   } catch (error: any) {

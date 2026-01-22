@@ -174,21 +174,29 @@ const TourCatalogPage: React.FC = () => {
           return;
         }
 
-        // Get tour counts for each destination
-        const destinationsWithCounts = await Promise.all(
-          destinations.map(async (dest) => {
-            const { count, error: countError } = await supabase
-              .from('tour_destinations')
-              .select('*', { count: 'exact', head: true })
-              .eq('destination_id', dest.id);
+        // OPTIMIZED: Get tour counts in ONE query instead of N queries
+        const destinationIds = destinations.map(d => d.id);
+        const { data: tourDestinations, error: tdError } = await supabase
+          .from('tour_destinations')
+          .select('destination_id')
+          .in('destination_id', destinationIds);
 
-            return {
-              id: dest.id,
-              name: dest.name,
-              tour_count: countError ? 0 : (count || 0)
-            };
-          })
-        );
+        if (tdError) {
+          console.error('❌ Error cargando tour_destinations:', tdError);
+          return;
+        }
+
+        // Count tours per destination in memory (much faster than N queries)
+        const countsByDestination = (tourDestinations || []).reduce((acc: Record<string, number>, td: any) => {
+          acc[td.destination_id] = (acc[td.destination_id] || 0) + 1;
+          return acc;
+        }, {});
+
+        const destinationsWithCounts = destinations.map(dest => ({
+          id: dest.id,
+          name: dest.name,
+          tour_count: countsByDestination[dest.id] || 0
+        }));
 
         // Filter and sort destinations with tours
         const processedDestinations = destinationsWithCounts
@@ -228,23 +236,31 @@ const TourCatalogPage: React.FC = () => {
           return;
         }
 
-        // Get tour counts for each departure point
-        const pointsWithCounts = await Promise.all(
-          departurePoints.map(async (point) => {
-            const { count, error: countError } = await supabase
-              .from('tour_departure_points')
-              .select('*', { count: 'exact', head: true })
-              .eq('departure_point_id', point.id);
+        // OPTIMIZED: Get tour counts in ONE query instead of N queries
+        const pointIds = departurePoints.map(p => p.id);
+        const { data: tourDeparturePoints, error: tdpError } = await supabase
+          .from('tour_departure_points')
+          .select('departure_point_id')
+          .in('departure_point_id', pointIds);
 
-            return {
-              id: point.id,
-              name: point.name,
-              city: point.city,
-              municipality: point.municipality,
-              tour_count: countError ? 0 : (count || 0)
-            };
-          })
-        );
+        if (tdpError) {
+          console.error('❌ Error cargando tour_departure_points:', tdpError);
+          return;
+        }
+
+        // Count tours per departure point in memory (much faster than N queries)
+        const countsByPoint = (tourDeparturePoints || []).reduce((acc: Record<string, number>, tdp: any) => {
+          acc[tdp.departure_point_id] = (acc[tdp.departure_point_id] || 0) + 1;
+          return acc;
+        }, {});
+
+        const pointsWithCounts = departurePoints.map(point => ({
+          id: point.id,
+          name: point.name,
+          city: point.city,
+          municipality: point.municipality,
+          tour_count: countsByPoint[point.id] || 0
+        }));
 
         // Filter and sort points with tours
         const processedPoints = pointsWithCounts
