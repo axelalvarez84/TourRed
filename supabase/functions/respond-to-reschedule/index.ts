@@ -168,22 +168,40 @@ Deno.serve(async (req: Request) => {
           }
         ]);
 
-      // Enviar emails de confirmación
+      // Enviar emails de confirmación usando service role client
+      const serviceRoleClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
+
       try {
-        await Promise.all([
-          supabase.functions.invoke("send-reschedule-response-confirmation", {
+        const emailPromises = [
+          serviceRoleClient.functions.invoke("send-reschedule-response-confirmation", {
             body: {
               booking_id: booking_id,
               response: "accepted"
             }
           }),
-          supabase.functions.invoke("send-reschedule-response-agency", {
+          serviceRoleClient.functions.invoke("send-reschedule-response-agency", {
             body: {
               booking_id: booking_id,
               response: "accepted"
             }
           })
-        ]);
+        ];
+
+        const results = await Promise.allSettled(emailPromises);
+
+        results.forEach((result, index) => {
+          const functionName = index === 0 ? "send-reschedule-response-confirmation" : "send-reschedule-response-agency";
+          if (result.status === "rejected") {
+            console.error(`Error sending email via ${functionName}:`, result.reason);
+          } else if (result.value.error) {
+            console.error(`Error response from ${functionName}:`, result.value.error);
+          } else {
+            console.log(`✅ Email sent successfully via ${functionName}`);
+          }
+        });
       } catch (emailErr) {
         console.error("Error sending confirmation emails:", emailErr);
       }
@@ -302,22 +320,40 @@ Deno.serve(async (req: Request) => {
           }
         ]);
 
-      // Enviar emails de confirmación de reembolso
+      // Enviar emails de confirmación de reembolso usando service role client
+      const serviceRoleClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
+
       try {
-        await Promise.all([
-          supabase.functions.invoke("send-reschedule-response-confirmation", {
+        const emailPromises = [
+          serviceRoleClient.functions.invoke("send-reschedule-response-confirmation", {
             body: {
               booking_id: booking_id,
               response: "rejected"
             }
           }),
-          supabase.functions.invoke("send-reschedule-response-agency", {
+          serviceRoleClient.functions.invoke("send-reschedule-response-agency", {
             body: {
               booking_id: booking_id,
               response: "rejected"
             }
           })
-        ]);
+        ];
+
+        const results = await Promise.allSettled(emailPromises);
+
+        results.forEach((result, index) => {
+          const functionName = index === 0 ? "send-reschedule-response-confirmation" : "send-reschedule-response-agency";
+          if (result.status === "rejected") {
+            console.error(`Error sending email via ${functionName}:`, result.reason);
+          } else if (result.value.error) {
+            console.error(`Error response from ${functionName}:`, result.value.error);
+          } else {
+            console.log(`✅ Email sent successfully via ${functionName}`);
+          }
+        });
       } catch (emailErr) {
         console.error("Error sending refund emails:", emailErr);
       }
