@@ -15,6 +15,10 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  console.log("============================================");
+  console.log("FUNCIÓN RESPOND-TO-RESCHEDULE INICIADA");
+  console.log("============================================");
+
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -34,6 +38,11 @@ Deno.serve(async (req: Request) => {
     }
 
     const { booking_id, response } = await req.json();
+
+    console.log("📥 Request recibida:");
+    console.log("- Booking ID:", booking_id);
+    console.log("- Response:", response);
+    console.log("- User ID:", user.id);
 
     if (!booking_id || !response) {
       throw new Error("Missing required fields");

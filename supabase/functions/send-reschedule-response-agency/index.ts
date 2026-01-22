@@ -8,6 +8,10 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req: Request) => {
+  console.log("============================================");
+  console.log("FUNCIÓN SEND-RESCHEDULE-RESPONSE-AGENCY INICIADA");
+  console.log("============================================");
+
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 200,
@@ -22,6 +26,10 @@ Deno.serve(async (req: Request) => {
     );
 
     const { booking_id, response } = await req.json();
+
+    console.log("📥 Request recibida en send-reschedule-response-agency:");
+    console.log("- Booking ID:", booking_id);
+    console.log("- Response:", response);
 
     if (!booking_id || !response) {
       throw new Error("Missing required fields");
