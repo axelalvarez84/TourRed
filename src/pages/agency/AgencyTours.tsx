@@ -704,7 +704,7 @@ const AgencyTours: React.FC = () => {
           tour_id: rescheduleModal.tour.id,
           new_start_date: rescheduleFormData.new_start_date,
           new_end_date: rescheduleFormData.new_end_date,
-          reschedule_reason: rescheduleFormData.reschedule_reason.trim(),
+          reason: rescheduleFormData.reschedule_reason.trim(),
         },
       });
 
@@ -2001,11 +2001,11 @@ const AgencyTours: React.FC = () => {
                             value={rescheduleFormData.new_start_date}
                             onChange={(e) => setRescheduleFormData({ ...rescheduleFormData, new_start_date: e.target.value })}
                             className="input"
-                            min={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                            min={new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
                             required
                           />
                           <p className="text-xs text-gray-500 mt-1">
-                            Debe ser al menos 7 días en el futuro
+                            Debe ser al menos 4 días en el futuro
                           </p>
                         </div>
 
