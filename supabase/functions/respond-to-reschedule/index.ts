@@ -64,7 +64,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: agency } = await supabase
       .from("agencies")
-      .select("id, name, commission_rate")
+      .select("id, name, commission_rate, user_id")
       .eq("id", booking.agency_id)
       .maybeSingle();
 
@@ -140,20 +140,33 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", booking_id);
 
-      // Crear notificación de confirmación
+      // Crear notificaciones
       await supabase
         .from("notifications")
-        .insert({
-          user_id: user.id,
-          type: "booking_confirmed",
-          title: "Reagendamiento Aceptado",
-          message: `Has aceptado la nueva fecha para el tour "${booking.tour.name}". Tu reserva ha sido actualizada.`,
-          data: {
-            booking_id: booking_id,
-            tour_id: booking.tour_id,
-            new_date: rescheduleResponse.reschedule.new_start_date
+        .insert([
+          {
+            user_id: user.id,
+            type: "booking_confirmed",
+            title: "Reagendamiento Aceptado",
+            message: `Has aceptado la nueva fecha para el tour "${booking.tour.name}". Tu reserva ha sido actualizada.`,
+            data: {
+              booking_id: booking_id,
+              tour_id: booking.tour_id,
+              new_date: rescheduleResponse.reschedule.new_start_date
+            }
+          },
+          {
+            user_id: booking.agency.user_id,
+            type: "booking_confirmed",
+            title: "Reagendamiento Aceptado",
+            message: `${userInfo.first_name} ${userInfo.last_name} aceptó el reagendamiento del tour "${booking.tour.name}". La reserva continúa con la nueva fecha.`,
+            data: {
+              booking_id: booking_id,
+              tour_id: booking.tour_id,
+              new_date: rescheduleResponse.reschedule.new_start_date
+            }
           }
-        });
+        ]);
 
       // Enviar emails de confirmación
       try {
@@ -260,21 +273,34 @@ Deno.serve(async (req: Request) => {
         })
         .eq("booking_id", booking_id);
 
-      // Crear notificación de reembolso
+      // Crear notificaciones de reembolso
       await supabase
         .from("notifications")
-        .insert({
-          user_id: user.id,
-          type: "booking_cancelled",
-          title: "Reembolso Procesado",
-          message: `Has rechazado el reagendamiento del tour "${booking.tour.name}". Se ha procesado tu reembolso de $${totalRefund.toFixed(2)} MXN a tu monedero ToursRed Cash.`,
-          data: {
-            booking_id: booking_id,
-            tour_id: booking.tour_id,
-            refund_amount: totalRefund,
-            transaction_id: transactionId
+        .insert([
+          {
+            user_id: user.id,
+            type: "booking_cancelled",
+            title: "Reembolso Procesado",
+            message: `Has rechazado el reagendamiento del tour "${booking.tour.name}". Se ha procesado tu reembolso de $${totalRefund.toFixed(2)} MXN a tu monedero ToursRed Cash.`,
+            data: {
+              booking_id: booking_id,
+              tour_id: booking.tour_id,
+              refund_amount: totalRefund,
+              transaction_id: transactionId
+            }
+          },
+          {
+            user_id: booking.agency.user_id,
+            type: "booking_cancelled",
+            title: "Reagendamiento Rechazado",
+            message: `${userInfo.first_name} ${userInfo.last_name} rechazó el reagendamiento del tour "${booking.tour.name}". La reserva fue cancelada y se procesó el reembolso completo.`,
+            data: {
+              booking_id: booking_id,
+              tour_id: booking.tour_id,
+              refund_amount: totalRefund
+            }
           }
-        });
+        ]);
 
       // Enviar emails de confirmación de reembolso
       try {

@@ -824,6 +824,24 @@ const AgencyBookings: React.FC = () => {
                           No Show
                         </span>
                       )}
+                      {booking.reschedule_response === 'accepted' && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Reagendamiento Aceptado
+                        </span>
+                      )}
+                      {booking.reschedule_response === 'rejected' && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Reagendamiento Rechazado
+                        </span>
+                      )}
+                      {booking.has_pending_reschedule && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Esperando Respuesta
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1120,6 +1138,36 @@ const AgencyBookings: React.FC = () => {
                     <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
                       <p className="text-sm text-blue-800">
                         <strong>Acción requerida:</strong> El cliente ha pagado el depósito. Confirma la reserva para proceder.
+                      </p>
+                    </div>
+                  )}
+
+                  {booking.has_pending_reschedule && (
+                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-sm text-yellow-800">
+                        <strong>Reagendamiento pendiente:</strong> Has solicitado un cambio de fecha para este tour. Esperando la respuesta del viajero.
+                      </p>
+                    </div>
+                  )}
+
+                  {booking.reschedule_response === 'accepted' && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                      <p className="text-sm text-green-800">
+                        <strong>Reagendamiento aceptado:</strong> El viajero aceptó la nueva fecha propuesta. La reserva continúa vigente con la fecha actualizada.
+                        {booking.reschedule_responded_at && (
+                          <span className="block mt-1 text-xs">Respondió el: {formatDate(booking.reschedule_responded_at)}</span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+
+                  {booking.reschedule_response === 'rejected' && booking.status === 'cancelled' && (
+                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                      <p className="text-sm text-red-800">
+                        <strong>Reagendamiento rechazado:</strong> El viajero rechazó la nueva fecha. La reserva fue cancelada automáticamente y se procesó el reembolso completo.
+                        {booking.reschedule_responded_at && (
+                          <span className="block mt-1 text-xs">Respondió el: {formatDate(booking.reschedule_responded_at)}</span>
+                        )}
                       </p>
                     </div>
                   )}
