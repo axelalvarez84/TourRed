@@ -48,9 +48,9 @@ Deno.serve(async (req: Request) => {
       .from("bookings")
       .select(`
         *,
-        user:users!bookings_user_id_fkey(id, first_name, last_name, email),
-        tour:tours!bookings_tour_id_fkey(id, name, start_date, end_date),
-        agency:agencies!bookings_agency_id_fkey(id, name, commission_rate)
+        user:users(id, first_name, last_name, email),
+        tour:tours(id, name, start_date, end_date),
+        agency:agencies(id, name, commission_rate)
       `)
       .eq("id", booking_id)
       .single();
