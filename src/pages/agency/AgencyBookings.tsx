@@ -87,19 +87,21 @@ const AgencyBookings: React.FC = () => {
       console.log('✅ Reservas de agencia cargadas:', bookingsData);
       setBookings(bookingsData || []);
 
-      // Obtener tours con reservas confirmadas
+      // OPTIMIZED: Limit tours and only count IDs
       const { data: toursData, error: toursError } = await supabase
         .from('tours')
         .select('id, name, destination, start_date')
         .eq('agency_id', agencyData.id)
-        .order('start_date', { ascending: false });
+        .order('start_date', { ascending: false })
+        .limit(50);
 
       if (!toursError && toursData) {
         const toursWithBookings = await Promise.all(
           toursData.map(async (tour) => {
+            // OPTIMIZED: Count only IDs instead of all columns
             const { count } = await supabase
               .from('bookings')
-              .select('*', { count: 'exact', head: true })
+              .select('id', { count: 'exact', head: true })
               .eq('tour_id', tour.id)
               .in('status', ['confirmed', 'completed']);
 

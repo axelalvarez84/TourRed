@@ -37,6 +37,7 @@ const AdminDashboard: React.FC = () => {
       console.log('📊 Cargando estadísticas del dashboard...');
 
       // Obtener estadísticas en paralelo
+      // OPTIMIZED: Only count IDs instead of selecting all columns
       const [
         usersResult,
         agenciesResult,
@@ -44,17 +45,17 @@ const AdminDashboard: React.FC = () => {
         bookingsResult,
         destinationsResult
       ] = await Promise.all([
-        supabase.from('users').select('*', { count: 'exact', head: true }),
-        supabase.from('agencies').select('*', { count: 'exact', head: true }),
-        supabase.from('tours').select('*', { count: 'exact', head: true }),
-        supabase.from('bookings').select('*', { count: 'exact', head: true }),
-        supabase.from('destinations').select('*', { count: 'exact', head: true })
+        supabase.from('users').select('id', { count: 'exact', head: true }),
+        supabase.from('agencies').select('id', { count: 'exact', head: true }),
+        supabase.from('tours').select('id', { count: 'exact', head: true }),
+        supabase.from('bookings').select('id', { count: 'exact', head: true }),
+        supabase.from('destinations').select('id', { count: 'exact', head: true })
       ]);
 
-      // Obtener agencias activas
+      // Obtener agencias activas (OPTIMIZED: only count IDs)
       const { count: activeAgenciesCount } = await supabase
         .from('agencies')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('is_active', true);
 
       // Obtener actividad reciente (últimas 10 acciones)

@@ -54,7 +54,7 @@ const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
             <div className="flex items-center mb-4">
-              <img src="/logo copy.png" alt="ToursRed Logo" className="h-12 w-auto" />
+              <img src="/logo copy.png" alt="ToursRed Logo" loading="lazy" className="h-12 w-auto" />
             </div>
             <p className="text-gray-400 mb-4">
               Descubre destinos extraordinarios y experiencias inolvidables con nuestros socios de viaje de confianza.
@@ -67,7 +67,7 @@ const Footer: React.FC = () => {
                 <Instagram className="h-5 w-5" />
               </a>
               <a href="https://www.tiktok.com/@toursredmx" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
-                <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/tiktok.svg" alt="TikTok" className="h-5 w-5" />
+                <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/tiktok.svg" alt="TikTok" loading="lazy" className="h-5 w-5" />
               </a>
               <a href="https://www.linkedin.com/company/toursredmx" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
                 <Linkedin className="h-5 w-5" />

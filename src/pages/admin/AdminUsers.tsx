@@ -65,9 +65,10 @@ const AdminUsers: React.FC = () => {
       setLoading(true);
       setError(null);
 
+      // OPTIMIZED: Select only needed columns
       const { data: usersData, error: usersError } = await supabase
         .from('users')
-        .select('*')
+        .select('id, email, first_name, last_name, role, is_active, created_at, is_super_admin')
         .eq('role', 'admin')
         .order('created_at', { ascending: false });
 
@@ -77,7 +78,7 @@ const AdminUsers: React.FC = () => {
         (usersData || []).map(async (user) => {
           const { data: permsData } = await supabase
             .from('admin_permissions')
-            .select('*')
+            .select('can_manage_agencies, can_manage_users, can_manage_travelers, can_manage_destinations, can_manage_categories, can_manage_departure_points, can_manage_reviews, can_manage_messages, can_manage_inquiries')
             .eq('user_id', user.id)
             .maybeSingle();
 

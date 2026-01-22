@@ -294,14 +294,22 @@ export const updateAgencyStatus = async (agencyId: string, isActive: boolean) =>
 
 export const getAllAgencies = async () => {
   try {
+    // OPTIMIZED: Select only needed columns for admin listings
     const { data, error } = await supabase
       .from('agencies')
       .select(`
-        *,
+        id,
+        name,
+        is_active,
+        created_at,
+        phone,
+        whatsapp,
+        rating,
+        commission_rate,
         users(first_name, last_name, email)
       `)
       .order('created_at', { ascending: false });
-    
+
     return { data, error };
   } catch (error: any) {
     console.error('❌ Error en getAllAgencies:', error);
@@ -404,10 +412,22 @@ export const getTours = async (filters: any = {}) => {
         return { data: [], error: null };
       }
 
+      // OPTIMIZED: Select only needed columns for listings
       let query = supabase
         .from('tours')
         .select(`
-          *,
+          id,
+          name,
+          image_url,
+          destination,
+          start_date,
+          end_date,
+          price,
+          max_travelers,
+          is_featured,
+          agency_id,
+          pet_friendly,
+          category,
           agencies(id, name, rating, is_active)
         `)
         .in('id', finalTourIds);
@@ -461,10 +481,22 @@ export const getTours = async (filters: any = {}) => {
       return { data, error };
     }
 
+    // OPTIMIZED: Select only needed columns for listings
     let query = supabase
       .from('tours')
       .select(`
-        *,
+        id,
+        name,
+        image_url,
+        destination,
+        start_date,
+        end_date,
+        price,
+        max_travelers,
+        is_featured,
+        agency_id,
+        pet_friendly,
+        category,
         agencies(id, name, rating, is_active)
       `);
 

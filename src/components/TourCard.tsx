@@ -117,6 +117,7 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
         <img
           src={tour.image_url || 'https://images.pexels.com/photos/2245436/pexels-photo-2245436.png'}
           alt={tour.name}
+          loading="lazy"
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
         {tour.is_featured && (

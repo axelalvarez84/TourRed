@@ -75,14 +75,23 @@ const AdminAgencies: React.FC = () => {
       
       console.log('🏢 Cargando agencias desde la BD...');
       
-      // Obtener agencias con información del usuario y estadísticas
+      // OPTIMIZED: Select only needed columns + pagination (limit 100 agencies)
       const { data: agenciesData, error: agenciesError } = await supabase
         .from('agencies')
         .select(`
-          *,
+          id,
+          name,
+          is_active,
+          created_at,
+          phone,
+          whatsapp,
+          rating,
+          commission_rate,
+          user_id,
           users(first_name, last_name, email, is_approved)
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (agenciesError) {
         throw new Error(agenciesError.message);
@@ -94,16 +103,16 @@ const AdminAgencies: React.FC = () => {
       const agenciesWithStats = await Promise.all(
         (agenciesData || []).map(async (agency) => {
           try {
-            // Contar tours
+            // OPTIMIZED: Count only IDs instead of all columns
             const { count: tourCount } = await supabase
               .from('tours')
-              .select('*', { count: 'exact', head: true })
+              .select('id', { count: 'exact', head: true })
               .eq('agency_id', agency.id);
 
-            // Contar reservas
+            // OPTIMIZED: Count only IDs instead of all columns
             const { count: bookingCount } = await supabase
               .from('bookings')
-              .select('*', { count: 'exact', head: true })
+              .select('id', { count: 'exact', head: true })
               .eq('agency_id', agency.id);
 
             // Calcular ingresos totales (suma de agency_net_amount de commission_records)

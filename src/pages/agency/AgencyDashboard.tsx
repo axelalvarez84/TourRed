@@ -70,41 +70,49 @@ const AgencyDashboard: React.FC = () => {
       console.log('✅ ID de agencia encontrado:', agencyData.id);
       setAgencyId(agencyData.id);
 
-      // Obtener estadísticas en paralelo
+      // OPTIMIZED: Select only needed columns + pagination
       const [
         toursResult,
         bookingsResult,
         recentBookingsResult,
         commissionRecordsResult
       ] = await Promise.all([
-        // Tours de la agencia
+        // Tours de la agencia (OPTIMIZED: limit 100)
         supabase
           .from('tours')
-          .select('*')
-          .eq('agency_id', agencyData.id),
-        
-        // Reservas de la agencia
+          .select('id, name, destination, price, is_featured, start_date, end_date')
+          .eq('agency_id', agencyData.id)
+          .limit(100),
+
+        // Reservas de la agencia (OPTIMIZED: only needed columns + limit 100)
         supabase
           .from('bookings')
           .select(`
-            *,
+            id,
+            status,
+            created_at,
+            total_price,
+            tour_id,
             tours(name, destination),
             users!bookings_user_id_fkey(first_name, last_name, email)
           `)
-          .eq('agency_id', agencyData.id),
-        
-        // Reservas recientes (últimos 30 días)
+          .eq('agency_id', agencyData.id)
+          .limit(100),
+
+        // Reservas recientes (últimos 30 días) - OPTIMIZED: only needed columns
         supabase
           .from('bookings')
-          .select('*')
+          .select('id, status, created_at, total_price')
           .eq('agency_id', agencyData.id)
-          .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+          .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+          .limit(50),
 
-        // Registros de comisiones para calcular ingresos reales
+        // Registros de comisiones (OPTIMIZED: only needed columns + limit)
         supabase
           .from('commission_records')
-          .select('*')
+          .select('agency_net_amount, agency_commission_amount, status, created_at')
           .eq('agency_id', agencyData.id)
+          .limit(100)
       ]);
 
       if (toursResult.error) {

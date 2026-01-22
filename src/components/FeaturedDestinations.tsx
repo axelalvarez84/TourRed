@@ -8,7 +8,6 @@ interface Destination {
   name: string;
   tour_count: number;
   sample_image?: string;
-  main_image_base64?: string;
   main_image_url?: string;
 }
 
@@ -21,13 +20,12 @@ const FeaturedDestinations: React.FC = () => {
       try {
         console.log('🌍 Cargando destinos populares desde la BD...');
         
-        // Get destinations with tour counts and images
+        // Get destinations with tour counts and images (OPTIMIZED: no base64)
         const { data, error } = await supabase
           .from('destinations')
           .select(`
             id,
             name,
-            main_image_base64,
             main_image_url,
             tour_destinations(
               tours(id, image_url)
@@ -54,7 +52,6 @@ const FeaturedDestinations: React.FC = () => {
             return {
               id: dest.id,
               name: dest.name,
-              main_image_base64: dest.main_image_base64,
               main_image_url: dest.main_image_url,
               tour_count: tours.length,
               sample_image: tours[0]?.image_url || 'https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg'
@@ -109,8 +106,9 @@ const FeaturedDestinations: React.FC = () => {
           className="group relative overflow-hidden rounded-lg aspect-[3/4] animate-fade-in"
         >
           <img
-            src={getImageSrc(destination.main_image_base64, destination.main_image_url) || destination.sample_image}
+            src={destination.main_image_url || destination.sample_image}
             alt={destination.name}
+            loading="lazy"
             className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent opacity-70"></div>

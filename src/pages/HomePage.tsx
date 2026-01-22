@@ -49,6 +49,7 @@ const HomePage: React.FC = () => {
           <img
             src="https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg"
             alt="Fondo de viaje"
+            loading="lazy"
             className="w-full h-full object-cover opacity-60"
           />
         </div>
