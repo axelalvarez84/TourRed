@@ -75,6 +75,11 @@ Deno.serve(async (req: Request) => {
       .select("*")
       .single();
 
+    console.log("📧 Email settings obtenidas:", emailSettings ? "SÍ" : "NO");
+    console.log("📧 SMTP API Key presente:", emailSettings?.smtp_api_key ? "SÍ" : "NO");
+    console.log("📧 From email:", emailSettings?.from_email);
+    console.log("📧 From name:", emailSettings?.from_name);
+
     if (!emailSettings?.smtp_api_key) {
       throw new Error("Email settings not configured");
     }
@@ -345,6 +350,11 @@ Deno.serve(async (req: Request) => {
       ],
     };
 
+    console.log("\n🚀 ENVIANDO A SENDGRID...");
+    console.log("📧 Destinatario:", agencyEmail);
+    console.log("📧 Asunto:", subject);
+    console.log("📧 API Key (primeros 10 chars):", emailSettings.smtp_api_key.substring(0, 10) + "...");
+
     const emailResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
       headers: {
@@ -354,11 +364,18 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify(emailData),
     });
 
+    console.log("📧 SendGrid status:", emailResponse.status);
+    console.log("📧 SendGrid ok:", emailResponse.ok);
+
     if (!emailResponse.ok) {
       const errorText = await emailResponse.text();
-      console.error("SendGrid error:", errorText);
+      console.error("❌ SendGrid error response:", errorText);
+      console.error("❌ SendGrid status:", emailResponse.status);
+      console.error("❌ Email data enviada:", JSON.stringify(emailData, null, 2));
       throw new Error(`Failed to send email: ${emailResponse.status}`);
     }
+
+    console.log("✅ Email enviado exitosamente a la agencia!");
 
     return new Response(
       JSON.stringify({ success: true }),
