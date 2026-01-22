@@ -79,12 +79,12 @@ Deno.serve(async (req: Request) => {
       throw new Error("Deben quedar al menos 48 horas para reagendar un tour");
     }
 
-    // Validar que la nueva fecha sea al menos 7 días en el futuro
+    // Validar que la nueva fecha sea al menos 4 días en el futuro
     const newStartDate = new Date(new_start_date);
     const daysUntilNewStart = (newStartDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
 
-    if (daysUntilNewStart < 7) {
-      throw new Error("La nueva fecha debe ser al menos 7 días en el futuro");
+    if (daysUntilNewStart < 4) {
+      throw new Error("La nueva fecha debe ser al menos 4 días en el futuro");
     }
 
     // Verificar que no haya un reagendamiento activo para este tour
@@ -116,9 +116,9 @@ Deno.serve(async (req: Request) => {
       throw new Error("No hay reservas activas para este tour");
     }
 
-    // Calcular fecha límite para respuestas (72 horas = 3 días)
+    // Calcular fecha límite para respuestas (96 horas = 4 días)
     const responseDeadline = new Date();
-    responseDeadline.setHours(responseDeadline.getHours() + 72);
+    responseDeadline.setHours(responseDeadline.getHours() + 96);
 
     // Crear el registro de reagendamiento
     const { data: reschedule, error: rescheduleError } = await supabase

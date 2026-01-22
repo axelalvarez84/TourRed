@@ -610,7 +610,7 @@ const AgencyTours: React.FC = () => {
     });
 
     const minNewDate = new Date();
-    minNewDate.setDate(minNewDate.getDate() + 7);
+    minNewDate.setDate(minNewDate.getDate() + 4);
 
     setRescheduleFormData({
       new_start_date: minNewDate.toISOString().split('T')[0],
@@ -668,10 +668,10 @@ const AgencyTours: React.FC = () => {
     const newStartDate = new Date(rescheduleFormData.new_start_date);
     const daysUntilNewStart = (newStartDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
 
-    if (daysUntilNewStart < 7) {
+    if (daysUntilNewStart < 4) {
       setRescheduleModal(prev => ({
         ...prev,
-        error: 'La nueva fecha debe ser al menos 7 días en el futuro',
+        error: 'La nueva fecha debe ser al menos 4 días en el futuro',
       }));
       return;
     }
@@ -2045,7 +2045,7 @@ const AgencyTours: React.FC = () => {
                       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                         <h4 className="font-medium text-gray-900 mb-2">Política de Reagendamiento</h4>
                         <ul className="text-sm text-gray-600 space-y-1">
-                          <li>• Los viajeros tendrán 7 días para responder</li>
+                          <li>• Los viajeros tendrán 4 días para responder</li>
                           <li>• Pueden aceptar las nuevas fechas sin costo adicional</li>
                           <li>• O solicitar un reembolso completo (100%)</li>
                           <li>• Se enviará una notificación por correo electrónico a cada viajero</li>
