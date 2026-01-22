@@ -155,16 +155,24 @@ Deno.serve(async (req: Request) => {
           }
         });
 
-      // Enviar email de confirmación
+      // Enviar emails de confirmación
       try {
-        await supabase.functions.invoke("send-reschedule-response-confirmation", {
-          body: {
-            booking_id: booking_id,
-            response: "accepted"
-          }
-        });
+        await Promise.all([
+          supabase.functions.invoke("send-reschedule-response-confirmation", {
+            body: {
+              booking_id: booking_id,
+              response: "accepted"
+            }
+          }),
+          supabase.functions.invoke("send-reschedule-response-agency", {
+            body: {
+              booking_id: booking_id,
+              response: "accepted"
+            }
+          })
+        ]);
       } catch (emailErr) {
-        console.error("Error sending confirmation email:", emailErr);
+        console.error("Error sending confirmation emails:", emailErr);
       }
 
       return new Response(
@@ -268,16 +276,24 @@ Deno.serve(async (req: Request) => {
           }
         });
 
-      // Enviar email de confirmación de reembolso
+      // Enviar emails de confirmación de reembolso
       try {
-        await supabase.functions.invoke("send-reschedule-response-confirmation", {
-          body: {
-            booking_id: booking_id,
-            response: "rejected"
-          }
-        });
+        await Promise.all([
+          supabase.functions.invoke("send-reschedule-response-confirmation", {
+            body: {
+              booking_id: booking_id,
+              response: "rejected"
+            }
+          }),
+          supabase.functions.invoke("send-reschedule-response-agency", {
+            body: {
+              booking_id: booking_id,
+              response: "rejected"
+            }
+          })
+        ]);
       } catch (emailErr) {
-        console.error("Error sending refund email:", emailErr);
+        console.error("Error sending refund emails:", emailErr);
       }
 
       return new Response(
