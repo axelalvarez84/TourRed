@@ -66,7 +66,31 @@ const TravelerWallet: React.FC = () => {
           .order('created_at', { ascending: false });
 
         if (transactionsError) throw transactionsError;
-        setTransactions(transactionsData || []);
+
+        const transactionsWithBookingCodes = await Promise.all(
+          (transactionsData || []).map(async (transaction) => {
+            if (transaction.reference_type === 'booking' && transaction.reference_id) {
+              const { data: booking } = await supabase
+                .from('bookings')
+                .select('booking_code')
+                .eq('id', transaction.reference_id)
+                .maybeSingle();
+
+              if (booking?.booking_code) {
+                return {
+                  ...transaction,
+                  description: transaction.description.replace(
+                    new RegExp(transaction.reference_id, 'g'),
+                    booking.booking_code
+                  )
+                };
+              }
+            }
+            return transaction;
+          })
+        );
+
+        setTransactions(transactionsWithBookingCodes);
       }
     } catch (error) {
       console.error('Error loading wallet data:', error);
