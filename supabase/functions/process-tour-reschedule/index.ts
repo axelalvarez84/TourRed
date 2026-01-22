@@ -66,18 +66,20 @@ Deno.serve(async (req: Request) => {
 
     // Validar que el tour no haya iniciado ya
     const tourStartDate = new Date(tour.start_date);
-    const today = new Date();
+    const now = new Date();
+
+    // Normalizar ambas fechas a medianoche para comparar días completos
+    const tourStartDay = new Date(tourStartDate);
+    tourStartDay.setHours(0, 0, 0, 0);
+
+    const today = new Date(now);
     today.setHours(0, 0, 0, 0);
 
-    if (tourStartDate <= today) {
-      throw new Error("No se puede reagendar un tour que ya inició");
-    }
+    // Validar que quedan al menos 2 días completos para el inicio
+    const daysUntilStart = Math.floor((tourStartDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
-    // Validar que quedan al menos 48 horas para el inicio
-    const now = new Date();
-    const hoursUntilStart = (tourStartDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-    if (hoursUntilStart < 48) {
-      throw new Error(`Deben quedar al menos 48 horas para reagendar un tour. Quedan ${Math.round(hoursUntilStart)} horas.`);
+    if (daysUntilStart < 2) {
+      throw new Error(`Deben quedar al menos 2 días completos para reagendar un tour. Quedan ${daysUntilStart} días.`);
     }
 
     // Validar que la nueva fecha sea al menos 4 días en el futuro
