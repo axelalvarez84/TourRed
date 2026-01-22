@@ -235,6 +235,171 @@ Deno.serve(async (req: Request) => {
       })
       .eq("id", tour_id);
 
+    // Enviar correo de confirmación a la agencia
+    console.log("📧 Enviando correo de confirmación a la agencia...");
+    try {
+      // Obtener configuración de email
+      const { data: emailSettings, error: emailError } = await supabase
+        .from("email_settings")
+        .select("*")
+        .single();
+
+      if (emailError || !emailSettings?.smtp_api_key) {
+        console.error("❌ Email settings not configured:", emailError);
+      } else {
+        const formatDate = (dateStr: string) => {
+          const date = new Date(dateStr);
+          return date.toLocaleDateString('es-MX', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+        };
+
+        const originalDate = formatDate(tour.start_date);
+        const newDate = formatDate(new_start_date);
+        const deadlineDate = formatDate(responseDeadline.toISOString());
+        const agencyName = tour.agency.name;
+        const tourName = tour.name;
+
+        const subject = `✅ Reagendamiento Creado - ${tourName}`;
+
+        const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reagendamiento Creado</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 40px 20px; text-align: center;">
+              <img src="https://huzsedewwzjywcpbkjkm.supabase.co/storage/v1/object/public/images/email-logo.png" alt="ToursRed Logo" style="width: 120px; height: auto; margin-bottom: 20px;" />
+              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">✅ Reagendamiento Creado</h1>
+              <p style="color: #bfdbfe; margin: 10px 0 0 0; font-size: 14px;">Tour reagendado exitosamente</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #dbeafe; border-left: 4px solid #3b82f6; padding: 20px; text-align: center;">
+              <p style="margin: 0; color: #1e40af; font-weight: bold; font-size: 16px;">El tour ha sido reagendado y los viajeros han sido notificados</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                Hola <strong>${agencyName}</strong>,
+              </p>
+              <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">
+                Tu solicitud de reagendamiento para el tour <strong>${tourName}</strong> ha sido procesada exitosamente.
+              </p>
+              <div style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 2px solid #3b82f6; padding: 25px; margin: 30px 0; border-radius: 8px;">
+                <h2 style="margin: 0 0 20px 0; color: #1e40af; font-size: 18px;">📅 Detalles del Reagendamiento</h2>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Tour:</td>
+                    <td style="padding: 8px 0; color: #1f2937; font-weight: bold; font-size: 14px; text-align: right;">${tourName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Fecha Original:</td>
+                    <td style="padding: 8px 0; color: #ef4444; font-weight: bold; font-size: 14px; text-align: right; text-decoration: line-through;">${originalDate}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Nueva Fecha:</td>
+                    <td style="padding: 8px 0; color: #10b981; font-weight: bold; font-size: 14px; text-align: right;">${newDate}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Reservas Afectadas:</td>
+                    <td style="padding: 8px 0; color: #1f2937; font-weight: bold; font-size: 14px; text-align: right;">${activeBookings.length}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Viajeros Notificados:</td>
+                    <td style="padding: 8px 0; color: #3b82f6; font-weight: bold; font-size: 14px; text-align: right;">${emailsSent}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Fecha Límite Respuesta:</td>
+                    <td style="padding: 8px 0; color: #f59e0b; font-weight: bold; font-size: 14px; text-align: right;">${deadlineDate}</td>
+                  </tr>
+                </table>
+              </div>
+              <div style="background-color: #fef3c7; border: 1px solid #fbbf24; padding: 20px; margin: 30px 0; border-radius: 8px;">
+                <p style="margin: 0 0 10px 0; color: #92400e; font-weight: bold; font-size: 14px;">⏰ Próximos Pasos</p>
+                <ul style="margin: 0; padding-left: 20px; color: #78350f; font-size: 14px; line-height: 1.8;">
+                  <li>Todos los viajeros con reservas activas han sido notificados por email</li>
+                  <li>Los viajeros tienen 4 días (96 horas) para responder</li>
+                  <li>Si un viajero acepta, su reserva continúa con la nueva fecha</li>
+                  <li>Si un viajero rechaza, su reserva se cancelará automáticamente con reembolso del 100%</li>
+                  <li>Recibirás un correo cada vez que un viajero responda</li>
+                </ul>
+              </div>
+              <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0;">
+                Puedes monitorear las respuestas de los viajeros desde tu panel de agencia en ToursRed.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="color: #6b7280; font-size: 12px; margin: 0 0 10px 0;">
+                Este correo fue enviado por ToursRed
+              </p>
+              <p style="color: #6b7280; font-size: 12px; margin: 0;">
+                © ${new Date().getFullYear()} ToursRed. Todos los derechos reservados.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+        `;
+
+        const emailData = {
+          personalizations: [
+            {
+              to: [{ email: tour.agency.contact_email, name: agencyName }],
+              subject: subject,
+            },
+          ],
+          from: {
+            email: emailSettings.from_email,
+            name: emailSettings.from_name || "ToursRed",
+          },
+          content: [
+            {
+              type: "text/html",
+              value: htmlContent,
+            },
+          ],
+        };
+
+        const emailResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${emailSettings.smtp_api_key}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(emailData),
+        });
+
+        if (emailResponse.ok) {
+          console.log("✅ Email de confirmación enviado a la agencia");
+        } else {
+          const errorText = await emailResponse.text();
+          console.error("❌ Error enviando email a agencia:", errorText);
+        }
+      }
+    } catch (emailErr: any) {
+      console.error("❌ Error al enviar email a agencia:", emailErr);
+      // No lanzamos error porque el reagendamiento ya se procesó exitosamente
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
