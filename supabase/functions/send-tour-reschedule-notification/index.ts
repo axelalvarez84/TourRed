@@ -93,7 +93,7 @@ Deno.serve(async (req: Request) => {
     });
 
     // URLs para aceptar/rechazar (apuntan a la página de reservas del viajero)
-    const appUrl = Deno.env.get("APP_URL") || "https://toursred.netlify.app";
+    const appUrl = Deno.env.get("APP_URL") || "https://toursredmx.netlify.app";
     const acceptUrl = `${appUrl}/traveler/bookings?action=accept&booking=${booking_id}`;
     const rejectUrl = `${appUrl}/traveler/bookings?action=reject&booking=${booking_id}`;
 
