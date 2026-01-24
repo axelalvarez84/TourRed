@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Mail, Phone, MapPin, CheckCircle, AlertCircle, Loader } from 'lucide-react';
+import { useFormPersistence } from '../hooks/useFormPersistence';
+import { usePreventUnload } from '../hooks/usePreventUnload';
 
 const ContactPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -12,6 +14,22 @@ const ContactPage: React.FC = () => {
     type: 'success' | 'error' | null;
     message: string;
   }>({ type: null, message: '' });
+
+  const contactFormPersistence = useFormPersistence(
+    formData,
+    { key: 'contact_form', expirationHours: 24 }
+  );
+
+  usePreventUnload(formData.name.length > 0 || formData.email.length > 0 || formData.message.length > 0);
+
+  useEffect(() => {
+    const savedData = contactFormPersistence.loadFromStorage();
+    if (savedData) {
+      contactFormPersistence.setIsRestoring(true);
+      setFormData(savedData);
+      setTimeout(() => contactFormPersistence.setIsRestoring(false), 100);
+    }
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
@@ -39,6 +57,7 @@ const ContactPage: React.FC = () => {
       const data = await response.json();
 
       if (response.ok) {
+        contactFormPersistence.clearStorage();
         setSubmitStatus({
           type: 'success',
           message: 'Tu mensaje ha sido enviado correctamente. Nos pondremos en contacto contigo pronto.',

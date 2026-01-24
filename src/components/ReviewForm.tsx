@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Star } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useFormPersistence } from '../hooks/useFormPersistence';
+import { usePreventUnload } from '../hooks/usePreventUnload';
 
 interface ReviewFormProps {
   bookingId: string;
@@ -28,6 +30,25 @@ export default function ReviewForm({
   const [comment, setComment] = useState(existingReview?.comment || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const reviewFormPersistence = useFormPersistence(
+    { rating, comment },
+    { key: `review_${bookingId}_${revieweeId}`, expirationHours: 24 }
+  );
+
+  usePreventUnload(comment.length > 0 || rating > 0);
+
+  useEffect(() => {
+    if (!existingReview) {
+      const savedData = reviewFormPersistence.loadFromStorage();
+      if (savedData) {
+        reviewFormPersistence.setIsRestoring(true);
+        if (savedData.rating) setRating(savedData.rating);
+        if (savedData.comment) setComment(savedData.comment);
+        setTimeout(() => reviewFormPersistence.setIsRestoring(false), 100);
+      }
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,6 +104,7 @@ export default function ReviewForm({
         if (insertError) throw insertError;
       }
 
+      reviewFormPersistence.clearStorage();
       if (onSuccess) onSuccess();
     } catch (err: any) {
       console.error('Error submitting review:', err);
@@ -160,7 +182,10 @@ export default function ReviewForm({
         {onCancel && (
           <button
             type="button"
-            onClick={onCancel}
+            onClick={() => {
+              reviewFormPersistence.clearStorage();
+              onCancel();
+            }}
             disabled={loading}
             className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >

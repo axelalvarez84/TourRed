@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { ChevronRight, Info, X, Loader, AlertCircle, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { useFormPersistence } from '../../hooks/useFormPersistence';
+import { usePreventUnload } from '../../hooks/usePreventUnload';
 
 interface DestinationTab {
   id: string;
@@ -49,6 +51,27 @@ const MegaTravelPage: React.FC = () => {
 
   const activeDestination = destinations.find(d => d.id === activeTab) || destinations[0];
   const iframeUrl = `${activeDestination.url}${activeDestination.url.includes('?') ? '&' : '?'}colorPrimario=2563eb&colorSecundario=f59e0b&colorTexto=000000&colorFondo=ffffff`;
+
+  const megaTravelFormPersistence = useFormPersistence(
+    formData,
+    { key: 'mega_travel_inquiry', expirationHours: 24 }
+  );
+
+  usePreventUnload(
+    formData.name.length > 0 ||
+    formData.email.length > 0 ||
+    formData.phone.length > 0 ||
+    formData.message.length > 0
+  );
+
+  useEffect(() => {
+    const savedData = megaTravelFormPersistence.loadFromStorage();
+    if (savedData) {
+      megaTravelFormPersistence.setIsRestoring(true);
+      setFormData(savedData);
+      setTimeout(() => megaTravelFormPersistence.setIsRestoring(false), 100);
+    }
+  }, []);
 
   useEffect(() => {
     setFormData(prev => ({
@@ -122,6 +145,7 @@ const MegaTravelPage: React.FC = () => {
         throw new Error(result.error || 'Error al enviar la cotización');
       }
 
+      megaTravelFormPersistence.clearStorage();
       setSuccess(true);
       setTimeout(() => {
         setIsModalOpen(false);

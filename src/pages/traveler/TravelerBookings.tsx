@@ -6,6 +6,8 @@ import { Booking, PendingReschedule } from '../../types';
 import { format } from 'date-fns';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import ReviewForm from '../../components/ReviewForm';
+import { useFormPersistence } from '../../hooks/useFormPersistence';
+import { usePreventUnload } from '../../hooks/usePreventUnload';
 
 const TravelerBookings: React.FC = () => {
   const { user } = useAuth();
@@ -78,6 +80,13 @@ const TravelerBookings: React.FC = () => {
     action: null,
   });
   const [pendingReschedules, setPendingReschedules] = useState<{ [bookingId: string]: PendingReschedule }>({});
+
+  const cancellationFormPersistence = useFormPersistence(
+    { cancellationReason: cancellationModal.cancellationReason },
+    { key: `cancellation_${cancellationModal.booking?.id || 'temp'}`, expirationHours: 24 }
+  );
+
+  usePreventUnload(cancellationModal.open && cancellationModal.cancellationReason.length > 0);
 
   useEffect(() => {
     if (user?.id) {
@@ -309,17 +318,22 @@ const TravelerBookings: React.FC = () => {
       return;
     }
 
+    const savedData = cancellationFormPersistence.loadFromStorage();
+
     setCancellationModal({
       open: true,
       booking,
       policy: null,
       isCalculating: true,
       isCancelling: false,
-      cancellationReason: '',
+      cancellationReason: savedData?.cancellationReason || '',
       acceptPolicy: false,
       error: '',
       success: false,
     });
+
+    cancellationFormPersistence.setIsRestoring(true);
+    setTimeout(() => cancellationFormPersistence.setIsRestoring(false), 100);
 
     try {
       const { data: fullBooking, error } = await supabase
@@ -352,6 +366,7 @@ const TravelerBookings: React.FC = () => {
   };
 
   const handleCloseCancellationModal = () => {
+    cancellationFormPersistence.clearStorage();
     setCancellationModal({
       open: false,
       booking: null,
@@ -392,6 +407,8 @@ const TravelerBookings: React.FC = () => {
       if (result.error) {
         throw new Error(result.error);
       }
+
+      cancellationFormPersistence.clearStorage();
 
       setCancellationModal(prev => ({
         ...prev,

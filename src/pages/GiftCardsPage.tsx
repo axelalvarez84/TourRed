@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Gift, Check, CreditCard } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useFormPersistence } from '../hooks/useFormPersistence';
+import { usePreventUnload } from '../hooks/usePreventUnload';
 
 const GIFT_CARD_AMOUNTS = [100, 200, 500, 1000];
 
@@ -14,6 +16,33 @@ export default function GiftCardsPage() {
   const [personalMessage, setPersonalMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const giftCardFormPersistence = useFormPersistence(
+    { purchaserName, purchaserEmail, recipientName, recipientEmail, personalMessage, selectedAmount },
+    { key: 'gift_card_purchase', expirationHours: 24 }
+  );
+
+  usePreventUnload(
+    purchaserName.length > 0 ||
+    purchaserEmail.length > 0 ||
+    recipientName.length > 0 ||
+    recipientEmail.length > 0 ||
+    personalMessage.length > 0
+  );
+
+  useEffect(() => {
+    const savedData = giftCardFormPersistence.loadFromStorage();
+    if (savedData) {
+      giftCardFormPersistence.setIsRestoring(true);
+      if (savedData.purchaserName) setPurchaserName(savedData.purchaserName);
+      if (savedData.purchaserEmail) setPurchaserEmail(savedData.purchaserEmail);
+      if (savedData.recipientName) setRecipientName(savedData.recipientName);
+      if (savedData.recipientEmail) setRecipientEmail(savedData.recipientEmail);
+      if (savedData.personalMessage) setPersonalMessage(savedData.personalMessage);
+      if (savedData.selectedAmount) setSelectedAmount(savedData.selectedAmount);
+      setTimeout(() => giftCardFormPersistence.setIsRestoring(false), 100);
+    }
+  }, []);
 
   const handlePurchase = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +66,7 @@ export default function GiftCardsPage() {
       }
 
       if (data?.url) {
+        giftCardFormPersistence.clearStorage();
         window.location.href = data.url;
       } else {
         throw new Error('No se pudo crear la sesión de pago');

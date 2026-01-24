@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, MoreVertical, Edit, Trash2, Clock, Check, CheckCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { useFormPersistence } from '../../hooks/useFormPersistence';
+import { usePreventUnload } from '../../hooks/usePreventUnload';
 
 interface Message {
   id: string;
@@ -42,8 +44,26 @@ const MessageThread: React.FC<MessageThreadProps> = ({
   const [editContent, setEditContent] = useState('');
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
+  const newMessagePersistence = useFormPersistence(
+    { newMessage },
+    { key: `message_new_${conversationId}`, expirationHours: 24 }
+  );
+
+  const editMessagePersistence = useFormPersistence(
+    { editContent },
+    { key: `message_edit_${editingMessageId || 'none'}`, expirationHours: 24 }
+  );
+
+  usePreventUnload(newMessage.length > 0 || editContent.length > 0);
+
   useEffect(() => {
     if (conversationId) {
+      const savedData = newMessagePersistence.loadFromStorage();
+      if (savedData?.newMessage) {
+        newMessagePersistence.setIsRestoring(true);
+        setNewMessage(savedData.newMessage);
+        setTimeout(() => newMessagePersistence.setIsRestoring(false), 100);
+      }
       fetchMessages();
       markAsRead();
     }
@@ -109,6 +129,7 @@ const MessageThread: React.FC<MessageThreadProps> = ({
         throw new Error(error.message);
       }
 
+      newMessagePersistence.clearStorage();
       setNewMessage('');
       await fetchMessages();
     } catch (err: any) {
@@ -137,12 +158,13 @@ const MessageThread: React.FC<MessageThreadProps> = ({
         throw new Error(error.message);
       }
 
-      setMessages(prev => prev.map(msg => 
-        msg.id === editingMessageId 
+      setMessages(prev => prev.map(msg =>
+        msg.id === editingMessageId
           ? { ...msg, content: editContent.trim(), is_edited: true, edited_at: new Date().toISOString() }
           : msg
       ));
 
+      editMessagePersistence.clearStorage();
       setEditingMessageId(null);
       setEditContent('');
     } catch (err: any) {
@@ -152,6 +174,7 @@ const MessageThread: React.FC<MessageThreadProps> = ({
   };
 
   const cancelEdit = () => {
+    editMessagePersistence.clearStorage();
     setEditingMessageId(null);
     setEditContent('');
   };

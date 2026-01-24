@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { supabase, getCurrentUser, UserRole } from '../lib/supabase';
 
 export interface AdminPermissions {
@@ -345,7 +345,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isAgency = userRole === UserRole.AGENCY;
   const isTraveler = userRole === UserRole.TRAVELER;
 
-  // Log del estado actual cada vez que cambia
+  const contextValue = useMemo(() => ({
+    user,
+    userRole,
+    isLoading,
+    isAdmin,
+    isAgency,
+    isTraveler,
+    isEmailVerified,
+    isSuperAdmin,
+    permissions
+  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isEmailVerified, isSuperAdmin, permissions]);
+
   useEffect(() => {
     console.log('🎭 Estado del contexto actualizado:', {
       userEmail: user?.email,
@@ -361,17 +372,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isEmailVerified, isSuperAdmin, permissions]);
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      userRole,
-      isLoading,
-      isAdmin,
-      isAgency,
-      isTraveler,
-      isEmailVerified,
-      isSuperAdmin,
-      permissions
-    }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
