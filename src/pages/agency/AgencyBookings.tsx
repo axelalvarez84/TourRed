@@ -31,6 +31,12 @@ const AgencyBookings: React.FC = () => {
     booking: Booking | null;
     travelers: any[];
   }>({ open: false, booking: null, travelers: [] });
+  const [cancelBookingModal, setCancelBookingModal] = useState<{
+    open: boolean;
+    booking: Booking | null;
+    isSubmitting: boolean;
+    reason: string;
+  }>({ open: false, booking: null, isSubmitting: false, reason: '' });
   const [activeTab, setActiveTab] = useState<'bookings' | 'reports'>('bookings');
   const [availableTours, setAvailableTours] = useState<any[]>([]);
   const [selectedTourForReport, setSelectedTourForReport] = useState<string>('');
@@ -582,6 +588,92 @@ const AgencyBookings: React.FC = () => {
     setTravelersModal({ open: false, booking: null, travelers: [] });
   };
 
+  const handleOpenCancelBookingModal = (booking: Booking) => {
+    if (booking.cancelled_at || booking.status === 'cancelled') {
+      alert('Esta reserva ya fue cancelada');
+      return;
+    }
+
+    if (!['confirmed', 'pending'].includes(booking.status) || booking.payment_status !== 'succeeded') {
+      alert('Solo se pueden cancelar reservas confirmadas o pendientes con pago exitoso');
+      return;
+    }
+
+    const tourStartDate = new Date(booking.tours?.start_date || '');
+    const now = new Date();
+    tourStartDate.setHours(0, 0, 0, 0);
+    now.setHours(0, 0, 0, 0);
+
+    if (tourStartDate <= now) {
+      alert('No se puede cancelar una reserva de un tour que ya inició');
+      return;
+    }
+
+    setCancelBookingModal({ open: true, booking, isSubmitting: false, reason: '' });
+  };
+
+  const handleCloseCancelBookingModal = () => {
+    setCancelBookingModal({ open: false, booking: null, isSubmitting: false, reason: '' });
+  };
+
+  const handleCancelBookingReasonChange = (reason: string) => {
+    setCancelBookingModal(prev => ({ ...prev, reason }));
+  };
+
+  const handleSubmitCancelBooking = async () => {
+    if (!cancelBookingModal.booking) return;
+
+    if (cancelBookingModal.reason.trim().length < 50) {
+      alert('El motivo de cancelación debe tener al menos 50 caracteres');
+      return;
+    }
+
+    if (!confirm('¿Estás seguro de cancelar esta reserva?\n\nEl viajero recibirá un reembolso del 100% en su ToursRed Cash y tú no recibirás comisión por esta reserva.\n\nEsta acción no se puede deshacer.')) {
+      return;
+    }
+
+    try {
+      setCancelBookingModal(prev => ({ ...prev, isSubmitting: true }));
+
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        throw new Error('No hay sesión activa');
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-agency-booking-cancellation`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            booking_id: cancelBookingModal.booking.id,
+            cancellation_reason: cancelBookingModal.reason.trim()
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Error al cancelar la reserva');
+      }
+
+      alert(`Reserva cancelada exitosamente.\n\nEl viajero ha recibido un reembolso de $${result.refund_amount?.toFixed(2) || '0.00'} en su ToursRed Cash.`);
+
+      handleCloseCancelBookingModal();
+      fetchAgencyData();
+
+    } catch (err: any) {
+      console.error('Error cancelando reserva:', err);
+      alert(err.message || 'Error al cancelar la reserva');
+      setCancelBookingModal(prev => ({ ...prev, isSubmitting: false }));
+    }
+  };
+
   const getCategoryLabel = (categoria: string): string => {
     const labels: Record<string, string> = {
       adulto: 'Adulto',
@@ -1053,6 +1145,16 @@ const AgencyBookings: React.FC = () => {
                         Calificar Viajero
                       </button>
                     )}
+
+                    {booking.status !== 'cancelled' && !booking.cancelled_at && ['confirmed', 'pending'].includes(booking.status) && booking.payment_status === 'succeeded' && !(booking as any).is_no_show && (
+                      <button
+                        onClick={() => handleOpenCancelBookingModal(booking)}
+                        className="btn bg-orange-600 text-white hover:bg-orange-700 flex items-center justify-center"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Cancelar Reserva
+                      </button>
+                    )}
                   </div>
 
                   {/* Important Notes */}
@@ -1062,13 +1164,18 @@ const AgencyBookings: React.FC = () => {
                         <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
                         <div className="flex-1">
                           <p className="text-sm text-red-800 font-semibold mb-2">
-                            Reserva Cancelada por el Viajero
+                            {(booking as any).cancelled_by_agency_at ? 'Reserva Cancelada por tu Agencia' : 'Reserva Cancelada por el Viajero'}
                           </p>
                           <div className="text-xs text-red-700 space-y-1">
                             <p>
                               <strong>Cancelado el:</strong> {formatDate((booking as any).cancelled_at)}
                             </p>
-                            {(booking as any).cancellation_type && (
+                            {(booking as any).cancelled_by_agency_at && (
+                              <p className="text-orange-800 font-semibold mt-2">
+                                ℹ️ Esta reserva fue cancelada por tu agencia. El viajero recibió un reembolso del 100% y no se pagará comisión.
+                              </p>
+                            )}
+                            {!(booking as any).cancelled_by_agency_at && (booking as any).cancellation_type && (
                               <p>
                                 <strong>Política aplicada:</strong> {
                                   (booking as any).cancellation_type === '100_percent' ? 'Reembolso del 100%' :
@@ -1076,6 +1183,7 @@ const AgencyBookings: React.FC = () => {
                                   (booking as any).cancellation_type === 'no_refund' ? 'Sin reembolso' :
                                   (booking as any).cancellation_type === 'no_show' ? 'Cancelación tardía (No Show)' :
                                   (booking as any).cancellation_type === 'pending_approval' ? 'Reserva pendiente' :
+                                  (booking as any).cancellation_type === 'agency_cancellation' ? 'Cancelación por agencia' :
                                   'N/A'
                                 }
                               </p>
@@ -1615,6 +1723,125 @@ const AgencyBookings: React.FC = () => {
                 onCancel={handleCloseReviewModal}
                 existingReview={reviewModal.existingReview}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Booking Modal */}
+      {cancelBookingModal.open && cancelBookingModal.booking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="bg-orange-100 rounded-full p-3">
+                    <XCircle className="h-6 w-6 text-orange-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">Cancelar Reserva</h2>
+                    <p className="text-sm text-gray-500">Esta acción no se puede deshacer</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleCloseCancelBookingModal}
+                  className="text-gray-400 hover:text-gray-600"
+                  disabled={cancelBookingModal.isSubmitting}
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <h3 className="font-semibold mb-3">Información de la Reserva</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Código de reserva:</span>
+                    <span className="font-semibold">{cancelBookingModal.booking.booking_code}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Tour:</span>
+                    <span className="font-semibold">{cancelBookingModal.booking.tours?.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Viajero:</span>
+                    <span className="font-semibold">
+                      {cancelBookingModal.booking.users?.first_name} {cancelBookingModal.booking.users?.last_name}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Anticipo pagado:</span>
+                    <span className="font-semibold">${(cancelBookingModal.booking.deposit_amount || 0).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6">
+                <div className="flex gap-2">
+                  <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-yellow-800">
+                    <p className="font-semibold mb-1">⚠️ Importante: Política de Cancelación por Agencia</p>
+                    <ul className="list-disc list-inside space-y-1 ml-2">
+                      <li>El viajero recibirá un <strong>reembolso del 100%</strong> en su ToursRed Cash</li>
+                      <li>Los cargos por servicio NO son reembolsables (ya cobrados por Stripe)</li>
+                      <li>Tu agencia <strong>NO recibirá comisión</strong> por esta reserva</li>
+                      <li>Esta acción es <strong>irreversible</strong></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Motivo de la Cancelación *
+                  <span className="text-xs text-gray-500 ml-2">(mínimo 50 caracteres)</span>
+                </label>
+                <textarea
+                  value={cancelBookingModal.reason}
+                  onChange={(e) => handleCancelBookingReasonChange(e.target.value)}
+                  placeholder="Explica el motivo de la cancelación. Por ejemplo: sobrecupo, problema logístico, situación especial con el viajero, etc."
+                  className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none"
+                  rows={5}
+                  disabled={cancelBookingModal.isSubmitting}
+                />
+                <div className="flex justify-between items-center mt-2">
+                  <span className={`text-xs ${cancelBookingModal.reason.length < 50 ? 'text-red-600' : 'text-green-600'}`}>
+                    {cancelBookingModal.reason.length} / 50 caracteres
+                  </span>
+                  {cancelBookingModal.reason.length < 50 && (
+                    <span className="text-xs text-red-600">
+                      Faltan {50 - cancelBookingModal.reason.length} caracteres
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={handleCloseCancelBookingModal}
+                  className="btn btn-outline flex-1"
+                  disabled={cancelBookingModal.isSubmitting}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSubmitCancelBooking}
+                  disabled={cancelBookingModal.reason.trim().length < 50 || cancelBookingModal.isSubmitting}
+                  className="btn bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex-1 flex items-center justify-center"
+                >
+                  {cancelBookingModal.isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Confirmar Cancelación
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
