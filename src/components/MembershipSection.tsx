@@ -1,8 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Crown, Check, CreditCard } from 'lucide-react';
+import { useMembershipPrices } from '../hooks/useMembershipPrices';
 
 const MembershipSection: React.FC = () => {
+  const { prices, loading } = useMembershipPrices();
+
+  if (loading || !prices) {
+    return null;
+  }
+
   return (
     <section className="py-12 bg-gradient-to-br from-amber-50 to-orange-50">
       <div className="container-custom">
@@ -21,7 +28,7 @@ const MembershipSection: React.FC = () => {
             <div className="text-center mb-6">
               <h3 className="text-2xl font-bold mb-2">Plan Mensual</h3>
               <div className="flex items-baseline justify-center">
-                <span className="text-4xl font-bold text-primary-600">$49</span>
+                <span className="text-4xl font-bold text-primary-600">{prices.monthlyPriceFormatted}</span>
                 <span className="text-gray-600 ml-2">/mes</span>
               </div>
             </div>
@@ -59,16 +66,16 @@ const MembershipSection: React.FC = () => {
 
           <div className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl shadow-xl p-8 border-2 border-amber-400 relative overflow-hidden">
             <div className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">
-              AHORRA 17%
+              AHORRA {prices.savingsPercentage}%
             </div>
 
             <div className="text-center mb-6">
               <h3 className="text-2xl font-bold text-white mb-2">Plan Anual</h3>
               <div className="flex items-baseline justify-center mb-1">
-                <span className="text-4xl font-bold text-white">$490</span>
+                <span className="text-4xl font-bold text-white">{prices.annualPriceFormatted}</span>
                 <span className="text-amber-100 ml-2">/año</span>
               </div>
-              <p className="text-amber-100 text-sm">Equivalente a $40.83/mes</p>
+              <p className="text-amber-100 text-sm">Equivalente a {prices.annualMonthlyEquivalentFormatted}/mes</p>
             </div>
 
             <ul className="space-y-3 mb-8">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard } from 'lucide-react';
+import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard, Crown } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface EmailSettings {
@@ -18,6 +18,8 @@ interface PlatformSettings {
   agency_commission_percentage: number;
   stripe_monthly_price_id: string;
   stripe_annual_price_id: string;
+  membership_monthly_price: number;
+  membership_annual_price: number;
 }
 
 const AdminSettings: React.FC = () => {
@@ -36,6 +38,8 @@ const AdminSettings: React.FC = () => {
     agency_commission_percentage: 15,
     stripe_monthly_price_id: '',
     stripe_annual_price_id: '',
+    membership_monthly_price: 49,
+    membership_annual_price: 490,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -106,6 +110,8 @@ const AdminSettings: React.FC = () => {
             agency_commission_percentage: platformSettings.agency_commission_percentage,
             stripe_monthly_price_id: platformSettings.stripe_monthly_price_id,
             stripe_annual_price_id: platformSettings.stripe_annual_price_id,
+            membership_monthly_price: platformSettings.membership_monthly_price,
+            membership_annual_price: platformSettings.membership_annual_price,
             updated_at: new Date().toISOString(),
             updated_by: user?.id
           })
@@ -144,7 +150,7 @@ const AdminSettings: React.FC = () => {
 
   const handlePlatformChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    const numericFields = ['service_charge_percentage', 'agency_commission_percentage'];
+    const numericFields = ['service_charge_percentage', 'agency_commission_percentage', 'membership_monthly_price', 'membership_annual_price'];
     setPlatformSettings(prev => ({
       ...prev,
       [name]: numericFields.includes(name) ? (parseFloat(value) || 0) : value,
@@ -354,6 +360,91 @@ const AdminSettings: React.FC = () => {
                   Este ID debe empezar con "price_" no con "prod_"
                 </p>
               )}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <Crown className="w-6 h-6 text-amber-600" />
+            <h2 className="text-xl font-semibold text-gray-900">
+              Precios de Membresías ToursRed+
+            </h2>
+          </div>
+
+          <div className="bg-amber-50 border border-amber-200 rounded-md p-4 mb-4">
+            <div className="flex items-start">
+              <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 mr-2 flex-shrink-0" />
+              <div className="text-sm text-amber-800">
+                <p className="font-medium mb-2">Información importante:</p>
+                <ul className="space-y-1 text-xs">
+                  <li>• Los precios se mostrarán en todas las páginas de membresía y correos electrónicos</li>
+                  <li>• Asegúrate de que estos precios coincidan con los productos en Stripe</li>
+                  <li>• Los cambios se reflejarán inmediatamente después de guardar</li>
+                  <li>• El ahorro del plan anual se calcula automáticamente</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="membership_monthly_price" className="block text-sm font-medium text-gray-700 mb-1">
+                Precio Plan Mensual (MXN)
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                Precio mensual de la membresía ToursRed+
+              </p>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                <input
+                  type="number"
+                  id="membership_monthly_price"
+                  name="membership_monthly_price"
+                  value={platformSettings.membership_monthly_price}
+                  onChange={handlePlatformChange}
+                  min="1"
+                  step="0.01"
+                  required
+                  className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="membership_annual_price" className="block text-sm font-medium text-gray-700 mb-1">
+                Precio Plan Anual (MXN)
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                Precio anual de la membresía ToursRed+
+              </p>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                <input
+                  type="number"
+                  id="membership_annual_price"
+                  name="membership_annual_price"
+                  value={platformSettings.membership_annual_price}
+                  onChange={handlePlatformChange}
+                  min="1"
+                  step="0.01"
+                  required
+                  className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-md p-4">
+            <h4 className="text-sm font-semibold text-blue-900 mb-2">Vista Previa del Ahorro:</h4>
+            <div className="text-sm text-blue-800 space-y-1">
+              <p>• Plan Mensual x 12 meses = ${(platformSettings.membership_monthly_price * 12).toFixed(2)} MXN</p>
+              <p>• Plan Anual = ${platformSettings.membership_annual_price.toFixed(2)} MXN</p>
+              <p className="font-semibold text-green-700">
+                • Ahorro con Plan Anual = ${((platformSettings.membership_monthly_price * 12) - platformSettings.membership_annual_price).toFixed(2)} MXN
+                ({Math.round((((platformSettings.membership_monthly_price * 12) - platformSettings.membership_annual_price) / (platformSettings.membership_monthly_price * 12)) * 100)}% de descuento)
+              </p>
+              <p>• Equivalente Mensual del Plan Anual = ${(platformSettings.membership_annual_price / 12).toFixed(2)} MXN/mes</p>
             </div>
           </div>
         </div>

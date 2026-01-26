@@ -67,8 +67,28 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const { data: platformSettings, error: platformError } = await supabase
+      .from("platform_settings")
+      .select("membership_monthly_price, membership_annual_price")
+      .maybeSingle();
+
+    if (platformError || !platformSettings) {
+      console.error("Error fetching platform settings:", platformError);
+      return new Response(
+        JSON.stringify({ error: "Error al obtener configuración de precios" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const monthlyPrice = parseFloat(platformSettings.membership_monthly_price) || 49;
+    const annualPrice = parseFloat(platformSettings.membership_annual_price) || 490;
+    const annualSavings = (monthlyPrice * 12) - annualPrice;
+
     const planName = planType === 'monthly' ? 'Mensual' : 'Anual';
-    const planPrice = planType === 'monthly' ? '$49 MXN/mes' : '$490 MXN/año';
+    const planPrice = planType === 'monthly' ? `$${monthlyPrice.toFixed(0)} MXN/mes` : `$${annualPrice.toFixed(0)} MXN/año`;
 
     const formattedStartDate = new Date(startDate).toLocaleDateString('es-MX', {
       year: 'numeric',

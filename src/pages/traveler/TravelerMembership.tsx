@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Crown, Check, X, Zap, Shield, Sparkles, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { useMembershipPrices } from '../../hooks/useMembershipPrices';
 
 interface Membership {
   id: string;
@@ -24,6 +25,7 @@ export default function TravelerMembership() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const { prices, loading: pricesLoading } = useMembershipPrices();
 
   useEffect(() => {
     if (searchParams.get('success') === 'true') {
@@ -130,7 +132,7 @@ export default function TravelerMembership() {
     ? Math.max(0, 500 - (membership.service_fee_exemption_used || 0))
     : 0;
 
-  if (loading) {
+  if (loading || pricesLoading || !prices) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
@@ -248,10 +250,10 @@ export default function TravelerMembership() {
                   <div className="flex items-start gap-3 mb-3">
                     <Crown className="h-6 w-6 text-yellow-600 flex-shrink-0" />
                     <div>
-                      <p className="font-semibold text-gray-900 mb-1">Actualiza a Plan Anual y ahorra $98 MXN</p>
+                      <p className="font-semibold text-gray-900 mb-1">Actualiza a Plan Anual y ahorra {prices.annualSavingsFormatted} MXN</p>
                       <p className="text-sm text-gray-700">
                         Tu plan mensual continuará hasta el {formatDate(membership.current_period_end)}.
-                        A partir de esa fecha, pagarás solo $490 MXN/año (equivale a $40.83/mes).
+                        A partir de esa fecha, pagarás solo {prices.annualPriceFormatted} MXN/año (equivale a {prices.annualMonthlyEquivalentFormatted}/mes).
                       </p>
                     </div>
                   </div>
@@ -301,7 +303,7 @@ export default function TravelerMembership() {
               <div className="text-center mb-6">
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">Plan Mensual</h3>
                 <div className="flex items-baseline justify-center gap-2">
-                  <span className="text-5xl font-bold text-blue-600">$49</span>
+                  <span className="text-5xl font-bold text-blue-600">{prices.monthlyPriceFormatted}</span>
                   <span className="text-gray-600">MXN/mes</span>
                 </div>
               </div>
@@ -336,16 +338,16 @@ export default function TravelerMembership() {
 
             <div className="bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 rounded-2xl shadow-2xl p-8 text-white relative overflow-hidden transform hover:scale-105 transition-transform duration-300">
               <div className="absolute top-4 right-4 bg-red-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
-                Ahorra $98
+                Ahorra {prices.annualSavingsFormatted}
               </div>
 
               <div className="text-center mb-6">
                 <h3 className="text-2xl font-bold mb-2">Plan Anual</h3>
                 <div className="flex items-baseline justify-center gap-2">
-                  <span className="text-5xl font-bold">$490</span>
+                  <span className="text-5xl font-bold">{prices.annualPriceFormatted}</span>
                   <span className="text-yellow-100">MXN/año</span>
                 </div>
-                <p className="text-yellow-100 text-sm mt-2">Solo $40.83 MXN/mes</p>
+                <p className="text-yellow-100 text-sm mt-2">Solo {prices.annualMonthlyEquivalentFormatted} MXN/mes</p>
               </div>
 
               <ul className="space-y-4 mb-8">
@@ -363,7 +365,7 @@ export default function TravelerMembership() {
                 </li>
                 <li className="flex items-start gap-3">
                   <Crown className="h-5 w-5 text-white flex-shrink-0 mt-0.5" />
-                  <span className="font-semibold">2 meses GRATIS ($98 de ahorro)</span>
+                  <span className="font-semibold">2 meses GRATIS ({prices.annualSavingsFormatted} de ahorro)</span>
                 </li>
               </ul>
 
