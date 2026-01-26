@@ -359,6 +359,7 @@ const TravelersInfoPage: React.FC = () => {
             payment_status: 'succeeded',
             status: 'confirmed',
             payment_method: 'toursred_cash',
+            paid_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
           .eq('id', bookingId);
@@ -384,10 +385,27 @@ const TravelersInfoPage: React.FC = () => {
           }
         }
 
-        // Enviar notificación por email a la agencia
+        // Registrar el método de pago en payment_transactions
+        const { error: paymentTransactionError } = await supabase
+          .from('payment_transactions')
+          .insert({
+            booking_id: bookingId,
+            user_id: user?.id,
+            amount: booking?.user_payment || 0,
+            payment_method_type: 'ToursRed Points & Cash',
+            status: 'completed',
+            created_at: new Date().toISOString(),
+          });
+
+        if (paymentTransactionError) {
+          console.error('Error registrando transacción de pago:', paymentTransactionError);
+        }
+
+        // Enviar emails de confirmación a viajero, agencia y admin
         try {
-          await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-request-notification`,
+          console.log('Enviando emails de confirmación para reserva pagada con puntos/cash...');
+          const emailResponse = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-confirmation`,
             {
               method: 'POST',
               headers: {
@@ -397,8 +415,15 @@ const TravelersInfoPage: React.FC = () => {
               body: JSON.stringify({ booking_id: bookingId }),
             }
           );
+
+          if (emailResponse.ok) {
+            const emailResult = await emailResponse.json();
+            console.log('✅ Emails de confirmación enviados:', emailResult);
+          } else {
+            console.error('Error en envío de emails:', await emailResponse.text());
+          }
         } catch (emailError) {
-          console.error('Error enviando notificación a la agencia:', emailError);
+          console.error('Error enviando emails de confirmación:', emailError);
         }
 
         // Redirigir a la página de éxito
