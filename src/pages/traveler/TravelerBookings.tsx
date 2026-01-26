@@ -504,8 +504,10 @@ const TravelerBookings: React.FC = () => {
         }
       }
 
-      // Calcular el monto a cobrar después de aplicar ToursRed Cash
-      const amountToCharge = (booking.user_payment || booking.deposit_amount || 0) - toursRedCashToUse;
+      // Calcular el monto a cobrar después de aplicar puntos ya usados y ToursRed Cash
+      const originalAmount = booking.user_payment || booking.deposit_amount || 0;
+      const pointsAlreadyUsed = ((booking.points_used || 0) / 100);
+      const amountToCharge = originalAmount - pointsAlreadyUsed - toursRedCashToUse;
 
       // Si el monto es 0 o menor, confirmar directamente
       if (amountToCharge <= 0) {
@@ -1488,82 +1490,100 @@ const TravelerBookings: React.FC = () => {
                 {/* Payment Summary */}
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Monto a Pagar:</span>
+                    <span className="text-gray-600">Monto Original:</span>
                     <span className="font-semibold">${(paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0).toLocaleString()}</span>
                   </div>
 
-                  {/* ToursRed Cash Section */}
-                  {paymentModal.walletBalance > 0 && (
-                    <>
-                      <div className="border-t pt-3">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm font-medium text-gray-700">Tu Saldo ToursRed Cash:</span>
-                          <span className="text-lg font-bold text-green-600">${paymentModal.walletBalance.toLocaleString()}</span>
-                        </div>
-
-                        <div className="mt-4">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Usar ToursRed Cash
-                          </label>
-                          <div className="flex gap-2">
-                            <input
-                              type="number"
-                              min="0"
-                              max={Math.min(paymentModal.walletBalance, paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0)}
-                              value={paymentModal.toursRedCashToUse}
-                              onChange={(e) => {
-                                const value = parseFloat(e.target.value) || 0;
-                                const maxAmount = Math.min(
-                                  paymentModal.walletBalance,
-                                  paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0
-                                );
-                                setPaymentModal(prev => ({
-                                  ...prev,
-                                  toursRedCashToUse: Math.min(Math.max(0, value), maxAmount)
-                                }));
-                              }}
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
-                              disabled={paymentModal.isProcessing}
-                            />
-                            <button
-                              onClick={() => {
-                                const maxAmount = Math.min(
-                                  paymentModal.walletBalance,
-                                  paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0
-                                );
-                                setPaymentModal(prev => ({
-                                  ...prev,
-                                  toursRedCashToUse: maxAmount
-                                }));
-                              }}
-                              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
-                              disabled={paymentModal.isProcessing}
-                            >
-                              Usar Todo
-                            </button>
-                          </div>
-                          <p className="mt-1 text-xs text-gray-500">
-                            Máximo: ${Math.min(paymentModal.walletBalance, paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0).toLocaleString()}
-                          </p>
-                        </div>
+                  {/* Points Already Used */}
+                  {(paymentModal.booking?.points_used || 0) > 0 && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-amber-800">ToursRed Points Aplicados:</span>
+                        <span className="font-semibold text-amber-800">-${((paymentModal.booking?.points_used || 0) / 100).toFixed(2)}</span>
                       </div>
+                      <p className="text-xs text-amber-700 mt-1">
+                        {(paymentModal.booking?.points_used || 0).toLocaleString()} puntos ya descontados
+                      </p>
+                    </div>
+                  )}
 
-                      {paymentModal.toursRedCashToUse > 0 && (
-                        <div className="bg-green-50 border border-green-200 rounded-md p-3">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-green-800">ToursRed Cash Aplicado:</span>
-                            <span className="font-semibold text-green-800">-${paymentModal.toursRedCashToUse.toLocaleString()}</span>
+                  {/* ToursRed Cash Section */}
+                  {paymentModal.walletBalance > 0 && (() => {
+                    const originalAmount = paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0;
+                    const pointsAlreadyUsed = ((paymentModal.booking?.points_used || 0) / 100);
+                    const remainingAmount = originalAmount - pointsAlreadyUsed;
+
+                    return (
+                      <>
+                        <div className="border-t pt-3">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium text-gray-700">Tu Saldo ToursRed Cash:</span>
+                            <span className="text-lg font-bold text-green-600">${paymentModal.walletBalance.toLocaleString()}</span>
+                          </div>
+
+                          <div className="mt-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Usar ToursRed Cash
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="number"
+                                min="0"
+                                max={Math.min(paymentModal.walletBalance, remainingAmount)}
+                                value={paymentModal.toursRedCashToUse}
+                                onChange={(e) => {
+                                  const value = parseFloat(e.target.value) || 0;
+                                  const maxAmount = Math.min(paymentModal.walletBalance, remainingAmount);
+                                  setPaymentModal(prev => ({
+                                    ...prev,
+                                    toursRedCashToUse: Math.min(Math.max(0, value), maxAmount)
+                                  }));
+                                }}
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                                disabled={paymentModal.isProcessing}
+                              />
+                              <button
+                                onClick={() => {
+                                  const maxAmount = Math.min(paymentModal.walletBalance, remainingAmount);
+                                  setPaymentModal(prev => ({
+                                    ...prev,
+                                    toursRedCashToUse: maxAmount
+                                  }));
+                                }}
+                                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                                disabled={paymentModal.isProcessing}
+                              >
+                                Usar Todo
+                              </button>
+                            </div>
+                            <p className="mt-1 text-xs text-gray-500">
+                              Máximo: ${Math.min(paymentModal.walletBalance, remainingAmount).toLocaleString()}
+                            </p>
                           </div>
                         </div>
-                      )}
-                    </>
-                  )}
+
+                        {paymentModal.toursRedCashToUse > 0 && (
+                          <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-green-800">ToursRed Cash Aplicado:</span>
+                              <span className="font-semibold text-green-800">-${paymentModal.toursRedCashToUse.toLocaleString()}</span>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
 
                   <div className="border-t pt-3">
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total a Pagar{paymentModal.toursRedCashToUse > 0 ? ' con Stripe' : ''}:</span>
                       <span className="text-primary-600">
-                        ${Math.max(0, (paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0) - paymentModal.toursRedCashToUse).toLocaleString()}
+                        ${(() => {
+                          const originalAmount = paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0;
+                          const pointsAlreadyUsed = ((paymentModal.booking?.points_used || 0) / 100);
+                          const remainingAmount = originalAmount - pointsAlreadyUsed;
+                          return Math.max(0, remainingAmount - paymentModal.toursRedCashToUse).toLocaleString();
+                        })()}
                       </span>
                     </div>
                   </div>
@@ -1590,9 +1610,13 @@ const TravelerBookings: React.FC = () => {
                       </>
                     ) : (
                       <>
-                        {((paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0) - paymentModal.toursRedCashToUse) <= 0
-                          ? 'Confirmar Pago'
-                          : 'Proceder a Stripe'}
+                        {(() => {
+                          const originalAmount = paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0;
+                          const pointsAlreadyUsed = ((paymentModal.booking?.points_used || 0) / 100);
+                          const remainingAmount = originalAmount - pointsAlreadyUsed;
+                          const finalAmount = remainingAmount - paymentModal.toursRedCashToUse;
+                          return finalAmount <= 0 ? 'Confirmar Pago' : 'Proceder a Stripe';
+                        })()}
                       </>
                     )}
                   </button>
