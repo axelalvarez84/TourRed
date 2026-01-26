@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Heart, Clock, CheckCircle, Crown, Sparkles, Wallet } from 'lucide-react';
+import { Calendar, MapPin, Heart, Clock, CheckCircle, Crown, Sparkles, Wallet, Award } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Link } from 'react-router-dom';
@@ -56,6 +56,9 @@ const TravelerDashboard: React.FC = () => {
   const [savedTours, setSavedTours] = useState<SavedTour[]>([]);
   const [membership, setMembership] = useState<Membership | null>(null);
   const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [pointsBalance, setPointsBalance] = useState<number>(0);
+  const [pointsWalletActive, setPointsWalletActive] = useState<boolean>(false);
+  const [nextPointsExpiration, setNextPointsExpiration] = useState<{ date: string; amount: number } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -155,6 +158,34 @@ const TravelerDashboard: React.FC = () => {
         console.error('Error fetching wallet:', walletError);
       } else {
         setWalletBalance(walletData?.balance ? Number(walletData.balance) : 0);
+      }
+
+      const { data: pointsWalletData, error: pointsWalletError } = await supabase
+        .from('toursred_points_wallets')
+        .select('balance, is_active')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (pointsWalletError) {
+        console.error('Error fetching points wallet:', pointsWalletError);
+      } else if (pointsWalletData) {
+        setPointsBalance(pointsWalletData.balance || 0);
+        setPointsWalletActive(pointsWalletData.is_active || false);
+
+        const { data: expiringPoints } = await supabase
+          .from('toursred_points_transactions')
+          .select('expires_at, amount')
+          .eq('user_id', user.id)
+          .eq('type', 'earned')
+          .gt('expires_at', new Date().toISOString())
+          .order('expires_at', { ascending: true });
+
+        if (expiringPoints && expiringPoints.length > 0) {
+          const nextExp = expiringPoints[0];
+          const sameDate = expiringPoints.filter(t => t.expires_at === nextExp.expires_at);
+          const totalAmount = sameDate.reduce((sum, t) => sum + t.amount, 0);
+          setNextPointsExpiration({ date: nextExp.expires_at!, amount: totalAmount });
+        }
       }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -450,6 +481,73 @@ const TravelerDashboard: React.FC = () => {
           <p>Usa tu saldo ToursRed Cash para pagar tus próximas reservas o recibe reembolsos y bonificaciones directamente aquí.</p>
         </div>
       </div>
+
+      {/* ToursRed Points Card */}
+      {pointsBalance > 0 && (
+        <div className={`mb-8 rounded-xl shadow-lg p-6 text-white ${
+          pointsWalletActive
+            ? 'bg-gradient-to-br from-amber-500 via-amber-600 to-yellow-600'
+            : 'bg-gradient-to-br from-gray-400 via-gray-500 to-gray-600'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
+                <Award className="h-8 w-8" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold">ToursRed Points</h3>
+                <p className="text-amber-100 text-sm">
+                  {pointsWalletActive ? 'Programa de lealtad activo' : 'Requiere membresía activa'}
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-4xl font-bold">
+                {pointsBalance.toLocaleString()}
+              </p>
+              <p className="text-amber-100 text-sm mt-1">
+                ${(pointsBalance / 100).toFixed(2)} MXN
+              </p>
+            </div>
+          </div>
+
+          {!pointsWalletActive && (
+            <div className="mt-4 bg-white/20 border border-white/40 rounded-lg p-3">
+              <p className="text-sm text-white">
+                Tus puntos están guardados. Reactiva tu membresía ToursRed+ para volver a usarlos.
+              </p>
+            </div>
+          )}
+
+          {pointsWalletActive && nextPointsExpiration && (
+            <div className="mt-4 bg-white/20 border border-white/40 rounded-lg p-3">
+              <p className="text-sm text-white font-medium mb-1">
+                Próxima expiración
+              </p>
+              <p className="text-xs text-amber-100">
+                {nextPointsExpiration.amount.toLocaleString()} puntos expirarán el{' '}
+                {new Date(nextPointsExpiration.date).toLocaleDateString('es-MX', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </p>
+            </div>
+          )}
+
+          <div className="mt-4">
+            <Link
+              to="/traveler/points"
+              className="block bg-white text-amber-600 px-4 py-2.5 rounded-lg font-semibold hover:bg-amber-50 transition-colors text-center text-sm"
+            >
+              Ver Historial de Puntos
+            </Link>
+          </div>
+          <div className="mt-3 bg-white/10 backdrop-blur-sm rounded-lg p-3 text-xs text-amber-100">
+            <p>Gana 1 punto por cada peso gastado. Usa hasta el 50% del total de tu reserva con puntos. Los puntos expiran 12 meses después de ganarlos.</p>
+          </div>
+        </div>
+      )}
 
       <div className="mb-12">
         <div className="flex items-center justify-between mb-6">

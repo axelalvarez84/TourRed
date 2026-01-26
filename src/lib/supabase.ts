@@ -669,8 +669,35 @@ export const createBooking = async (bookingData: any) => {
       .insert(bookingData)
       .select()
       .single();
-    
-    return { data, error };
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    if (data && bookingData.points_used && bookingData.points_used > 0) {
+      const { error: pointsError } = await supabase.rpc('redeem_points_for_booking', {
+        p_booking_id: data.id,
+        p_user_id: bookingData.user_id,
+        p_points_to_use: bookingData.points_used,
+        p_total_price: bookingData.total_price
+      });
+
+      if (pointsError) {
+        console.error('❌ Error al canjear puntos:', pointsError);
+        await supabase.from('bookings').delete().eq('id', data.id);
+        return {
+          data: null,
+          error: {
+            message: pointsError.message || 'Error al procesar los puntos. Por favor, intenta de nuevo.',
+            code: pointsError.code
+          }
+        };
+      }
+
+      console.log('✅ Puntos canjeados exitosamente:', bookingData.points_used);
+    }
+
+    return { data, error: null };
   } catch (error: any) {
     console.error('❌ Error en createBooking:', error);
     return { data: null, error };

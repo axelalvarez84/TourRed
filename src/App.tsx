@@ -20,6 +20,7 @@ import TravelerBookings from './pages/traveler/TravelerBookings';
 import TravelerProfile from './pages/traveler/TravelerProfile';
 import TravelerMembership from './pages/traveler/TravelerMembership';
 import TravelerWallet from './pages/traveler/TravelerWallet';
+import TravelerPoints from './pages/traveler/TravelerPoints';
 import AgencyDashboard from './pages/agency/AgencyDashboard';
 import AgencyTours from './pages/agency/AgencyTours';
 import AgencyBookings from './pages/agency/AgencyBookings';
@@ -157,6 +158,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.TRAVELER]}>
                 <TravelerWallet />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/traveler/points"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.TRAVELER]}>
+                <TravelerPoints />
               </ProtectedRoute>
             }
           />

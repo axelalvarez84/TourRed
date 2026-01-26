@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet } from 'lucide-react';
+import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet, Award } from 'lucide-react';
 import { Tour } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { createBooking, formatDateForDB, supabase } from '../lib/supabase';
@@ -34,6 +34,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [walletBalance, setWalletBalance] = useState(0);
   const [isLoadingWallet, setIsLoadingWallet] = useState(true);
   const [useToursRedCash, setUseToursRedCash] = useState(false);
+  const [pointsBalance, setPointsBalance] = useState(0);
+  const [isLoadingPoints, setIsLoadingPoints] = useState(true);
+  const [useToursRedPoints, setUseToursRedPoints] = useState(false);
+  const [pointsToUse, setPointsToUse] = useState(0);
+  const [pointsWalletActive, setPointsWalletActive] = useState(false);
   const [noShowCount, setNoShowCount] = useState(0);
   const [isLoadingNoShowCount, setIsLoadingNoShowCount] = useState(true);
   const [isHighRisk, setIsHighRisk] = useState(false);
@@ -135,6 +140,41 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     };
 
     loadWalletBalance();
+  }, [user, isTraveler]);
+
+  React.useEffect(() => {
+    const loadPointsBalance = async () => {
+      if (!user || !isTraveler) {
+        setIsLoadingPoints(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('toursred_points_wallets')
+          .select('balance, is_active')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error loading points wallet:', error);
+          setPointsBalance(0);
+          setPointsWalletActive(false);
+        } else {
+          setPointsBalance(data?.balance || 0);
+          setPointsWalletActive(data?.is_active || false);
+          console.log('✅ Saldo ToursRed Points:', data?.balance || 0, '- Activo:', data?.is_active || false);
+        }
+      } catch (err) {
+        console.error('Error loading points wallet:', err);
+        setPointsBalance(0);
+        setPointsWalletActive(false);
+      } finally {
+        setIsLoadingPoints(false);
+      }
+    };
+
+    loadPointsBalance();
   }, [user, isTraveler]);
 
   React.useEffect(() => {
@@ -296,9 +336,23 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
   const userPayment = depositAmount + serviceCharge;
 
-  // Calcular ToursRed Cash aplicado
-  const toursRedCashApplied = useToursRedCash ? Math.min(walletBalance, userPayment) : 0;
-  const amountAfterToursRedCash = userPayment - toursRedCashApplied;
+  // Calculate maximum points allowed (50% of total)
+  const maxPointsAllowed = Math.floor(userPayment * 50);
+
+  // Calculate points to apply (limited by balance, max allowed, and user selection)
+  const pointsApplied = useToursRedPoints
+    ? Math.min(pointsToUse, pointsBalance, maxPointsAllowed)
+    : 0;
+
+  // Convert points to pesos: 100 points = 1 peso
+  const pointsDiscountAmount = pointsApplied / 100;
+
+  // Calculate amount after points
+  const amountAfterPoints = userPayment - pointsDiscountAmount;
+
+  // Calculate ToursRed Cash applied to remaining amount
+  const toursRedCashApplied = useToursRedCash ? Math.min(walletBalance, amountAfterPoints) : 0;
+  const amountAfterToursRedCash = amountAfterPoints - toursRedCashApplied;
 
   const totalToPayNow = amountAfterToursRedCash + membershipCost;
 
@@ -374,6 +428,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         count_infantes: travelerCounts.infantes,
         count_adultos_mayores: travelerCounts.adultos_mayores,
         count_mascotas: travelerCounts.mascotas,
+        points_used: pointsApplied,
         toursred_cash_used: toursRedCashApplied,
       };
 
@@ -776,6 +831,115 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           </div>
         )}
 
+        {!isLoadingPoints && pointsBalance > 0 && totalTravelers > 0 && pointsWalletActive && hasMembership && (
+          <div className="mb-4 bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-300 rounded-lg p-4">
+            <div className="flex items-start mb-3">
+              <Award className="h-5 w-5 text-amber-600 mr-2 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-sm font-bold text-gray-900 mb-1">
+                  ToursRed Points Disponibles
+                </h4>
+                <p className="text-xs text-gray-700">
+                  Tienes {pointsBalance.toLocaleString()} puntos (${(pointsBalance / 100).toFixed(2)} MXN). Usa hasta el 50% del total con puntos.
+                </p>
+              </div>
+            </div>
+
+            <label className="flex items-start cursor-pointer mb-3">
+              <input
+                type="checkbox"
+                checked={useToursRedPoints}
+                onChange={(e) => {
+                  setUseToursRedPoints(e.target.checked);
+                  if (!e.target.checked) {
+                    setPointsToUse(0);
+                  } else {
+                    setPointsToUse(Math.min(pointsBalance, maxPointsAllowed));
+                  }
+                }}
+                className="mt-1 h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
+              />
+              <span className="ml-3 text-sm font-medium text-gray-900">
+                Usar mis ToursRed Points
+              </span>
+            </label>
+
+            {useToursRedPoints && (
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-xs text-gray-600 mb-2">
+                    <span>Puntos a usar:</span>
+                    <span className="font-medium">{pointsApplied.toLocaleString()} puntos</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max={Math.min(pointsBalance, maxPointsAllowed)}
+                    value={pointsToUse}
+                    onChange={(e) => setPointsToUse(parseInt(e.target.value))}
+                    className="w-full h-2 bg-amber-200 rounded-lg appearance-none cursor-pointer slider-thumb"
+                    style={{
+                      background: `linear-gradient(to right, rgb(217, 119, 6) 0%, rgb(217, 119, 6) ${(pointsApplied / Math.min(pointsBalance, maxPointsAllowed)) * 100}%, rgb(253, 230, 138) ${(pointsApplied / Math.min(pointsBalance, maxPointsAllowed)) * 100}%, rgb(253, 230, 138) 100%)`
+                    }}
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>0</span>
+                    <span>{Math.min(pointsBalance, maxPointsAllowed).toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-md p-3 border border-amber-200 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-700">Descuento con puntos:</span>
+                    <span className="font-bold text-amber-600">
+                      -${pointsDiscountAmount.toFixed(2)} MXN
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Máximo permitido (50%):</span>
+                    <span className="font-medium">
+                      {maxPointsAllowed.toLocaleString()} puntos (${(maxPointsAllowed / 100).toFixed(2)})
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Saldo restante:</span>
+                    <span className="font-medium">
+                      {(pointsBalance - pointsApplied).toLocaleString()} puntos
+                    </span>
+                  </div>
+                </div>
+
+                {pointsApplied >= maxPointsAllowed && (
+                  <div className="bg-amber-100 border border-amber-300 rounded-md p-2">
+                    <p className="text-xs text-amber-800 font-medium text-center">
+                      ℹ Has alcanzado el límite del 50% con puntos
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!isLoadingPoints && pointsBalance > 0 && !pointsWalletActive && totalTravelers > 0 && (
+          <div className="mb-4 bg-orange-50 border-2 border-orange-300 rounded-lg p-4">
+            <div className="flex items-start">
+              <Award className="h-5 w-5 text-orange-600 mr-2 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-sm font-bold text-orange-900 mb-1">
+                  Reactiva tu Membresía para Usar Puntos
+                </h4>
+                <p className="text-xs text-orange-800">
+                  Tienes {pointsBalance.toLocaleString()} puntos disponibles, pero necesitas una membresía ToursRed+ activa para usarlos. {' '}
+                  <Link to="/traveler/membership" className="underline font-medium">
+                    Reactivar membresía
+                  </Link>
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {!isLoadingWallet && walletBalance > 0 && totalTravelers > 0 && (
           <div className="mb-4 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-lg p-4">
             <div className="flex items-start mb-3">
@@ -892,6 +1056,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     Membresía ToursRed+ ({selectedMembershipPlan === 'monthly' ? 'Mensual' : 'Anual'}):
                   </span>
                   <span className="font-medium">+${membershipCost.toLocaleString()}</span>
+                </div>
+              )}
+
+              {useToursRedPoints && pointsApplied > 0 && (
+                <div className="flex justify-between text-sm text-amber-600 mt-1">
+                  <span className="flex items-center">
+                    <Award className="h-3 w-3 mr-1" />
+                    ToursRed Points aplicados:
+                  </span>
+                  <span className="font-medium">-${pointsDiscountAmount.toFixed(2)} ({pointsApplied.toLocaleString()} pts)</span>
                 </div>
               )}
 
