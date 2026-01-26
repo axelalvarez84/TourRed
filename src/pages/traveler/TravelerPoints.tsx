@@ -121,25 +121,56 @@ const TravelerPointsPage: React.FC = () => {
 
         setTransactions(formattedData);
 
-        const earnedNotExpired = formattedData.filter(
-          t => t.type === 'earned' && t.expires_at && new Date(t.expires_at) > new Date()
-        );
+        // Calcular próxima expiración considerando FIFO (First In First Out)
+        // Los puntos usados se descuentan de los más antiguos primero
+        const earnedTransactions = formattedData
+          .filter(t => t.type === 'earned' && t.expires_at && new Date(t.expires_at) > new Date())
+          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
-        if (earnedNotExpired.length > 0) {
-          earnedNotExpired.sort((a, b) =>
-            new Date(a.expires_at!).getTime() - new Date(b.expires_at!).getTime()
+        if (earnedTransactions.length > 0) {
+          // Calcular total de puntos usados (redeemed son negativos)
+          const totalRedeemed = Math.abs(
+            formattedData
+              .filter(t => t.type === 'redeemed')
+              .reduce((sum, t) => sum + t.amount, 0)
           );
 
-          const nextExp = earnedNotExpired[0];
-          const sameDate = earnedNotExpired.filter(
-            t => t.expires_at === nextExp.expires_at
-          );
-          const totalAmount = sameDate.reduce((sum, t) => sum + t.amount, 0);
+          // Descontar puntos usados de las transacciones earned más antiguas (FIFO)
+          let remainingToDeduct = totalRedeemed;
+          const availableEarned = earnedTransactions.map(tx => {
+            if (remainingToDeduct <= 0) {
+              // No hay más puntos que descontar, esta transacción está intacta
+              return { ...tx, availableAmount: tx.amount };
+            } else if (remainingToDeduct >= tx.amount) {
+              // Esta transacción completa fue usada
+              remainingToDeduct -= tx.amount;
+              return { ...tx, availableAmount: 0 };
+            } else {
+              // Solo parte de esta transacción fue usada
+              const available = tx.amount - remainingToDeduct;
+              remainingToDeduct = 0;
+              return { ...tx, availableAmount: available };
+            }
+          }).filter(tx => tx.availableAmount > 0);
 
-          setNextExpiration({
-            date: nextExp.expires_at!,
-            amount: totalAmount
-          });
+          if (availableEarned.length > 0) {
+            // Ordenar por fecha de expiración (las que expiran primero)
+            availableEarned.sort((a, b) =>
+              new Date(a.expires_at!).getTime() - new Date(b.expires_at!).getTime()
+            );
+
+            const nextExp = availableEarned[0];
+            // Sumar todos los puntos disponibles que expiran en la misma fecha
+            const sameDate = availableEarned.filter(
+              t => t.expires_at === nextExp.expires_at
+            );
+            const totalAmount = sameDate.reduce((sum, t) => sum + t.availableAmount, 0);
+
+            setNextExpiration({
+              date: nextExp.expires_at!,
+              amount: totalAmount
+            });
+          }
         }
       } catch (err) {
         console.error('Error:', err);

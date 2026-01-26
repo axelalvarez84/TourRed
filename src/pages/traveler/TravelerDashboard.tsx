@@ -173,19 +173,53 @@ const TravelerDashboard: React.FC = () => {
       if (pointsWalletData) {
         setPointsBalance(pointsWalletData.balance || 0);
 
-        const { data: expiringPoints } = await supabase
+        // Obtener todas las transacciones para calcular correctamente considerando FIFO
+        const { data: allTransactions } = await supabase
           .from('toursred_points_transactions')
-          .select('expires_at, amount')
-          .eq('user_id', user.id)
-          .eq('type', 'earned')
-          .gt('expires_at', new Date().toISOString())
-          .order('expires_at', { ascending: true });
+          .select('expires_at, amount, type, created_at')
+          .eq('user_id', user.id);
 
-        if (expiringPoints && expiringPoints.length > 0) {
-          const nextExp = expiringPoints[0];
-          const sameDate = expiringPoints.filter(t => t.expires_at === nextExp.expires_at);
-          const totalAmount = sameDate.reduce((sum, t) => sum + t.amount, 0);
-          setNextPointsExpiration({ date: nextExp.expires_at!, amount: totalAmount });
+        if (allTransactions && allTransactions.length > 0) {
+          // Filtrar transacciones earned que no han expirado
+          const earnedTransactions = allTransactions
+            .filter(t => t.type === 'earned' && t.expires_at && new Date(t.expires_at) > new Date())
+            .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+          if (earnedTransactions.length > 0) {
+            // Calcular total de puntos usados (redeemed son negativos)
+            const totalRedeemed = Math.abs(
+              allTransactions
+                .filter(t => t.type === 'redeemed')
+                .reduce((sum, t) => sum + t.amount, 0)
+            );
+
+            // Descontar puntos usados de las transacciones earned más antiguas (FIFO)
+            let remainingToDeduct = totalRedeemed;
+            const availableEarned = earnedTransactions.map(tx => {
+              if (remainingToDeduct <= 0) {
+                return { ...tx, availableAmount: tx.amount };
+              } else if (remainingToDeduct >= tx.amount) {
+                remainingToDeduct -= tx.amount;
+                return { ...tx, availableAmount: 0 };
+              } else {
+                const available = tx.amount - remainingToDeduct;
+                remainingToDeduct = 0;
+                return { ...tx, availableAmount: available };
+              }
+            }).filter(tx => tx.availableAmount > 0);
+
+            if (availableEarned.length > 0) {
+              // Ordenar por fecha de expiración
+              availableEarned.sort((a, b) =>
+                new Date(a.expires_at!).getTime() - new Date(b.expires_at!).getTime()
+              );
+
+              const nextExp = availableEarned[0];
+              const sameDate = availableEarned.filter(t => t.expires_at === nextExp.expires_at);
+              const totalAmount = sameDate.reduce((sum, t) => sum + t.availableAmount, 0);
+              setNextPointsExpiration({ date: nextExp.expires_at!, amount: totalAmount });
+            }
+          }
         }
       }
 
