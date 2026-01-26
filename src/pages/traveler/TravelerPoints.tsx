@@ -28,6 +28,7 @@ interface PointsTransaction {
 const TravelerPointsPage: React.FC = () => {
   const { user } = useAuth();
   const [wallet, setWallet] = useState<PointsWallet | null>(null);
+  const [hasMembership, setHasMembership] = useState(false);
   const [transactions, setTransactions] = useState<PointsTransaction[]>([]);
   const [isLoadingWallet, setIsLoadingWallet] = useState(true);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
@@ -39,6 +40,15 @@ const TravelerPointsPage: React.FC = () => {
       if (!user) return;
 
       try {
+        const { data: membershipData } = await supabase
+          .from('memberships')
+          .select('status')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .maybeSingle();
+
+        setHasMembership(!!membershipData);
+
         const { data, error } = await supabase
           .from('toursred_points_wallets')
           .select('*')
@@ -189,7 +199,7 @@ const TravelerPointsPage: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
-          <Link to="/traveler" className="text-primary-600 hover:text-primary-700 flex items-center">
+          <Link to="/traveler/dashboard" className="text-primary-600 hover:text-primary-700 flex items-center">
             <svg className="h-5 w-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -206,7 +216,7 @@ const TravelerPointsPage: React.FC = () => {
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
           </div>
-        ) : !wallet ? (
+        ) : !hasMembership ? (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
             <Award className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No tienes una billetera de puntos</h3>
@@ -230,10 +240,10 @@ const TravelerPointsPage: React.FC = () => {
                   <span className="text-sm font-medium">Balance</span>
                 </div>
                 <div className="text-3xl font-bold mb-1">
-                  {wallet.balance.toLocaleString()}
+                  {(wallet?.balance || 0).toLocaleString()}
                 </div>
                 <div className="text-amber-100 text-sm">
-                  ${(wallet.balance / 100).toFixed(2)} MXN de valor
+                  ${((wallet?.balance || 0) / 100).toFixed(2)} MXN de valor
                 </div>
               </div>
 
@@ -243,7 +253,7 @@ const TravelerPointsPage: React.FC = () => {
                   <span className="text-sm font-medium text-gray-600">Ganados</span>
                 </div>
                 <div className="text-2xl font-bold text-gray-900">
-                  {wallet.total_earned.toLocaleString()}
+                  {(wallet?.total_earned || 0).toLocaleString()}
                 </div>
                 <div className="text-gray-500 text-sm">
                   Total histórico
@@ -256,7 +266,7 @@ const TravelerPointsPage: React.FC = () => {
                   <span className="text-sm font-medium text-gray-600">Usados</span>
                 </div>
                 <div className="text-2xl font-bold text-gray-900">
-                  {wallet.total_used.toLocaleString()}
+                  {(wallet?.total_used || 0).toLocaleString()}
                 </div>
                 <div className="text-gray-500 text-sm">
                   Total canjeado
@@ -269,7 +279,7 @@ const TravelerPointsPage: React.FC = () => {
                   <span className="text-sm font-medium text-gray-600">Expirados</span>
                 </div>
                 <div className="text-2xl font-bold text-gray-900">
-                  {wallet.total_expired.toLocaleString()}
+                  {(wallet?.total_expired || 0).toLocaleString()}
                 </div>
                 <div className="text-gray-500 text-sm">
                   Total perdido
@@ -277,7 +287,7 @@ const TravelerPointsPage: React.FC = () => {
               </div>
             </div>
 
-            {!wallet.is_active && (
+            {wallet && !wallet.is_active && (
               <div className="bg-orange-50 border-l-4 border-orange-500 p-4 mb-6 rounded-md">
                 <div className="flex items-start">
                   <AlertCircle className="h-5 w-5 text-orange-600 mr-2 flex-shrink-0 mt-0.5" />

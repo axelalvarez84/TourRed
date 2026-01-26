@@ -168,9 +168,10 @@ const TravelerDashboard: React.FC = () => {
 
       if (pointsWalletError) {
         console.error('Error fetching points wallet:', pointsWalletError);
-      } else if (pointsWalletData) {
+      }
+
+      if (pointsWalletData) {
         setPointsBalance(pointsWalletData.balance || 0);
-        setPointsWalletActive(pointsWalletData.is_active || false);
 
         const { data: expiringPoints } = await supabase
           .from('toursred_points_transactions')
@@ -187,6 +188,8 @@ const TravelerDashboard: React.FC = () => {
           setNextPointsExpiration({ date: nextExp.expires_at!, amount: totalAmount });
         }
       }
+
+      setPointsWalletActive(membershipData?.status === 'active' || false);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
