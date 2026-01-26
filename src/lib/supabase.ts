@@ -729,6 +729,8 @@ export const getUserBookings = async (userId: string) => {
         is_no_show,
         no_show_marked_at,
         toursred_cash_used,
+        points_used,
+        points_earned,
         has_pending_reschedule,
         reschedule_response,
         reschedule_responded_at,
