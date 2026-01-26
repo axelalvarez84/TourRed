@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Award, Search, Filter, TrendingUp, TrendingDown, Clock, Users } from 'lucide-react';
+import { Award, Search, Filter, TrendingUp, TrendingDown, Clock, Users, Plus, Minus, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface PointsWallet {
@@ -33,6 +33,12 @@ const AdminPoints: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [selectedWallet, setSelectedWallet] = useState<PointsWallet | null>(null);
+  const [adjustmentType, setAdjustmentType] = useState<'add' | 'subtract'>('add');
+  const [adjustmentAmount, setAdjustmentAmount] = useState('');
+  const [adjustmentReason, setAdjustmentReason] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -96,6 +102,56 @@ const AdminPoints: React.FC = () => {
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  const handleOpenAdjustModal = (wallet: PointsWallet, type: 'add' | 'subtract') => {
+    setSelectedWallet(wallet);
+    setAdjustmentType(type);
+    setAdjustmentAmount('');
+    setAdjustmentReason('');
+    setShowAdjustModal(true);
+  };
+
+  const handleCloseAdjustModal = () => {
+    setShowAdjustModal(false);
+    setSelectedWallet(null);
+    setAdjustmentAmount('');
+    setAdjustmentReason('');
+  };
+
+  const handleAdjustPoints = async () => {
+    if (!selectedWallet || !adjustmentAmount || !adjustmentReason.trim()) {
+      alert('Por favor completa todos los campos');
+      return;
+    }
+
+    const amount = parseInt(adjustmentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      alert('Por favor ingresa una cantidad válida');
+      return;
+    }
+
+    const finalAmount = adjustmentType === 'subtract' ? -amount : amount;
+
+    setIsSubmitting(true);
+    try {
+      const { data, error } = await supabase.rpc('admin_adjust_points', {
+        target_user_id: selectedWallet.user_id,
+        points_amount: finalAmount,
+        adjustment_reason: adjustmentReason
+      });
+
+      if (error) throw error;
+
+      alert(`Puntos ajustados exitosamente. Nuevo balance: ${data.new_balance}`);
+      handleCloseAdjustModal();
+      loadData();
+    } catch (error: any) {
+      console.error('Error adjusting points:', error);
+      alert(error.message || 'Error al ajustar los puntos');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -219,6 +275,9 @@ const AdminPoints: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Creada
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Acciones
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -261,6 +320,24 @@ const AdminPoints: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(wallet.created_at)}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleOpenAdjustModal(wallet, 'add')}
+                          className="inline-flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                          title="Agregar puntos"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenAdjustModal(wallet, 'subtract')}
+                          className="inline-flex items-center px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                          title="Restar puntos"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -286,6 +363,93 @@ const AdminPoints: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {showAdjustModal && selectedWallet && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900">
+                {adjustmentType === 'add' ? 'Agregar Puntos' : 'Restar Puntos'}
+              </h3>
+              <button
+                onClick={handleCloseAdjustModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-600">Usuario</div>
+              <div className="font-semibold text-gray-900">
+                {`${selectedWallet.users.first_name || ''} ${selectedWallet.users.last_name || ''}`.trim()}
+              </div>
+              <div className="text-sm text-gray-500">{selectedWallet.users.email}</div>
+              <div className="mt-2 text-sm">
+                <span className="text-gray-600">Balance actual: </span>
+                <span className="font-bold text-amber-600">
+                  {selectedWallet.balance.toLocaleString()} puntos
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Cantidad de puntos
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={adjustmentAmount}
+                  onChange={(e) => setAdjustmentAmount(e.target.value)}
+                  placeholder="Ingresa la cantidad"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                />
+                {adjustmentAmount && (
+                  <div className="mt-2 text-sm text-gray-600">
+                    Equivalente a: ${(parseInt(adjustmentAmount) / 100).toFixed(2)} MXN
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Razón del ajuste
+                </label>
+                <textarea
+                  value={adjustmentReason}
+                  onChange={(e) => setAdjustmentReason(e.target.value)}
+                  placeholder="Explica por qué se ajustan los puntos..."
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={handleCloseAdjustModal}
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleAdjustPoints}
+                disabled={isSubmitting || !adjustmentAmount || !adjustmentReason.trim()}
+                className={`flex-1 px-4 py-2 text-white rounded-lg disabled:opacity-50 ${
+                  adjustmentType === 'add'
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                {isSubmitting ? 'Procesando...' : adjustmentType === 'add' ? 'Agregar' : 'Restar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
