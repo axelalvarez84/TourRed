@@ -42,6 +42,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [noShowCount, setNoShowCount] = useState(0);
   const [isLoadingNoShowCount, setIsLoadingNoShowCount] = useState(true);
   const [isHighRisk, setIsHighRisk] = useState(false);
+  const [remainingExemption, setRemainingExemption] = useState(500);
+  const [isLoadingExemption, setIsLoadingExemption] = useState(true);
 
   const [travelerCounts, setTravelerCounts] = useState<TravelerCounts>({
     adultos: 1,
@@ -216,6 +218,37 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   }, [user, isTraveler]);
 
   React.useEffect(() => {
+    const loadRemainingExemption = async () => {
+      if (!user || !isTraveler || !hasMembership) {
+        setRemainingExemption(0);
+        setIsLoadingExemption(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase.rpc('get_remaining_service_fee_exemption', {
+          p_user_id: user.id
+        });
+
+        if (error) {
+          console.error('Error loading remaining exemption:', error);
+          setRemainingExemption(0);
+        } else {
+          setRemainingExemption(data || 0);
+          console.log('✅ Límite de exención restante:', data || 0);
+        }
+      } catch (err) {
+        console.error('Error loading remaining exemption:', err);
+        setRemainingExemption(0);
+      } finally {
+        setIsLoadingExemption(false);
+      }
+    };
+
+    loadRemainingExemption();
+  }, [user, isTraveler, hasMembership]);
+
+  React.useEffect(() => {
     const fetchAvailability = async () => {
       try {
         setIsLoadingAvailability(true);
@@ -326,8 +359,28 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const membershipMonthlyPrice = 49;
   const membershipAnnualPrice = 490;
 
+  // Calculate service charge with exemption limit
+  const fullServiceCharge = totalPrice * (serviceChargePercentage / 100);
   const shouldWaiveServiceCharge = hasMembership || addMembershipToBooking;
-  const serviceCharge = shouldWaiveServiceCharge ? 0 : totalPrice * (serviceChargePercentage / 100);
+
+  let serviceCharge = 0;
+  let exemptionUsed = 0;
+  let hasReachedExemptionLimit = false;
+
+  if (shouldWaiveServiceCharge && hasMembership) {
+    // If has membership, apply exemption up to remaining limit
+    exemptionUsed = Math.min(fullServiceCharge, remainingExemption);
+    serviceCharge = fullServiceCharge - exemptionUsed;
+    hasReachedExemptionLimit = remainingExemption < fullServiceCharge;
+  } else if (addMembershipToBooking) {
+    // If adding membership to booking, waive full service charge
+    serviceCharge = 0;
+    exemptionUsed = fullServiceCharge;
+  } else {
+    // No membership, charge full service charge
+    serviceCharge = fullServiceCharge;
+  }
+
   const platformRevenue = agencyCommission + serviceCharge;
 
   const membershipCost = addMembershipToBooking
@@ -817,19 +870,40 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
         {hasMembership && (
           <>
-            <div className="mb-4 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-lg p-4">
-              <div className="flex items-center">
-                <Crown className="h-6 w-6 text-amber-600 mr-2" />
-                <div className="flex-1">
-                  <h4 className="text-sm font-bold text-gray-900">
-                    Beneficio ToursRed+ Activo
-                  </h4>
-                  <p className="text-xs text-gray-700">
-                    No se aplicará cargo por servicio en esta reserva
-                  </p>
+            {!hasReachedExemptionLimit ? (
+              <div className="mb-4 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-lg p-4">
+                <div className="flex items-center">
+                  <Crown className="h-6 w-6 text-amber-600 mr-2" />
+                  <div className="flex-1">
+                    <h4 className="text-sm font-bold text-gray-900">
+                      Beneficio ToursRed+ Activo
+                    </h4>
+                    <p className="text-xs text-gray-700">
+                      No se aplicará cargo por servicio en esta reserva
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="mb-4 bg-gradient-to-br from-orange-50 to-red-50 border-2 border-orange-400 rounded-lg p-4">
+                <div className="flex items-start">
+                  <AlertCircle className="h-6 w-6 text-orange-600 mr-2 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="text-sm font-bold text-gray-900 mb-1">
+                      Límite Mensual de Descuento Alcanzado
+                    </h4>
+                    <p className="text-xs text-gray-700 mb-2">
+                      Has usado ${(500 - remainingExemption).toFixed(2)} MXN de tus $500 MXN de descuento este mes. Esta reserva aplicará un cargo por servicio de ${serviceCharge.toFixed(2)} MXN.
+                    </p>
+                    <div className="bg-white rounded-md p-2 border border-orange-200">
+                      <p className="text-xs text-gray-600">
+                        <span className="font-semibold text-green-700">Buenas noticias:</span> El cargo por servicio también te genera <span className="font-bold text-green-700">{Math.floor(serviceCharge).toLocaleString()} ToursRed Points</span> (${(Math.floor(serviceCharge) / 100).toFixed(2)} MXN de valor)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {totalTravelers > 0 && (
               <div className="mb-4 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-4">
@@ -1052,14 +1126,34 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                 <span className="font-medium">${depositAmount.toLocaleString()}</span>
               </div>
 
-              {shouldWaiveServiceCharge ? (
+              {shouldWaiveServiceCharge && !hasReachedExemptionLimit ? (
                 <div className="flex justify-between text-sm text-green-600 mt-1">
                   <span className="flex items-center">
                     <Crown className="h-3 w-3 mr-1" />
                     Cargo por Servicio ({serviceChargePercentage}%):
                   </span>
-                  <span className="font-medium line-through text-gray-400">${(totalPrice * (serviceChargePercentage / 100)).toLocaleString()}</span>
+                  <span className="font-medium line-through text-gray-400">${fullServiceCharge.toLocaleString()}</span>
                 </div>
+              ) : shouldWaiveServiceCharge && hasReachedExemptionLimit ? (
+                <>
+                  <div className="flex justify-between text-sm text-gray-600 mt-1">
+                    <span>Cargo por Servicio ({serviceChargePercentage}%):</span>
+                    <span className="font-medium">${fullServiceCharge.toFixed(2)}</span>
+                  </div>
+                  {exemptionUsed > 0 && (
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span className="flex items-center">
+                        <Crown className="h-3 w-3 mr-1" />
+                        Descuento ToursRed+:
+                      </span>
+                      <span className="font-medium">-${exemptionUsed.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm text-orange-600">
+                    <span>Cargo por Servicio (a pagar):</span>
+                    <span className="font-medium">+${serviceCharge.toFixed(2)}</span>
+                  </div>
+                </>
               ) : (
                 <div className="flex justify-between text-sm text-orange-600 mt-1">
                   <span>Cargo por Servicio ({serviceChargePercentage}%):</span>
@@ -1103,10 +1197,15 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
               <span className="font-bold text-primary-600 text-lg">${totalToPayNow.toLocaleString()}</span>
             </div>
 
-            {shouldWaiveServiceCharge && (
+            {shouldWaiveServiceCharge && exemptionUsed > 0 && (
               <div className="bg-green-50 border border-green-200 rounded-md p-2 mt-2">
                 <p className="text-xs text-green-800 font-medium text-center">
-                  ✓ Ahorraste ${(totalPrice * (serviceChargePercentage / 100)).toLocaleString()} con ToursRed+
+                  ✓ Ahorraste ${exemptionUsed.toFixed(2)} con ToursRed+
+                  {hasReachedExemptionLimit && (
+                    <span className="block text-[10px] text-gray-600 mt-0.5">
+                      (Límite mensual: ${remainingExemption.toFixed(2)} restantes de $500.00)
+                    </span>
+                  )}
                 </p>
               </div>
             )}
