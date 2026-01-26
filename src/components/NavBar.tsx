@@ -132,6 +132,10 @@ const NavBar: React.FC = () => {
         menuItems.push({ to: '/admin/memberships', label: 'Membresías' });
       }
 
+      if (isSuperAdmin || permissions?.canManageMemberships) {
+        menuItems.push({ to: '/admin/points', label: 'Puntos' });
+      }
+
       return menuItems;
     }
 

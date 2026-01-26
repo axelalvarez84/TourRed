@@ -483,7 +483,7 @@ const TravelerDashboard: React.FC = () => {
       </div>
 
       {/* ToursRed Points Card */}
-      {pointsBalance > 0 && (
+      {membership && (
         <div className={`mb-8 rounded-xl shadow-lg p-6 text-white ${
           pointsWalletActive
             ? 'bg-gradient-to-br from-amber-500 via-amber-600 to-yellow-600'

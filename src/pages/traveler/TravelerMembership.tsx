@@ -315,6 +315,14 @@ export default function TravelerMembership() {
                 </li>
                 <li className="flex items-start gap-3">
                   <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <span className="text-gray-700">Acumula 1 punto por cada peso gastado en tours</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <span className="text-gray-700">Usa tus puntos para pagar hasta el 50% de tu reserva</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                   <span className="text-gray-700">Soporte prioritario</span>
                 </li>
                 <li className="flex items-start gap-3">
@@ -354,6 +362,14 @@ export default function TravelerMembership() {
                 <li className="flex items-start gap-3">
                   <Check className="h-5 w-5 text-white flex-shrink-0 mt-0.5" />
                   <span>Sin cargo por servicio hasta $500 MXN/mes en reservas nacionales</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-white flex-shrink-0 mt-0.5" />
+                  <span>Acumula 1 punto por cada peso gastado en tours</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-white flex-shrink-0 mt-0.5" />
+                  <span>Usa tus puntos para pagar hasta el 50% de tu reserva</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Check className="h-5 w-5 text-white flex-shrink-0 mt-0.5" />

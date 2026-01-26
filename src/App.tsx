@@ -38,6 +38,7 @@ import AdminCategories from './pages/admin/AdminCategories';
 import AdminProfile from './pages/admin/AdminProfile';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminMemberships from './pages/admin/AdminMemberships';
+import AdminPoints from './pages/admin/AdminPoints';
 import AdminInternationalInquiries from './pages/admin/AdminInternationalInquiries';
 import MegaTravelPage from './pages/international/MegaTravelPage';
 import ExoticcaPage from './pages/international/ExoticcaPage';
@@ -306,6 +307,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                 <AdminMemberships />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/points"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminPoints />
               </ProtectedRoute>
             }
           />
