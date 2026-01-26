@@ -21,6 +21,8 @@ interface PointsTransaction {
   expires_at: string | null;
   created_at: string;
   reference_id: string | null;
+  reference_type: string | null;
+  booking_code?: string | null;
 }
 
 const TravelerPointsPage: React.FC = () => {
@@ -73,38 +75,71 @@ const TravelerPointsPage: React.FC = () => {
       if (!user) return;
 
       try {
-        const { data, error } = await supabase
+        const { data: txData, error: txError } = await supabase
           .from('toursred_points_transactions')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(100);
 
-        if (error) {
-          console.error('Error loading transactions:', error);
-        } else if (data) {
-          setTransactions(data);
+        if (txError) {
+          console.error('Error loading transactions:', txError);
+          return;
+        }
 
-          const earnedNotExpired = data.filter(
-            t => t.type === 'earned' && t.expires_at && new Date(t.expires_at) > new Date()
+        if (!txData) {
+          setTransactions([]);
+          return;
+        }
+
+        const bookingIds = txData
+          .filter(tx => tx.reference_type === 'booking' && tx.reference_id)
+          .map(tx => tx.reference_id);
+
+        let bookingCodes: Record<string, string> = {};
+
+        if (bookingIds.length > 0) {
+          const { data: bookingsData, error: bookingsError } = await supabase
+            .from('bookings')
+            .select('id, booking_code')
+            .in('id', bookingIds);
+
+          if (!bookingsError && bookingsData) {
+            bookingCodes = bookingsData.reduce((acc, booking) => {
+              acc[booking.id] = booking.booking_code;
+              return acc;
+            }, {} as Record<string, string>);
+          }
+        }
+
+        const formattedData = txData.map(tx => ({
+          ...tx,
+          booking_code: tx.reference_type === 'booking' && tx.reference_id
+            ? bookingCodes[tx.reference_id] || null
+            : null
+        }));
+
+        setTransactions(formattedData);
+
+        const earnedNotExpired = formattedData.filter(
+          t => t.type === 'earned' && t.expires_at && new Date(t.expires_at) > new Date()
+        );
+
+        if (earnedNotExpired.length > 0) {
+          earnedNotExpired.sort((a, b) =>
+            new Date(a.expires_at!).getTime() - new Date(b.expires_at!).getTime()
           );
 
-          if (earnedNotExpired.length > 0) {
-            earnedNotExpired.sort((a, b) =>
-              new Date(a.expires_at!).getTime() - new Date(b.expires_at!).getTime()
-            );
+          const nextExp = earnedNotExpired[0];
+          const sameDate = earnedNotExpired.filter(
+            t => t.expires_at === nextExp.expires_at
+          );
+          const totalAmount = sameDate.reduce((sum, t) => sum + t.amount, 0);
 
-            const nextExp = earnedNotExpired[0];
-            const sameDate = earnedNotExpired.filter(
-              t => t.expires_at === nextExp.expires_at
-            );
-            const totalAmount = sameDate.reduce((sum, t) => sum + t.amount, 0);
-
-            setNextExpiration({
-              date: nextExp.expires_at!,
-              amount: totalAmount
-            });
-          }
+          setNextExpiration({
+            date: nextExp.expires_at!,
+            amount: totalAmount
+          });
         }
       } catch (err) {
         console.error('Error:', err);
@@ -405,6 +440,11 @@ const TravelerPointsPage: React.FC = () => {
                           <div className="text-sm text-gray-500">
                             {formatDate(transaction.created_at)}
                           </div>
+                          {transaction.booking_code && transaction.reference_type === 'booking' && (
+                            <div className="text-xs text-primary-600 font-medium mt-1">
+                              Código de reserva: {transaction.booking_code}
+                            </div>
+                          )}
                           {transaction.expires_at && transaction.type === 'earned' && (
                             <div className={`text-xs mt-1 ${
                               getDaysUntilExpiration(transaction.expires_at) <= 30
