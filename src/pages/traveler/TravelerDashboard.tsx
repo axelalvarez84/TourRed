@@ -58,7 +58,6 @@ const TravelerDashboard: React.FC = () => {
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [pointsBalance, setPointsBalance] = useState<number>(0);
   const [pointsWalletActive, setPointsWalletActive] = useState<boolean>(false);
-  const [nextPointsExpiration, setNextPointsExpiration] = useState<{ date: string; amount: number } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -172,55 +171,6 @@ const TravelerDashboard: React.FC = () => {
 
       if (pointsWalletData) {
         setPointsBalance(pointsWalletData.balance || 0);
-
-        // Obtener todas las transacciones para calcular correctamente considerando FIFO
-        const { data: allTransactions } = await supabase
-          .from('toursred_points_transactions')
-          .select('expires_at, amount, type, created_at')
-          .eq('user_id', user.id);
-
-        if (allTransactions && allTransactions.length > 0) {
-          // Filtrar transacciones earned que no han expirado
-          const earnedTransactions = allTransactions
-            .filter(t => t.type === 'earned' && t.expires_at && new Date(t.expires_at) > new Date())
-            .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-
-          if (earnedTransactions.length > 0) {
-            // Calcular total de puntos usados (redeemed son negativos)
-            const totalRedeemed = Math.abs(
-              allTransactions
-                .filter(t => t.type === 'redeemed')
-                .reduce((sum, t) => sum + t.amount, 0)
-            );
-
-            // Descontar puntos usados de las transacciones earned más antiguas (FIFO)
-            let remainingToDeduct = totalRedeemed;
-            const availableEarned = earnedTransactions.map(tx => {
-              if (remainingToDeduct <= 0) {
-                return { ...tx, availableAmount: tx.amount };
-              } else if (remainingToDeduct >= tx.amount) {
-                remainingToDeduct -= tx.amount;
-                return { ...tx, availableAmount: 0 };
-              } else {
-                const available = tx.amount - remainingToDeduct;
-                remainingToDeduct = 0;
-                return { ...tx, availableAmount: available };
-              }
-            }).filter(tx => tx.availableAmount > 0);
-
-            if (availableEarned.length > 0) {
-              // Ordenar por fecha de expiración
-              availableEarned.sort((a, b) =>
-                new Date(a.expires_at!).getTime() - new Date(b.expires_at!).getTime()
-              );
-
-              const nextExp = availableEarned[0];
-              const sameDate = availableEarned.filter(t => t.expires_at === nextExp.expires_at);
-              const totalAmount = sameDate.reduce((sum, t) => sum + t.availableAmount, 0);
-              setNextPointsExpiration({ date: nextExp.expires_at!, amount: totalAmount });
-            }
-          }
-        }
       }
 
       setPointsWalletActive(membershipData?.status === 'active' || false);
@@ -556,18 +506,13 @@ const TravelerDashboard: React.FC = () => {
             </div>
           )}
 
-          {pointsWalletActive && nextPointsExpiration && (
+          {pointsWalletActive && (
             <div className="mt-4 bg-white/20 border border-white/40 rounded-lg p-3">
               <p className="text-sm text-white font-medium mb-1">
-                Próxima expiración
+                ✨ Beneficio ToursRed+
               </p>
               <p className="text-xs text-amber-100">
-                {nextPointsExpiration.amount.toLocaleString()} puntos expirarán el{' '}
-                {new Date(nextPointsExpiration.date).toLocaleDateString('es-MX', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
+                ¡Tus puntos nunca expiran! Acumula sin límite mientras mantengas tu membresía activa.
               </p>
             </div>
           )}
@@ -581,7 +526,7 @@ const TravelerDashboard: React.FC = () => {
             </Link>
           </div>
           <div className="mt-3 bg-white/10 backdrop-blur-sm rounded-lg p-3 text-xs text-amber-100">
-            <p>Gana 1 punto por cada peso gastado. Usa hasta el 50% del total de tu reserva con puntos. Los puntos expiran 12 meses después de ganarlos.</p>
+            <p>Gana 1 punto por cada peso gastado. Usa hasta el 50% del total de tu reserva con puntos. Tus puntos nunca expiran.</p>
           </div>
         </div>
       )}

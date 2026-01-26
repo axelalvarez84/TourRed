@@ -356,7 +356,7 @@ const AdminPoints: React.FC = () => {
             <ul className="text-sm text-blue-800 space-y-1">
               <li>• Los puntos se otorgan automáticamente cuando una reserva se completa</li>
               <li>• 1 punto = $0.01 MXN (100 puntos = $1 MXN)</li>
-              <li>• Los puntos expiran automáticamente 12 meses después de ganarse</li>
+              <li>• Los puntos NUNCA expiran (beneficio ToursRed+)</li>
               <li>• Los usuarios solo pueden usar puntos con membresía activa</li>
               <li>• Límite de uso: hasta 50% del total de la reserva</li>
             </ul>

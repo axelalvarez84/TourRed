@@ -33,7 +33,6 @@ const TravelerPointsPage: React.FC = () => {
   const [isLoadingWallet, setIsLoadingWallet] = useState(true);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [filter, setFilter] = useState<'all' | 'earned' | 'redeemed' | 'expired'>('all');
-  const [nextExpiration, setNextExpiration] = useState<{ date: string; amount: number } | null>(null);
 
   useEffect(() => {
     const loadWallet = async () => {
@@ -120,58 +119,6 @@ const TravelerPointsPage: React.FC = () => {
         }));
 
         setTransactions(formattedData);
-
-        // Calcular próxima expiración considerando FIFO (First In First Out)
-        // Los puntos usados se descuentan de los más antiguos primero
-        const earnedTransactions = formattedData
-          .filter(t => t.type === 'earned' && t.expires_at && new Date(t.expires_at) > new Date())
-          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-
-        if (earnedTransactions.length > 0) {
-          // Calcular total de puntos usados (redeemed son negativos)
-          const totalRedeemed = Math.abs(
-            formattedData
-              .filter(t => t.type === 'redeemed')
-              .reduce((sum, t) => sum + t.amount, 0)
-          );
-
-          // Descontar puntos usados de las transacciones earned más antiguas (FIFO)
-          let remainingToDeduct = totalRedeemed;
-          const availableEarned = earnedTransactions.map(tx => {
-            if (remainingToDeduct <= 0) {
-              // No hay más puntos que descontar, esta transacción está intacta
-              return { ...tx, availableAmount: tx.amount };
-            } else if (remainingToDeduct >= tx.amount) {
-              // Esta transacción completa fue usada
-              remainingToDeduct -= tx.amount;
-              return { ...tx, availableAmount: 0 };
-            } else {
-              // Solo parte de esta transacción fue usada
-              const available = tx.amount - remainingToDeduct;
-              remainingToDeduct = 0;
-              return { ...tx, availableAmount: available };
-            }
-          }).filter(tx => tx.availableAmount > 0);
-
-          if (availableEarned.length > 0) {
-            // Ordenar por fecha de expiración (las que expiran primero)
-            availableEarned.sort((a, b) =>
-              new Date(a.expires_at!).getTime() - new Date(b.expires_at!).getTime()
-            );
-
-            const nextExp = availableEarned[0];
-            // Sumar todos los puntos disponibles que expiran en la misma fecha
-            const sameDate = availableEarned.filter(
-              t => t.expires_at === nextExp.expires_at
-            );
-            const totalAmount = sameDate.reduce((sum, t) => sum + t.availableAmount, 0);
-
-            setNextExpiration({
-              date: nextExp.expires_at!,
-              amount: totalAmount
-            });
-          }
-        }
       } catch (err) {
         console.error('Error:', err);
       } finally {
@@ -367,32 +314,16 @@ const TravelerPointsPage: React.FC = () => {
               </div>
             )}
 
-            {nextExpiration && wallet.is_active && (
-              <div className={`border-l-4 p-4 mb-6 rounded-md ${
-                getDaysUntilExpiration(nextExpiration.date) <= 30
-                  ? 'bg-yellow-50 border-yellow-500'
-                  : 'bg-blue-50 border-blue-500'
-              }`}>
+            {wallet && wallet.is_active && (
+              <div className="bg-gradient-to-r from-emerald-50 to-green-50 border-l-4 border-emerald-500 p-4 mb-6 rounded-md">
                 <div className="flex items-start">
-                  <Calendar className={`h-5 w-5 mr-2 flex-shrink-0 mt-0.5 ${
-                    getDaysUntilExpiration(nextExpiration.date) <= 30 ? 'text-yellow-600' : 'text-blue-600'
-                  }`} />
+                  <Award className="h-5 w-5 text-emerald-600 mr-2 flex-shrink-0 mt-0.5" />
                   <div>
-                    <h4 className={`text-sm font-semibold mb-1 ${
-                      getDaysUntilExpiration(nextExpiration.date) <= 30 ? 'text-yellow-900' : 'text-blue-900'
-                    }`}>
-                      Próxima Expiración de Puntos
+                    <h4 className="text-sm font-semibold text-emerald-900 mb-1">
+                      Beneficio ToursRed+
                     </h4>
-                    <p className={`text-sm ${
-                      getDaysUntilExpiration(nextExpiration.date) <= 30 ? 'text-yellow-800' : 'text-blue-800'
-                    }`}>
-                      {nextExpiration.amount.toLocaleString()} puntos expirarán el{' '}
-                      {new Date(nextExpiration.date).toLocaleDateString('es-MX', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                      {' '}({getDaysUntilExpiration(nextExpiration.date)} días restantes)
+                    <p className="text-sm text-emerald-800">
+                      ¡Tus puntos nunca expiran! Acumula y canjea cuando quieras, siempre y cuando mantengas tu membresía ToursRed+ activa.
                     </p>
                   </div>
                 </div>
