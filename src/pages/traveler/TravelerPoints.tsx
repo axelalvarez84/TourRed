@@ -241,7 +241,7 @@ const TravelerPointsPage: React.FC = () => {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-lg shadow-lg p-6 text-white">
                 <div className="flex items-center justify-between mb-2">
                   <Award className="h-8 w-8" />
@@ -278,19 +278,6 @@ const TravelerPointsPage: React.FC = () => {
                 </div>
                 <div className="text-gray-500 text-sm">
                   Total canjeado
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <Clock className="h-6 w-6 text-red-600" />
-                  <span className="text-sm font-medium text-gray-600">Expirados</span>
-                </div>
-                <div className="text-2xl font-bold text-gray-900">
-                  {(wallet?.total_expired || 0).toLocaleString()}
-                </div>
-                <div className="text-gray-500 text-sm">
-                  Total perdido
                 </div>
               </div>
             </div>
@@ -454,9 +441,9 @@ const TravelerPointsPage: React.FC = () => {
                   </p>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">¿Cuándo expiran mis puntos?</h3>
+                  <h3 className="font-semibold text-gray-900 mb-1">¿Mis puntos expiran?</h3>
                   <p className="text-sm text-gray-700">
-                    Los puntos expiran 12 meses después de haberlos ganado. Te enviaremos un recordatorio por email 30 días antes de que expiren.
+                    ¡No! Tus ToursRed Points nunca expiran. Puedes acumular sin límite y usarlos cuando quieras, siempre que mantengas tu membresía ToursRed+ activa.
                   </p>
                 </div>
                 <div>
