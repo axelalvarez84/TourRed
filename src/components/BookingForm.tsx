@@ -816,19 +816,37 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         )}
 
         {hasMembership && (
-          <div className="mb-4 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-lg p-4">
-            <div className="flex items-center">
-              <Crown className="h-6 w-6 text-amber-600 mr-2" />
-              <div className="flex-1">
-                <h4 className="text-sm font-bold text-gray-900">
-                  Beneficio ToursRed+ Activo
-                </h4>
-                <p className="text-xs text-gray-700">
-                  No se aplicará cargo por servicio en esta reserva
-                </p>
+          <>
+            <div className="mb-4 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-lg p-4">
+              <div className="flex items-center">
+                <Crown className="h-6 w-6 text-amber-600 mr-2" />
+                <div className="flex-1">
+                  <h4 className="text-sm font-bold text-gray-900">
+                    Beneficio ToursRed+ Activo
+                  </h4>
+                  <p className="text-xs text-gray-700">
+                    No se aplicará cargo por servicio en esta reserva
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+
+            {totalTravelers > 0 && (
+              <div className="mb-4 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-4">
+                <div className="flex items-center">
+                  <Sparkles className="h-6 w-6 text-green-600 mr-2" />
+                  <div className="flex-1">
+                    <h4 className="text-sm font-bold text-gray-900">
+                      Vas a acumular ToursRed Points
+                    </h4>
+                    <p className="text-xs text-gray-700">
+                      Ganarás <span className="font-bold text-green-700">{Math.floor(userPayment).toLocaleString()} puntos</span> (${(Math.floor(userPayment) / 100).toFixed(2)} MXN de valor) con esta reserva
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {!isLoadingPoints && pointsBalance > 0 && totalTravelers > 0 && pointsWalletActive && hasMembership && (
