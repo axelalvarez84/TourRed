@@ -153,6 +153,7 @@ const NavBar: React.FC = () => {
         { to: '/traveler/dashboard', label: 'Panel' },
         { to: '/traveler/bookings', label: 'Reservas' },
         { to: '/traveler/wallet', label: 'ToursRed Cash' },
+        { to: '/traveler/points', label: 'ToursRed Points' },
       ];
     }
 
