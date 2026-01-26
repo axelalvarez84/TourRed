@@ -12,7 +12,8 @@ interface PointsWallet {
   is_active: boolean;
   created_at: string;
   users: {
-    nombre: string;
+    first_name: string;
+    last_name: string;
     email: string;
   };
 }
@@ -44,7 +45,7 @@ const AdminPoints: React.FC = () => {
         .from('toursred_points_wallets')
         .select(`
           *,
-          users!inner(nombre, email)
+          users!inner(first_name, last_name, email)
         `)
         .order('balance', { ascending: false });
 
@@ -83,10 +84,11 @@ const AdminPoints: React.FC = () => {
     }
   };
 
-  const filteredWallets = wallets.filter(wallet =>
-    wallet.users.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    wallet.users.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredWallets = wallets.filter(wallet => {
+    const fullName = `${wallet.users.first_name || ''} ${wallet.users.last_name || ''}`.trim();
+    return fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      wallet.users.email.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-MX', {
@@ -224,7 +226,9 @@ const AdminPoints: React.FC = () => {
                   <tr key={wallet.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{wallet.users.nombre}</div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {`${wallet.users.first_name || ''} ${wallet.users.last_name || ''}`.trim() || 'Sin nombre'}
+                        </div>
                         <div className="text-sm text-gray-500">{wallet.users.email}</div>
                       </div>
                     </td>
