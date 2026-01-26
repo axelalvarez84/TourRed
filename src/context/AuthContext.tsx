@@ -51,7 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const getCachedRole = (userId: string): UserRole | null => {
     try {
-      const cached = localStorage.getItem(`user_role_${userId}`);
+      const cached = sessionStorage.getItem(`user_role_${userId}`) || localStorage.getItem(`user_role_${userId}`);
       if (cached && Object.values(UserRole).includes(cached as UserRole)) {
         return cached as UserRole;
       }
@@ -63,9 +63,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const setCachedRole = (userId: string, role: UserRole) => {
     try {
+      sessionStorage.setItem(`user_role_${userId}`, role);
       localStorage.setItem(`user_role_${userId}`, role);
     } catch (err) {
       console.error('Error guardando cache de rol:', err);
+    }
+  };
+
+  const getCachedAuthState = () => {
+    try {
+      const cached = sessionStorage.getItem('auth_state');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.timestamp && Date.now() - parsed.timestamp < 60000) {
+          return parsed;
+        }
+      }
+    } catch (err) {
+      console.error('Error leyendo cache de auth:', err);
+    }
+    return null;
+  };
+
+  const setCachedAuthState = (userId: string | null, role: UserRole | null, emailVerified: boolean) => {
+    try {
+      sessionStorage.setItem('auth_state', JSON.stringify({
+        userId,
+        role,
+        emailVerified,
+        timestamp: Date.now()
+      }));
+    } catch (err) {
+      console.error('Error guardando cache de auth:', err);
     }
   };
 
@@ -175,6 +204,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('🎭 Rol determinado:', role, 'Email verificado:', emailVerified);
         setUserRole(role);
         setIsEmailVerified(emailVerified);
+        setCachedAuthState(authUser.id, role, emailVerified);
 
         if (role === UserRole.ADMIN) {
           try {
@@ -230,6 +260,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsSuperAdmin(false);
         setPermissions(null);
         try {
+          sessionStorage.removeItem('auth_state');
           localStorage.clear();
         } catch (err) {
           console.error('Error limpiando cache:', err);
@@ -275,6 +306,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('🚀 Inicializando autenticación...');
 
       try {
+        // Intentar cargar desde cache primero para evitar parpadeos
+        const cachedAuth = getCachedAuthState();
+        if (cachedAuth && cachedAuth.userId) {
+          console.log('💾 Restaurando estado desde cache temporalmente...');
+          // Establecer estado temporal desde cache
+          setUser({ id: cachedAuth.userId });
+          setUserRole(cachedAuth.role);
+          setIsEmailVerified(cachedAuth.emailVerified);
+          // Pero mantener isLoading en true hasta validar
+        }
+
         // Obtener usuario actual con timeout
         const timeoutPromise = new Promise<null>((resolve) =>
           setTimeout(() => {
@@ -332,6 +374,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
         setUserRole(null);
         setIsLoading(false);
+        setIsSuperAdmin(false);
+        setPermissions(null);
+        try {
+          sessionStorage.removeItem('auth_state');
+        } catch (err) {
+          console.error('Error limpiando cache:', err);
+        }
       }
     });
 

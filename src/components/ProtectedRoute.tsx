@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../lib/supabase';
@@ -10,6 +10,29 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
   const { user, userRole, isLoading, isEmailVerified } = useAuth();
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+  const redirectTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (redirectTimerRef.current) {
+      clearTimeout(redirectTimerRef.current);
+      redirectTimerRef.current = null;
+    }
+
+    if (!isLoading && !user) {
+      redirectTimerRef.current = setTimeout(() => {
+        setShouldRedirect(true);
+      }, 300);
+    } else {
+      setShouldRedirect(false);
+    }
+
+    return () => {
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current);
+      }
+    };
+  }, [user, isLoading]);
 
   if (isLoading) {
     return (
@@ -19,8 +42,16 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
     );
   }
 
-  if (!user) {
+  if (!user && shouldRedirect) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+      </div>
+    );
   }
 
   if (!isEmailVerified) {
