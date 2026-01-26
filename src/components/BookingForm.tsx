@@ -897,7 +897,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     </p>
                     <div className="bg-white rounded-md p-2 border border-orange-200">
                       <p className="text-xs text-gray-600">
-                        <span className="font-semibold text-green-700">Buenas noticias:</span> El cargo por servicio también te genera <span className="font-bold text-green-700">{Math.floor(serviceCharge).toLocaleString()} ToursRed Points</span> (${(Math.floor(serviceCharge) / 100).toFixed(2)} MXN de valor)
+                        <span className="font-semibold text-green-700">Buenas noticias:</span> El cargo por servicio también te genera <span className="font-bold text-green-700">{Math.floor(serviceCharge).toLocaleString()} ToursRed Points</span>
                       </p>
                     </div>
                   </div>
@@ -914,7 +914,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                       Vas a acumular ToursRed Points
                     </h4>
                     <p className="text-xs text-gray-700">
-                      Ganarás <span className="font-bold text-green-700">{Math.floor(userPayment).toLocaleString()} puntos</span> (${(Math.floor(userPayment) / 100).toFixed(2)} MXN de valor) con esta reserva
+                      Ganarás <span className="font-bold text-green-700">{Math.floor(userPayment).toLocaleString()} puntos</span> con esta reserva
                     </p>
                   </div>
                 </div>
