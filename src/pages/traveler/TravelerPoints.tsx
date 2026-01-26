@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom';
 import { Award, TrendingUp, TrendingDown, Clock, ArrowUp, ArrowDown, AlertCircle, HelpCircle, Calendar, Crown } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import NavBar from '../../components/NavBar';
-import Footer from '../../components/Footer';
 
 interface PointsWallet {
   balance: number;
@@ -179,7 +177,6 @@ const TravelerPointsPage: React.FC = () => {
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <NavBar />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Debes iniciar sesión</h2>
@@ -188,14 +185,12 @@ const TravelerPointsPage: React.FC = () => {
             </Link>
           </div>
         </div>
-        <Footer />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <NavBar />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
@@ -479,8 +474,6 @@ const TravelerPointsPage: React.FC = () => {
           </>
         )}
       </div>
-
-      <Footer />
     </div>
   );
 };
