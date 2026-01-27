@@ -244,11 +244,11 @@ Deno.serve(async (req) => {
             try {
               const { data: booking } = await supabase
                 .from('bookings')
-                .select('user_id, total_price, service_charge')
+                .select('user_id, total_price, service_charge, used_membership_benefit')
                 .eq('id', bookingId)
                 .single();
 
-              if (booking) {
+              if (booking && !booking.used_membership_benefit) {
                 const { data: membership } = await supabase
                   .from('memberships')
                   .select('id, service_fee_exemption_used')
@@ -296,6 +296,8 @@ Deno.serve(async (req) => {
                     }
                   }
                 }
+              } else if (booking?.used_membership_benefit) {
+                console.log(`⚠️ Membership benefit already applied for booking ${bookingId}, skipping...`);
               }
             } catch (membershipError) {
               console.error('Error processing membership exemption:', membershipError);
@@ -482,11 +484,11 @@ Deno.serve(async (req) => {
             try {
               const { data: booking } = await supabase
                 .from('bookings')
-                .select('user_id, total_price, service_charge')
+                .select('user_id, total_price, service_charge, used_membership_benefit')
                 .eq('id', bookingId)
                 .single();
 
-              if (booking) {
+              if (booking && !booking.used_membership_benefit) {
                 const { data: membership } = await supabase
                   .from('memberships')
                   .select('id, service_fee_exemption_used')
@@ -534,6 +536,8 @@ Deno.serve(async (req) => {
                     }
                   }
                 }
+              } else if (booking?.used_membership_benefit) {
+                console.log(`⚠️ Membership benefit already applied for booking ${bookingId}, skipping...`);
               }
             } catch (membershipError) {
               console.error('Error processing membership exemption:', membershipError);
