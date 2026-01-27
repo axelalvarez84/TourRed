@@ -152,6 +152,7 @@ const NavBar: React.FC = () => {
       return [
         { to: '/traveler/dashboard', label: 'Panel' },
         { to: '/traveler/bookings', label: 'Reservas' },
+        { to: '/traveler/membership', label: 'ToursRed Plus' },
         { to: '/traveler/wallet', label: 'ToursRed Cash' },
         { to: '/traveler/points', label: 'ToursRed Points' },
       ];
