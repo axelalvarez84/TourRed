@@ -349,9 +349,9 @@ const TravelersInfoPage: React.FC = () => {
 
       // Calcular el monto a cobrar después de aplicar puntos y ToursRed Cash
       const pointsUsed = booking?.points_used || 0;
-      const pointsDiscountAmount = pointsUsed / 100; // 100 puntos = 1 peso
       const toursRedCashUsed = booking?.toursred_cash_used || 0;
-      const amountToCharge = (booking?.user_payment || 0) - pointsDiscountAmount - toursRedCashUsed;
+      // toursRedCashUsed ya incluye el valor de los puntos, no restamos pointsDiscountAmount por separado
+      const amountToCharge = (booking?.user_payment || 0) - toursRedCashUsed;
 
       // Si el monto a cobrar es 0 o menor, marcar la reserva como pagada directamente
       if (amountToCharge <= 0) {
@@ -380,74 +380,31 @@ const TravelersInfoPage: React.FC = () => {
           console.log('✅ ToursRed Cash descontado exitosamente:', walletResult);
         }
 
-        // SEGUNDO: Descontar puntos del monedero de puntos
-        // Nota: Ya guardamos points_used en el booking al crearlo, solo necesitamos descontar del wallet
+        // SEGUNDO: Descontar puntos del monedero de puntos usando la función RPC
         if (pointsUsed > 0) {
           console.log(`🎯 Descontando ${pointsUsed} puntos del monedero...`);
 
-          // Validar que el usuario pueda usar puntos (membresía activa)
-          const { data: canUsePoints, error: checkError } = await supabase.rpc(
-            'check_can_use_points',
-            { p_user_id: user?.id }
-          );
+          try {
+            const { data: redeemResult, error: redeemError } = await supabase.rpc(
+              'redeem_points_for_booking',
+              {
+                p_booking_id: bookingId,
+                p_user_id: user?.id,
+                p_points_to_use: pointsUsed,
+                p_total_price: booking?.user_payment || 0
+              }
+            );
 
-          if (checkError || !canUsePoints) {
-            throw new Error('No puedes usar puntos. Necesitas una membresía activa.');
+            if (redeemError) {
+              console.error('Error al canjear puntos:', redeemError);
+              throw new Error(`Error al canjear puntos: ${redeemError.message}`);
+            }
+
+            console.log(`✅ Puntos descontados exitosamente del monedero`);
+          } catch (pointsError) {
+            console.error('Excepción al canjear puntos:', pointsError);
+            throw new Error(`No se pudieron canjear los puntos: ${pointsError instanceof Error ? pointsError.message : String(pointsError)}`);
           }
-
-          // Obtener el wallet de puntos
-          const { data: wallet, error: walletError } = await supabase
-            .from('toursred_points_wallets')
-            .select('id, balance, total_used')
-            .eq('user_id', user?.id)
-            .maybeSingle();
-
-          if (walletError || !wallet) {
-            throw new Error('No se encontró la billetera de puntos');
-          }
-
-          // Validar puntos disponibles
-          if (wallet.balance < pointsUsed) {
-            throw new Error(`Puntos insuficientes. Disponibles: ${wallet.balance}, Solicitados: ${pointsUsed}`);
-          }
-
-          const newBalance = wallet.balance - pointsUsed;
-          const newTotalUsed = wallet.total_used + pointsUsed;
-
-          // Descontar puntos del wallet
-          const { error: updateWalletError } = await supabase
-            .from('toursred_points_wallets')
-            .update({
-              balance: newBalance,
-              total_used: newTotalUsed,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', wallet.id);
-
-          if (updateWalletError) {
-            throw new Error(`Error al actualizar el balance de puntos: ${updateWalletError.message}`);
-          }
-
-          // Crear registro de transacción
-          const { error: txError } = await supabase
-            .from('toursred_points_transactions')
-            .insert({
-              wallet_id: wallet.id,
-              user_id: user?.id,
-              amount: -pointsUsed,
-              balance_after: newBalance,
-              type: 'redeemed',
-              description: `Puntos canjeados en reserva para ${tour?.name}`,
-              reference_id: bookingId,
-              reference_type: 'booking'
-            });
-
-          if (txError) {
-            console.error('Error creando transacción de puntos:', txError);
-            // No lanzamos error aquí porque el descuento ya se hizo
-          }
-
-          console.log(`✅ Puntos descontados exitosamente del monedero. Nuevo saldo: ${newBalance}`);
         }
 
         // TERCERO: Determinar el método de pago y actualizar la reserva
@@ -476,29 +433,6 @@ const TravelersInfoPage: React.FC = () => {
         }
 
         console.log('✅ Reserva confirmada exitosamente');
-
-        // Registrar el método de pago en payment_transactions
-        let paymentMethodType = 'ToursRed Points';
-        if (pointsUsed > 0 && toursRedCashUsed > 0) {
-          paymentMethodType = 'ToursRed Points & Cash';
-        } else if (toursRedCashUsed > 0) {
-          paymentMethodType = 'ToursRed Cash';
-        }
-
-        const { error: paymentTransactionError } = await supabase
-          .from('payment_transactions')
-          .insert({
-            booking_id: bookingId,
-            user_id: user?.id,
-            amount: booking?.user_payment || 0,
-            payment_method_type: paymentMethodType,
-            status: 'completed',
-            created_at: new Date().toISOString(),
-          });
-
-        if (paymentTransactionError) {
-          console.error('Error registrando transacción de pago:', paymentTransactionError);
-        }
 
         // CUARTO: Enviar emails de confirmación a viajero, agencia y admin
         try {
