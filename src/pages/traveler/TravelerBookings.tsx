@@ -525,17 +525,23 @@ const TravelerBookings: React.FC = () => {
           throw new Error(`Error al confirmar la reserva: ${confirmError.message}`);
         }
 
-        // Crear registro en wallet_transactions
+        // Descontar ToursRed Cash del monedero
         if (toursRedCashToUse > 0) {
-          await supabase
-            .from('wallet_transactions')
-            .insert({
-              user_id: user?.id,
-              transaction_type: 'use',
-              amount: toursRedCashToUse,
-              booking_id: booking.id,
-              description: `Pago de reserva para ${booking.tours?.name}`,
-            });
+          const { error: walletError } = await supabase.rpc(
+            'update_wallet_balance',
+            {
+              p_user_id: user?.id,
+              p_amount: -toursRedCashToUse,
+              p_type: 'debit',
+              p_description: `Pago de reserva para ${booking.tours?.name}`,
+              p_reference_id: booking.id,
+              p_reference_type: 'booking'
+            }
+          );
+
+          if (walletError) {
+            throw new Error(`Error al procesar el pago con ToursRed Cash: ${walletError.message}`);
+          }
         }
 
         // Enviar notificación por email a la agencia

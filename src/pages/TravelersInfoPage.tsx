@@ -355,7 +355,102 @@ const TravelersInfoPage: React.FC = () => {
 
       // Si el monto a cobrar es 0 o menor, marcar la reserva como pagada directamente
       if (amountToCharge <= 0) {
-        // Determinar el método de pago
+        console.log('💰 Procesando pago con puntos y/o ToursRed Cash...');
+
+        // PRIMERO: Descontar ToursRed Cash usando la función que actualiza el saldo
+        if (toursRedCashUsed > 0) {
+          console.log(`💵 Descontando ${toursRedCashUsed} MXN de ToursRed Cash...`);
+          const { data: walletResult, error: walletError } = await supabase.rpc(
+            'update_wallet_balance',
+            {
+              p_user_id: user?.id,
+              p_amount: -toursRedCashUsed, // Negativo para restar del saldo
+              p_type: 'debit',
+              p_description: `Pago de reserva para ${tour?.name}`,
+              p_reference_id: bookingId,
+              p_reference_type: 'booking'
+            }
+          );
+
+          if (walletError) {
+            console.error('❌ Error descontando ToursRed Cash del monedero:', walletError);
+            throw new Error(`Error al procesar el pago con ToursRed Cash: ${walletError.message}`);
+          }
+
+          console.log('✅ ToursRed Cash descontado exitosamente:', walletResult);
+        }
+
+        // SEGUNDO: Descontar puntos del monedero de puntos
+        // Nota: Ya guardamos points_used en el booking al crearlo, solo necesitamos descontar del wallet
+        if (pointsUsed > 0) {
+          console.log(`🎯 Descontando ${pointsUsed} puntos del monedero...`);
+
+          // Validar que el usuario pueda usar puntos (membresía activa)
+          const { data: canUsePoints, error: checkError } = await supabase.rpc(
+            'check_can_use_points',
+            { p_user_id: user?.id }
+          );
+
+          if (checkError || !canUsePoints) {
+            throw new Error('No puedes usar puntos. Necesitas una membresía activa.');
+          }
+
+          // Obtener el wallet de puntos
+          const { data: wallet, error: walletError } = await supabase
+            .from('toursred_points_wallets')
+            .select('id, balance, total_used')
+            .eq('user_id', user?.id)
+            .maybeSingle();
+
+          if (walletError || !wallet) {
+            throw new Error('No se encontró la billetera de puntos');
+          }
+
+          // Validar puntos disponibles
+          if (wallet.balance < pointsUsed) {
+            throw new Error(`Puntos insuficientes. Disponibles: ${wallet.balance}, Solicitados: ${pointsUsed}`);
+          }
+
+          const newBalance = wallet.balance - pointsUsed;
+          const newTotalUsed = wallet.total_used + pointsUsed;
+
+          // Descontar puntos del wallet
+          const { error: updateWalletError } = await supabase
+            .from('toursred_points_wallets')
+            .update({
+              balance: newBalance,
+              total_used: newTotalUsed,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', wallet.id);
+
+          if (updateWalletError) {
+            throw new Error(`Error al actualizar el balance de puntos: ${updateWalletError.message}`);
+          }
+
+          // Crear registro de transacción
+          const { error: txError } = await supabase
+            .from('toursred_points_transactions')
+            .insert({
+              wallet_id: wallet.id,
+              user_id: user?.id,
+              amount: -pointsUsed,
+              balance_after: newBalance,
+              type: 'redeemed',
+              description: `Puntos canjeados en reserva para ${tour?.name}`,
+              reference_id: bookingId,
+              reference_type: 'booking'
+            });
+
+          if (txError) {
+            console.error('Error creando transacción de puntos:', txError);
+            // No lanzamos error aquí porque el descuento ya se hizo
+          }
+
+          console.log(`✅ Puntos descontados exitosamente del monedero. Nuevo saldo: ${newBalance}`);
+        }
+
+        // TERCERO: Determinar el método de pago y actualizar la reserva
         let paymentMethod = 'toursred_points';
         if (pointsUsed > 0 && toursRedCashUsed > 0) {
           paymentMethod = 'toursred_points_cash';
@@ -363,6 +458,7 @@ const TravelersInfoPage: React.FC = () => {
           paymentMethod = 'toursred_cash';
         }
 
+        console.log(`📝 Confirmando reserva con método de pago: ${paymentMethod}`);
         const { error: updateError } = await supabase
           .from('bookings')
           .update({
@@ -375,25 +471,11 @@ const TravelersInfoPage: React.FC = () => {
           .eq('id', bookingId);
 
         if (updateError) {
+          console.error('❌ Error al confirmar la reserva:', updateError);
           throw new Error(`Error al confirmar la reserva: ${updateError.message}`);
         }
 
-        // Crear registro en wallet_transactions para el uso de ToursRed Cash
-        if (toursRedCashUsed > 0) {
-          const { error: transactionError } = await supabase
-            .from('wallet_transactions')
-            .insert({
-              user_id: user?.id,
-              transaction_type: 'use',
-              amount: toursRedCashUsed,
-              booking_id: bookingId,
-              description: `Pago de reserva para ${tour?.name}`,
-            });
-
-          if (transactionError) {
-            console.error('Error registrando transacción de ToursRed Cash:', transactionError);
-          }
-        }
+        console.log('✅ Reserva confirmada exitosamente');
 
         // Registrar el método de pago en payment_transactions
         let paymentMethodType = 'ToursRed Points';
@@ -418,9 +500,9 @@ const TravelersInfoPage: React.FC = () => {
           console.error('Error registrando transacción de pago:', paymentTransactionError);
         }
 
-        // Enviar emails de confirmación a viajero, agencia y admin
+        // CUARTO: Enviar emails de confirmación a viajero, agencia y admin
         try {
-          console.log('Enviando emails de confirmación para reserva pagada con puntos/cash...');
+          console.log('📧 Enviando emails de confirmación para reserva pagada con puntos/cash...');
           const emailResponse = await fetch(
             `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-confirmation`,
             {
@@ -435,14 +517,18 @@ const TravelersInfoPage: React.FC = () => {
 
           if (emailResponse.ok) {
             const emailResult = await emailResponse.json();
-            console.log('✅ Emails de confirmación enviados:', emailResult);
+            console.log('✅ Emails de confirmación enviados exitosamente:', emailResult);
           } else {
-            console.error('Error en envío de emails:', await emailResponse.text());
+            const errorText = await emailResponse.text();
+            console.error('❌ Error HTTP en envío de emails:', emailResponse.status, errorText);
+            // No lanzamos error aquí porque los emails no deben bloquear el flujo
           }
         } catch (emailError) {
-          console.error('Error enviando emails de confirmación:', emailError);
+          console.error('❌ Excepción al enviar emails de confirmación:', emailError);
+          // No lanzamos error aquí porque los emails no deben bloquear el flujo
         }
 
+        console.log('✅ Proceso completado, redirigiendo a página de éxito...');
         // Redirigir a la página de éxito
         navigate(`/booking-success?booking_id=${bookingId}`);
         return;
