@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wallet, TrendingUp, TrendingDown, Calendar, DollarSign, Gift, RefreshCw, Award, AlertCircle, ArrowUpCircle, ArrowDownCircle, Check, X } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Calendar, DollarSign, Gift, RefreshCw, Award, AlertCircle, ArrowUpCircle, ArrowDownCircle, Check, X, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -24,6 +24,7 @@ interface Transaction {
   reference_id: string | null;
   reference_type: string | null;
   created_at: string;
+  booking_code?: string;
 }
 
 const TravelerWallet: React.FC = () => {
@@ -79,10 +80,7 @@ const TravelerWallet: React.FC = () => {
               if (booking?.booking_code) {
                 return {
                   ...transaction,
-                  description: transaction.description.replace(
-                    new RegExp(transaction.reference_id, 'g'),
-                    booking.booking_code
-                  )
+                  booking_code: booking.booking_code
                 };
               }
             }
@@ -233,6 +231,14 @@ const TravelerWallet: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-6xl mx-auto">
+        <Link
+          to="/traveler/dashboard"
+          className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 mb-6 font-medium transition-colors"
+        >
+          <ArrowLeft className="h-5 w-5" />
+          Regresar al Dashboard
+        </Link>
+
         <h1 className="text-3xl font-bold mb-8 flex items-center gap-3">
           <Wallet className="h-8 w-8 text-accent-600" />
           ToursRed Cash
@@ -460,6 +466,11 @@ const TravelerWallet: React.FC = () => {
                       </div>
                       <div className="flex-1">
                         <p className="font-medium text-gray-900">{transaction.description}</p>
+                        {transaction.booking_code && (
+                          <p className="text-sm text-primary-600 font-semibold mt-1">
+                            Código de Reserva: {transaction.booking_code}
+                          </p>
+                        )}
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-xs px-2 py-1 bg-white rounded-full text-gray-600 font-medium">
                             {getTransactionTypeLabel(transaction.type)}
