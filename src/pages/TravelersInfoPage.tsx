@@ -347,18 +347,28 @@ const TravelersInfoPage: React.FC = () => {
         throw new Error('No hay sesión activa');
       }
 
-      // Calcular el monto a cobrar después de aplicar ToursRed Cash
+      // Calcular el monto a cobrar después de aplicar puntos y ToursRed Cash
+      const pointsUsed = booking?.points_used || 0;
+      const pointsDiscountAmount = pointsUsed / 100; // 100 puntos = 1 peso
       const toursRedCashUsed = booking?.toursred_cash_used || 0;
-      const amountToCharge = (booking?.user_payment || 0) - toursRedCashUsed;
+      const amountToCharge = (booking?.user_payment || 0) - pointsDiscountAmount - toursRedCashUsed;
 
       // Si el monto a cobrar es 0 o menor, marcar la reserva como pagada directamente
       if (amountToCharge <= 0) {
+        // Determinar el método de pago
+        let paymentMethod = 'toursred_points';
+        if (pointsUsed > 0 && toursRedCashUsed > 0) {
+          paymentMethod = 'toursred_points_cash';
+        } else if (toursRedCashUsed > 0) {
+          paymentMethod = 'toursred_cash';
+        }
+
         const { error: updateError } = await supabase
           .from('bookings')
           .update({
             payment_status: 'succeeded',
             status: 'confirmed',
-            payment_method: 'toursred_cash',
+            payment_method: paymentMethod,
             paid_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -386,13 +396,20 @@ const TravelersInfoPage: React.FC = () => {
         }
 
         // Registrar el método de pago en payment_transactions
+        let paymentMethodType = 'ToursRed Points';
+        if (pointsUsed > 0 && toursRedCashUsed > 0) {
+          paymentMethodType = 'ToursRed Points & Cash';
+        } else if (toursRedCashUsed > 0) {
+          paymentMethodType = 'ToursRed Cash';
+        }
+
         const { error: paymentTransactionError } = await supabase
           .from('payment_transactions')
           .insert({
             booking_id: bookingId,
             user_id: user?.id,
             amount: booking?.user_payment || 0,
-            payment_method_type: 'ToursRed Points & Cash',
+            payment_method_type: paymentMethodType,
             status: 'completed',
             created_at: new Date().toISOString(),
           });
