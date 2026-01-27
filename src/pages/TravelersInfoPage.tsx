@@ -503,6 +503,10 @@ const TravelersInfoPage: React.FC = () => {
         // CUARTO: Enviar emails de confirmación a viajero, agencia y admin
         try {
           console.log('📧 Enviando emails de confirmación para reserva pagada con puntos/cash...');
+          console.log('📧 URL del endpoint:', `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-confirmation`);
+          console.log('📧 Booking ID:', bookingId);
+          console.log('📧 Session token presente:', !!session.access_token);
+
           const emailResponse = await fetch(
             `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-confirmation`,
             {
@@ -515,16 +519,26 @@ const TravelersInfoPage: React.FC = () => {
             }
           );
 
+          console.log('📧 Status de respuesta del email:', emailResponse.status);
+
           if (emailResponse.ok) {
             const emailResult = await emailResponse.json();
             console.log('✅ Emails de confirmación enviados exitosamente:', emailResult);
           } else {
             const errorText = await emailResponse.text();
-            console.error('❌ Error HTTP en envío de emails:', emailResponse.status, errorText);
+            console.error('❌ Error HTTP en envío de emails:', {
+              status: emailResponse.status,
+              statusText: emailResponse.statusText,
+              error: errorText
+            });
             // No lanzamos error aquí porque los emails no deben bloquear el flujo
           }
         } catch (emailError) {
-          console.error('❌ Excepción al enviar emails de confirmación:', emailError);
+          console.error('❌ Excepción al enviar emails de confirmación:', {
+            error: emailError,
+            message: emailError instanceof Error ? emailError.message : String(emailError),
+            stack: emailError instanceof Error ? emailError.stack : undefined
+          });
           // No lanzamos error aquí porque los emails no deben bloquear el flujo
         }
 

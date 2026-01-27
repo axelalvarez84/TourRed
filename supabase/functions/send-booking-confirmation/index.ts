@@ -20,13 +20,17 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    console.log("🚀 send-booking-confirmation: Función iniciada");
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { booking_id }: BookingConfirmationRequest = await req.json();
+    console.log("📝 Booking ID recibido:", booking_id);
 
     if (!booking_id) {
+      console.error("❌ No se proporcionó booking_id");
       return new Response(
         JSON.stringify({ error: "El ID de reserva es requerido" }),
         {
