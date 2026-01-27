@@ -241,6 +241,34 @@ Deno.serve(async (req) => {
               }
             }
 
+            // Deduct ToursRed Points if used
+            const pointsUsed = parseInt(session.metadata?.points_used || '0');
+            if (pointsUsed > 0) {
+              try {
+                const { data: booking } = await supabase
+                  .from('bookings')
+                  .select('user_id')
+                  .eq('id', bookingId)
+                  .single();
+
+                if (booking) {
+                  const { error: pointsError } = await supabase.rpc('deduct_points_for_booking', {
+                    p_booking_id: bookingId,
+                    p_user_id: booking.user_id,
+                    p_points_to_deduct: pointsUsed
+                  });
+
+                  if (pointsError) {
+                    console.error(`Error deducting points: ${pointsError.message}`);
+                  } else {
+                    console.log(`Successfully deducted ${pointsUsed} points from user points wallet`);
+                  }
+                }
+              } catch (pointsErr) {
+                console.error('Error processing points deduction:', pointsErr);
+              }
+            }
+
             try {
               const { data: booking } = await supabase
                 .from('bookings')
@@ -480,6 +508,34 @@ Deno.serve(async (req) => {
             console.error(`Error updating booking: ${bookingError.message}`);
           } else {
             console.log(`Successfully confirmed booking ${bookingId} after payment`);
+
+            // Deduct ToursRed Points if used (from payment_intent metadata)
+            const pointsUsedFromIntent = parseInt(paymentIntent.metadata?.points_used || '0');
+            if (pointsUsedFromIntent > 0) {
+              try {
+                const { data: bookingForPoints } = await supabase
+                  .from('bookings')
+                  .select('user_id')
+                  .eq('id', bookingId)
+                  .single();
+
+                if (bookingForPoints) {
+                  const { error: pointsError } = await supabase.rpc('deduct_points_for_booking', {
+                    p_booking_id: bookingId,
+                    p_user_id: bookingForPoints.user_id,
+                    p_points_to_deduct: pointsUsedFromIntent
+                  });
+
+                  if (pointsError) {
+                    console.error(`Error deducting points: ${pointsError.message}`);
+                  } else {
+                    console.log(`Successfully deducted ${pointsUsedFromIntent} points from payment_intent`);
+                  }
+                }
+              } catch (pointsErr) {
+                console.error('Error processing points deduction from payment_intent:', pointsErr);
+              }
+            }
 
             try {
               const { data: booking } = await supabase

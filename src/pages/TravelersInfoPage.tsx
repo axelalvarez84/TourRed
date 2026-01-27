@@ -586,6 +586,7 @@ const TravelersInfoPage: React.FC = () => {
             success_url: `${window.location.origin}/booking-success?booking_id=${bookingId}`,
             cancel_url: `${window.location.origin}/booking-cancel?booking_id=${bookingId}`,
             toursRedCashUsed: toursRedCashUsed,
+            pointsUsed: pointsUsed,
             metadata: {
               points_used: pointsUsed.toString(),
               points_discount: pointsDiscountAmount.toString()
