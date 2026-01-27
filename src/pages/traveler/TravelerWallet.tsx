@@ -70,18 +70,41 @@ const TravelerWallet: React.FC = () => {
 
         const transactionsWithBookingCodes = await Promise.all(
           (transactionsData || []).map(async (transaction) => {
-            if (transaction.reference_type === 'booking' && transaction.reference_id) {
-              const { data: booking } = await supabase
-                .from('bookings')
-                .select('booking_code')
-                .eq('id', transaction.reference_id)
-                .maybeSingle();
+            if (transaction.reference_id) {
+              if (transaction.reference_type === 'booking') {
+                const { data: booking } = await supabase
+                  .from('bookings')
+                  .select('booking_code')
+                  .eq('id', transaction.reference_id)
+                  .maybeSingle();
 
-              if (booking?.booking_code) {
-                return {
-                  ...transaction,
-                  booking_code: booking.booking_code
-                };
+                if (booking?.booking_code) {
+                  return {
+                    ...transaction,
+                    booking_code: booking.booking_code
+                  };
+                }
+              } else if (transaction.reference_type === 'booking_cancellation') {
+                const { data: cancellation } = await supabase
+                  .from('booking_cancellations')
+                  .select('booking_id')
+                  .eq('id', transaction.reference_id)
+                  .maybeSingle();
+
+                if (cancellation?.booking_id) {
+                  const { data: booking } = await supabase
+                    .from('bookings')
+                    .select('booking_code')
+                    .eq('id', cancellation.booking_id)
+                    .maybeSingle();
+
+                  if (booking?.booking_code) {
+                    return {
+                      ...transaction,
+                      booking_code: booking.booking_code
+                    };
+                  }
+                }
               }
             }
             return transaction;
