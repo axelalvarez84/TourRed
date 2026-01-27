@@ -458,7 +458,7 @@ Deno.serve(async (req: Request) => {
 
       <div class="highlight">
         <strong>Próximos pasos:</strong><br>
-        • El monto de ${formatCurrency(agencyReceives)} será depositado en tu cuenta en los próximos 2-3 días hábiles.<br>
+        • El monto de ${formatCurrency(agencyReceives)} será depositado en tu cuenta al completar el tour.<br>
         • El viajero debe pagar el saldo restante de ${formatCurrency(remainingAmount)} directamente a ti según tus políticas.<br>
         • Por favor, contacta al viajero para coordinar los detalles finales del tour.
       </div>
