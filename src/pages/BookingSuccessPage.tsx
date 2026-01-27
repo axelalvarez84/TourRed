@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { CheckCircle, Calendar, MapPin, Users, DollarSign, ArrowRight, CreditCard, Mail, Wallet } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, Users, DollarSign, ArrowRight, CreditCard, Mail, Wallet, Award } from 'lucide-react';
 import { supabase, parseDateFromDB } from '../lib/supabase';
 import { Booking, Tour } from '../types';
 import { format } from 'date-fns';
@@ -13,6 +13,7 @@ const BookingSuccessPage: React.FC = () => {
   const [tour, setTour] = useState<Tour | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
   const emailSendAttempted = useRef(false);
   const { user, isLoading: authLoading } = useAuth();
 
@@ -130,6 +131,25 @@ const BookingSuccessPage: React.FC = () => {
 
       setBooking(bookingData);
       setTour(bookingData.tours);
+
+      // Get payment method from payment_transactions
+      const { data: paymentTransaction } = await supabase
+        .from('payment_transactions')
+        .select('payment_method_type')
+        .eq('booking_id', bookingId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (paymentTransaction?.payment_method_type) {
+        const methodMap: Record<string, string> = {
+          'card': 'Tarjeta de Crédito/Débito',
+          'toursred_cash': 'ToursRed Cash',
+          'toursred_points_cash': 'Puntos ToursRed + ToursRed Cash',
+          'stripe': 'Stripe'
+        };
+        setPaymentMethod(methodMap[paymentTransaction.payment_method_type] || paymentTransaction.payment_method_type);
+      }
 
       // Update booking status to confirmed if payment was pending
       console.log('Current booking status:', bookingData.payment_status, 'Status:', bookingData.status);
@@ -303,7 +323,7 @@ const BookingSuccessPage: React.FC = () => {
                     <CreditCard className="h-5 w-5 text-gray-400 mr-3 mt-1" />
                     <div>
                       <div className="text-sm text-gray-500">Método de Pago</div>
-                      <div className="font-medium">{booking.payment_method || 'Tarjeta'}</div>
+                      <div className="font-medium">{paymentMethod || booking.payment_method || 'Tarjeta'}</div>
                     </div>
                   </div>
                 </div>
@@ -327,7 +347,7 @@ const BookingSuccessPage: React.FC = () => {
                       <span className="text-gray-600">Cargo por Servicio:</span>
                       <span className="font-medium">
                         {booking.service_charge === 0 ? (
-                          <span className="text-green-600">$0</span>
+                          <span className="text-green-600">$0 (ToursRed Plus)</span>
                         ) : (
                           `$${booking.service_charge.toLocaleString()}`
                         )}
@@ -335,13 +355,23 @@ const BookingSuccessPage: React.FC = () => {
                     </div>
                   )}
 
-                  {booking.toursred_cash_used && booking.toursred_cash_used > 0 && (
+                  {booking.points_used && booking.points_used > 0 && (
                     <div className="flex justify-between bg-amber-50 border border-amber-200 rounded px-2 py-1.5 -mx-1">
+                      <span className="text-amber-700 font-medium flex items-center">
+                        <Award className="h-4 w-4 mr-1" />
+                        Puntos ToursRed Usados:
+                      </span>
+                      <span className="font-bold text-amber-600">-{booking.points_used.toLocaleString()} puntos (${booking.points_used.toLocaleString()})</span>
+                    </div>
+                  )}
+
+                  {booking.toursred_cash_used && booking.toursred_cash_used > 0 && (
+                    <div className="flex justify-between bg-amber-50 border border-amber-200 rounded px-2 py-1.5 -mx-1 mt-1">
                       <span className="text-amber-700 font-medium flex items-center">
                         <Wallet className="h-4 w-4 mr-1" />
                         ToursRed Cash Aplicado:
                       </span>
-                      <span className="font-bold text-amber-600">-${booking.toursred_cash_used.toLocaleString()}</span>
+                      <span className="font-bold text-amber-600">-${(booking.toursred_cash_used - (booking.points_used || 0)).toLocaleString()}</span>
                     </div>
                   )}
 
@@ -350,12 +380,34 @@ const BookingSuccessPage: React.FC = () => {
                       <span className="text-green-600">Total Pagado:</span>
                       <span className="text-green-600">${booking.user_payment?.toLocaleString()}</span>
                     </div>
-                    {booking.toursred_cash_used && booking.toursred_cash_used > 0 && (
+                    {((booking.points_used && booking.points_used > 0) || (booking.toursred_cash_used && booking.toursred_cash_used > 0)) && (
                       <div className="text-xs text-gray-500 mt-1 text-right">
-                        (${booking.toursred_cash_used.toLocaleString()} ToursRed Cash + ${((booking.user_payment || 0) - (booking.toursred_cash_used || 0)).toLocaleString()} Stripe)
+                        {booking.points_used && booking.points_used > 0 && booking.toursred_cash_used && booking.toursred_cash_used > 0 ? (
+                          <>
+                            ({booking.points_used.toLocaleString()} puntos + ${(booking.toursred_cash_used - booking.points_used).toLocaleString()} ToursRed Cash + ${((booking.user_payment || 0) - (booking.toursred_cash_used || 0)).toLocaleString()} Stripe)
+                          </>
+                        ) : booking.points_used && booking.points_used > 0 ? (
+                          <>
+                            ({booking.points_used.toLocaleString()} puntos + ${((booking.user_payment || 0) - booking.points_used).toLocaleString()} Stripe)
+                          </>
+                        ) : (
+                          <>
+                            (${booking.toursred_cash_used?.toLocaleString()} ToursRed Cash + ${((booking.user_payment || 0) - (booking.toursred_cash_used || 0)).toLocaleString()} Stripe)
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
+
+                  {booking.points_earned && booking.points_earned > 0 && (
+                    <div className="flex justify-between bg-green-50 border border-green-200 rounded px-2 py-1.5 -mx-1 mt-2">
+                      <span className="text-green-700 font-medium flex items-center">
+                        <Award className="h-4 w-4 mr-1" />
+                        Puntos ToursRed Ganados:
+                      </span>
+                      <span className="font-bold text-green-600">+{booking.points_earned.toLocaleString()} puntos</span>
+                    </div>
+                  )}
 
                   <div className="flex justify-between text-sm text-gray-500 mt-2">
                     <span>Saldo Restante:</span>
