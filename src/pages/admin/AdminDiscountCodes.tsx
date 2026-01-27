@@ -94,17 +94,26 @@ export default function AdminDiscountCodes() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.code || !formData.description || !formData.discount_value || !formData.valid_until) {
+    if (!formData.code || !formData.description || !formData.valid_until) {
+      alert('Por favor complete todos los campos requeridos');
+      return;
+    }
+
+    if (formData.discount_type !== 'membership_free_month' && !formData.discount_value) {
       alert('Por favor complete todos los campos requeridos');
       return;
     }
 
     try {
+      const discountValue = formData.discount_type === 'membership_free_month'
+        ? 1
+        : parseFloat(formData.discount_value);
+
       const codeData = {
         code: formData.code.toUpperCase(),
         description: formData.description,
         discount_type: formData.discount_type,
-        discount_value: parseFloat(formData.discount_value),
+        discount_value: discountValue,
         applicable_to: formData.applicable_to,
         is_single_use: formData.is_single_use,
         is_active: formData.is_active,
@@ -145,7 +154,7 @@ export default function AdminDiscountCodes() {
       description: code.description,
       applicable_to: code.applicable_to,
       discount_type: code.discount_type,
-      discount_value: code.discount_value.toString(),
+      discount_value: code.discount_type === 'membership_free_month' ? '' : code.discount_value.toString(),
       valid_from: code.valid_from.split('T')[0],
       valid_until: code.valid_until.split('T')[0],
       is_single_use: code.is_single_use,
@@ -650,7 +659,11 @@ export default function AdminDiscountCodes() {
                     </label>
                     <select
                       value={formData.discount_type}
-                      onChange={(e) => setFormData({ ...formData, discount_type: e.target.value })}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        discount_type: e.target.value,
+                        discount_value: e.target.value === 'membership_free_month' ? '' : formData.discount_value
+                      })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       required
                     >
