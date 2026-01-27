@@ -415,42 +415,16 @@ const TravelersInfoPage: React.FC = () => {
           }
         }
 
-        // TERCERO: Determinar el método de pago y actualizar la reserva
-        let paymentMethod = 'toursred_points';
-        if (pointsUsed > 0 && toursRedCashUsed > 0) {
-          paymentMethod = 'toursred_points_cash';
-        } else if (toursRedCashUsed > 0) {
-          paymentMethod = 'toursred_cash';
-        }
-
-        console.log(`📝 Confirmando reserva con método de pago: ${paymentMethod}`);
-        const { error: updateError } = await supabase
-          .from('bookings')
-          .update({
-            payment_status: 'succeeded',
-            status: 'confirmed',
-            payment_method: paymentMethod,
-            paid_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', bookingId);
-
-        if (updateError) {
-          console.error('❌ Error al confirmar la reserva:', updateError);
-          throw new Error(`Error al confirmar la reserva: ${updateError.message}`);
-        }
-
-        console.log('✅ Reserva confirmada exitosamente');
-
-        // CUARTO: Procesar beneficio de membresía si aplica
+        // TERCERO: Calcular beneficio de membresía si aplica (ANTES de actualizar)
+        let membershipBenefitData: any = {};
         try {
           const { data: bookingWithDetails } = await supabase
             .from('bookings')
-            .select('user_id, total_price, service_charge, used_membership_benefit')
+            .select('user_id, total_price, service_charge')
             .eq('id', bookingId)
             .single();
 
-          if (bookingWithDetails && !bookingWithDetails.used_membership_benefit) {
+          if (bookingWithDetails) {
             const { data: membership } = await supabase
               .from('memberships')
               .select('id, service_fee_exemption_used')
@@ -477,21 +451,46 @@ const TravelersInfoPage: React.FC = () => {
                   })
                   .eq('id', membership.id);
 
-                await supabase
-                  .from('bookings')
-                  .update({
-                    used_membership_benefit: true,
-                    membership_service_fee_saved: exemptionUsed
-                  })
-                  .eq('id', bookingId);
+                membershipBenefitData = {
+                  used_membership_benefit: true,
+                  membership_service_fee_saved: exemptionUsed
+                };
 
-                console.log(`✅ Beneficio de membresía aplicado: ${exemptionUsed} MXN`);
+                console.log(`✅ Beneficio de membresía calculado: ${exemptionUsed} MXN`);
               }
             }
           }
         } catch (membershipError) {
           console.error('Error procesando beneficio de membresía:', membershipError);
         }
+
+        // CUARTO: Determinar el método de pago y actualizar la reserva (UN SOLO UPDATE)
+        let paymentMethod = 'toursred_points';
+        if (pointsUsed > 0 && toursRedCashUsed > 0) {
+          paymentMethod = 'toursred_points_cash';
+        } else if (toursRedCashUsed > 0) {
+          paymentMethod = 'toursred_cash';
+        }
+
+        console.log(`📝 Confirmando reserva con método de pago: ${paymentMethod}`);
+        const { error: updateError } = await supabase
+          .from('bookings')
+          .update({
+            payment_status: 'succeeded',
+            status: 'confirmed',
+            payment_method: paymentMethod,
+            paid_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            ...membershipBenefitData
+          })
+          .eq('id', bookingId);
+
+        if (updateError) {
+          console.error('❌ Error al confirmar la reserva:', updateError);
+          throw new Error(`Error al confirmar la reserva: ${updateError.message}`);
+        }
+
+        console.log('✅ Reserva confirmada exitosamente');
 
         // QUINTO: Enviar emails de confirmación a viajero, agencia y admin
         try {
