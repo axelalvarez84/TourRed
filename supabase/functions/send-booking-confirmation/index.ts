@@ -70,7 +70,19 @@ Deno.serve(async (req: Request) => {
       .limit(1)
       .maybeSingle();
 
-    const paymentMethod = paymentTransaction?.payment_method_type || 'No especificado';
+    const pointsUsed = booking.points_used || 0;
+    const pointsEarned = booking.points_earned || 0;
+
+    let paymentMethod = 'No especificado';
+    if (paymentTransaction?.payment_method_type) {
+      const methodMap: Record<string, string> = {
+        'card': 'Tarjeta de Crédito/Débito',
+        'toursred_cash': 'ToursRed Cash',
+        'toursred_points_cash': 'Puntos ToursRed + ToursRed Cash',
+        'stripe': 'Stripe'
+      };
+      paymentMethod = methodMap[paymentTransaction.payment_method_type] || paymentTransaction.payment_method_type;
+    }
 
     if (booking.confirmation_email_sent) {
       console.log("Emails de confirmación ya fueron enviados para esta reserva");
@@ -131,6 +143,8 @@ Deno.serve(async (req: Request) => {
     const serviceCharge = booking.service_charge || 0;
     const toursRedCashUsed = booking.toursred_cash_used || 0;
     const userPayment = booking.user_payment || (depositAmount + serviceCharge);
+    const pointsValueUsed = pointsUsed;
+    const cashAfterPoints = toursRedCashUsed > 0 ? toursRedCashUsed - pointsValueUsed : 0;
     const stripePayment = userPayment - toursRedCashUsed;
     const remainingAmount = totalPrice - depositAmount;
 
@@ -240,10 +254,16 @@ Deno.serve(async (req: Request) => {
           <span class="info-value" style="color: #059669;">$0.00 (ToursRed Plus)</span>
         </div>
         `}
-        ${toursRedCashUsed > 0 ? `
+        ${pointsUsed > 0 ? `
+        <div class="info-row" style="background-color: #fef3c7; margin: 5px -5px; padding: 8px 5px;">
+          <span class="info-label" style="font-weight: 600;">⭐ Puntos ToursRed Usados:</span>
+          <span class="info-value" style="color: #d97706;">-${pointsUsed.toLocaleString('es-MX')} puntos (${formatCurrency(pointsValueUsed)})</span>
+        </div>
+        ` : ''}
+        ${cashAfterPoints > 0 ? `
         <div class="info-row" style="background-color: #fef3c7; margin: 5px -5px; padding: 8px 5px;">
           <span class="info-label" style="font-weight: 600;">💰 ToursRed Cash Aplicado:</span>
-          <span class="info-value" style="color: #d97706;">-${formatCurrency(toursRedCashUsed)}</span>
+          <span class="info-value" style="color: #d97706;">-${formatCurrency(cashAfterPoints)}</span>
         </div>
         ` : ''}
         <div class="info-row">
@@ -255,12 +275,27 @@ Deno.serve(async (req: Request) => {
             <span>Total pagado:</span>
             <span style="color: #059669;">${formatCurrency(userPayment)}</span>
           </div>
-          ${toursRedCashUsed > 0 ? `
+          ${(pointsUsed > 0 || toursRedCashUsed > 0) ? `
           <div style="font-size: 12px; color: #6b7280; text-align: right; margin-top: 5px;">
-            (${formatCurrency(toursRedCashUsed)} ToursRed Cash + ${formatCurrency(stripePayment)} Stripe)
+            ${pointsUsed > 0 && cashAfterPoints > 0 && stripePayment > 0
+              ? `(${pointsUsed.toLocaleString('es-MX')} puntos + ${formatCurrency(cashAfterPoints)} ToursRed Cash + ${formatCurrency(stripePayment)} Stripe)`
+              : pointsUsed > 0 && stripePayment > 0
+                ? `(${pointsUsed.toLocaleString('es-MX')} puntos + ${formatCurrency(stripePayment)} Stripe)`
+                : pointsUsed > 0 && cashAfterPoints > 0
+                  ? `(${pointsUsed.toLocaleString('es-MX')} puntos + ${formatCurrency(cashAfterPoints)} ToursRed Cash)`
+                  : toursRedCashUsed > 0 && stripePayment > 0
+                    ? `(${formatCurrency(toursRedCashUsed)} ToursRed Cash + ${formatCurrency(stripePayment)} Stripe)`
+                    : ''
+            }
           </div>
           ` : ''}
         </div>
+        ${pointsEarned > 0 ? `
+        <div class="info-row" style="background-color: #dcfce7; margin: 5px -5px; padding: 8px 5px;">
+          <span class="info-label" style="font-weight: 600;">🎁 Puntos ToursRed Ganados:</span>
+          <span class="info-value" style="color: #059669;">+${pointsEarned.toLocaleString('es-MX')} puntos</span>
+        </div>
+        ` : ''}
         <div class="info-row">
           <span class="info-label">Monto restante a pagar a la agencia:</span>
           <span class="info-value" style="color: #dc2626;">${formatCurrency(remainingAmount)}</span>
