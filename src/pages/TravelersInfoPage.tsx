@@ -509,6 +509,8 @@ const TravelersInfoPage: React.FC = () => {
             payment_method: paymentMethod,
             paid_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
+            points_used: pointsUsed,
+            toursred_cash_used: toursRedCashUsed,
             ...membershipBenefitData
           })
           .eq('id', bookingId);
