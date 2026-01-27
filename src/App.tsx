@@ -40,6 +40,7 @@ import AdminSettings from './pages/admin/AdminSettings';
 import AdminMemberships from './pages/admin/AdminMemberships';
 import AdminPoints from './pages/admin/AdminPoints';
 import AdminInternationalInquiries from './pages/admin/AdminInternationalInquiries';
+import AdminDiscountCodes from './pages/admin/AdminDiscountCodes';
 import MegaTravelPage from './pages/international/MegaTravelPage';
 import ExoticcaPage from './pages/international/ExoticcaPage';
 import ComingSoonPage from './pages/international/ComingSoonPage';
@@ -331,6 +332,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                 <AdminDeparturePoints />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/discount-codes"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminDiscountCodes />
               </ProtectedRoute>
             }
           />

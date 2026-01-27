@@ -136,6 +136,10 @@ const NavBar: React.FC = () => {
         menuItems.push({ to: '/admin/points', label: 'Puntos' });
       }
 
+      if (isSuperAdmin || permissions?.canManageSettings) {
+        menuItems.push({ to: '/admin/discount-codes', label: 'Códigos Descuento' });
+      }
+
       return menuItems;
     }
 
