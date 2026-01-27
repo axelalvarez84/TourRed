@@ -403,9 +403,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   // Calculate amount after points
   const amountAfterPoints = userPayment - pointsDiscountAmount;
 
-  // Calculate ToursRed Cash applied to remaining amount
+  // Calculate ToursRed Cash applied to remaining amount (this is what comes from the cash wallet)
   const toursRedCashApplied = useToursRedCash ? Math.min(walletBalance, amountAfterPoints) : 0;
   const amountAfterToursRedCash = amountAfterPoints - toursRedCashApplied;
+
+  // IMPORTANT: toursRedCashApplied is the TOTAL remaining after points
+  // But we need to store only the PURE ToursRed Cash (not including the points value that was already deducted)
+  // This is already correct because toursRedCashApplied = min(walletBalance, amountAfterPoints)
+  // where amountAfterPoints already has the points discount applied
 
   const totalToPayNow = amountAfterToursRedCash + membershipCost;
 

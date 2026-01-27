@@ -371,7 +371,7 @@ const BookingSuccessPage: React.FC = () => {
                         <Wallet className="h-4 w-4 mr-1" />
                         ToursRed Cash Aplicado:
                       </span>
-                      <span className="font-bold text-amber-600">-${(booking.toursred_cash_used - ((booking.points_used || 0) / 100)).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-bold text-amber-600">-${Number(booking.toursred_cash_used).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                   )}
 
@@ -384,15 +384,15 @@ const BookingSuccessPage: React.FC = () => {
                       <div className="text-xs text-gray-500 mt-1 text-right">
                         {booking.points_used && booking.points_used > 0 && booking.toursred_cash_used && booking.toursred_cash_used > 0 ? (
                           <>
-                            ({booking.points_used.toLocaleString()} puntos + ${(booking.toursred_cash_used - (booking.points_used / 100)).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ToursRed Cash + ${((booking.user_payment || 0) - (booking.toursred_cash_used || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Stripe)
+                            ({booking.points_used.toLocaleString()} puntos + ${Number(booking.toursred_cash_used).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ToursRed Cash + ${Math.max(0, (booking.user_payment || 0) - ((booking.points_used || 0) / 100) - Number(booking.toursred_cash_used || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Stripe)
                           </>
                         ) : booking.points_used && booking.points_used > 0 ? (
                           <>
-                            ({booking.points_used.toLocaleString()} puntos + ${((booking.user_payment || 0) - (booking.points_used / 100)).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Stripe)
+                            ({booking.points_used.toLocaleString()} puntos + ${Math.max(0, (booking.user_payment || 0) - (booking.points_used / 100)).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Stripe)
                           </>
                         ) : (
                           <>
-                            (${booking.toursred_cash_used?.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ToursRed Cash + ${((booking.user_payment || 0) - (booking.toursred_cash_used || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Stripe)
+                            (${Number(booking.toursred_cash_used || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ToursRed Cash + ${Math.max(0, (booking.user_payment || 0) - Number(booking.toursred_cash_used || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Stripe)
                           </>
                         )}
                       </div>
