@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Crown, Check, X, Zap, Shield, Sparkles, AlertCircle } from 'lucide-react';
+import { Crown, Check, X, Zap, Shield, Sparkles, AlertCircle, ArrowLeft, Calendar, MapPin, DollarSign } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { useMembershipPrices } from '../../hooks/useMembershipPrices';
@@ -16,11 +16,23 @@ interface Membership {
   service_fee_exemption_used: number;
 }
 
+interface BookingWithBenefit {
+  id: string;
+  booking_code: string;
+  created_at: string;
+  service_charge: number;
+  tour: {
+    name: string;
+    destination: string;
+  };
+}
+
 export default function TravelerMembership() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [membership, setMembership] = useState<Membership | null>(null);
+  const [bookingsWithBenefit, setBookingsWithBenefit] = useState<BookingWithBenefit[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,10 +59,44 @@ export default function TravelerMembership() {
 
       if (error) throw error;
       setMembership(data);
+
+      if (data) {
+        await fetchBookingsWithBenefit(data.current_period_end);
+      }
     } catch (err) {
       console.error('Error fetching membership:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBookingsWithBenefit = async (currentPeriodEnd: string) => {
+    if (!user) return;
+
+    try {
+      const periodStart = new Date(currentPeriodEnd);
+      periodStart.setMonth(periodStart.getMonth() - 1);
+
+      const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+          id,
+          booking_code,
+          created_at,
+          service_charge,
+          tour:tours(name, destination)
+        `)
+        .eq('user_id', user.id)
+        .eq('service_charge', 0)
+        .gte('created_at', periodStart.toISOString())
+        .lte('created_at', currentPeriodEnd)
+        .in('status', ['confirmed', 'completed'])
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setBookingsWithBenefit(data || []);
+    } catch (err) {
+      console.error('Error fetching bookings with benefit:', err);
     }
   };
 
@@ -143,6 +189,16 @@ export default function TravelerMembership() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-6">
+          <button
+            onClick={() => navigate('/traveler/dashboard')}
+            className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5" />
+            Regresar al Dashboard
+          </button>
+        </div>
+
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center mb-4">
             <Crown className="h-16 w-16 text-yellow-500" />
@@ -241,6 +297,58 @@ export default function TravelerMembership() {
                 </div>
               </div>
             </div>
+
+            {bookingsWithBenefit.length > 0 && (
+              <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                  Reservas con Beneficio Aplicado Este Mes
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Has ahorrado el cargo por servicio en las siguientes reservas durante tu período de facturación actual:
+                </p>
+                <div className="space-y-3">
+                  {bookingsWithBenefit.map((booking) => (
+                    <div
+                      key={booking.id}
+                      className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-mono bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                              {booking.booking_code}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {new Date(booking.created_at).toLocaleDateString('es-MX', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </span>
+                          </div>
+                          <h4 className="font-medium text-gray-900 mb-1">{booking.tour.name}</h4>
+                          <p className="text-sm text-gray-600 flex items-center gap-1">
+                            <MapPin className="h-4 w-4" />
+                            {booking.tour.destination}
+                          </p>
+                        </div>
+                        <div className="text-right ml-4">
+                          <p className="text-xs text-gray-500 mb-1">Cargo por servicio</p>
+                          <p className="text-lg font-bold text-green-600">$0.00</p>
+                          <p className="text-xs text-gray-500">¡Ahorraste!</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
+                  <p className="text-sm text-green-800 font-medium">
+                    Total ahorrado este mes: ${((membership?.service_fee_exemption_used || 0)).toFixed(2)} MXN
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="bg-white rounded-xl shadow-md p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Gestionar Suscripción</h3>
