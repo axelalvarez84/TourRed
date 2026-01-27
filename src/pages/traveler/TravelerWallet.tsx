@@ -98,18 +98,29 @@ const TravelerWallet: React.FC = () => {
                   };
                 }
               } else if (transaction.reference_type === 'tour_cancellation') {
-                const { data: booking } = await supabase
+                const { data: bookings } = await supabase
                   .from('bookings')
-                  .select('booking_code')
+                  .select('booking_code, cancelled_at')
                   .eq('user_id', transaction.user_id)
                   .eq('agency_cancellation_id', transaction.reference_id)
-                  .maybeSingle();
+                  .order('cancelled_at', { ascending: true });
 
-                if (booking?.booking_code) {
-                  return {
-                    ...transaction,
-                    booking_code: booking.booking_code
-                  };
+                if (bookings && bookings.length > 0) {
+                  const transactionTime = new Date(transaction.created_at).getTime();
+                  const closestBooking = bookings.reduce((closest, booking) => {
+                    const bookingTime = new Date(booking.cancelled_at).getTime();
+                    const currentDiff = Math.abs(transactionTime - bookingTime);
+                    const closestTime = new Date(closest.cancelled_at).getTime();
+                    const closestDiff = Math.abs(transactionTime - closestTime);
+                    return currentDiff < closestDiff ? booking : closest;
+                  }, bookings[0]);
+
+                  if (closestBooking?.booking_code) {
+                    return {
+                      ...transaction,
+                      booking_code: closestBooking.booking_code
+                    };
+                  }
                 }
               }
             }
