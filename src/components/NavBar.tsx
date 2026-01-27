@@ -132,11 +132,11 @@ const NavBar: React.FC = () => {
         menuItems.push({ to: '/admin/memberships', label: 'Membresías' });
       }
 
-      if (isSuperAdmin || permissions?.canManageMemberships) {
+      if (isSuperAdmin || permissions?.canManagePoints) {
         menuItems.push({ to: '/admin/points', label: 'Puntos' });
       }
 
-      if (isSuperAdmin || permissions?.canManageSettings) {
+      if (isSuperAdmin || permissions?.canManageDiscountCodes) {
         menuItems.push({ to: '/admin/discount-codes', label: 'Códigos Descuento' });
       }
 

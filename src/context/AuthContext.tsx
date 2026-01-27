@@ -13,6 +13,8 @@ export interface AdminPermissions {
   canManageSettings: boolean;
   canManageMemberships: boolean;
   canManageInquiries: boolean;
+  canManagePoints: boolean;
+  canManageDiscountCodes: boolean;
 }
 
 interface AuthContextType {
@@ -237,6 +239,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     canManageSettings: permsData.can_manage_settings,
                     canManageMemberships: permsData.can_manage_memberships,
                     canManageInquiries: permsData.can_manage_inquiries,
+                    canManagePoints: permsData.can_manage_points,
+                    canManageDiscountCodes: permsData.can_manage_discount_codes,
                   });
                 } else {
                   setPermissions(null);

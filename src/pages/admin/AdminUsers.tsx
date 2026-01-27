@@ -39,6 +39,8 @@ const AdminUsers: React.FC = () => {
       canManageSettings: false,
       canManageMemberships: false,
       canManageInquiries: false,
+      canManagePoints: false,
+      canManageDiscountCodes: false,
     }
   });
 
@@ -54,6 +56,8 @@ const AdminUsers: React.FC = () => {
     canManageSettings: false,
     canManageMemberships: false,
     canManageInquiries: false,
+    canManagePoints: false,
+    canManageDiscountCodes: false,
   });
 
   useEffect(() => {
@@ -78,7 +82,7 @@ const AdminUsers: React.FC = () => {
         (usersData || []).map(async (user) => {
           const { data: permsData } = await supabase
             .from('admin_permissions')
-            .select('can_manage_agencies, can_manage_users, can_manage_travelers, can_manage_destinations, can_manage_categories, can_manage_departure_points, can_manage_reviews, can_manage_messages, can_manage_inquiries')
+            .select('can_manage_agencies, can_manage_users, can_manage_travelers, can_manage_destinations, can_manage_categories, can_manage_departure_points, can_manage_reviews, can_manage_messages, can_manage_inquiries, can_manage_settings, can_manage_memberships, can_manage_points, can_manage_discount_codes')
             .eq('user_id', user.id)
             .maybeSingle();
 
@@ -96,6 +100,8 @@ const AdminUsers: React.FC = () => {
               canManageSettings: permsData.can_manage_settings,
               canManageMemberships: permsData.can_manage_memberships,
               canManageInquiries: permsData.can_manage_inquiries,
+              canManagePoints: permsData.can_manage_points,
+              canManageDiscountCodes: permsData.can_manage_discount_codes,
             } : null
           };
         })
@@ -150,6 +156,8 @@ const AdminUsers: React.FC = () => {
               can_manage_settings: newUser.permissions.canManageSettings,
               can_manage_memberships: newUser.permissions.canManageMemberships,
               can_manage_inquiries: newUser.permissions.canManageInquiries,
+              can_manage_points: newUser.permissions.canManagePoints,
+              can_manage_discount_codes: newUser.permissions.canManageDiscountCodes,
             }
           }),
         }
@@ -179,6 +187,8 @@ const AdminUsers: React.FC = () => {
           canManageSettings: false,
           canManageMemberships: false,
           canManageInquiries: false,
+          canManagePoints: false,
+          canManageDiscountCodes: false,
         }
       });
 
@@ -210,6 +220,8 @@ const AdminUsers: React.FC = () => {
           can_manage_settings: tempPermissions.canManageSettings,
           can_manage_memberships: tempPermissions.canManageMemberships,
           can_manage_inquiries: tempPermissions.canManageInquiries,
+          can_manage_points: tempPermissions.canManagePoints,
+          can_manage_discount_codes: tempPermissions.canManageDiscountCodes,
         })
         .eq('user_id', userId);
 
@@ -510,6 +522,16 @@ const AdminUsers: React.FC = () => {
                             checked={tempPermissions.canManageInquiries}
                             onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageInquiries: checked })}
                           />
+                          <PermissionCheckbox
+                            label="Gestionar Puntos"
+                            checked={tempPermissions.canManagePoints}
+                            onChange={(checked) => setTempPermissions({ ...tempPermissions, canManagePoints: checked })}
+                          />
+                          <PermissionCheckbox
+                            label="Códigos de Descuento"
+                            checked={tempPermissions.canManageDiscountCodes}
+                            onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageDiscountCodes: checked })}
+                          />
                         </>
                       ) : (
                         <>
@@ -576,6 +598,18 @@ const AdminUsers: React.FC = () => {
                           <PermissionCheckbox
                             label="Gestionar Cotizaciones"
                             checked={user.permissions.canManageInquiries}
+                            onChange={() => {}}
+                            disabled
+                          />
+                          <PermissionCheckbox
+                            label="Gestionar Puntos"
+                            checked={user.permissions.canManagePoints}
+                            onChange={() => {}}
+                            disabled
+                          />
+                          <PermissionCheckbox
+                            label="Códigos de Descuento"
+                            checked={user.permissions.canManageDiscountCodes}
                             onChange={() => {}}
                             disabled
                           />
@@ -769,6 +803,22 @@ const AdminUsers: React.FC = () => {
                       onChange={(checked) => setNewUser({
                         ...newUser,
                         permissions: { ...newUser.permissions, canManageInquiries: checked }
+                      })}
+                    />
+                    <PermissionCheckbox
+                      label="Gestionar Puntos"
+                      checked={newUser.permissions.canManagePoints}
+                      onChange={(checked) => setNewUser({
+                        ...newUser,
+                        permissions: { ...newUser.permissions, canManagePoints: checked }
+                      })}
+                    />
+                    <PermissionCheckbox
+                      label="Códigos de Descuento"
+                      checked={newUser.permissions.canManageDiscountCodes}
+                      onChange={(checked) => setNewUser({
+                        ...newUser,
+                        permissions: { ...newUser.permissions, canManageDiscountCodes: checked }
                       })}
                     />
                   </div>
