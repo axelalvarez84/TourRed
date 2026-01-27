@@ -26,6 +26,7 @@ import AgencyTours from './pages/agency/AgencyTours';
 import AgencyBookings from './pages/agency/AgencyBookings';
 import AgencyProfile from './pages/agency/AgencyProfile';
 import AgencyDestinations from './pages/agency/AgencyDestinations';
+import AgencyDiscountCodes from './pages/agency/AgencyDiscountCodes';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminAgencies from './pages/admin/AdminAgencies';
 import AdminUsers from './pages/admin/AdminUsers';
@@ -194,6 +195,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.AGENCY]}>
                 <AgencyBookings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/agency/discount-codes"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.AGENCY]}>
+                <AgencyDiscountCodes />
               </ProtectedRoute>
             }
           />

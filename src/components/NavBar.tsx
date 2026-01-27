@@ -149,6 +149,7 @@ const NavBar: React.FC = () => {
         { to: '/agency/tours', label: 'Tours' },
         { to: '/agency/destinations', label: 'Destinos' },
         { to: '/agency/bookings', label: 'Reservas' },
+        { to: '/agency/discount-codes', label: 'Códigos Descuento' },
       ];
     }
 

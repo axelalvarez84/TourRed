@@ -368,3 +368,53 @@ export interface PendingReschedule {
     email_sent: boolean;
   };
 }
+
+export interface DiscountCode {
+  id: string;
+  code: string;
+  description: string;
+  discount_type: 'tour_percentage' | 'tour_fixed' | 'membership_free_month' | 'gift_card_percentage' | 'gift_card_fixed' | 'agency_tour_percentage' | 'agency_tour_fixed';
+  discount_value: number;
+  applicable_to: 'tours' | 'memberships' | 'gift_cards';
+  is_single_use: boolean;
+  is_active: boolean;
+  valid_from: string;
+  valid_until: string;
+  max_uses?: number;
+  times_used: number;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+  agency_id?: string;
+  tour_id?: string;
+  tour_name?: string;
+  agencies?: Agency;
+  tours?: Tour;
+}
+
+export interface AgencyDiscountCode extends DiscountCode {
+  agency_id: string;
+  discount_type: 'agency_tour_percentage' | 'agency_tour_fixed';
+  applicable_to: 'tours';
+}
+
+export interface DiscountCodeUsage {
+  id: string;
+  discount_code_id: string;
+  user_id: string;
+  used_at: string;
+  booking_id?: string;
+  gift_card_id?: string;
+  membership_id?: string;
+  created_at: string;
+}
+
+export interface AgencyTour {
+  id: string;
+  name: string;
+  destination: string;
+  price: number;
+  start_date: string;
+  end_date: string;
+  image_url: string;
+}
