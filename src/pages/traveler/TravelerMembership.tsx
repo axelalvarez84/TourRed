@@ -14,6 +14,7 @@ interface Membership {
   cancel_at_period_end: boolean;
   cancelled_at: string | null;
   service_fee_exemption_used: number;
+  exemption_period_start: string;
 }
 
 interface BookingWithBenefit {
@@ -51,6 +52,8 @@ export default function TravelerMembership() {
     if (!user) return;
 
     try {
+      await supabase.rpc('reset_monthly_service_fee_exemption');
+
       const { data, error } = await supabase
         .from('memberships')
         .select('*')
@@ -62,7 +65,7 @@ export default function TravelerMembership() {
       setMembership(data);
 
       if (data) {
-        await fetchBookingsWithBenefit(data.current_period_end);
+        await fetchBookingsWithBenefit(data.exemption_period_start);
       }
     } catch (err) {
       console.error('Error fetching membership:', err);
@@ -71,13 +74,12 @@ export default function TravelerMembership() {
     }
   };
 
-  const fetchBookingsWithBenefit = async (currentPeriodEnd: string) => {
+  const fetchBookingsWithBenefit = async (exemptionPeriodStart: string) => {
     if (!user) return;
 
     try {
-      const periodEnd = new Date(currentPeriodEnd);
-      const periodStart = new Date(periodEnd);
-      periodStart.setMonth(periodStart.getMonth() - 1);
+      const periodStart = new Date(exemptionPeriodStart);
+      const now = new Date();
 
       const { data, error } = await supabase
         .from('bookings')
@@ -92,7 +94,7 @@ export default function TravelerMembership() {
         .eq('user_id', user.id)
         .eq('used_membership_benefit', true)
         .gte('created_at', periodStart.toISOString())
-        .lte('created_at', periodEnd.toISOString())
+        .lte('created_at', now.toISOString())
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -267,8 +269,15 @@ export default function TravelerMembership() {
                     style={{ width: `${(remainingExemption / 500) * 100}%` }}
                   ></div>
                 </div>
-                <p className="text-yellow-100 text-xs mt-1">
+                <p className="text-yellow-100 text-xs mt-2">
                   De $500 MXN totales ({((remainingExemption / 500) * 100).toFixed(0)}% disponible)
+                </p>
+                <p className="text-yellow-100 text-xs mt-1">
+                  Se resetea el: {new Date(new Date(membership.exemption_period_start).setMonth(new Date(membership.exemption_period_start).getMonth() + 1)).toLocaleDateString('es-MX', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
                 </p>
               </div>
             </div>
@@ -528,11 +537,15 @@ export default function TravelerMembership() {
               <h3 className="text-lg font-semibold text-gray-900 mb-2">¿Cómo funciona la exención de cargo por servicio?</h3>
               <p className="text-gray-700 mb-4">
                 Como miembro de ToursRed+, no pagas el cargo por servicio del 5% en tus reservas nacionales hasta un monto acumulado de $500 MXN por mes.
-                El contador se resetea automáticamente cada mes en la fecha de renovación de tu membresía.
+                El contador se resetea automáticamente cada 30 días desde que iniciaste tu membresía o desde el último reset.
               </p>
-              <p className="text-gray-700 text-sm">
+              <p className="text-gray-700 text-sm mb-3">
                 <strong>Ejemplo:</strong> Si reservas un tour nacional de $1,000 MXN, normalmente pagarías $50 MXN de cargo por servicio.
                 Con ToursRed+, ¡ese cargo es $0! Y aún te quedarían $450 MXN de exención disponible para el mes.
+              </p>
+              <p className="text-gray-700 text-sm">
+                <strong>Nota:</strong> Los $500 mensuales son independientes del tipo de plan (mensual o anual).
+                Todos los miembros de ToursRed+ obtienen $500 de exención cada mes.
               </p>
             </div>
           </div>
