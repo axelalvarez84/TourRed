@@ -180,6 +180,31 @@ Deno.serve(async (req) => {
         console.log(`Checkout session completed for booking ${bookingId}, payment status: ${paymentStatus}, method: ${paymentMethod}`);
 
         if (paymentStatus === 'paid') {
+          const { data: booking, error: bookingFetchError } = await supabase
+            .from('bookings')
+            .select('tour_id, travelers_count')
+            .eq('id', bookingId)
+            .single();
+
+          if (bookingFetchError || !booking) {
+            console.error(`Error fetching booking ${bookingId}:`, bookingFetchError);
+            break;
+          }
+
+          const { data: availability, error: availabilityError } = await supabase
+            .rpc('get_tour_availability', { p_tour_id: booking.tour_id });
+
+          if (availabilityError || !availability || availability.length === 0) {
+            console.error(`Error checking tour availability:`, availabilityError);
+            break;
+          }
+
+          if (availability[0].available_spots < booking.travelers_count) {
+            console.error(`Insufficient availability for booking ${bookingId}. Available: ${availability[0].available_spots}, Required: ${booking.travelers_count}`);
+            console.log(`Tour ${booking.tour_id} has insufficient spots. This booking will NOT be confirmed.`);
+            break;
+          }
+
           const { error: bookingError } = await supabase
             .from('bookings')
             .update({

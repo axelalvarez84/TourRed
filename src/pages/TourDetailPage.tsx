@@ -219,27 +219,19 @@ const TourDetailPage: React.FC = () => {
       if (!tour) return;
 
       try {
-        const { data: bookings, error } = await supabase
-          .from('bookings')
-          .select('travelers_count, status')
-          .eq('tour_id', tour.id)
-          .in('status', ['confirmed', 'pending']);
+        const { data, error } = await supabase
+          .rpc('get_tour_availability', { p_tour_id: tour.id });
 
         if (error) {
-          console.error('Error fetching bookings:', error);
+          console.error('Error fetching availability from RPC:', error);
           return;
         }
 
-        const totalBooked = bookings?.reduce((sum, booking) => sum + booking.travelers_count, 0) || 0;
-
-        const maxCapacity = tour.available_spots !== null && tour.available_spots !== undefined
-          ? tour.available_spots
-          : (tour.max_travelers || 10);
-
-        const available = Math.max(0, maxCapacity - totalBooked);
-
-        setTotalCapacity(maxCapacity);
-        setAvailableSpots(available);
+        if (data && data.length > 0) {
+          const availability = data[0];
+          setTotalCapacity(availability.max_capacity);
+          setAvailableSpots(availability.available_spots);
+        }
 
       } catch (err) {
         console.error('Error loading availability:', err);
@@ -247,7 +239,27 @@ const TourDetailPage: React.FC = () => {
     };
 
     fetchAvailability();
-  }, [tour]);
+
+    const channel = supabase
+      .channel(`tour_detail_availability:${tour.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookings',
+          filter: `tour_id=eq.${tour.id}`,
+        },
+        () => {
+          fetchAvailability();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [tour.id]);
 
   const handleContactAgency = async () => {
     if (!user) {
