@@ -349,9 +349,17 @@ const TravelersInfoPage: React.FC = () => {
 
       // Calcular el monto a cobrar después de aplicar puntos y ToursRed Cash
       const pointsUsed = booking?.points_used || 0;
+      const pointsDiscountAmount = pointsUsed / 100; // convertir puntos a pesos
       const toursRedCashUsed = booking?.toursred_cash_used || 0;
-      // toursRedCashUsed ya incluye el valor de los puntos, no restamos pointsDiscountAmount por separado
-      const amountToCharge = (booking?.user_payment || 0) - toursRedCashUsed;
+      const amountToCharge = (booking?.user_payment || 0) - pointsDiscountAmount - toursRedCashUsed;
+
+      console.log('💵 Cálculo de pago:', {
+        user_payment: booking?.user_payment,
+        pointsUsed,
+        pointsDiscountAmount,
+        toursRedCashUsed,
+        amountToCharge
+      });
 
       // Si el monto a cobrar es 0 o menor, marcar la reserva como pagada directamente
       if (amountToCharge <= 0) {
@@ -434,7 +442,58 @@ const TravelersInfoPage: React.FC = () => {
 
         console.log('✅ Reserva confirmada exitosamente');
 
-        // CUARTO: Enviar emails de confirmación a viajero, agencia y admin
+        // CUARTO: Procesar beneficio de membresía si aplica
+        try {
+          const { data: bookingWithDetails } = await supabase
+            .from('bookings')
+            .select('user_id, total_price, service_charge, used_membership_benefit')
+            .eq('id', bookingId)
+            .single();
+
+          if (bookingWithDetails && !bookingWithDetails.used_membership_benefit) {
+            const { data: membership } = await supabase
+              .from('memberships')
+              .select('id, service_fee_exemption_used')
+              .eq('user_id', bookingWithDetails.user_id)
+              .eq('status', 'active')
+              .maybeSingle();
+
+            if (membership) {
+              const { data: settings } = await supabase
+                .from('platform_settings')
+                .select('service_charge_percentage')
+                .maybeSingle();
+
+              const serviceChargeRate = settings?.service_charge_percentage || 5;
+              const fullServiceCharge = (bookingWithDetails.total_price * serviceChargeRate) / 100;
+              const actualServiceCharge = parseFloat(bookingWithDetails.service_charge || 0);
+              const exemptionUsed = fullServiceCharge - actualServiceCharge;
+
+              if (exemptionUsed > 0) {
+                await supabase
+                  .from('memberships')
+                  .update({
+                    service_fee_exemption_used: parseFloat(membership.service_fee_exemption_used) + exemptionUsed
+                  })
+                  .eq('id', membership.id);
+
+                await supabase
+                  .from('bookings')
+                  .update({
+                    used_membership_benefit: true,
+                    membership_service_fee_saved: exemptionUsed
+                  })
+                  .eq('id', bookingId);
+
+                console.log(`✅ Beneficio de membresía aplicado: ${exemptionUsed} MXN`);
+              }
+            }
+          }
+        } catch (membershipError) {
+          console.error('Error procesando beneficio de membresía:', membershipError);
+        }
+
+        // QUINTO: Enviar emails de confirmación a viajero, agencia y admin
         try {
           console.log('📧 Enviando emails de confirmación para reserva pagada con puntos/cash...');
           console.log('📧 URL del endpoint:', `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-confirmation`);
@@ -498,6 +557,10 @@ const TravelersInfoPage: React.FC = () => {
             success_url: `${window.location.origin}/booking-success?booking_id=${bookingId}`,
             cancel_url: `${window.location.origin}/booking-cancel?booking_id=${bookingId}`,
             toursRedCashUsed: toursRedCashUsed,
+            metadata: {
+              points_used: pointsUsed.toString(),
+              points_discount: pointsDiscountAmount.toString()
+            }
           }),
         }
       );
