@@ -215,9 +215,9 @@ const TourDetailPage: React.FC = () => {
   };
 
   useEffect(() => {
-    const fetchAvailability = async () => {
-      if (!tour) return;
+    if (!tour) return;
 
+    const fetchAvailability = async () => {
       try {
         const { data, error } = await supabase
           .rpc('get_tour_availability', { p_tour_id: tour.id });
@@ -259,7 +259,7 @@ const TourDetailPage: React.FC = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [tour.id]);
+  }, [tour?.id]);
 
   const handleContactAgency = async () => {
     if (!user) {
@@ -1057,13 +1057,15 @@ const TourDetailPage: React.FC = () => {
       </div>
       </div>
 
-      <ShareTourModal
-        isOpen={isShareModalOpen}
-        onClose={() => setIsShareModalOpen(false)}
-        tourId={tour.id}
-        tourName={tour.name}
-        tourImage={tour.image_url}
-      />
+      {tour && (
+        <ShareTourModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          tourId={tour.id}
+          tourName={tour.name}
+          tourImage={tour.image_url}
+        />
+      )}
     </>
   );
 };
