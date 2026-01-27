@@ -256,40 +256,44 @@ Deno.serve(async (req) => {
                   .eq('status', 'active')
                   .maybeSingle();
 
-                if (membership && booking.service_charge === 0) {
+                if (membership) {
                   const { data: settings } = await supabase
                     .from('platform_settings')
                     .select('service_charge_percentage')
                     .maybeSingle();
 
                   const serviceChargeRate = settings?.service_charge_percentage || 5;
-                  const wouldBeServiceCharge = (booking.total_price * serviceChargeRate) / 100;
+                  const fullServiceCharge = (booking.total_price * serviceChargeRate) / 100;
+                  const actualServiceCharge = parseFloat(booking.service_charge || 0);
+                  const exemptionUsed = fullServiceCharge - actualServiceCharge;
 
-                  const { error: membershipError } = await supabase
-                    .from('memberships')
-                    .update({
-                      service_fee_exemption_used: parseFloat(membership.service_fee_exemption_used) + wouldBeServiceCharge
-                    })
-                    .eq('id', membership.id);
+                  if (exemptionUsed > 0) {
+                    const { error: membershipError } = await supabase
+                      .from('memberships')
+                      .update({
+                        service_fee_exemption_used: parseFloat(membership.service_fee_exemption_used) + exemptionUsed
+                      })
+                      .eq('id', membership.id);
 
-                  if (membershipError) {
-                    console.error(`Error updating membership exemption: ${membershipError.message}`);
-                  } else {
-                    console.log(`Updated membership exemption: +${wouldBeServiceCharge} MXN`);
-                  }
+                    if (membershipError) {
+                      console.error(`Error updating membership exemption: ${membershipError.message}`);
+                    } else {
+                      console.log(`Updated membership exemption: +${exemptionUsed} MXN (saved from ${fullServiceCharge} MXN)`);
+                    }
 
-                  const { error: bookingUpdateError } = await supabase
-                    .from('bookings')
-                    .update({
-                      used_membership_benefit: true,
-                      membership_service_fee_saved: wouldBeServiceCharge
-                    })
-                    .eq('id', bookingId);
+                    const { error: bookingUpdateError } = await supabase
+                      .from('bookings')
+                      .update({
+                        used_membership_benefit: true,
+                        membership_service_fee_saved: exemptionUsed
+                      })
+                      .eq('id', bookingId);
 
-                  if (bookingUpdateError) {
-                    console.error(`Error updating booking membership benefit: ${bookingUpdateError.message}`);
-                  } else {
-                    console.log(`Marked booking as using membership benefit, saved ${wouldBeServiceCharge} MXN`);
+                    if (bookingUpdateError) {
+                      console.error(`Error updating booking membership benefit: ${bookingUpdateError.message}`);
+                    } else {
+                      console.log(`Marked booking as using membership benefit, saved ${exemptionUsed} MXN`);
+                    }
                   }
                 }
               }
@@ -490,40 +494,44 @@ Deno.serve(async (req) => {
                   .eq('status', 'active')
                   .maybeSingle();
 
-                if (membership && booking.service_charge === 0) {
+                if (membership) {
                   const { data: settings } = await supabase
                     .from('platform_settings')
                     .select('service_charge_percentage')
                     .maybeSingle();
 
                   const serviceChargeRate = settings?.service_charge_percentage || 5;
-                  const wouldBeServiceCharge = (booking.total_price * serviceChargeRate) / 100;
+                  const fullServiceCharge = (booking.total_price * serviceChargeRate) / 100;
+                  const actualServiceCharge = parseFloat(booking.service_charge || 0);
+                  const exemptionUsed = fullServiceCharge - actualServiceCharge;
 
-                  const { error: membershipError } = await supabase
-                    .from('memberships')
-                    .update({
-                      service_fee_exemption_used: parseFloat(membership.service_fee_exemption_used) + wouldBeServiceCharge
-                    })
-                    .eq('id', membership.id);
+                  if (exemptionUsed > 0) {
+                    const { error: membershipError } = await supabase
+                      .from('memberships')
+                      .update({
+                        service_fee_exemption_used: parseFloat(membership.service_fee_exemption_used) + exemptionUsed
+                      })
+                      .eq('id', membership.id);
 
-                  if (membershipError) {
-                    console.error(`Error updating membership exemption: ${membershipError.message}`);
-                  } else {
-                    console.log(`Updated membership exemption: +${wouldBeServiceCharge} MXN`);
-                  }
+                    if (membershipError) {
+                      console.error(`Error updating membership exemption: ${membershipError.message}`);
+                    } else {
+                      console.log(`Updated membership exemption: +${exemptionUsed} MXN (saved from ${fullServiceCharge} MXN)`);
+                    }
 
-                  const { error: bookingUpdateError } = await supabase
-                    .from('bookings')
-                    .update({
-                      used_membership_benefit: true,
-                      membership_service_fee_saved: wouldBeServiceCharge
-                    })
-                    .eq('id', bookingId);
+                    const { error: bookingUpdateError } = await supabase
+                      .from('bookings')
+                      .update({
+                        used_membership_benefit: true,
+                        membership_service_fee_saved: exemptionUsed
+                      })
+                      .eq('id', bookingId);
 
-                  if (bookingUpdateError) {
-                    console.error(`Error updating booking membership benefit: ${bookingUpdateError.message}`);
-                  } else {
-                    console.log(`Marked booking as using membership benefit, saved ${wouldBeServiceCharge} MXN`);
+                    if (bookingUpdateError) {
+                      console.error(`Error updating booking membership benefit: ${bookingUpdateError.message}`);
+                    } else {
+                      console.log(`Marked booking as using membership benefit, saved ${exemptionUsed} MXN`);
+                    }
                   }
                 }
               }
