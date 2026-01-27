@@ -20,7 +20,8 @@ interface BookingWithBenefit {
   id: string;
   booking_code: string;
   created_at: string;
-  service_charge: number;
+  membership_service_fee_saved: number;
+  used_membership_benefit: boolean;
   tour: {
     name: string;
     destination: string;
@@ -74,7 +75,8 @@ export default function TravelerMembership() {
     if (!user) return;
 
     try {
-      const periodStart = new Date(currentPeriodEnd);
+      const periodEnd = new Date(currentPeriodEnd);
+      const periodStart = new Date(periodEnd);
       periodStart.setMonth(periodStart.getMonth() - 1);
 
       const { data, error } = await supabase
@@ -83,14 +85,14 @@ export default function TravelerMembership() {
           id,
           booking_code,
           created_at,
-          service_charge,
+          membership_service_fee_saved,
+          used_membership_benefit,
           tour:tours(name, destination)
         `)
         .eq('user_id', user.id)
-        .eq('service_charge', 0)
+        .eq('used_membership_benefit', true)
         .gte('created_at', periodStart.toISOString())
-        .lte('created_at', currentPeriodEnd)
-        .in('status', ['confirmed', 'completed'])
+        .lte('created_at', periodEnd.toISOString())
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -298,57 +300,72 @@ export default function TravelerMembership() {
               </div>
             </div>
 
-            {bookingsWithBenefit.length > 0 && (
-              <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-green-600" />
-                  Reservas con Beneficio Aplicado Este Mes
-                </h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Has ahorrado el cargo por servicio en las siguientes reservas durante tu período de facturación actual:
-                </p>
-                <div className="space-y-3">
-                  {bookingsWithBenefit.map((booking) => (
-                    <div
-                      key={booking.id}
-                      className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-xs font-mono bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                              {booking.booking_code}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {new Date(booking.created_at).toLocaleDateString('es-MX', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                              })}
-                            </span>
+            <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-green-600" />
+                Reservas con Beneficio Aplicado Este Mes
+              </h3>
+
+              {bookingsWithBenefit.length > 0 ? (
+                <>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Has ahorrado el cargo por servicio en las siguientes reservas durante tu período de facturación actual:
+                  </p>
+                  <div className="space-y-3">
+                    {bookingsWithBenefit.map((booking) => (
+                      <div
+                        key={booking.id}
+                        className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-mono bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                {booking.booking_code}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {new Date(booking.created_at).toLocaleDateString('es-MX', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                })}
+                              </span>
+                            </div>
+                            <h4 className="font-medium text-gray-900 mb-1">{booking.tour.name}</h4>
+                            <p className="text-sm text-gray-600 flex items-center gap-1">
+                              <MapPin className="h-4 w-4" />
+                              {booking.tour.destination}
+                            </p>
                           </div>
-                          <h4 className="font-medium text-gray-900 mb-1">{booking.tour.name}</h4>
-                          <p className="text-sm text-gray-600 flex items-center gap-1">
-                            <MapPin className="h-4 w-4" />
-                            {booking.tour.destination}
-                          </p>
-                        </div>
-                        <div className="text-right ml-4">
-                          <p className="text-xs text-gray-500 mb-1">Cargo por servicio</p>
-                          <p className="text-lg font-bold text-green-600">$0.00</p>
-                          <p className="text-xs text-gray-500">¡Ahorraste!</p>
+                          <div className="text-right ml-4">
+                            <p className="text-xs text-gray-500 mb-1">Ahorro en cargo por servicio</p>
+                            <p className="text-lg font-bold text-green-600">
+                              ${(booking.membership_service_fee_saved || 0).toFixed(2)}
+                            </p>
+                            <p className="text-xs text-gray-500">¡Beneficio aplicado!</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
-                  <p className="text-sm text-green-800 font-medium">
-                    Total ahorrado este mes: ${((membership?.service_fee_exemption_used || 0)).toFixed(2)} MXN
+                    ))}
+                  </div>
+                  <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
+                    <p className="text-sm text-green-800 font-medium">
+                      Total ahorrado este mes: ${((membership?.service_fee_exemption_used || 0)).toFixed(2)} MXN
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
+                    <DollarSign className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <p className="text-gray-600 mb-2">Aún no has usado tu beneficio este mes</p>
+                  <p className="text-sm text-gray-500">
+                    Tienes ${remainingExemption.toFixed(2)} MXN disponibles para ahorrar en cargos por servicio
                   </p>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             <div className="bg-white rounded-xl shadow-md p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Gestionar Suscripción</h3>

@@ -277,6 +277,20 @@ Deno.serve(async (req) => {
                   } else {
                     console.log(`Updated membership exemption: +${wouldBeServiceCharge} MXN`);
                   }
+
+                  const { error: bookingUpdateError } = await supabase
+                    .from('bookings')
+                    .update({
+                      used_membership_benefit: true,
+                      membership_service_fee_saved: wouldBeServiceCharge
+                    })
+                    .eq('id', bookingId);
+
+                  if (bookingUpdateError) {
+                    console.error(`Error updating booking membership benefit: ${bookingUpdateError.message}`);
+                  } else {
+                    console.log(`Marked booking as using membership benefit, saved ${wouldBeServiceCharge} MXN`);
+                  }
                 }
               }
             } catch (membershipError) {
@@ -496,6 +510,20 @@ Deno.serve(async (req) => {
                     console.error(`Error updating membership exemption: ${membershipError.message}`);
                   } else {
                     console.log(`Updated membership exemption: +${wouldBeServiceCharge} MXN`);
+                  }
+
+                  const { error: bookingUpdateError } = await supabase
+                    .from('bookings')
+                    .update({
+                      used_membership_benefit: true,
+                      membership_service_fee_saved: wouldBeServiceCharge
+                    })
+                    .eq('id', bookingId);
+
+                  if (bookingUpdateError) {
+                    console.error(`Error updating booking membership benefit: ${bookingUpdateError.message}`);
+                  } else {
+                    console.log(`Marked booking as using membership benefit, saved ${wouldBeServiceCharge} MXN`);
                   }
                 }
               }
