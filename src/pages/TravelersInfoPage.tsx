@@ -388,30 +388,58 @@ const TravelersInfoPage: React.FC = () => {
           console.log('✅ ToursRed Cash descontado exitosamente:', walletResult);
         }
 
-        // SEGUNDO: Descontar puntos del monedero de puntos usando la función RPC
+        // SEGUNDO: Descontar puntos del monedero manualmente
         if (pointsUsed > 0) {
           console.log(`🎯 Descontando ${pointsUsed} puntos del monedero...`);
 
           try {
-            const { data: redeemResult, error: redeemError } = await supabase.rpc(
-              'redeem_points_for_booking',
-              {
-                p_booking_id: bookingId,
-                p_user_id: user?.id,
-                p_points_to_use: pointsUsed,
-                p_total_price: booking?.user_payment || 0
-              }
-            );
+            const { data: wallet, error: walletError } = await supabase
+              .from('toursred_points_wallets')
+              .select('id, balance, total_used')
+              .eq('user_id', user?.id)
+              .single();
 
-            if (redeemError) {
-              console.error('Error al canjear puntos:', redeemError);
-              throw new Error(`Error al canjear puntos: ${redeemError.message}`);
+            if (walletError || !wallet) {
+              throw new Error('No se encontró la billetera de puntos');
             }
 
-            console.log(`✅ Puntos descontados exitosamente del monedero`);
+            const newBalance = wallet.balance - pointsUsed;
+            const newTotalUsed = wallet.total_used + pointsUsed;
+
+            const { error: updateWalletError } = await supabase
+              .from('toursred_points_wallets')
+              .update({
+                balance: newBalance,
+                total_used: newTotalUsed,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', wallet.id);
+
+            if (updateWalletError) {
+              throw new Error(`Error al actualizar wallet: ${updateWalletError.message}`);
+            }
+
+            const { error: txError } = await supabase
+              .from('toursred_points_transactions')
+              .insert({
+                wallet_id: wallet.id,
+                user_id: user?.id,
+                amount: -pointsUsed,
+                balance_after: newBalance,
+                type: 'redeemed',
+                description: 'Puntos canjeados en reserva',
+                reference_id: bookingId,
+                reference_type: 'booking'
+              });
+
+            if (txError) {
+              console.error('Error creando transacción de puntos:', txError);
+            }
+
+            console.log(`✅ Puntos descontados del monedero`);
           } catch (pointsError) {
-            console.error('Excepción al canjear puntos:', pointsError);
-            throw new Error(`No se pudieron canjear los puntos: ${pointsError instanceof Error ? pointsError.message : String(pointsError)}`);
+            console.error('Error al canjear puntos:', pointsError);
+            throw new Error(`Error al canjear puntos: ${pointsError instanceof Error ? pointsError.message : String(pointsError)}`);
           }
         }
 
