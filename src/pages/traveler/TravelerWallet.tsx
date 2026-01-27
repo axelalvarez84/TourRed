@@ -122,6 +122,19 @@ const TravelerWallet: React.FC = () => {
                     };
                   }
                 }
+              } else if (transaction.reference_type === 'reschedule_rejection') {
+                const { data: booking } = await supabase
+                  .from('bookings')
+                  .select('booking_code')
+                  .eq('id', transaction.reference_id)
+                  .maybeSingle();
+
+                if (booking?.booking_code) {
+                  return {
+                    ...transaction,
+                    booking_code: booking.booking_code
+                  };
+                }
               }
             }
             return transaction;
