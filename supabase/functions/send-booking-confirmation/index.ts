@@ -73,15 +73,21 @@ Deno.serve(async (req: Request) => {
     const pointsUsed = booking.points_used || 0;
     const pointsEarned = booking.points_earned || 0;
 
-    let paymentMethod = 'No especificado';
+    let paymentMethod = booking.payment_method || 'Tarjeta de Crédito/Débito';
     if (paymentTransaction?.payment_method_type) {
       const methodMap: Record<string, string> = {
         'card': 'Tarjeta de Crédito/Débito',
         'toursred_cash': 'ToursRed Cash',
         'toursred_points_cash': 'Puntos ToursRed + ToursRed Cash',
-        'stripe': 'Stripe'
+        'stripe': 'Tarjeta de Crédito/Débito'
       };
       paymentMethod = methodMap[paymentTransaction.payment_method_type] || paymentTransaction.payment_method_type;
+    } else if (booking.toursred_cash_used > 0 && pointsUsed > 0) {
+      paymentMethod = 'Puntos ToursRed + ToursRed Cash + Stripe';
+    } else if (pointsUsed > 0) {
+      paymentMethod = 'Puntos ToursRed + Stripe';
+    } else if (booking.toursred_cash_used > 0) {
+      paymentMethod = 'ToursRed Cash + Stripe';
     }
 
     if (booking.confirmation_email_sent) {
@@ -143,8 +149,8 @@ Deno.serve(async (req: Request) => {
     const serviceCharge = booking.service_charge || 0;
     const toursRedCashUsed = booking.toursred_cash_used || 0;
     const userPayment = booking.user_payment || (depositAmount + serviceCharge);
-    const pointsValueUsed = pointsUsed;
-    const cashAfterPoints = toursRedCashUsed > 0 ? toursRedCashUsed - pointsValueUsed : 0;
+    const pointsValueUsed = pointsUsed / 100;
+    const cashAfterPoints = toursRedCashUsed > pointsValueUsed ? toursRedCashUsed - pointsValueUsed : 0;
     const stripePayment = userPayment - toursRedCashUsed;
     const remainingAmount = totalPrice - depositAmount;
 
