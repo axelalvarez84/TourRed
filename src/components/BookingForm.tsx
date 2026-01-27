@@ -4,6 +4,7 @@ import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, 
 import { Tour } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { createBooking, formatDateForDB, supabase } from '../lib/supabase';
+import { useMembershipPrices } from '../hooks/useMembershipPrices';
 
 interface BookingFormProps {
   tour: Tour;
@@ -52,6 +53,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     adultos_mayores: 0,
     mascotas: 0,
   });
+
+  const { prices: membershipPrices, loading: loadingPrices } = useMembershipPrices();
 
   React.useEffect(() => {
     const fetchPlatformSettings = async () => {
@@ -356,8 +359,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   // Comisiones
   const agencyCommission = totalPrice * (agencyCommissionPercentage / 100);
 
-  const membershipMonthlyPrice = 49;
-  const membershipAnnualPrice = 490;
+  const membershipMonthlyPrice = membershipPrices?.monthlyPrice || 49;
+  const membershipAnnualPrice = membershipPrices?.annualPrice || 490;
 
   // Calculate service charge with exemption limit
   const fullServiceCharge = totalPrice * (serviceChargePercentage / 100);
@@ -845,7 +848,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <div className="ml-3 flex-1">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-gray-900">Plan Mensual</span>
-                        <span className="text-sm font-bold text-primary-600">$49/mes</span>
+                        <span className="text-sm font-bold text-primary-600">{membershipPrices?.monthlyPriceFormatted || '$49'}/mes</span>
                       </div>
                       <p className="text-xs text-gray-600">Cancela cuando quieras</p>
                     </div>
@@ -862,9 +865,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <div className="ml-3 flex-1">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-gray-900">Plan Anual</span>
-                        <span className="text-sm font-bold text-primary-600">$490/año</span>
+                        <span className="text-sm font-bold text-primary-600">{membershipPrices?.annualPriceFormatted || '$490'}/año</span>
                       </div>
-                      <p className="text-xs text-gray-600">Ahorra $98 al año (2 meses gratis)</p>
+                      <p className="text-xs text-gray-600">Ahorra {membershipPrices?.annualSavingsFormatted || '$98'} al año ({membershipPrices?.savingsPercentage || 17}% descuento)</p>
                     </div>
                   </label>
                 </div>
