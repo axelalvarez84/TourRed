@@ -710,7 +710,7 @@ Deno.serve(async (req) => {
 
       case 'customer.subscription.deleted': {
         const subscription = event.data.object;
-        
+
         console.log(`Subscription deleted: ${subscription.id}`);
 
         const { error: membershipError } = await supabase
@@ -725,6 +725,123 @@ Deno.serve(async (req) => {
           console.error(`Error cancelling membership: ${membershipError.message}`);
         } else {
           console.log(`Successfully cancelled membership ${subscription.id}`);
+        }
+
+        break;
+      }
+
+      case 'checkout.session.expired': {
+        const session = event.data.object;
+        const bookingId = session.metadata?.booking_id;
+
+        if (!bookingId) {
+          console.log('No booking ID in expired session');
+          break;
+        }
+
+        console.log(`Checkout session expired for booking ${bookingId}`);
+
+        const { data: booking } = await supabase
+          .from('bookings')
+          .select('user_id, points_used, toursred_cash_used, booking_code')
+          .eq('id', bookingId)
+          .single();
+
+        if (booking) {
+          if (booking.points_used && booking.points_used > 0) {
+            await supabase.rpc('refund_points_for_cancelled_booking', {
+              p_booking_id: bookingId,
+              p_user_id: booking.user_id,
+              p_points_to_refund: booking.points_used
+            });
+            console.log(`Refunded ${booking.points_used} points for expired booking`);
+          }
+
+          const toursRedCashUsed = parseFloat(booking.toursred_cash_used || '0');
+          if (toursRedCashUsed > 0) {
+            await supabase.rpc('update_wallet_balance', {
+              p_user_id: booking.user_id,
+              p_amount: toursRedCashUsed,
+              p_type: 'credit',
+              p_description: `Reembolso de reserva expirada #${booking.booking_code}`,
+              p_reference_id: bookingId,
+              p_reference_type: 'booking_refund'
+            });
+            console.log(`Refunded ${toursRedCashUsed} MXN ToursRed Cash for expired booking`);
+          }
+        }
+
+        const { error: bookingError } = await supabase
+          .from('bookings')
+          .update({
+            status: 'cancelled',
+            payment_status: 'expired'
+          })
+          .eq('id', bookingId);
+
+        if (bookingError) {
+          console.error(`Error cancelling expired booking: ${bookingError.message}`);
+        } else {
+          console.log(`Successfully cancelled expired booking ${bookingId}`);
+        }
+
+        break;
+      }
+
+      case 'payment_intent.payment_failed':
+      case 'payment_intent.canceled': {
+        const paymentIntent = event.data.object;
+        const bookingId = paymentIntent.metadata?.booking_id;
+
+        if (!bookingId) {
+          console.log(`No booking ID in ${event.type}`);
+          break;
+        }
+
+        console.log(`${event.type} for booking ${bookingId}`);
+
+        const { data: booking } = await supabase
+          .from('bookings')
+          .select('user_id, points_used, toursred_cash_used, booking_code')
+          .eq('id', bookingId)
+          .single();
+
+        if (booking) {
+          if (booking.points_used && booking.points_used > 0) {
+            await supabase.rpc('refund_points_for_cancelled_booking', {
+              p_booking_id: bookingId,
+              p_user_id: booking.user_id,
+              p_points_to_refund: booking.points_used
+            });
+            console.log(`Refunded ${booking.points_used} points for failed booking`);
+          }
+
+          const toursRedCashUsed = parseFloat(booking.toursred_cash_used || '0');
+          if (toursRedCashUsed > 0) {
+            await supabase.rpc('update_wallet_balance', {
+              p_user_id: booking.user_id,
+              p_amount: toursRedCashUsed,
+              p_type: 'credit',
+              p_description: `Reembolso de reserva fallida #${booking.booking_code}`,
+              p_reference_id: bookingId,
+              p_reference_type: 'booking_refund'
+            });
+            console.log(`Refunded ${toursRedCashUsed} MXN ToursRed Cash for failed booking`);
+          }
+        }
+
+        const { error: bookingError } = await supabase
+          .from('bookings')
+          .update({
+            status: 'cancelled',
+            payment_status: 'failed'
+          })
+          .eq('id', bookingId);
+
+        if (bookingError) {
+          console.error(`Error cancelling failed booking: ${bookingError.message}`);
+        } else {
+          console.log(`Successfully cancelled failed booking ${bookingId}`);
         }
 
         break;

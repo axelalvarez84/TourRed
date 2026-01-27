@@ -6,14 +6,12 @@ import { supabase } from '../lib/supabase';
 const BookingCancelPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
-  const [bookingId, setBookingId] = useState<string | null>(null);
+  const [bookingCode, setBookingCode] = useState<string | null>(null);
 
   useEffect(() => {
     const id = searchParams.get('booking_id');
-    setBookingId(id);
-    
+
     if (id) {
-      // Update booking status to canceled
       updateBookingStatus(id);
     } else {
       setIsLoading(false);
@@ -23,11 +21,54 @@ const BookingCancelPage: React.FC = () => {
   const updateBookingStatus = async (id: string) => {
     try {
       setIsLoading(true);
-      
-      // Update booking status to canceled
+
+      const { data: booking, error: fetchError } = await supabase
+        .from('bookings')
+        .select('booking_code, user_id, points_used, toursred_cash_used')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching booking:', fetchError);
+        setIsLoading(false);
+        return;
+      }
+
+      setBookingCode(booking.booking_code);
+
+      const pointsUsed = booking.points_used || 0;
+      const toursRedCashUsed = parseFloat(booking.toursred_cash_used || '0');
+
+      if (pointsUsed > 0) {
+        const { error: pointsError } = await supabase.rpc('refund_points_for_cancelled_booking', {
+          p_booking_id: id,
+          p_user_id: booking.user_id,
+          p_points_to_refund: pointsUsed
+        });
+
+        if (pointsError) {
+          console.error('Error refunding points:', pointsError);
+        }
+      }
+
+      if (toursRedCashUsed > 0) {
+        const { error: cashError } = await supabase.rpc('update_wallet_balance', {
+          p_user_id: booking.user_id,
+          p_amount: toursRedCashUsed,
+          p_type: 'credit',
+          p_description: `Reembolso de reserva cancelada #${booking.booking_code}`,
+          p_reference_id: id,
+          p_reference_type: 'booking_refund'
+        });
+
+        if (cashError) {
+          console.error('Error refunding ToursRed Cash:', cashError);
+        }
+      }
+
       const { error } = await supabase
         .from('bookings')
-        .update({ 
+        .update({
           status: 'cancelled',
           payment_status: 'canceled'
         })
@@ -45,10 +86,7 @@ const BookingCancelPage: React.FC = () => {
   };
 
   const handleRetryPayment = () => {
-    if (bookingId) {
-      // Redirect back to the tour page to retry the booking
-      window.history.back();
-    }
+    window.history.back();
   };
 
   if (isLoading) {
@@ -73,13 +111,13 @@ const BookingCancelPage: React.FC = () => {
           
           <p className="text-gray-600 mb-6">
             Tu pago fue cancelado. No se realizaron cargos a tu tarjeta.
-            {bookingId && ' Tu reserva ha sido marcada como cancelada.'}
+            {bookingCode && ' Tu reserva ha sido marcada como cancelada.'}
           </p>
 
-          {bookingId && (
+          {bookingCode && (
             <div className="bg-white rounded-lg shadow-md p-4 mb-6">
               <h3 className="text-sm font-medium text-gray-900 mb-2">ID de Reserva</h3>
-              <p className="text-xs font-mono text-gray-600">{bookingId}</p>
+              <p className="text-xs font-mono text-gray-600">{bookingCode}</p>
             </div>
           )}
 
