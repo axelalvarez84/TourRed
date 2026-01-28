@@ -35,11 +35,13 @@ export default function GiftCardsPage() {
   );
 
   usePreventUnload(
-    purchaserName.length > 0 ||
-    purchaserEmail.length > 0 ||
-    recipientName.length > 0 ||
-    recipientEmail.length > 0 ||
-    personalMessage.length > 0
+    !isProcessing && (
+      purchaserName.length > 0 ||
+      purchaserEmail.length > 0 ||
+      recipientName.length > 0 ||
+      recipientEmail.length > 0 ||
+      personalMessage.length > 0
+    )
   );
 
   useEffect(() => {
