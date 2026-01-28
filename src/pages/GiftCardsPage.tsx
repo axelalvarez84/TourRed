@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Gift, Check, CreditCard, Tag, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useFormPersistence } from '../hooks/useFormPersistence';
@@ -9,6 +10,7 @@ const GIFT_CARD_AMOUNTS = [100, 200, 500, 1000];
 
 export default function GiftCardsPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [selectedAmount, setSelectedAmount] = useState<number>(500);
   const [purchaserName, setPurchaserName] = useState('');
   const [purchaserEmail, setPurchaserEmail] = useState('');
@@ -188,11 +190,13 @@ export default function GiftCardsPage() {
         console.log('Redirecting to:', data.url);
         giftCardFormPersistence.clearStorage();
 
-        setTimeout(() => {
-          console.log('Executing redirect now...');
-          window.location.replace(data.url);
-        }, 100);
-
+        if (data.isFree && data.giftCardId) {
+          console.log('Free gift card, navigating internally to success page');
+          navigate(`/gift-card/success?gift_card_id=${data.giftCardId}&free=true`);
+        } else {
+          console.log('Paid gift card, redirecting to Stripe');
+          window.location.href = data.url;
+        }
         return;
       } else {
         console.error('No URL in response:', data);
