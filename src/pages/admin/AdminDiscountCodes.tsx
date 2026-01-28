@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Ticket, Plus, Edit2, Trash2, Eye, Percent, DollarSign, Calendar, Users, AlertCircle, CheckCircle, XCircle, Search } from 'lucide-react';
+import { Ticket, Plus, Edit2, Trash2, Eye, Percent, DollarSign, Calendar, Users, AlertCircle, CheckCircle, XCircle, Search, Map, Crown, Gift } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -566,13 +566,29 @@ export default function AdminDiscountCodes() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {code.applicable_to === 'service_fees' ? (
+                        {code.applicable_to === 'tours' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            <Map className="h-3 w-3" />
+                            {getApplicableToLabel(code.applicable_to)}
+                          </span>
+                        )}
+                        {code.applicable_to === 'memberships' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            <Crown className="h-3 w-3" />
+                            {getApplicableToLabel(code.applicable_to)}
+                          </span>
+                        )}
+                        {code.applicable_to === 'gift_cards' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                            <Gift className="h-3 w-3" />
+                            {getApplicableToLabel(code.applicable_to)}
+                          </span>
+                        )}
+                        {code.applicable_to === 'service_fees' && (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-800">
                             <DollarSign className="h-3 w-3" />
                             {getApplicableToLabel(code.applicable_to)}
                           </span>
-                        ) : (
-                          <div className="text-sm text-gray-900">{getApplicableToLabel(code.applicable_to)}</div>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
