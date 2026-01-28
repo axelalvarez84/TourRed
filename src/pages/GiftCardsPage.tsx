@@ -44,17 +44,7 @@ export default function GiftCardsPage() {
 
   useEffect(() => {
     const loadInitialData = async () => {
-      const savedData = giftCardFormPersistence.loadFromStorage();
-      if (savedData) {
-        giftCardFormPersistence.setIsRestoring(true);
-        if (savedData.purchaserName) setPurchaserName(savedData.purchaserName);
-        if (savedData.purchaserEmail) setPurchaserEmail(savedData.purchaserEmail);
-        if (savedData.recipientName) setRecipientName(savedData.recipientName);
-        if (savedData.recipientEmail) setRecipientEmail(savedData.recipientEmail);
-        if (savedData.personalMessage) setPersonalMessage(savedData.personalMessage);
-        if (savedData.selectedAmount) setSelectedAmount(savedData.selectedAmount);
-        setTimeout(() => giftCardFormPersistence.setIsRestoring(false), 100);
-      } else if (user) {
+      if (user) {
         const { data: userData } = await supabase
           .from('users')
           .select('nombre, apellido, email')
@@ -66,6 +56,16 @@ export default function GiftCardsPage() {
           if (fullName) setPurchaserName(fullName);
           if (userData.email) setPurchaserEmail(userData.email);
         }
+      }
+
+      const savedData = giftCardFormPersistence.loadFromStorage();
+      if (savedData) {
+        giftCardFormPersistence.setIsRestoring(true);
+        if (savedData.recipientName) setRecipientName(savedData.recipientName);
+        if (savedData.recipientEmail) setRecipientEmail(savedData.recipientEmail);
+        if (savedData.personalMessage) setPersonalMessage(savedData.personalMessage);
+        if (savedData.selectedAmount) setSelectedAmount(savedData.selectedAmount);
+        setTimeout(() => giftCardFormPersistence.setIsRestoring(false), 100);
       }
     };
 
