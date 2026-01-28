@@ -117,7 +117,7 @@ Deno.serve(async (req: Request) => {
         code,
         amount,
         currency: "MXN",
-        status: finalAmount === 0 ? "paid" : "active",
+        status: "active",
         purchaser_email: purchaserEmail,
         purchaser_name: purchaserName,
         recipient_email: recipientEmail || null,
