@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Ticket, Plus, Edit2, Trash2, Eye, Percent, DollarSign, Calendar, Users, AlertCircle, CheckCircle, XCircle, Search, Map, Crown, Gift } from 'lucide-react';
+import { Ticket, Plus, Edit2, Trash2, Eye, Percent, DollarSign, Calendar, Users, AlertCircle, CheckCircle, XCircle, Search, Map, Crown, Gift, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -42,6 +42,8 @@ export default function AdminDiscountCodes() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [sortColumn, setSortColumn] = useState<string>('created_at');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const [formData, setFormData] = useState({
     code: '',
@@ -331,6 +333,22 @@ export default function AdminDiscountCodes() {
     );
   };
 
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (column: string) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-4 w-4" />;
+    }
+    return sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
+  };
+
   const filteredCodes = codes.filter(code => {
     const matchesSearch = code.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          code.description.toLowerCase().includes(searchTerm.toLowerCase());
@@ -350,6 +368,55 @@ export default function AdminDiscountCodes() {
     }
 
     return matchesSearch && matchesType && matchesStatus;
+  });
+
+  const sortedAndFilteredCodes = [...filteredCodes].sort((a, b) => {
+    let aValue: any;
+    let bValue: any;
+
+    switch (sortColumn) {
+      case 'code':
+        aValue = a.code.toLowerCase();
+        bValue = b.code.toLowerCase();
+        break;
+      case 'type':
+        aValue = a.discount_type;
+        bValue = b.discount_type;
+        break;
+      case 'discount':
+        aValue = a.discount_value;
+        bValue = b.discount_value;
+        break;
+      case 'applicable_to':
+        aValue = a.applicable_to;
+        bValue = b.applicable_to;
+        break;
+      case 'uses':
+        aValue = a.times_used;
+        bValue = b.times_used;
+        break;
+      case 'valid_from':
+        aValue = new Date(a.valid_from).getTime();
+        bValue = new Date(b.valid_from).getTime();
+        break;
+      case 'valid_until':
+        aValue = new Date(a.valid_until).getTime();
+        bValue = new Date(b.valid_until).getTime();
+        break;
+      case 'status':
+        aValue = a.is_active ? 1 : 0;
+        bValue = b.is_active ? 1 : 0;
+        break;
+      case 'created_at':
+      default:
+        aValue = new Date(a.created_at).getTime();
+        bValue = new Date(b.created_at).getTime();
+        break;
+    }
+
+    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
   });
 
   const stats = {
@@ -486,7 +553,7 @@ export default function AdminDiscountCodes() {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
               <p className="text-gray-600 mt-4">Cargando códigos...</p>
             </div>
-          ) : filteredCodes.length === 0 ? (
+          ) : sortedAndFilteredCodes.length === 0 ? (
             <div className="p-8 text-center">
               <Ticket className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600">No se encontraron códigos de descuento</p>
@@ -496,26 +563,68 @@ export default function AdminDiscountCodes() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Código
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('code')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Código
+                        {getSortIcon('code')}
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Tipo
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('type')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Tipo
+                        {getSortIcon('type')}
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Descuento
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('discount')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Descuento
+                        {getSortIcon('discount')}
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Aplicable a
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('applicable_to')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Aplicable a
+                        {getSortIcon('applicable_to')}
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Usos
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('uses')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Usos
+                        {getSortIcon('uses')}
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Vigencia
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('valid_from')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Vigencia
+                        {getSortIcon('valid_from')}
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Estado
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('status')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Estado
+                        {getSortIcon('status')}
+                      </div>
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Acciones
@@ -523,7 +632,7 @@ export default function AdminDiscountCodes() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredCodes.map((code) => (
+                  {sortedAndFilteredCodes.map((code) => (
                     <tr key={code.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
