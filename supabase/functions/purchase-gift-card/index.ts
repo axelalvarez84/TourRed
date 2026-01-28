@@ -86,12 +86,46 @@ Deno.serve(async (req: Request) => {
     let discountAmount = 0;
     let validatedDiscountCode = null;
 
-    if (discountCode && userId) {
+    if (discountCode) {
+      if (!userId) {
+        return new Response(
+          JSON.stringify({
+            error: "Para usar un código de descuento debes iniciar sesión primero",
+            requiresAuth: true
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
       const { data: validationData, error: validationError } = await supabase.rpc('validate_discount_code', {
         p_code: discountCode,
         p_user_id: userId,
         p_applicable_to: 'gift_cards'
       });
+
+      if (validationError) {
+        console.error("Error validating discount code:", validationError);
+        return new Response(
+          JSON.stringify({ error: "Error al validar el código de descuento" }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      if (validationData && validationData.error) {
+        return new Response(
+          JSON.stringify({ error: validationData.error }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
 
       if (!validationError && validationData && !validationData.error) {
         if (validationData.discount_type === 'gift_card_percentage') {
@@ -103,8 +137,6 @@ Deno.serve(async (req: Request) => {
         finalAmount = Math.max(0, amount - discountAmount);
         validatedDiscountCode = discountCode;
       }
-    } else if (discountCode && !userId) {
-      console.log("Discount code provided but user not authenticated - ignoring discount");
     }
 
     const code = await generateGiftCardCode(supabase);

@@ -141,7 +141,14 @@ export default function GiftCardsPage() {
     setError(null);
     setIsProcessing(true);
 
+    const timeoutId = setTimeout(() => {
+      console.error('Request timeout after 30 seconds');
+      setError('La solicitud está tomando demasiado tiempo. Por favor intenta nuevamente.');
+      setIsProcessing(false);
+    }, 30000);
+
     try {
+      console.log('Sending purchase request...');
       const { data, error: functionError } = await supabase.functions.invoke('purchase-gift-card', {
         body: {
           amount: selectedAmount,
@@ -154,17 +161,39 @@ export default function GiftCardsPage() {
         },
       });
 
+      clearTimeout(timeoutId);
+
+      console.log('Response received:', { data, functionError });
+
       if (functionError) {
-        throw functionError;
+        console.error('Function error details:', functionError);
+        throw new Error(functionError.message || 'Error al comunicarse con el servidor');
+      }
+
+      if (!data) {
+        console.error('No data received from function');
+        throw new Error('No se recibió respuesta del servidor');
+      }
+
+      if (data.error) {
+        console.error('Error in response:', data.error);
+        throw new Error(data.error);
+      }
+
+      if (data.requiresAuth) {
+        throw new Error('Para usar un código de descuento debes iniciar sesión');
       }
 
       if (data?.url) {
+        console.log('Redirecting to:', data.url);
         giftCardFormPersistence.clearStorage();
         window.location.href = data.url;
       } else {
+        console.error('No URL in response:', data);
         throw new Error('No se pudo crear la sesión de pago');
       }
     } catch (err: any) {
+      clearTimeout(timeoutId);
       console.error('Error purchasing gift card:', err);
       setError(err.message || 'Error al procesar tu solicitud. Por favor intenta nuevamente.');
       setIsProcessing(false);
