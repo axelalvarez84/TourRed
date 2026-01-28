@@ -133,6 +133,22 @@ export default function GiftCardsPage() {
     setCodeError(null);
   };
 
+  useEffect(() => {
+    if (appliedDiscount) {
+      let newDiscountAmount = 0;
+      if (appliedDiscount.discount_type === 'gift_card_percentage') {
+        newDiscountAmount = (selectedAmount * appliedDiscount.discount_value) / 100;
+      } else if (appliedDiscount.discount_type === 'gift_card_fixed') {
+        newDiscountAmount = Math.min(appliedDiscount.discount_value, selectedAmount);
+      }
+
+      setAppliedDiscount({
+        ...appliedDiscount,
+        discountAmount: Math.round(newDiscountAmount * 100) / 100
+      });
+    }
+  }, [selectedAmount]);
+
   const calculateFinalAmount = () => {
     if (!appliedDiscount) return selectedAmount;
     return Math.max(0, selectedAmount - appliedDiscount.discountAmount);
