@@ -191,25 +191,39 @@ Deno.serve(async (req) => {
                 }
               }
 
-              try {
-                const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-gift-card-email`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${supabaseServiceKey}`,
-                  },
-                  body: JSON.stringify({ giftCardId: giftCardId }),
-                });
+              const { data: checkEmail } = await supabase
+                .from('gift_cards')
+                .select('email_sent')
+                .eq('id', giftCardId)
+                .single();
 
-                const emailResult = await emailResponse.json();
+              if (!checkEmail?.email_sent) {
+                try {
+                  const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-gift-card-email`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${supabaseServiceKey}`,
+                    },
+                    body: JSON.stringify({ giftCardId: giftCardId }),
+                  });
 
-                if (emailResult.success) {
-                  console.log('Gift card emails sent successfully');
-                } else {
-                  console.error('Error sending gift card emails:', emailResult);
+                  const emailResult = await emailResponse.json();
+
+                  if (emailResult.success) {
+                    console.log('Gift card emails sent successfully');
+                    await supabase
+                      .from('gift_cards')
+                      .update({ email_sent: true, email_sent_at: new Date().toISOString() })
+                      .eq('id', giftCardId);
+                  } else {
+                    console.error('Error sending gift card emails:', emailResult);
+                  }
+                } catch (emailError) {
+                  console.error('Error calling gift card email function:', emailError);
                 }
-              } catch (emailError) {
-                console.error('Error calling gift card email function:', emailError);
+              } else {
+                console.log(`Gift card email already sent for ${giftCardId}, skipping`);
               }
             }
           }
@@ -539,25 +553,39 @@ Deno.serve(async (req) => {
           } else {
             console.log(`Successfully updated gift card ${giftCardId} after delayed payment`);
 
-            try {
-              const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-gift-card-email`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${supabaseServiceKey}`,
-                },
-                body: JSON.stringify({ giftCardId: giftCardId }),
-              });
+            const { data: checkEmail } = await supabase
+              .from('gift_cards')
+              .select('email_sent')
+              .eq('id', giftCardId)
+              .single();
 
-              const emailResult = await emailResponse.json();
+            if (!checkEmail?.email_sent) {
+              try {
+                const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-gift-card-email`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${supabaseServiceKey}`,
+                  },
+                  body: JSON.stringify({ giftCardId: giftCardId }),
+                });
 
-              if (emailResult.success) {
-                console.log('Gift card emails sent successfully after delayed payment');
-              } else {
-                console.error('Error sending gift card emails:', emailResult);
+                const emailResult = await emailResponse.json();
+
+                if (emailResult.success) {
+                  console.log('Gift card emails sent successfully after delayed payment');
+                  await supabase
+                    .from('gift_cards')
+                    .update({ email_sent: true, email_sent_at: new Date().toISOString() })
+                    .eq('id', giftCardId);
+                } else {
+                  console.error('Error sending gift card emails:', emailResult);
+                }
+              } catch (emailError) {
+                console.error('Error calling gift card email function:', emailError);
               }
-            } catch (emailError) {
-              console.error('Error calling gift card email function:', emailError);
+            } else {
+              console.log(`Gift card email already sent for ${giftCardId} after delayed payment, skipping`);
             }
           }
 
