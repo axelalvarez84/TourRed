@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Gift, Check, Mail, Download } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 export default function GiftCardSuccessPage() {
   const [searchParams] = useSearchParams();
@@ -9,9 +10,17 @@ export default function GiftCardSuccessPage() {
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
     const isFree = searchParams.get('free');
+    const giftCardId = searchParams.get('gift_card_id');
 
-    if (isFree === 'true') {
-      setIsProcessing(false);
+    if (isFree === 'true' && giftCardId) {
+      supabase.functions.invoke('send-gift-card-email', {
+        body: { giftCardId }
+      }).then(() => {
+        setIsProcessing(false);
+      }).catch((error) => {
+        console.error('Error sending gift card email:', error);
+        setIsProcessing(false);
+      });
     } else if (sessionId) {
       setTimeout(() => {
         setIsProcessing(false);

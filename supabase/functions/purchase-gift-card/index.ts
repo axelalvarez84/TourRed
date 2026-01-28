@@ -164,15 +164,11 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      await supabase.functions.invoke("send-gift-card-email", {
-        body: {
-          giftCardId: giftCard.id,
-        },
-      });
+      const origin = req.headers.get("origin") || req.headers.get("referer")?.split("/").slice(0, 3).join("/") || "";
 
       return new Response(
         JSON.stringify({
-          url: `${req.headers.get("origin")}/gift-card/success?gift_card_id=${giftCard.id}&free=true`,
+          url: `${origin}/gift-card/success?gift_card_id=${giftCard.id}&free=true`,
           giftCardId: giftCard.id,
           isFree: true,
         }),
