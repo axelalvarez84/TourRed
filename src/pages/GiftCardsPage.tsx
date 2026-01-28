@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Gift, Check, CreditCard } from 'lucide-react';
+import { Gift, Check, CreditCard, Tag, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useFormPersistence } from '../hooks/useFormPersistence';
 import { usePreventUnload } from '../hooks/usePreventUnload';
@@ -16,6 +16,16 @@ export default function GiftCardsPage() {
   const [personalMessage, setPersonalMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [discountCode, setDiscountCode] = useState('');
+  const [isValidatingCode, setIsValidatingCode] = useState(false);
+  const [appliedDiscount, setAppliedDiscount] = useState<{
+    code: string;
+    discount_type: string;
+    discount_value: number;
+    discountAmount: number;
+  } | null>(null);
+  const [codeError, setCodeError] = useState<string | null>(null);
 
   const giftCardFormPersistence = useFormPersistence(
     { purchaserName, purchaserEmail, recipientName, recipientEmail, personalMessage, selectedAmount },
@@ -44,6 +54,63 @@ export default function GiftCardsPage() {
     }
   }, []);
 
+  const validateDiscountCode = async () => {
+    if (!discountCode.trim()) {
+      setCodeError('Por favor ingresa un código');
+      return;
+    }
+
+    setIsValidatingCode(true);
+    setCodeError(null);
+
+    try {
+      const { data, error } = await supabase.rpc('validate_discount_code', {
+        p_code: discountCode.trim().toUpperCase(),
+        p_applicable_to: 'gift_cards',
+        p_purchase_amount: selectedAmount
+      });
+
+      if (error) throw error;
+
+      if (!data || data.error) {
+        setCodeError(data?.error || 'Código inválido');
+        setIsValidatingCode(false);
+        return;
+      }
+
+      let discountAmount = 0;
+      if (data.discount_type === 'gift_card_percentage') {
+        discountAmount = (selectedAmount * data.discount_value) / 100;
+      } else if (data.discount_type === 'gift_card_fixed') {
+        discountAmount = Math.min(data.discount_value, selectedAmount);
+      }
+
+      setAppliedDiscount({
+        code: discountCode.trim().toUpperCase(),
+        discount_type: data.discount_type,
+        discount_value: data.discount_value,
+        discountAmount: Math.round(discountAmount * 100) / 100
+      });
+      setDiscountCode('');
+      setCodeError(null);
+    } catch (err: any) {
+      console.error('Error validating discount code:', err);
+      setCodeError('Error al validar el código');
+    } finally {
+      setIsValidatingCode(false);
+    }
+  };
+
+  const removeDiscountCode = () => {
+    setAppliedDiscount(null);
+    setCodeError(null);
+  };
+
+  const calculateFinalAmount = () => {
+    if (!appliedDiscount) return selectedAmount;
+    return Math.max(0, selectedAmount - appliedDiscount.discountAmount);
+  };
+
   const handlePurchase = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -58,6 +125,7 @@ export default function GiftCardsPage() {
           recipientEmail: isGift ? recipientEmail : undefined,
           recipientName: isGift ? recipientName : undefined,
           personalMessage: isGift && personalMessage ? personalMessage : undefined,
+          discountCode: appliedDiscount?.code,
         },
       });
 
@@ -232,16 +300,100 @@ export default function GiftCardsPage() {
 
             <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6 mb-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-3">Resumen de Compra</h3>
-              <div className="flex justify-between items-center text-lg">
-                <span className="text-gray-700">Total a Pagar:</span>
-                <span className="text-3xl font-bold text-amber-600">
-                  ${selectedAmount.toLocaleString('es-MX')} MXN
-                </span>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-lg">
+                  <span className="text-gray-700">Monto de Tarjeta:</span>
+                  <span className="text-2xl font-bold text-gray-900">
+                    ${selectedAmount.toLocaleString('es-MX')} MXN
+                  </span>
+                </div>
+                {appliedDiscount && (
+                  <div className="flex justify-between items-center text-lg text-green-600">
+                    <span>Descuento:</span>
+                    <span className="text-xl font-semibold">
+                      -${appliedDiscount.discountAmount.toLocaleString('es-MX')} MXN
+                    </span>
+                  </div>
+                )}
+                <div className="pt-2 border-t border-amber-200">
+                  <div className="flex justify-between items-center text-lg">
+                    <span className="text-gray-700 font-semibold">Total a Pagar:</span>
+                    <span className="text-3xl font-bold text-amber-600">
+                      ${calculateFinalAmount().toLocaleString('es-MX')} MXN
+                    </span>
+                  </div>
+                </div>
               </div>
               {isGift && recipientEmail && (
                 <p className="text-sm text-gray-600 mt-3">
                   Se enviará a: <strong>{recipientEmail}</strong>
                 </p>
+              )}
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Tag className="w-5 h-5 text-amber-600" />
+                <h4 className="font-semibold text-gray-900">¿Tienes un código de descuento?</h4>
+              </div>
+
+              {!appliedDiscount ? (
+                <div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={discountCode}
+                      onChange={(e) => {
+                        setDiscountCode(e.target.value.toUpperCase());
+                        setCodeError(null);
+                      }}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          validateDiscountCode();
+                        }
+                      }}
+                      placeholder="Ingresa tu código"
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent uppercase"
+                      disabled={isValidatingCode}
+                    />
+                    <button
+                      type="button"
+                      onClick={validateDiscountCode}
+                      disabled={isValidatingCode || !discountCode.trim()}
+                      className="px-6 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                    >
+                      {isValidatingCode ? (
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        'Aplicar'
+                      )}
+                    </button>
+                  </div>
+                  {codeError && (
+                    <p className="text-sm text-red-600 mt-2">{codeError}</p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-5 h-5 text-green-600" />
+                    <div>
+                      <p className="font-semibold text-green-900">Código aplicado: {appliedDiscount.code}</p>
+                      <p className="text-sm text-green-700">
+                        Descuento de ${appliedDiscount.discountAmount.toLocaleString('es-MX')} MXN
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removeDiscountCode}
+                    className="text-green-600 hover:text-green-800 transition-colors"
+                    title="Quitar código"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               )}
             </div>
 

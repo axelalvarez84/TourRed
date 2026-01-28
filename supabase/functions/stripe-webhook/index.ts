@@ -144,6 +144,44 @@ Deno.serve(async (req) => {
             } else {
               console.log(`Successfully updated gift card ${giftCardId}`);
 
+              const discountCode = session.metadata?.discount_code;
+              if (discountCode) {
+                try {
+                  const { data: giftCardData } = await supabase
+                    .from('gift_cards')
+                    .select('purchaser_email')
+                    .eq('id', giftCardId)
+                    .single();
+
+                  if (giftCardData?.purchaser_email) {
+                    const { data: userData } = await supabase
+                      .from('users')
+                      .select('id')
+                      .eq('email', giftCardData.purchaser_email)
+                      .maybeSingle();
+
+                    const userId = userData?.id || null;
+
+                    const { error: usageError } = await supabase
+                      .from('discount_code_usage')
+                      .insert({
+                        code: discountCode,
+                        user_id: userId,
+                        gift_card_id: giftCardId,
+                        used_at: new Date().toISOString(),
+                      });
+
+                    if (usageError) {
+                      console.error(`Error recording discount code usage: ${usageError.message}`);
+                    } else {
+                      console.log(`Successfully recorded discount code usage: ${discountCode}`);
+                    }
+                  }
+                } catch (discountError) {
+                  console.error('Error processing discount code:', discountError);
+                }
+              }
+
               try {
                 const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-gift-card-email`, {
                   method: 'POST',

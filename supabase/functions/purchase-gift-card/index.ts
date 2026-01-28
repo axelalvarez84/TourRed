@@ -16,6 +16,7 @@ interface PurchaseGiftCardRequest {
   recipientName?: string;
   personalMessage?: string;
   scheduledSendDate?: string;
+  discountCode?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -41,7 +42,7 @@ Deno.serve(async (req: Request) => {
     });
 
     const requestData: PurchaseGiftCardRequest = await req.json();
-    const { amount, purchaserEmail, purchaserName, recipientEmail, recipientName, personalMessage, scheduledSendDate } = requestData;
+    const { amount, purchaserEmail, purchaserName, recipientEmail, recipientName, personalMessage, scheduledSendDate, discountCode } = requestData;
 
     if (!amount || ![100, 200, 500, 1000].includes(amount)) {
       return new Response(
@@ -61,6 +62,29 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
+    }
+
+    let finalAmount = amount;
+    let discountAmount = 0;
+    let validatedDiscountCode = null;
+
+    if (discountCode) {
+      const { data: validationData, error: validationError } = await supabase.rpc('validate_discount_code', {
+        p_code: discountCode,
+        p_applicable_to: 'gift_cards',
+        p_purchase_amount: amount
+      });
+
+      if (!validationError && validationData && !validationData.error) {
+        if (validationData.discount_type === 'gift_card_percentage') {
+          discountAmount = Math.round((amount * validationData.discount_value) / 100 * 100) / 100;
+        } else if (validationData.discount_type === 'gift_card_fixed') {
+          discountAmount = Math.min(validationData.discount_value, amount);
+        }
+
+        finalAmount = Math.max(0, amount - discountAmount);
+        validatedDiscountCode = discountCode;
+      }
     }
 
     let customerId: string;
@@ -115,7 +139,37 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const stripeAmount = Math.round(amount * 100);
+    const stripeAmount = Math.round(finalAmount * 100);
+
+    const lineItems: any[] = [
+      {
+        price_data: {
+          currency: "mxn",
+          product_data: {
+            name: `Tarjeta de Regalo ToursRed - $${amount} MXN`,
+            description: recipientEmail
+              ? `Regalo para: ${recipientEmail}`
+              : "Tarjeta de regalo digital",
+          },
+          unit_amount: Math.round(amount * 100),
+        },
+        quantity: 1,
+      },
+    ];
+
+    if (discountAmount > 0) {
+      lineItems.push({
+        price_data: {
+          currency: "mxn",
+          product_data: {
+            name: `Descuento (${validatedDiscountCode})`,
+            description: "Código de descuento aplicado",
+          },
+          unit_amount: -Math.round(discountAmount * 100),
+        },
+        quantity: 1,
+      });
+    }
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -128,21 +182,7 @@ Deno.serve(async (req: Request) => {
           },
         },
       },
-      line_items: [
-        {
-          price_data: {
-            currency: "mxn",
-            product_data: {
-              name: `Tarjeta de Regalo ToursRed - $${amount} MXN`,
-              description: recipientEmail
-                ? `Regalo para: ${recipientEmail}`
-                : "Tarjeta de regalo digital",
-            },
-            unit_amount: stripeAmount,
-          },
-          quantity: 1,
-        },
-      ],
+      line_items: lineItems,
       mode: "payment",
       success_url: `${req.headers.get("origin")}/gift-card/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.get("origin")}/gift-cards`,
@@ -150,12 +190,16 @@ Deno.serve(async (req: Request) => {
         gift_card_id: giftCard.id,
         gift_card_code: code,
         type: "gift_card",
+        discount_code: validatedDiscountCode || "",
+        discount_amount: discountAmount.toString(),
       },
       payment_intent_data: {
         metadata: {
           gift_card_id: giftCard.id,
           gift_card_code: code,
           type: "gift_card",
+          discount_code: validatedDiscountCode || "",
+          discount_amount: discountAmount.toString(),
         },
       },
     });
