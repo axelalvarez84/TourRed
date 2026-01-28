@@ -3,10 +3,12 @@ import { Gift, Check, CreditCard, Tag, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useFormPersistence } from '../hooks/useFormPersistence';
 import { usePreventUnload } from '../hooks/usePreventUnload';
+import { useAuth } from '../context/AuthContext';
 
 const GIFT_CARD_AMOUNTS = [100, 200, 500, 1000];
 
 export default function GiftCardsPage() {
+  const { user } = useAuth();
   const [selectedAmount, setSelectedAmount] = useState<number>(500);
   const [purchaserName, setPurchaserName] = useState('');
   const [purchaserEmail, setPurchaserEmail] = useState('');
@@ -55,6 +57,11 @@ export default function GiftCardsPage() {
   }, []);
 
   const validateDiscountCode = async () => {
+    if (!user) {
+      setCodeError('Debes iniciar sesión para usar códigos de descuento');
+      return;
+    }
+
     if (!discountCode.trim()) {
       setCodeError('Por favor ingresa un código');
       return;
@@ -66,8 +73,8 @@ export default function GiftCardsPage() {
     try {
       const { data, error } = await supabase.rpc('validate_discount_code', {
         p_code: discountCode.trim().toUpperCase(),
-        p_applicable_to: 'gift_cards',
-        p_purchase_amount: selectedAmount
+        p_user_id: user.id,
+        p_applicable_to: 'gift_cards'
       });
 
       if (error) throw error;
@@ -331,71 +338,73 @@ export default function GiftCardsPage() {
               )}
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
-              <div className="flex items-center gap-2 mb-3">
-                <Tag className="w-5 h-5 text-amber-600" />
-                <h4 className="font-semibold text-gray-900">¿Tienes un código de descuento?</h4>
-              </div>
+            {user && (
+              <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Tag className="w-5 h-5 text-amber-600" />
+                  <h4 className="font-semibold text-gray-900">¿Tienes un código de descuento?</h4>
+                </div>
 
-              {!appliedDiscount ? (
-                <div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={discountCode}
-                      onChange={(e) => {
-                        setDiscountCode(e.target.value.toUpperCase());
-                        setCodeError(null);
-                      }}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          validateDiscountCode();
-                        }
-                      }}
-                      placeholder="Ingresa tu código"
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent uppercase"
-                      disabled={isValidatingCode}
-                    />
+                {!appliedDiscount ? (
+                  <div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={discountCode}
+                        onChange={(e) => {
+                          setDiscountCode(e.target.value.toUpperCase());
+                          setCodeError(null);
+                        }}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            validateDiscountCode();
+                          }
+                        }}
+                        placeholder="Ingresa tu código"
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent uppercase"
+                        disabled={isValidatingCode}
+                      />
+                      <button
+                        type="button"
+                        onClick={validateDiscountCode}
+                        disabled={isValidatingCode || !discountCode.trim()}
+                        className="px-6 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                      >
+                        {isValidatingCode ? (
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          'Aplicar'
+                        )}
+                      </button>
+                    </div>
+                    {codeError && (
+                      <p className="text-sm text-red-600 mt-2">{codeError}</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2">
+                      <Check className="w-5 h-5 text-green-600" />
+                      <div>
+                        <p className="font-semibold text-green-900">Código aplicado: {appliedDiscount.code}</p>
+                        <p className="text-sm text-green-700">
+                          Descuento de ${appliedDiscount.discountAmount.toLocaleString('es-MX')} MXN
+                        </p>
+                      </div>
+                    </div>
                     <button
                       type="button"
-                      onClick={validateDiscountCode}
-                      disabled={isValidatingCode || !discountCode.trim()}
-                      className="px-6 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                      onClick={removeDiscountCode}
+                      className="text-green-600 hover:text-green-800 transition-colors"
+                      title="Quitar código"
                     >
-                      {isValidatingCode ? (
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        'Aplicar'
-                      )}
+                      <X className="w-5 h-5" />
                     </button>
                   </div>
-                  {codeError && (
-                    <p className="text-sm text-red-600 mt-2">{codeError}</p>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
-                  <div className="flex items-center gap-2">
-                    <Check className="w-5 h-5 text-green-600" />
-                    <div>
-                      <p className="font-semibold text-green-900">Código aplicado: {appliedDiscount.code}</p>
-                      <p className="text-sm text-green-700">
-                        Descuento de ${appliedDiscount.discountAmount.toLocaleString('es-MX')} MXN
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={removeDiscountCode}
-                    className="text-green-600 hover:text-green-800 transition-colors"
-                    title="Quitar código"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <h4 className="font-semibold text-blue-900 mb-2">Métodos de Pago Disponibles:</h4>

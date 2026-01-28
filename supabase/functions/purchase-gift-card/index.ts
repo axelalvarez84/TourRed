@@ -30,10 +30,28 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
 
     if (!stripeSecretKey) {
       throw new Error("Stripe secret key not configured");
+    }
+
+    const authHeader = req.headers.get("Authorization");
+    let userId: string | null = null;
+
+    if (authHeader) {
+      try {
+        const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+          global: {
+            headers: { Authorization: authHeader },
+          },
+        });
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        userId = user?.id || null;
+      } catch (authError) {
+        console.log("No authenticated user found");
+      }
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -68,11 +86,11 @@ Deno.serve(async (req: Request) => {
     let discountAmount = 0;
     let validatedDiscountCode = null;
 
-    if (discountCode) {
+    if (discountCode && userId) {
       const { data: validationData, error: validationError } = await supabase.rpc('validate_discount_code', {
         p_code: discountCode,
-        p_applicable_to: 'gift_cards',
-        p_purchase_amount: amount
+        p_user_id: userId,
+        p_applicable_to: 'gift_cards'
       });
 
       if (!validationError && validationData && !validationData.error) {
@@ -85,6 +103,8 @@ Deno.serve(async (req: Request) => {
         finalAmount = Math.max(0, amount - discountAmount);
         validatedDiscountCode = discountCode;
       }
+    } else if (discountCode && !userId) {
+      console.log("Discount code provided but user not authenticated - ignoring discount");
     }
 
     let customerId: string;
