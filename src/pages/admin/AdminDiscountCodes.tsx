@@ -7,15 +7,16 @@ interface DiscountCode {
   id: string;
   code: string;
   description: string;
-  discount_type: 'tour_percentage' | 'tour_fixed' | 'membership_free_month' | 'gift_card_percentage' | 'gift_card_fixed';
+  discount_type: 'tour_percentage' | 'tour_fixed' | 'membership_free_month' | 'gift_card_percentage' | 'gift_card_fixed' | 'service_fee_percentage' | 'service_fee_fixed' | 'service_fee_full';
   discount_value: number;
-  applicable_to: 'tours' | 'memberships' | 'gift_cards';
+  applicable_to: 'tours' | 'memberships' | 'gift_cards' | 'service_fees';
   is_single_use: boolean;
   is_active: boolean;
   valid_from: string;
   valid_until: string;
   max_uses: number | null;
   times_used: number;
+  max_discount_amount?: number | null;
   created_at: string;
 }
 
@@ -45,13 +46,14 @@ export default function AdminDiscountCodes() {
   const [formData, setFormData] = useState({
     code: '',
     description: '',
-    applicable_to: 'tours' as 'tours' | 'memberships' | 'gift_cards',
+    applicable_to: 'tours' as 'tours' | 'memberships' | 'gift_cards' | 'service_fees',
     discount_type: 'tour_percentage' as string,
     discount_value: '',
     valid_from: new Date().toISOString().split('T')[0],
     valid_until: '',
     is_single_use: false,
     max_uses: '',
+    max_discount_amount: '',
     is_active: true,
   });
 
@@ -99,14 +101,19 @@ export default function AdminDiscountCodes() {
       return;
     }
 
-    if (formData.discount_type !== 'membership_free_month' && !formData.discount_value) {
+    if (formData.discount_type !== 'membership_free_month' && formData.discount_type !== 'service_fee_full' && !formData.discount_value) {
       alert('Por favor complete todos los campos requeridos');
       return;
     }
 
+    if (formData.max_discount_amount && parseFloat(formData.max_discount_amount) <= 0) {
+      alert('El monto máximo de descuento debe ser mayor que 0');
+      return;
+    }
+
     try {
-      const discountValue = formData.discount_type === 'membership_free_month'
-        ? 1
+      const discountValue = formData.discount_type === 'membership_free_month' || formData.discount_type === 'service_fee_full'
+        ? (formData.discount_type === 'service_fee_full' ? 100 : 1)
         : parseFloat(formData.discount_value);
 
       const codeData = {
@@ -120,6 +127,7 @@ export default function AdminDiscountCodes() {
         valid_from: formData.valid_from,
         valid_until: formData.valid_until,
         max_uses: formData.max_uses ? parseInt(formData.max_uses) : null,
+        max_discount_amount: formData.max_discount_amount ? parseFloat(formData.max_discount_amount) : null,
         created_by: user?.id,
       };
 
@@ -154,11 +162,12 @@ export default function AdminDiscountCodes() {
       description: code.description,
       applicable_to: code.applicable_to,
       discount_type: code.discount_type,
-      discount_value: code.discount_type === 'membership_free_month' ? '' : code.discount_value.toString(),
+      discount_value: (code.discount_type === 'membership_free_month' || code.discount_type === 'service_fee_full') ? '' : code.discount_value.toString(),
       valid_from: code.valid_from.split('T')[0],
       valid_until: code.valid_until.split('T')[0],
       is_single_use: code.is_single_use,
       max_uses: code.max_uses?.toString() || '',
+      max_discount_amount: code.max_discount_amount?.toString() || '',
       is_active: code.is_active,
     });
     setShowModal(true);
@@ -201,6 +210,7 @@ export default function AdminDiscountCodes() {
       valid_until: '',
       is_single_use: false,
       max_uses: '',
+      max_discount_amount: '',
       is_active: true,
     });
   };
@@ -219,6 +229,12 @@ export default function AdminDiscountCodes() {
           { value: 'gift_card_percentage', label: 'Porcentaje' },
           { value: 'gift_card_fixed', label: 'Monto Fijo' },
         ];
+      case 'service_fees':
+        return [
+          { value: 'service_fee_percentage', label: 'Porcentaje del Cargo' },
+          { value: 'service_fee_fixed', label: 'Monto Fijo' },
+          { value: 'service_fee_full', label: 'Cargo por Servicio Gratis' },
+        ];
       default:
         return [];
     }
@@ -231,6 +247,9 @@ export default function AdminDiscountCodes() {
       membership_free_month: 'Mes Gratis',
       gift_card_percentage: 'Porcentaje',
       gift_card_fixed: 'Monto Fijo',
+      service_fee_percentage: 'Porcentaje del Cargo',
+      service_fee_fixed: 'Monto Fijo',
+      service_fee_full: 'Cargo Gratis',
     };
     return labels[type] || type;
   };
@@ -240,6 +259,7 @@ export default function AdminDiscountCodes() {
       tours: 'Tours',
       memberships: 'Membresías',
       gift_cards: 'Tarjetas de Regalo',
+      service_fees: 'Cargo por Servicio',
     };
     return labels[type] || type;
   };
@@ -437,6 +457,7 @@ export default function AdminDiscountCodes() {
                 <option value="tours">Tours</option>
                 <option value="memberships">Membresías</option>
                 <option value="gift_cards">Tarjetas de Regalo</option>
+                <option value="service_fees">Cargo por Servicio</option>
               </select>
             </div>
 
@@ -519,24 +540,40 @@ export default function AdminDiscountCodes() {
                         <div className="text-sm text-gray-900">{getDiscountTypeLabel(code.discount_type)}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1 text-sm font-medium text-gray-900">
-                          {code.discount_type.includes('percentage') ? (
-                            <>
-                              <Percent className="h-4 w-4 text-green-600" />
-                              {code.discount_value}%
-                            </>
-                          ) : code.discount_type === 'membership_free_month' ? (
-                            <>1 Mes Gratis</>
-                          ) : (
-                            <>
-                              <DollarSign className="h-4 w-4 text-green-600" />
-                              ${code.discount_value}
-                            </>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1 text-sm font-medium text-gray-900">
+                            {code.discount_type.includes('percentage') ? (
+                              <>
+                                <Percent className="h-4 w-4 text-green-600" />
+                                {code.discount_value}%
+                              </>
+                            ) : code.discount_type === 'membership_free_month' ? (
+                              <>1 Mes Gratis</>
+                            ) : code.discount_type === 'service_fee_full' ? (
+                              <>Cargo Gratis</>
+                            ) : (
+                              <>
+                                <DollarSign className="h-4 w-4 text-green-600" />
+                                ${code.discount_value}
+                              </>
+                            )}
+                          </div>
+                          {code.max_discount_amount && code.discount_type.includes('percentage') && (
+                            <div className="text-xs text-gray-500">
+                              (máx. ${code.max_discount_amount})
+                            </div>
                           )}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{getApplicableToLabel(code.applicable_to)}</div>
+                        {code.applicable_to === 'service_fees' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-800">
+                            <DollarSign className="h-3 w-3" />
+                            {getApplicableToLabel(code.applicable_to)}
+                          </span>
+                        ) : (
+                          <div className="text-sm text-gray-900">{getApplicableToLabel(code.applicable_to)}</div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
@@ -620,12 +657,13 @@ export default function AdminDiscountCodes() {
                     <select
                       value={formData.applicable_to}
                       onChange={(e) => {
-                        const newApplicableTo = e.target.value as 'tours' | 'memberships' | 'gift_cards';
+                        const newApplicableTo = e.target.value as 'tours' | 'memberships' | 'gift_cards' | 'service_fees';
                         const options = getDiscountTypeOptions(newApplicableTo);
                         setFormData({
                           ...formData,
                           applicable_to: newApplicableTo,
                           discount_type: options[0]?.value || '',
+                          max_discount_amount: '',
                         });
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -634,7 +672,13 @@ export default function AdminDiscountCodes() {
                       <option value="tours">Tours</option>
                       <option value="memberships">Membresías</option>
                       <option value="gift_cards">Tarjetas de Regalo</option>
+                      <option value="service_fees">Cargo por Servicio</option>
                     </select>
+                    {formData.applicable_to === 'service_fees' && (
+                      <p className="text-xs text-cyan-600 mt-1">
+                        Descuentos aplicables únicamente al cargo por servicio de la plataforma. No afecta el precio del tour.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -662,7 +706,8 @@ export default function AdminDiscountCodes() {
                       onChange={(e) => setFormData({
                         ...formData,
                         discount_type: e.target.value,
-                        discount_value: e.target.value === 'membership_free_month' ? '' : formData.discount_value
+                        discount_value: (e.target.value === 'membership_free_month' || e.target.value === 'service_fee_full') ? '' : formData.discount_value,
+                        max_discount_amount: e.target.value === 'service_fee_full' ? '' : formData.max_discount_amount
                       })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       required
@@ -673,9 +718,14 @@ export default function AdminDiscountCodes() {
                         </option>
                       ))}
                     </select>
+                    {formData.discount_type === 'service_fee_full' && (
+                      <p className="text-xs text-cyan-600 mt-1">
+                        Este código eliminará completamente el cargo por servicio para el usuario
+                      </p>
+                    )}
                   </div>
 
-                  {formData.discount_type !== 'membership_free_month' && (
+                  {formData.discount_type !== 'membership_free_month' && formData.discount_type !== 'service_fee_full' && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Valor del Descuento *
@@ -697,6 +747,26 @@ export default function AdminDiscountCodes() {
                     </div>
                   )}
                 </div>
+
+                {formData.applicable_to === 'service_fees' && formData.discount_type === 'service_fee_percentage' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Monto Máximo de Descuento (Opcional)
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.max_discount_amount}
+                      onChange={(e) => setFormData({ ...formData, max_discount_amount: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="100"
+                      min="0"
+                      step="0.01"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Opcional: Límite máximo del descuento en pesos. Útil para controlar el costo de promociones con porcentajes altos.
+                    </p>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
@@ -828,15 +898,26 @@ export default function AdminDiscountCodes() {
                     <p className="text-sm text-gray-900">{getDiscountTypeLabel(selectedCode.discount_type)}</p>
                   </div>
                   <div>
+                    <p className="text-sm text-gray-600">Aplicable a</p>
+                    <p className="text-sm font-medium text-gray-900">{getApplicableToLabel(selectedCode.applicable_to)}</p>
+                  </div>
+                  <div>
                     <p className="text-sm text-gray-600">Valor</p>
                     <p className="text-sm font-medium text-gray-900">
                       {selectedCode.discount_type.includes('percentage')
                         ? `${selectedCode.discount_value}%`
                         : selectedCode.discount_type === 'membership_free_month'
                         ? '1 Mes Gratis'
+                        : selectedCode.discount_type === 'service_fee_full'
+                        ? 'Cargo por Servicio Gratis'
                         : `$${selectedCode.discount_value}`
                       }
                     </p>
+                    {selectedCode.max_discount_amount && selectedCode.discount_type.includes('percentage') && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Máximo: ${selectedCode.max_discount_amount}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Usos</p>
@@ -845,6 +926,13 @@ export default function AdminDiscountCodes() {
                     </p>
                   </div>
                 </div>
+                {selectedCode.applicable_to === 'service_fees' && (
+                  <div className="mt-4 p-3 bg-cyan-50 border border-cyan-200 rounded-lg">
+                    <p className="text-sm text-cyan-800">
+                      <strong>Nota:</strong> Este código solo afecta el cargo por servicio de la plataforma y no modifica el precio base del tour.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <h3 className="text-lg font-bold text-gray-900 mb-4">Historial de Uso</h3>
