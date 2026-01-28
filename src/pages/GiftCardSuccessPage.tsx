@@ -8,7 +8,11 @@ export default function GiftCardSuccessPage() {
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
-    if (sessionId) {
+    const isFree = searchParams.get('free');
+
+    if (isFree === 'true') {
+      setIsProcessing(false);
+    } else if (sessionId) {
       setTimeout(() => {
         setIsProcessing(false);
       }, 2000);
@@ -26,6 +30,8 @@ export default function GiftCardSuccessPage() {
     );
   }
 
+  const isFree = searchParams.get('free') === 'true';
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 py-12 px-4">
       <div className="max-w-3xl mx-auto">
@@ -35,10 +41,13 @@ export default function GiftCardSuccessPage() {
               <Check className="w-14 h-14 text-green-600" />
             </div>
             <h1 className="text-4xl font-bold text-white mb-3">
-              ¡Compra Exitosa!
+              {isFree ? '¡Tarjeta Obtenida!' : '¡Compra Exitosa!'}
             </h1>
             <p className="text-green-100 text-lg">
-              Tu tarjeta de regalo ha sido creada y enviada
+              {isFree
+                ? 'Tu tarjeta de regalo ha sido creada y enviada (100% descuento aplicado)'
+                : 'Tu tarjeta de regalo ha sido creada y enviada'
+              }
             </p>
           </div>
 

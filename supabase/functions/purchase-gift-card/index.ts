@@ -107,25 +107,6 @@ Deno.serve(async (req: Request) => {
       console.log("Discount code provided but user not authenticated - ignoring discount");
     }
 
-    let customerId: string;
-    const existingCustomers = await stripe.customers.list({
-      email: purchaserEmail,
-      limit: 1
-    });
-
-    if (existingCustomers.data.length > 0) {
-      customerId = existingCustomers.data[0].id;
-    } else {
-      const customer = await stripe.customers.create({
-        email: purchaserEmail,
-        name: purchaserName,
-        metadata: {
-          source: 'gift_card_purchase'
-        },
-      });
-      customerId = customer.id;
-    }
-
     const code = await generateGiftCardCode(supabase);
     const expiresAt = new Date();
     expiresAt.setFullYear(expiresAt.getFullYear() + 1);
@@ -136,7 +117,7 @@ Deno.serve(async (req: Request) => {
         code,
         amount,
         currency: "MXN",
-        status: "active",
+        status: finalAmount === 0 ? "paid" : "active",
         purchaser_email: purchaserEmail,
         purchaser_name: purchaserName,
         recipient_email: recipientEmail || null,
@@ -157,6 +138,68 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
+    }
+
+    if (finalAmount === 0) {
+      if (validatedDiscountCode && userId) {
+        const { data: discountCodeData } = await supabase
+          .from("discount_codes")
+          .select("id, times_used")
+          .eq("code", validatedDiscountCode)
+          .single();
+
+        if (discountCodeData) {
+          await supabase
+            .from("discount_code_usage")
+            .insert({
+              discount_code_id: discountCodeData.id,
+              user_id: userId,
+              gift_card_id: giftCard.id,
+            });
+
+          await supabase
+            .from("discount_codes")
+            .update({ times_used: (discountCodeData.times_used || 0) + 1 })
+            .eq("id", discountCodeData.id);
+        }
+      }
+
+      await supabase.functions.invoke("send-gift-card-email", {
+        body: {
+          giftCardId: giftCard.id,
+        },
+      });
+
+      return new Response(
+        JSON.stringify({
+          url: `${req.headers.get("origin")}/gift-card/success?gift_card_id=${giftCard.id}&free=true`,
+          giftCardId: giftCard.id,
+          isFree: true,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    let customerId: string;
+    const existingCustomers = await stripe.customers.list({
+      email: purchaserEmail,
+      limit: 1
+    });
+
+    if (existingCustomers.data.length > 0) {
+      customerId = existingCustomers.data[0].id;
+    } else {
+      const customer = await stripe.customers.create({
+        email: purchaserEmail,
+        name: purchaserName,
+        metadata: {
+          source: 'gift_card_purchase'
+        },
+      });
+      customerId = customer.id;
     }
 
     const stripeAmount = Math.round(finalAmount * 100);
