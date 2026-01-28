@@ -232,35 +232,29 @@ Deno.serve(async (req: Request) => {
 
     const stripeAmount = Math.round(finalAmount * 100);
 
+    let productName = `Tarjeta de Regalo ToursRed - $${amount} MXN`;
+    let productDescription = recipientEmail
+      ? `Regalo para: ${recipientEmail}`
+      : "Tarjeta de regalo digital";
+
+    if (discountAmount > 0) {
+      productName = `Tarjeta de Regalo ToursRed - $${amount} MXN (Descuento aplicado: ${validatedDiscountCode})`;
+      productDescription = `${productDescription} | Precio original: $${amount} MXN | Descuento: -$${discountAmount} MXN`;
+    }
+
     const lineItems: any[] = [
       {
         price_data: {
           currency: "mxn",
           product_data: {
-            name: `Tarjeta de Regalo ToursRed - $${amount} MXN`,
-            description: recipientEmail
-              ? `Regalo para: ${recipientEmail}`
-              : "Tarjeta de regalo digital",
+            name: productName,
+            description: productDescription,
           },
-          unit_amount: Math.round(amount * 100),
+          unit_amount: stripeAmount,
         },
         quantity: 1,
       },
     ];
-
-    if (discountAmount > 0) {
-      lineItems.push({
-        price_data: {
-          currency: "mxn",
-          product_data: {
-            name: `Descuento (${validatedDiscountCode})`,
-            description: "Código de descuento aplicado",
-          },
-          unit_amount: -Math.round(discountAmount * 100),
-        },
-        quantity: 1,
-      });
-    }
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
