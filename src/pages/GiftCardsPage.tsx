@@ -187,7 +187,13 @@ export default function GiftCardsPage() {
       if (data?.url) {
         console.log('Redirecting to:', data.url);
         giftCardFormPersistence.clearStorage();
-        window.location.href = data.url;
+
+        setTimeout(() => {
+          console.log('Executing redirect now...');
+          window.location.replace(data.url);
+        }, 100);
+
+        return;
       } else {
         console.error('No URL in response:', data);
         throw new Error('No se pudo crear la sesión de pago');
