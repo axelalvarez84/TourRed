@@ -45,14 +45,14 @@ export default function GiftCardsPage() {
   useEffect(() => {
     const loadInitialData = async () => {
       if (user) {
-        const { data: userData } = await supabase
+        const { data: userData, error } = await supabase
           .from('users')
-          .select('nombre, apellido, email')
+          .select('first_name, last_name, email')
           .eq('id', user.id)
           .single();
 
-        if (userData) {
-          const fullName = [userData.nombre, userData.apellido].filter(Boolean).join(' ');
+        if (userData && !error) {
+          const fullName = [userData.first_name, userData.last_name].filter(Boolean).join(' ');
           if (fullName) setPurchaserName(fullName);
           if (userData.email) setPurchaserEmail(userData.email);
         }
