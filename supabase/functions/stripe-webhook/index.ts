@@ -147,25 +147,34 @@ Deno.serve(async (req) => {
               const discountCode = session.metadata?.discount_code;
               if (discountCode) {
                 try {
-                  const { data: giftCardData } = await supabase
-                    .from('gift_cards')
-                    .select('purchaser_email')
-                    .eq('id', giftCardId)
+                  const { data: codeData } = await supabase
+                    .from('discount_codes')
+                    .select('id')
+                    .ilike('code', discountCode)
                     .single();
 
-                  if (giftCardData?.purchaser_email) {
-                    const { data: userData } = await supabase
-                      .from('users')
-                      .select('id')
-                      .eq('email', giftCardData.purchaser_email)
-                      .maybeSingle();
+                  if (codeData) {
+                    const { data: giftCardData } = await supabase
+                      .from('gift_cards')
+                      .select('purchaser_email')
+                      .eq('id', giftCardId)
+                      .single();
 
-                    const userId = userData?.id || null;
+                    let userId = null;
+                    if (giftCardData?.purchaser_email) {
+                      const { data: userData } = await supabase
+                        .from('users')
+                        .select('id')
+                        .eq('email', giftCardData.purchaser_email)
+                        .maybeSingle();
+
+                      userId = userData?.id || null;
+                    }
 
                     const { error: usageError } = await supabase
                       .from('discount_code_usage')
                       .insert({
-                        code: discountCode,
+                        discount_code_id: codeData.id,
                         user_id: userId,
                         gift_card_id: giftCardId,
                         used_at: new Date().toISOString(),
