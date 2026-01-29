@@ -126,108 +126,7 @@ Deno.serve(async (req) => {
         const transactionType = session.metadata?.type;
 
         if (transactionType === 'gift_card' && giftCardId) {
-          console.log(`Processing gift card purchase: ${giftCardId}`);
-
-          const paymentStatus = session.payment_status;
-
-          if (paymentStatus === 'paid') {
-            const { error: giftCardError } = await supabase
-              .from('gift_cards')
-              .update({
-                stripe_payment_intent_id: session.payment_intent,
-                purchased_at: new Date().toISOString(),
-              })
-              .eq('id', giftCardId);
-
-            if (giftCardError) {
-              console.error(`Error updating gift card: ${giftCardError.message}`);
-            } else {
-              console.log(`Successfully updated gift card ${giftCardId}`);
-
-              const discountCode = session.metadata?.discount_code;
-              if (discountCode) {
-                try {
-                  const { data: codeData } = await supabase
-                    .from('discount_codes')
-                    .select('id')
-                    .ilike('code', discountCode)
-                    .single();
-
-                  if (codeData) {
-                    const { data: giftCardData } = await supabase
-                      .from('gift_cards')
-                      .select('purchaser_email')
-                      .eq('id', giftCardId)
-                      .single();
-
-                    let userId = null;
-                    if (giftCardData?.purchaser_email) {
-                      const { data: userData } = await supabase
-                        .from('users')
-                        .select('id')
-                        .eq('email', giftCardData.purchaser_email)
-                        .maybeSingle();
-
-                      userId = userData?.id || null;
-                    }
-
-                    const { error: usageError } = await supabase
-                      .from('discount_code_usage')
-                      .insert({
-                        discount_code_id: codeData.id,
-                        user_id: userId,
-                        gift_card_id: giftCardId,
-                        used_at: new Date().toISOString(),
-                      });
-
-                    if (usageError) {
-                      console.error(`Error recording discount code usage: ${usageError.message}`);
-                    } else {
-                      console.log(`Successfully recorded discount code usage: ${discountCode}`);
-                    }
-                  }
-                } catch (discountError) {
-                  console.error('Error processing discount code:', discountError);
-                }
-              }
-
-              const { data: checkEmail } = await supabase
-                .from('gift_cards')
-                .select('email_sent')
-                .eq('id', giftCardId)
-                .single();
-
-              if (!checkEmail?.email_sent) {
-                try {
-                  const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-gift-card-email`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${supabaseServiceKey}`,
-                    },
-                    body: JSON.stringify({ giftCardId: giftCardId }),
-                  });
-
-                  const emailResult = await emailResponse.json();
-
-                  if (emailResult.success) {
-                    console.log('Gift card emails sent successfully');
-                    await supabase
-                      .from('gift_cards')
-                      .update({ email_sent: true, email_sent_at: new Date().toISOString() })
-                      .eq('id', giftCardId);
-                  } else {
-                    console.error('Error sending gift card emails:', emailResult);
-                  }
-                } catch (emailError) {
-                  console.error('Error calling gift card email function:', emailError);
-                }
-              } else {
-                console.log(`Gift card email already sent for ${giftCardId}, skipping`);
-              }
-            }
-          }
-
+          console.log(`checkout.session.completed: Gift card ${giftCardId} session completed, will be processed by payment_intent.succeeded`);
           break;
         }
 
@@ -538,7 +437,7 @@ Deno.serve(async (req) => {
         }
 
         if (transactionType === 'gift_card' && giftCardId) {
-          console.log(`Processing delayed gift card payment completion: ${giftCardId}`);
+          console.log(`payment_intent.succeeded: Processing gift card payment: ${giftCardId}`);
 
           const { error: giftCardError } = await supabase
             .from('gift_cards')
@@ -551,7 +450,65 @@ Deno.serve(async (req) => {
           if (giftCardError) {
             console.error(`Error updating gift card: ${giftCardError.message}`);
           } else {
-            console.log(`Successfully updated gift card ${giftCardId} after delayed payment`);
+            console.log(`Successfully updated gift card ${giftCardId}`);
+
+            const discountCode = paymentIntent.metadata?.discount_code;
+            if (discountCode) {
+              try {
+                const { data: codeData } = await supabase
+                  .from('discount_codes')
+                  .select('id')
+                  .ilike('code', discountCode)
+                  .single();
+
+                if (codeData) {
+                  const { data: existingUsage } = await supabase
+                    .from('discount_code_usage')
+                    .select('id')
+                    .eq('discount_code_id', codeData.id)
+                    .eq('gift_card_id', giftCardId)
+                    .maybeSingle();
+
+                  if (existingUsage) {
+                    console.log(`Discount code ${discountCode} already recorded for gift card ${giftCardId}, skipping`);
+                  } else {
+                    const { data: giftCardData } = await supabase
+                      .from('gift_cards')
+                      .select('purchaser_email')
+                      .eq('id', giftCardId)
+                      .single();
+
+                    let userId = null;
+                    if (giftCardData?.purchaser_email) {
+                      const { data: userData } = await supabase
+                        .from('users')
+                        .select('id')
+                        .eq('email', giftCardData.purchaser_email)
+                        .maybeSingle();
+
+                      userId = userData?.id || null;
+                    }
+
+                    const { error: usageError } = await supabase
+                      .from('discount_code_usage')
+                      .insert({
+                        discount_code_id: codeData.id,
+                        user_id: userId,
+                        gift_card_id: giftCardId,
+                        used_at: new Date().toISOString(),
+                      });
+
+                    if (usageError) {
+                      console.error(`Error recording discount code usage: ${usageError.message}`);
+                    } else {
+                      console.log(`Successfully recorded discount code usage: ${discountCode}`);
+                    }
+                  }
+                }
+              } catch (discountError) {
+                console.error('Error processing discount code:', discountError);
+              }
+            }
 
             const { data: checkEmail } = await supabase
               .from('gift_cards')
@@ -573,7 +530,7 @@ Deno.serve(async (req) => {
                 const emailResult = await emailResponse.json();
 
                 if (emailResult.success) {
-                  console.log('Gift card emails sent successfully after delayed payment');
+                  console.log('Gift card emails sent successfully');
                   await supabase
                     .from('gift_cards')
                     .update({ email_sent: true, email_sent_at: new Date().toISOString() })
@@ -585,7 +542,7 @@ Deno.serve(async (req) => {
                 console.error('Error calling gift card email function:', emailError);
               }
             } else {
-              console.log(`Gift card email already sent for ${giftCardId} after delayed payment, skipping`);
+              console.log(`Gift card email already sent for ${giftCardId}, skipping`);
             }
           }
 
