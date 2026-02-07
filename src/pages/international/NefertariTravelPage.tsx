@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, Info, X, Loader, AlertCircle, MessageSquare } from 'lucide-react';
+import { ChevronRight, Info, X, Loader, AlertCircle, MessageSquare, RotateCcw } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useFormPersistence } from '../../hooks/useFormPersistence';
 import { usePreventUnload } from '../../hooks/usePreventUnload';
@@ -24,6 +24,14 @@ const NefertariTravelPage: React.FC = () => {
   const [success, setSuccess] = useState(false);
   const [iframeLoading, setIframeLoading] = useState(true);
   const [iframeError, setIframeError] = useState(false);
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+
+  const handleBackToCatalog = () => {
+    if (iframeRef.current) {
+      setIframeLoading(true);
+      iframeRef.current.src = IFRAME_URL;
+    }
+  };
 
   const formPersistence = useFormPersistence(
     formData,
@@ -182,6 +190,16 @@ const NefertariTravelPage: React.FC = () => {
           </div>
         </div>
 
+        <div className="flex justify-center my-6">
+          <button
+            onClick={handleBackToCatalog}
+            className="inline-flex items-center space-x-2 px-6 py-3 border-2 border-gray-300 rounded-full text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 transition-all font-medium shadow-sm"
+          >
+            <RotateCcw className="h-4 w-4" />
+            <span>Volver al Catalogo</span>
+          </button>
+        </div>
+
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           <div className="relative">
             {iframeLoading && (
@@ -208,6 +226,7 @@ const NefertariTravelPage: React.FC = () => {
               </div>
             ) : (
               <iframe
+                ref={iframeRef}
                 src={IFRAME_URL}
                 className="w-full h-[600px] md:h-[800px]"
                 title="Catalogo de Nefertari Travel"
