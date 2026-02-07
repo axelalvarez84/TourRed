@@ -365,7 +365,7 @@ const BookingSuccessPage: React.FC = () => {
                     </div>
                   )}
 
-                  {booking.points_used && booking.points_used > 0 && (
+                  {Number(booking.points_used) > 0 && (
                     <div className="flex justify-between bg-amber-50 border border-amber-200 rounded px-2 py-1.5 -mx-1">
                       <span className="text-amber-700 font-medium flex items-center">
                         <Award className="h-4 w-4 mr-1" />
@@ -375,7 +375,7 @@ const BookingSuccessPage: React.FC = () => {
                     </div>
                   )}
 
-                  {booking.toursred_cash_used && booking.toursred_cash_used > 0 && (
+                  {Number(booking.toursred_cash_used) > 0 && (
                     <div className="flex justify-between bg-amber-50 border border-amber-200 rounded px-2 py-1.5 -mx-1 mt-1">
                       <span className="text-amber-700 font-medium flex items-center">
                         <Wallet className="h-4 w-4 mr-1" />
@@ -390,13 +390,13 @@ const BookingSuccessPage: React.FC = () => {
                       <span className="text-green-600">Total Pagado:</span>
                       <span className="text-green-600">${booking.user_payment?.toLocaleString()}</span>
                     </div>
-                    {((booking.points_used && booking.points_used > 0) || (booking.toursred_cash_used && booking.toursred_cash_used > 0)) && (
+                    {((Number(booking.points_used) > 0) || (Number(booking.toursred_cash_used) > 0)) && (
                       <div className="text-xs text-gray-500 mt-1 text-right">
-                        {booking.points_used && booking.points_used > 0 && booking.toursred_cash_used && booking.toursred_cash_used > 0 ? (
+                        {Number(booking.points_used) > 0 && Number(booking.toursred_cash_used) > 0 ? (
                           <>
                             ({booking.points_used.toLocaleString()} puntos + ${Number(booking.toursred_cash_used).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ToursRed Cash + ${Math.max(0, (booking.user_payment || 0) - ((booking.points_used || 0) / 100) - Number(booking.toursred_cash_used || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Stripe)
                           </>
-                        ) : booking.points_used && booking.points_used > 0 ? (
+                        ) : Number(booking.points_used) > 0 ? (
                           <>
                             ({booking.points_used.toLocaleString()} puntos + ${Math.max(0, (booking.user_payment || 0) - (booking.points_used / 100)).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Stripe)
                           </>
@@ -409,7 +409,7 @@ const BookingSuccessPage: React.FC = () => {
                     )}
                   </div>
 
-                  {booking.points_earned && booking.points_earned > 0 && (
+                  {Number(booking.points_earned) > 0 && (
                     <div className="flex justify-between bg-green-50 border border-green-200 rounded px-2 py-1.5 -mx-1 mt-2">
                       <span className="text-green-700 font-medium flex items-center">
                         <Award className="h-4 w-4 mr-1" />

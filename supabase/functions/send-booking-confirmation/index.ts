@@ -147,6 +147,7 @@ Deno.serve(async (req: Request) => {
     const serviceChargePercentage = platformSettings.service_charge_percentage;
     const agencyCommissionPercentage = platformSettings.agency_commission_percentage;
     const serviceCharge = booking.service_charge || 0;
+    const discountAmount = Number(booking.discount_amount) || 0;
     const toursRedCashUsed = booking.toursred_cash_used || 0;
     const userPayment = booking.user_payment || (depositAmount + serviceCharge);
     const pointsValueUsed = pointsUsed / 100;
@@ -260,6 +261,12 @@ Deno.serve(async (req: Request) => {
           <span class="info-value" style="color: #059669;">$0.00 (ToursRed Plus)</span>
         </div>
         `}
+        ${discountAmount > 0 ? `
+        <div class="info-row" style="background-color: #dcfce7; margin: 5px -5px; padding: 8px 5px;">
+          <span class="info-label" style="font-weight: 600;">🏷️ Código de Descuento:</span>
+          <span class="info-value" style="color: #059669;">-${formatCurrency(discountAmount)}</span>
+        </div>
+        ` : ''}
         ${pointsUsed > 0 ? `
         <div class="info-row" style="background-color: #fef3c7; margin: 5px -5px; padding: 8px 5px;">
           <span class="info-label" style="font-weight: 600;">⭐ Puntos ToursRed Usados:</span>
@@ -418,6 +425,12 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">Anticipo pagado por el viajero (${depositPercentage}%):</span>
           <span class="info-value">${formatCurrency(depositAmount)}</span>
         </div>
+        ${discountAmount > 0 ? `
+        <div class="info-row">
+          <span class="info-label">Descuento aplicado al viajero:</span>
+          <span class="info-value" style="color: #059669;">-${formatCurrency(discountAmount)}</span>
+        </div>
+        ` : ''}
         <div class="info-row">
           <span class="info-label">Método de pago utilizado:</span>
           <span class="info-value">${paymentMethod}</span>
@@ -550,6 +563,12 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">- Cargo por plataforma (${serviceChargePercentage}%):</span>
           <span class="info-value">${formatCurrency(serviceCharge)}</span>
         </div>
+        ${discountAmount > 0 ? `
+        <div class="info-row">
+          <span class="info-label">- Descuento aplicado:</span>
+          <span class="info-value" style="color: #059669;">-${formatCurrency(discountAmount)}</span>
+        </div>
+        ` : ''}
         <div class="info-row">
           <span class="info-label">Método de pago:</span>
           <span class="info-value">${paymentMethod}</span>
