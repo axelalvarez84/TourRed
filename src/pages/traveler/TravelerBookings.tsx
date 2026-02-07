@@ -1495,12 +1495,40 @@ const TravelerBookings: React.FC = () => {
 
                 {/* Payment Summary */}
                 <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Monto Original:</span>
-                    <span className="font-semibold">${(paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0).toLocaleString()}</span>
-                  </div>
+                  {(() => {
+                    const discountAmount = paymentModal.booking?.discount_amount || 0;
+                    const userPayment = paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0;
+                    const preDiscountAmount = userPayment + discountAmount;
+                    const discountCode = (paymentModal.booking as any)?.discount_codes;
 
-                  {/* Points Already Used */}
+                    return (
+                      <>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">{discountAmount > 0 ? 'Subtotal:' : 'Monto Original:'}</span>
+                          <span className="font-semibold">${preDiscountAmount.toLocaleString()}</span>
+                        </div>
+
+                        {discountAmount > 0 && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-blue-800">
+                                Descuento Aplicado{discountCode?.code ? ` (${discountCode.code})` : ''}:
+                              </span>
+                              <span className="font-semibold text-blue-800">-${discountAmount.toLocaleString()}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {discountAmount > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Monto con Descuento:</span>
+                            <span className="font-semibold">${userPayment.toLocaleString()}</span>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+
                   {(paymentModal.booking?.points_used || 0) > 0 && (
                     <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
                       <div className="flex justify-between text-sm">
