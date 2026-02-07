@@ -741,7 +741,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-sm font-medium text-gray-900">Adultos</div>
-                        <div className="text-xs text-gray-500">13-59 años</div>
+                        <div className="text-xs text-gray-500">13-59 años &middot; ${getPrecioPorCategoria('adulto').toLocaleString()}/persona</div>
                       </div>
                       <div className="flex items-center space-x-3">
                         <button
@@ -768,7 +768,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-sm font-medium text-gray-900">Niños</div>
-                        <div className="text-xs text-gray-500">3-12 años</div>
+                        <div className="text-xs text-gray-500">3-12 años &middot; ${getPrecioPorCategoria('nino').toLocaleString()}/persona</div>
                       </div>
                       <div className="flex items-center space-x-3">
                         <button
@@ -795,7 +795,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-sm font-medium text-gray-900">Infantes</div>
-                        <div className="text-xs text-gray-500">0-2 años</div>
+                        <div className="text-xs text-gray-500">0-2 años &middot; ${getPrecioPorCategoria('infante').toLocaleString()}/persona</div>
                       </div>
                       <div className="flex items-center space-x-3">
                         <button
@@ -822,7 +822,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-sm font-medium text-gray-900">Adultos Mayores</div>
-                        <div className="text-xs text-gray-500">60+ con INAPAM</div>
+                        <div className="text-xs text-gray-500">60+ con INAPAM &middot; ${getPrecioPorCategoria('adulto_mayor').toLocaleString()}/persona</div>
                       </div>
                       <div className="flex items-center space-x-3">
                         <button
@@ -849,7 +849,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <div className="flex items-center justify-between border-t pt-3">
                       <div>
                         <div className="text-sm font-medium text-gray-900">Mascotas</div>
-                        <div className="text-xs text-gray-500">Perro o gato</div>
+                        <div className="text-xs text-gray-500">Perro o gato &middot; {getPrecioPorCategoria('mascota') > 0 ? `$${getPrecioPorCategoria('mascota').toLocaleString()}` : 'Gratis'}</div>
                       </div>
                       <div className="flex items-center space-x-3">
                         <button
