@@ -85,12 +85,29 @@ export default function MembershipCheckout() {
     date.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const isFreeMonthApplied = appliedDiscount?.discountType === 'membership_free_month';
-  const todayTotal = isFreeMonthApplied ? 0 : planPrice;
+  const isPercentageDiscount = appliedDiscount?.discountType === 'membership_percentage';
+  const isFixedDiscount = appliedDiscount?.discountType === 'membership_fixed';
+  const hasMonetaryDiscount = isPercentageDiscount || isFixedDiscount;
+
+  const discountAmount = isPercentageDiscount
+    ? Math.min(planPrice, planPrice * (appliedDiscount.discountValue / 100))
+    : isFixedDiscount
+      ? Math.min(planPrice, appliedDiscount.discountValue)
+      : 0;
+
+  const todayTotal = isFreeMonthApplied ? 0 : (hasMonetaryDiscount ? planPrice - discountAmount : planPrice);
 
   const firstChargeDate = new Date(today);
   if (isFreeMonthApplied) {
     firstChargeDate.setDate(firstChargeDate.getDate() + 30);
   }
+
+  const getDiscountLabel = () => {
+    if (isPercentageDiscount) return `${appliedDiscount.discountValue}% de descuento`;
+    if (isFixedDiscount) return `$${discountAmount.toFixed(0)} de descuento`;
+    if (isFreeMonthApplied) return 'Primer mes GRATIS';
+    return appliedDiscount?.description || '';
+  };
 
   const handleApplyCode = async () => {
     if (!discountCode.trim() || !user) return;
@@ -269,11 +286,7 @@ export default function MembershipCheckout() {
                       </div>
                       <div>
                         <p className="font-semibold text-green-900 text-sm">{appliedDiscount.code}</p>
-                        <p className="text-green-700 text-xs">
-                          {isFreeMonthApplied
-                            ? 'Primer mes GRATIS'
-                            : appliedDiscount.description}
-                        </p>
+                        <p className="text-green-700 text-xs">{getDiscountLabel()}</p>
                       </div>
                     </div>
                     <button
@@ -286,6 +299,11 @@ export default function MembershipCheckout() {
                   {isFreeMonthApplied && (
                     <p className="text-green-700 text-xs mt-3 pl-11">
                       Tu primer cobro de ${planPrice.toFixed(0)} MXN sera el {formatDate(firstChargeDate)}
+                    </p>
+                  )}
+                  {hasMonetaryDiscount && (
+                    <p className="text-green-700 text-xs mt-3 pl-11">
+                      Ahorras ${discountAmount.toFixed(0)} MXN en tu primer pago. Las renovaciones futuras se cobran al precio regular.
                     </p>
                   )}
                 </div>
@@ -333,6 +351,14 @@ export default function MembershipCheckout() {
                   <span className="text-green-600">-${planPrice.toFixed(2)} MXN</span>
                 </div>
               )}
+              {hasMonetaryDiscount && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-green-600">
+                    Descuento ({isPercentageDiscount ? `${appliedDiscount.discountValue}%` : 'codigo'})
+                  </span>
+                  <span className="text-green-600">-${discountAmount.toFixed(2)} MXN</span>
+                </div>
+              )}
               <div className="border-t border-gray-200 pt-3 flex items-center justify-between">
                 <span className="font-semibold text-gray-900">Total a pagar hoy</span>
                 <span className="text-2xl font-bold text-gray-900">${todayTotal.toFixed(2)} MXN</span>
@@ -371,7 +397,9 @@ export default function MembershipCheckout() {
               <p className="text-xs text-gray-400">
                 {isFreeMonthApplied
                   ? `Se registrara tu metodo de pago. Tu primer cobro de $${planPrice.toFixed(0)} MXN sera el ${formatDate(firstChargeDate)}.`
-                  : `Se renueva automaticamente. Puedes cancelar en cualquier momento.`}
+                  : hasMonetaryDiscount
+                    ? `El descuento aplica solo al primer pago. Las renovaciones se cobran a $${planPrice.toFixed(0)} MXN. Puedes cancelar en cualquier momento.`
+                    : `Se renueva automaticamente. Puedes cancelar en cualquier momento.`}
               </p>
               <p className="text-xs text-gray-400">
                 Pago seguro procesado por Stripe

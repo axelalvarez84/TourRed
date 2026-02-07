@@ -225,7 +225,11 @@ export default function AdminDiscountCodes() {
           { value: 'tour_fixed', label: 'Monto Fijo' },
         ];
       case 'memberships':
-        return [{ value: 'membership_free_month', label: 'Mes Gratis' }];
+        return [
+          { value: 'membership_percentage', label: 'Porcentaje' },
+          { value: 'membership_fixed', label: 'Monto Fijo' },
+          { value: 'membership_free_month', label: 'Mes Gratis (Solo Mensual)' },
+        ];
       case 'gift_cards':
         return [
           { value: 'gift_card_percentage', label: 'Porcentaje' },
@@ -247,6 +251,8 @@ export default function AdminDiscountCodes() {
       tour_percentage: 'Porcentaje',
       tour_fixed: 'Monto Fijo',
       membership_free_month: 'Mes Gratis',
+      membership_percentage: 'Porcentaje',
+      membership_fixed: 'Monto Fijo',
       gift_card_percentage: 'Porcentaje',
       gift_card_fixed: 'Monto Fijo',
       service_fee_percentage: 'Porcentaje del Cargo',

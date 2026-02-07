@@ -373,7 +373,7 @@ export interface DiscountCode {
   id: string;
   code: string;
   description: string;
-  discount_type: 'tour_percentage' | 'tour_fixed' | 'membership_free_month' | 'gift_card_percentage' | 'gift_card_fixed' | 'agency_tour_percentage' | 'agency_tour_fixed';
+  discount_type: 'tour_percentage' | 'tour_fixed' | 'membership_free_month' | 'membership_percentage' | 'membership_fixed' | 'gift_card_percentage' | 'gift_card_fixed' | 'agency_tour_percentage' | 'agency_tour_fixed';
   discount_value: number;
   applicable_to: 'tours' | 'memberships' | 'gift_cards';
   is_single_use: boolean;

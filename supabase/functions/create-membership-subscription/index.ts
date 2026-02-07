@@ -44,6 +44,8 @@ Deno.serve(async (req: Request) => {
 
     let validDiscountCode: string | null = null;
     let trialDays = 0;
+    let discountType: string | null = null;
+    let discountValue: number | null = null;
 
     if (discountCode && typeof discountCode === 'string') {
       const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
@@ -54,8 +56,13 @@ Deno.serve(async (req: Request) => {
       });
 
       if (validation?.valid) {
+        discountType = validation.discount_type;
+        discountValue = validation.discount_value;
+
         if (validation.discount_type === 'membership_free_month' && planType === 'monthly') {
           trialDays = 30;
+          validDiscountCode = discountCode.trim();
+        } else if (validation.discount_type === 'membership_percentage' || validation.discount_type === 'membership_fixed') {
           validDiscountCode = discountCode.trim();
         }
       }
@@ -123,7 +130,26 @@ Deno.serve(async (req: Request) => {
       subscriptionData.trial_period_days = trialDays;
     }
 
-    const session = await stripe.checkout.sessions.create({
+    let stripeCouponId: string | null = null;
+
+    if (validDiscountCode && discountType === 'membership_percentage' && discountValue) {
+      const coupon = await stripe.coupons.create({
+        percent_off: discountValue,
+        duration: 'once',
+        name: `Descuento ${discountValue}% - ${validDiscountCode}`,
+      });
+      stripeCouponId = coupon.id;
+    } else if (validDiscountCode && discountType === 'membership_fixed' && discountValue) {
+      const coupon = await stripe.coupons.create({
+        amount_off: Math.round(discountValue * 100),
+        currency: 'mxn',
+        duration: 'once',
+        name: `Descuento $${discountValue} - ${validDiscountCode}`,
+      });
+      stripeCouponId = coupon.id;
+    }
+
+    const sessionParams: any = {
       customer: customer.id,
       mode: 'subscription',
       payment_method_types: ['card'],
@@ -136,7 +162,13 @@ Deno.serve(async (req: Request) => {
       success_url: `${req.headers.get('origin')}/traveler/membership?success=true`,
       cancel_url: `${req.headers.get('origin')}/traveler/membership/checkout?plan=${planType}&cancelled=true`,
       subscription_data: subscriptionData,
-    });
+    };
+
+    if (stripeCouponId) {
+      sessionParams.discounts = [{ coupon: stripeCouponId }];
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
 
     return new Response(
       JSON.stringify({ url: session.url }),
