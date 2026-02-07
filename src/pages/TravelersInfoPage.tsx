@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Users, ArrowLeft, Save, UserPlus, Check } from 'lucide-react';
+import { useNavigate, useParams, Link } from 'react-router-dom';
+import { Users, ArrowLeft, Save, UserPlus, Check, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Booking, BookingTraveler, Tour, FrequentCompanion } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { validateBirthDateForCategory, validateAllTravelers } from '../utils/birthDateValidation';
 
 interface TravelerFormData {
   categoria_viajero: 'adulto' | 'nino' | 'infante' | 'adulto_mayor' | 'mascota';
@@ -27,6 +28,7 @@ const TravelersInfoPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [travelerErrors, setTravelerErrors] = useState<string[]>([]);
   const [showCompanionsSection, setShowCompanionsSection] = useState(true);
 
   useEffect(() => {
@@ -196,6 +198,18 @@ const TravelersInfoPage: React.FC = () => {
       [field]: value,
     };
     setTravelers(updatedTravelers);
+
+    if (field === 'fecha_nacimiento' && typeof value === 'string' && value) {
+      const result = validateBirthDateForCategory(
+        value,
+        updatedTravelers[index].categoria_viajero,
+        tour?.start_date
+      );
+      const newErrors = [...travelerErrors];
+      while (newErrors.length <= index) newErrors.push('');
+      newErrors[index] = result.isValid ? '' : result.errorMessage;
+      setTravelerErrors(newErrors);
+    }
   };
 
   const selectFrequentCompanion = (index: number, companion: FrequentCompanion) => {
@@ -209,9 +223,23 @@ const TravelersInfoPage: React.FC = () => {
       selectedCompanionId: companion.id,
     };
     setTravelers(updatedTravelers);
+
+    if (companion.fecha_nacimiento && updatedTravelers[index].categoria_viajero !== 'mascota') {
+      const result = validateBirthDateForCategory(
+        companion.fecha_nacimiento,
+        updatedTravelers[index].categoria_viajero,
+        tour?.start_date
+      );
+      const newErrors = [...travelerErrors];
+      while (newErrors.length <= index) newErrors.push('');
+      newErrors[index] = result.isValid ? '' : result.errorMessage;
+      setTravelerErrors(newErrors);
+    }
   };
 
   const validateForm = (): boolean => {
+    const newErrors: string[] = new Array(travelers.length).fill('');
+
     for (let i = 0; i < travelers.length; i++) {
       const traveler = travelers[i];
 
@@ -230,9 +258,22 @@ const TravelersInfoPage: React.FC = () => {
           setError(`Por favor ingresa la fecha de nacimiento del viajero ${i + 1}`);
           return false;
         }
+
+        const result = validateBirthDateForCategory(
+          traveler.fecha_nacimiento,
+          traveler.categoria_viajero,
+          tour?.start_date
+        );
+        if (!result.isValid) {
+          newErrors[i] = result.errorMessage;
+          setTravelerErrors(newErrors);
+          setError(`La fecha de nacimiento del viajero ${i + 1} no corresponde con su categoría. Verifica los datos o regresa a modificar la reserva.`);
+          return false;
+        }
       }
     }
 
+    setTravelerErrors(newErrors);
     return true;
   };
 
@@ -341,6 +382,22 @@ const TravelersInfoPage: React.FC = () => {
 
   const proceedToPayment = async () => {
     try {
+      const { data: savedTravelers, error: travelersFetchError } = await supabase
+        .from('booking_travelers')
+        .select('categoria_viajero, fecha_nacimiento, nombre')
+        .eq('booking_id', bookingId);
+
+      if (!travelersFetchError && savedTravelers && savedTravelers.length > 0) {
+        const { isValid, errors } = validateAllTravelers(savedTravelers, tour?.start_date);
+        if (!isValid) {
+          const firstErrorIdx = errors.findIndex(e => e !== '');
+          const travelerName = savedTravelers[firstErrorIdx]?.nombre || `Viajero ${firstErrorIdx + 1}`;
+          setError(`No se puede procesar el pago: la fecha de nacimiento de ${travelerName} no corresponde con su categoría de viajero. Por favor corrige los datos.`);
+          setTravelerErrors(errors);
+          return;
+        }
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
@@ -796,9 +853,29 @@ const TravelersInfoPage: React.FC = () => {
                           type="date"
                           value={traveler.fecha_nacimiento}
                           onChange={(e) => handleTravelerChange(index, 'fecha_nacimiento', e.target.value)}
-                          className="input"
+                          className={`input ${travelerErrors[index] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                           required
                         />
+                        {travelerErrors[index] && (
+                          <div className="mt-2 bg-red-50 border border-red-200 rounded-md p-3">
+                            <div className="flex items-start">
+                              <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 mr-2 flex-shrink-0" />
+                              <div className="text-sm text-red-700">
+                                <p>{travelerErrors[index]}</p>
+                                <p className="mt-2 text-xs">
+                                  Verifica la fecha de nacimiento o{' '}
+                                  <Link
+                                    to={`/tours/${tour?.id}`}
+                                    className="font-semibold text-red-800 underline hover:text-red-900"
+                                  >
+                                    regresa a actualizar la reserva
+                                  </Link>{' '}
+                                  y selecciona el tipo de viajero que corresponde.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <div>
@@ -857,9 +934,9 @@ const TravelersInfoPage: React.FC = () => {
           <div className="mt-8 flex justify-end">
             <button
               onClick={handleSave}
-              disabled={isSaving}
+              disabled={isSaving || travelerErrors.some(e => e !== '')}
               className={`px-6 py-3 rounded-md font-semibold flex items-center ${
-                isSaving
+                isSaving || travelerErrors.some(e => e !== '')
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-primary-600 text-white hover:bg-primary-700'
               }`}

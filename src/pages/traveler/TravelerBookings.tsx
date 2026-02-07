@@ -8,6 +8,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import ReviewForm from '../../components/ReviewForm';
 import { useFormPersistence } from '../../hooks/useFormPersistence';
 import { usePreventUnload } from '../../hooks/usePreventUnload';
+import { validateAllTravelers } from '../../utils/birthDateValidation';
 
 const TravelerBookings: React.FC = () => {
   const { user } = useAuth();
@@ -80,6 +81,11 @@ const TravelerBookings: React.FC = () => {
     action: null,
   });
   const [pendingReschedules, setPendingReschedules] = useState<{ [bookingId: string]: PendingReschedule }>({});
+  const [paymentValidationError, setPaymentValidationError] = useState<{
+    open: boolean;
+    bookingId: string;
+    message: string;
+  }>({ open: false, bookingId: '', message: '' });
 
   const cancellationFormPersistence = useFormPersistence(
     { cancellationReason: cancellationModal.cancellationReason },
@@ -453,7 +459,26 @@ const TravelerBookings: React.FC = () => {
 
   const handleCompletePayment = async (booking: Booking) => {
     try {
-      // Obtener el saldo de ToursRed Cash del usuario
+      const { data: travelerData, error: travelerError } = await supabase
+        .from('booking_travelers')
+        .select('categoria_viajero, fecha_nacimiento, nombre')
+        .eq('booking_id', booking.id);
+
+      if (!travelerError && travelerData && travelerData.length > 0) {
+        const tourStartDate = (booking as any).tours?.start_date || (booking as any).booking_date;
+        const { isValid, errors } = validateAllTravelers(travelerData, tourStartDate);
+        if (!isValid) {
+          const firstErrorIdx = errors.findIndex(e => e !== '');
+          const travelerName = travelerData[firstErrorIdx]?.nombre || `Viajero ${firstErrorIdx + 1}`;
+          setPaymentValidationError({
+            open: true,
+            bookingId: booking.id,
+            message: `La fecha de nacimiento de "${travelerName}" no corresponde con su categoría de viajero. Debes corregir los datos antes de pagar.`,
+          });
+          return;
+        }
+      }
+
       const { data: walletData } = await supabase
         .from('toursred_cash_wallets')
         .select('balance')
@@ -462,7 +487,6 @@ const TravelerBookings: React.FC = () => {
 
       const walletBalance = walletData?.balance || 0;
 
-      // Abrir el modal de pago
       setPaymentModal({
         open: true,
         booking: booking,
@@ -1656,6 +1680,38 @@ const TravelerBookings: React.FC = () => {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {paymentValidationError.open && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="flex items-start mb-4">
+              <AlertCircle className="h-6 w-6 text-red-600 mr-3 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Error de Validacion</h3>
+                <p className="text-sm text-gray-700">{paymentValidationError.message}</p>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setPaymentValidationError({ open: false, bookingId: '', message: '' })}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                Cerrar
+              </button>
+              <button
+                onClick={() => {
+                  setPaymentValidationError({ open: false, bookingId: '', message: '' });
+                  navigate(`/booking-travelers/${paymentValidationError.bookingId}`);
+                }}
+                className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 flex items-center justify-center"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Editar Viajeros
+              </button>
             </div>
           </div>
         </div>
