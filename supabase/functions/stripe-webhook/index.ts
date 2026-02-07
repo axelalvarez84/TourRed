@@ -316,6 +316,40 @@ Deno.serve(async (req) => {
               console.error('Error processing membership exemption:', membershipError);
             }
 
+            // Record discount code usage if applicable
+            const discountCodeId = session.metadata?.discount_code_id;
+            if (discountCodeId) {
+              try {
+                const { data: bookingForDiscount } = await supabase
+                  .from('bookings')
+                  .select('user_id')
+                  .eq('id', bookingId)
+                  .single();
+
+                if (bookingForDiscount) {
+                  const { data: existingUsage } = await supabase
+                    .from('discount_code_usage')
+                    .select('id')
+                    .eq('discount_code_id', discountCodeId)
+                    .eq('user_id', bookingForDiscount.user_id)
+                    .maybeSingle();
+
+                  if (!existingUsage) {
+                    await supabase.from('discount_code_usage').insert({
+                      discount_code_id: discountCodeId,
+                      user_id: bookingForDiscount.user_id,
+                      booking_id: bookingId,
+                    });
+                    console.log(`Discount code ${discountCodeId} usage recorded for booking ${bookingId}`);
+                  } else {
+                    console.log(`Discount code ${discountCodeId} already used by user, skipping`);
+                  }
+                }
+              } catch (discountError) {
+                console.error('Error recording discount code usage:', discountError);
+              }
+            }
+
             try {
               // Check if confirmation email was already sent to prevent duplicates
               const { data: bookingCheck } = await supabase

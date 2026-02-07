@@ -522,6 +522,18 @@ const TravelersInfoPage: React.FC = () => {
 
         console.log('✅ Reserva confirmada exitosamente');
 
+        if (booking?.discount_code_id) {
+          try {
+            await supabase.from('discount_code_usage').insert({
+              discount_code_id: booking.discount_code_id,
+              user_id: user?.id,
+              booking_id: bookingId,
+            });
+          } catch (discountErr) {
+            console.error('Error registrando uso de codigo de descuento:', discountErr);
+          }
+        }
+
         // QUINTO: Enviar emails de confirmación a viajero, agencia y admin
         try {
           console.log('📧 Enviando emails de confirmación para reserva pagada con puntos/cash...');
@@ -589,7 +601,9 @@ const TravelersInfoPage: React.FC = () => {
             pointsUsed: pointsUsed,
             metadata: {
               points_used: pointsUsed.toString(),
-              points_discount: pointsDiscountAmount.toString()
+              points_discount: pointsDiscountAmount.toString(),
+              discount_code_id: booking?.discount_code_id || '',
+              discount_amount: (booking?.discount_amount || 0).toString(),
             }
           }),
         }

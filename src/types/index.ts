@@ -164,6 +164,9 @@ export interface Booking {
   reschedule_response?: 'accepted' | 'rejected' | 'auto_accepted';
   reschedule_responded_at?: string;
   original_booking_date?: string;
+  discount_code_id?: string;
+  discount_amount?: number;
+  discount_codes?: DiscountCode;
 }
 
 export interface BookingTraveler {
@@ -376,11 +379,13 @@ export interface DiscountCode {
   discount_type: 'tour_percentage' | 'tour_fixed' | 'membership_free_month' | 'membership_percentage' | 'membership_fixed' | 'gift_card_percentage' | 'gift_card_fixed' | 'agency_tour_percentage' | 'agency_tour_fixed';
   discount_value: number;
   applicable_to: 'tours' | 'memberships' | 'gift_cards';
+  discount_applies_to: 'total_price' | 'payment_amount';
   is_single_use: boolean;
   is_active: boolean;
   valid_from: string;
   valid_until: string;
   max_uses?: number;
+  max_discount_amount?: number | null;
   times_used: number;
   created_by?: string;
   created_at: string;

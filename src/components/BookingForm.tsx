@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet, Award } from 'lucide-react';
+import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet, Award, Ticket, X, Check, Loader2 } from 'lucide-react';
 import { Tour } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { createBooking, formatDateForDB, supabase } from '../lib/supabase';
@@ -45,6 +45,18 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [isHighRisk, setIsHighRisk] = useState(false);
   const [remainingExemption, setRemainingExemption] = useState(500);
   const [isLoadingExemption, setIsLoadingExemption] = useState(true);
+
+  const [discountCodeInput, setDiscountCodeInput] = useState('');
+  const [isValidatingCode, setIsValidatingCode] = useState(false);
+  const [discountCodeError, setDiscountCodeError] = useState('');
+  const [appliedDiscount, setAppliedDiscount] = useState<{
+    code_id: string;
+    code: string;
+    discount_type: string;
+    discount_value: number;
+    discount_applies_to: 'total_price' | 'payment_amount';
+    max_discount_amount: number | null;
+  } | null>(null);
 
   const [travelerCounts, setTravelerCounts] = useState<TravelerCounts>({
     adultos: 1,
@@ -333,6 +345,47 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
   const bookingDeadlinePassed = isBookingDeadlinePassed();
 
+  const handleApplyDiscountCode = async () => {
+    if (!discountCodeInput.trim() || !user) return;
+
+    setIsValidatingCode(true);
+    setDiscountCodeError('');
+
+    try {
+      const { data, error } = await supabase.rpc('validate_tour_discount_code', {
+        p_code: discountCodeInput.trim(),
+        p_user_id: user.id,
+        p_tour_id: tour.id,
+      });
+
+      if (error) throw error;
+
+      if (data && data.valid) {
+        setAppliedDiscount({
+          code_id: data.code_id,
+          code: data.code,
+          discount_type: data.discount_type,
+          discount_value: data.discount_value,
+          discount_applies_to: data.discount_applies_to || 'total_price',
+          max_discount_amount: data.max_discount_amount || null,
+        });
+        setDiscountCodeError('');
+        setDiscountCodeInput('');
+      } else {
+        setDiscountCodeError(data?.error || 'Codigo invalido');
+      }
+    } catch (err: any) {
+      setDiscountCodeError(err.message || 'Error al validar el codigo');
+    } finally {
+      setIsValidatingCode(false);
+    }
+  };
+
+  const handleRemoveDiscount = () => {
+    setAppliedDiscount(null);
+    setDiscountCodeError('');
+  };
+
   // Calcular total de viajeros (sin contar mascotas)
   const totalTravelers = travelerCounts.adultos + travelerCounts.ninos + travelerCounts.infantes + travelerCounts.adultos_mayores;
 
@@ -361,20 +414,46 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const precioAdultosMayores = getPrecioPorCategoria('adulto_mayor') * travelerCounts.adultos_mayores;
   const precioMascotas = getPrecioPorCategoria('mascota') * travelerCounts.mascotas;
 
-  // Precio total del tour
-  const totalPrice = precioAdultos + precioNinos + precioInfantes + precioAdultosMayores + precioMascotas;
+  // Precio total del tour (sin descuento)
+  const grossTotalPrice = precioAdultos + precioNinos + precioInfantes + precioAdultosMayores + precioMascotas;
 
   // Si el usuario es de alto riesgo (más de 3 no shows), debe pagar el 100%
   const effectiveDepositPercentage = isHighRisk ? 100 : tour.deposit_percentage;
-  const depositAmount = totalPrice * (effectiveDepositPercentage / 100);
 
-  // Comisiones
-  const agencyCommission = totalPrice * (agencyCommissionPercentage / 100);
+  // Calculate discount amount
+  const calculateDiscountAmount = (baseAmount: number): number => {
+    if (!appliedDiscount) return 0;
+    let discount = 0;
+    if (appliedDiscount.discount_type.includes('percentage')) {
+      discount = baseAmount * (appliedDiscount.discount_value / 100);
+    } else {
+      discount = Math.min(appliedDiscount.discount_value, baseAmount);
+    }
+    if (appliedDiscount.max_discount_amount && discount > appliedDiscount.max_discount_amount) {
+      discount = appliedDiscount.max_discount_amount;
+    }
+    return Math.round(discount * 100) / 100;
+  };
+
+  let totalPrice: number;
+  let depositAmount: number;
+  let agencyCommission: number;
+  let discountAmount = 0;
+
+  if (appliedDiscount && appliedDiscount.discount_applies_to === 'total_price') {
+    discountAmount = calculateDiscountAmount(grossTotalPrice);
+    totalPrice = grossTotalPrice - discountAmount;
+    depositAmount = totalPrice * (effectiveDepositPercentage / 100);
+    agencyCommission = totalPrice * (agencyCommissionPercentage / 100);
+  } else {
+    totalPrice = grossTotalPrice;
+    depositAmount = totalPrice * (effectiveDepositPercentage / 100);
+    agencyCommission = totalPrice * (agencyCommissionPercentage / 100);
+  }
 
   const membershipMonthlyPrice = membershipPrices?.monthlyPrice || 49;
   const membershipAnnualPrice = membershipPrices?.annualPrice || 490;
 
-  // Calculate service charge with exemption limit
   const fullServiceCharge = totalPrice * (serviceChargePercentage / 100);
   const shouldWaiveServiceCharge = hasMembership || addMembershipToBooking;
 
@@ -383,16 +462,13 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   let hasReachedExemptionLimit = false;
 
   if (shouldWaiveServiceCharge && hasMembership) {
-    // If has membership, apply exemption up to remaining limit
     exemptionUsed = Math.min(fullServiceCharge, remainingExemption);
     serviceCharge = fullServiceCharge - exemptionUsed;
     hasReachedExemptionLimit = remainingExemption < fullServiceCharge;
   } else if (addMembershipToBooking) {
-    // If adding membership to booking, waive full service charge
     serviceCharge = 0;
     exemptionUsed = fullServiceCharge;
   } else {
-    // No membership, charge full service charge
     serviceCharge = fullServiceCharge;
   }
 
@@ -402,30 +478,25 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     ? (selectedMembershipPlan === 'monthly' ? membershipMonthlyPrice : membershipAnnualPrice)
     : 0;
 
-  const userPayment = depositAmount + serviceCharge;
+  let userPayment = depositAmount + serviceCharge;
 
-  // Calculate maximum points allowed (50% of total)
+  if (appliedDiscount && appliedDiscount.discount_applies_to === 'payment_amount') {
+    discountAmount = calculateDiscountAmount(userPayment);
+    userPayment = userPayment - discountAmount;
+  }
+
   const maxPointsAllowed = Math.floor(userPayment * 50);
 
-  // Calculate points to apply (limited by balance, max allowed, and user selection)
   const pointsApplied = useToursRedPoints
     ? Math.min(pointsToUse, pointsBalance, maxPointsAllowed)
     : 0;
 
-  // Convert points to pesos: 100 points = 1 peso
   const pointsDiscountAmount = pointsApplied / 100;
 
-  // Calculate amount after points
   const amountAfterPoints = userPayment - pointsDiscountAmount;
 
-  // Calculate ToursRed Cash applied to remaining amount (this is what comes from the cash wallet)
   const toursRedCashApplied = useToursRedCash ? Math.min(walletBalance, amountAfterPoints) : 0;
   const amountAfterToursRedCash = amountAfterPoints - toursRedCashApplied;
-
-  // IMPORTANT: toursRedCashApplied is the TOTAL remaining after points
-  // But we need to store only the PURE ToursRed Cash (not including the points value that was already deducted)
-  // This is already correct because toursRedCashApplied = min(walletBalance, amountAfterPoints)
-  // where amountAfterPoints already has the points discount applied
 
   const totalToPayNow = amountAfterToursRedCash + membershipCost;
 
@@ -481,7 +552,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
       const initialApprovalStatus = tour.booking_approval_type === 'manual' ? 'pending' : 'approved';
       const initialPaymentStatus = tour.booking_approval_type === 'manual' ? 'pending' : 'pending';
 
-      const bookingData = {
+      const bookingData: Record<string, any> = {
         user_id: user.id,
         tour_id: tour.id,
         agency_id: tour.agency_id,
@@ -503,6 +574,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         count_mascotas: travelerCounts.mascotas,
         points_used: pointsApplied,
         toursred_cash_used: toursRedCashApplied,
+        discount_code_id: appliedDiscount?.code_id || null,
+        discount_amount: discountAmount,
       };
 
       console.log('📝 Creando reserva con datos:', bookingData);
@@ -1097,6 +1170,81 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           </div>
         )}
 
+        {totalTravelers > 0 && user && isTraveler && (
+          <div className="mb-4">
+            {appliedDiscount ? (
+              <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Ticket className="h-5 w-5 text-green-600 mr-2" />
+                    <div>
+                      <span className="text-sm font-bold text-green-800">{appliedDiscount.code}</span>
+                      <span className="text-sm text-green-700 ml-2">
+                        {appliedDiscount.discount_type.includes('percentage')
+                          ? `${appliedDiscount.discount_value}% de descuento`
+                          : `$${appliedDiscount.discount_value} de descuento`}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveDiscount}
+                    className="text-green-600 hover:text-green-800 p-1"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                {discountAmount > 0 && (
+                  <p className="text-xs text-green-700 mt-1 ml-7">
+                    Ahorro: -${discountAmount.toLocaleString()} MXN
+                    {appliedDiscount.discount_applies_to === 'payment_amount' ? ' (sobre monto a pagar)' : ' (sobre costo total)'}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center mb-2">
+                  <Ticket className="h-4 w-4 text-gray-500 mr-2" />
+                  <span className="text-sm font-medium text-gray-700">Codigo de descuento</span>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={discountCodeInput}
+                    onChange={(e) => {
+                      setDiscountCodeInput(e.target.value.toUpperCase());
+                      setDiscountCodeError('');
+                    }}
+                    placeholder="Ingresa tu codigo"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm uppercase focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleApplyDiscountCode();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyDiscountCode}
+                    disabled={isValidatingCode || !discountCodeInput.trim()}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-md text-sm font-medium hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center"
+                  >
+                    {isValidatingCode ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      'Aplicar'
+                    )}
+                  </button>
+                </div>
+                {discountCodeError && (
+                  <p className="text-xs text-red-600 mt-1">{discountCodeError}</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {totalTravelers > 0 && (
           <div className="mb-4 bg-gray-50 p-4 rounded-md space-y-2">
             <h4 className="text-sm font-semibold text-gray-900">Desglose de Costos</h4>
@@ -1139,10 +1287,27 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
             <div className="border-t pt-2 mt-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Precio Total del Tour:</span>
-                <span className="font-semibold">${totalPrice.toLocaleString()}</span>
+                <span className={`font-semibold ${appliedDiscount && appliedDiscount.discount_applies_to === 'total_price' ? 'line-through text-gray-400' : ''}`}>
+                  ${grossTotalPrice.toLocaleString()}
+                </span>
               </div>
+              {appliedDiscount && appliedDiscount.discount_applies_to === 'total_price' && discountAmount > 0 && (
+                <>
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span className="flex items-center">
+                      <Ticket className="h-3 w-3 mr-1" />
+                      Descuento ({appliedDiscount.code}):
+                    </span>
+                    <span className="font-medium">-${discountAmount.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Precio con descuento:</span>
+                    <span className="font-semibold">${totalPrice.toLocaleString()}</span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between text-sm mt-1">
-                <span className="text-gray-600">Depósito ({tour.deposit_percentage}%):</span>
+                <span className="text-gray-600">Depósito ({effectiveDepositPercentage}%):</span>
                 <span className="font-medium">${depositAmount.toLocaleString()}</span>
               </div>
 
@@ -1178,6 +1343,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                 <div className="flex justify-between text-sm text-orange-600 mt-1">
                   <span>Cargo por Servicio ({serviceChargePercentage}%):</span>
                   <span className="font-medium">+${serviceCharge.toLocaleString()}</span>
+                </div>
+              )}
+
+              {appliedDiscount && appliedDiscount.discount_applies_to === 'payment_amount' && discountAmount > 0 && (
+                <div className="flex justify-between text-sm text-green-600 mt-1">
+                  <span className="flex items-center">
+                    <Ticket className="h-3 w-3 mr-1" />
+                    Descuento ({appliedDiscount.code}):
+                  </span>
+                  <span className="font-medium">-${discountAmount.toLocaleString()}</span>
                 </div>
               )}
 
@@ -1231,7 +1406,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
             )}
 
             <div className="text-xs text-gray-500 mt-2">
-              <div>Saldo Restante: ${(totalPrice - depositAmount).toLocaleString()}</div>
+              <div>Saldo Restante: ${(grossTotalPrice - depositAmount - (appliedDiscount?.discount_applies_to === 'total_price' ? discountAmount : 0)).toLocaleString()}</div>
             </div>
           </div>
         )}

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { CheckCircle, Calendar, MapPin, Users, DollarSign, ArrowRight, CreditCard, Mail, Wallet, Award } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, Users, DollarSign, ArrowRight, CreditCard, Mail, Wallet, Award, Ticket } from 'lucide-react';
 import { supabase, parseDateFromDB } from '../lib/supabase';
 import { Booking, Tour } from '../types';
 import { format } from 'date-fns';
@@ -352,6 +352,16 @@ const BookingSuccessPage: React.FC = () => {
                           `$${booking.service_charge.toLocaleString()}`
                         )}
                       </span>
+                    </div>
+                  )}
+
+                  {booking.discount_amount != null && booking.discount_amount > 0 && (
+                    <div className="flex justify-between bg-green-50 border border-green-200 rounded px-2 py-1.5 -mx-1">
+                      <span className="text-green-700 font-medium flex items-center">
+                        <Ticket className="h-4 w-4 mr-1" />
+                        Código de Descuento:
+                      </span>
+                      <span className="font-bold text-green-600">-${Number(booking.discount_amount).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                   )}
 

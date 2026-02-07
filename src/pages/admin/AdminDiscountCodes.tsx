@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Ticket, Plus, Edit2, Trash2, Eye, Percent, DollarSign, Calendar, Users, AlertCircle, CheckCircle, XCircle, Search, Map, Crown, Gift, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Ticket, Plus, Edit2, Trash2, Eye, Percent, DollarSign, Calendar, Users, AlertCircle, CheckCircle, XCircle, Search, Map, Crown, Gift, ArrowUpDown, ArrowUp, ArrowDown, Building2, Target } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -10,6 +10,7 @@ interface DiscountCode {
   discount_type: 'tour_percentage' | 'tour_fixed' | 'membership_free_month' | 'gift_card_percentage' | 'gift_card_fixed' | 'service_fee_percentage' | 'service_fee_fixed' | 'service_fee_full';
   discount_value: number;
   applicable_to: 'tours' | 'memberships' | 'gift_cards' | 'service_fees';
+  discount_applies_to: 'total_price' | 'payment_amount';
   is_single_use: boolean;
   is_active: boolean;
   valid_from: string;
@@ -18,7 +19,21 @@ interface DiscountCode {
   times_used: number;
   max_discount_amount?: number | null;
   membership_plan_type?: 'monthly' | 'annual' | 'both';
+  agency_id?: string | null;
+  tour_id?: string | null;
   created_at: string;
+  agencies?: { name: string } | null;
+  tours?: { name: string } | null;
+}
+
+interface AgencyOption {
+  id: string;
+  name: string;
+}
+
+interface TourOption {
+  id: string;
+  name: string;
 }
 
 interface UsageRecord {
@@ -45,6 +60,9 @@ export default function AdminDiscountCodes() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [sortColumn, setSortColumn] = useState<string>('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [agencies, setAgencies] = useState<AgencyOption[]>([]);
+  const [agencyTours, setAgencyTours] = useState<TourOption[]>([]);
+  const [loadingAgencyTours, setLoadingAgencyTours] = useState(false);
 
   const [formData, setFormData] = useState({
     code: '',
@@ -52,6 +70,7 @@ export default function AdminDiscountCodes() {
     applicable_to: 'tours' as 'tours' | 'memberships' | 'gift_cards' | 'service_fees',
     discount_type: 'tour_percentage' as string,
     discount_value: '',
+    discount_applies_to: 'total_price' as 'total_price' | 'payment_amount',
     valid_from: new Date().toISOString().split('T')[0],
     valid_until: '',
     is_single_use: false,
@@ -59,10 +78,13 @@ export default function AdminDiscountCodes() {
     max_discount_amount: '',
     is_active: true,
     membership_plan_type: 'both' as 'monthly' | 'annual' | 'both',
+    agency_id: '' as string,
+    tour_id: '' as string,
   });
 
   useEffect(() => {
     fetchCodes();
+    fetchAgencies();
   }, []);
 
   const fetchCodes = async () => {
@@ -70,7 +92,7 @@ export default function AdminDiscountCodes() {
     try {
       const { data, error } = await supabase
         .from('discount_codes')
-        .select('*')
+        .select('*, agencies:agency_id(name), tours:tour_id(name)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -79,6 +101,40 @@ export default function AdminDiscountCodes() {
       console.error('Error fetching discount codes:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAgencies = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('agencies')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setAgencies(data || []);
+    } catch (err) {
+      console.error('Error fetching agencies:', err);
+    }
+  };
+
+  const fetchAgencyTours = async (agencyId: string) => {
+    if (!agencyId) {
+      setAgencyTours([]);
+      return;
+    }
+    setLoadingAgencyTours(true);
+    try {
+      const { data, error } = await supabase
+        .rpc('get_agency_tours', { p_agency_id: agencyId });
+
+      if (error) throw error;
+      setAgencyTours(data || []);
+    } catch (err) {
+      console.error('Error fetching agency tours:', err);
+    } finally {
+      setLoadingAgencyTours(false);
     }
   };
 
@@ -126,6 +182,7 @@ export default function AdminDiscountCodes() {
         discount_type: formData.discount_type,
         discount_value: discountValue,
         applicable_to: formData.applicable_to,
+        discount_applies_to: formData.applicable_to === 'tours' ? formData.discount_applies_to : 'total_price',
         is_single_use: formData.is_single_use,
         is_active: formData.is_active,
         valid_from: formData.valid_from,
@@ -134,6 +191,8 @@ export default function AdminDiscountCodes() {
         max_discount_amount: formData.max_discount_amount ? parseFloat(formData.max_discount_amount) : null,
         created_by: user?.id,
         membership_plan_type: formData.applicable_to === 'memberships' ? formData.membership_plan_type : 'both',
+        agency_id: formData.applicable_to === 'tours' && formData.agency_id ? formData.agency_id : null,
+        tour_id: formData.applicable_to === 'tours' && formData.tour_id ? formData.tour_id : null,
       };
 
       if (editingCode) {
@@ -162,12 +221,16 @@ export default function AdminDiscountCodes() {
 
   const handleEdit = (code: DiscountCode) => {
     setEditingCode(code);
+    if (code.agency_id) {
+      fetchAgencyTours(code.agency_id);
+    }
     setFormData({
       code: code.code,
       description: code.description,
       applicable_to: code.applicable_to,
       discount_type: code.discount_type,
       discount_value: (code.discount_type === 'membership_free_month' || code.discount_type === 'service_fee_full') ? '' : code.discount_value.toString(),
+      discount_applies_to: code.discount_applies_to || 'total_price',
       valid_from: code.valid_from.split('T')[0],
       valid_until: code.valid_until.split('T')[0],
       is_single_use: code.is_single_use,
@@ -175,6 +238,8 @@ export default function AdminDiscountCodes() {
       max_discount_amount: code.max_discount_amount?.toString() || '',
       is_active: code.is_active,
       membership_plan_type: code.membership_plan_type || 'both',
+      agency_id: code.agency_id || '',
+      tour_id: code.tour_id || '',
     });
     setShowModal(true);
   };
@@ -206,12 +271,14 @@ export default function AdminDiscountCodes() {
 
   const resetForm = () => {
     setEditingCode(null);
+    setAgencyTours([]);
     setFormData({
       code: '',
       description: '',
       applicable_to: 'tours',
       discount_type: 'tour_percentage',
       discount_value: '',
+      discount_applies_to: 'total_price',
       valid_from: new Date().toISOString().split('T')[0],
       valid_until: '',
       is_single_use: false,
@@ -219,6 +286,8 @@ export default function AdminDiscountCodes() {
       max_discount_amount: '',
       is_active: true,
       membership_plan_type: 'both',
+      agency_id: '',
+      tour_id: '',
     });
   };
 
@@ -695,37 +764,51 @@ export default function AdminDiscountCodes() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {code.applicable_to === 'tours' && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            <Map className="h-3 w-3" />
-                            {getApplicableToLabel(code.applicable_to)}
-                          </span>
-                        )}
-                        {code.applicable_to === 'memberships' && (
-                          <div className="flex flex-col gap-1">
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                              <Crown className="h-3 w-3" />
+                        <div className="flex flex-col gap-1">
+                          {code.applicable_to === 'tours' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              <Map className="h-3 w-3" />
                               {getApplicableToLabel(code.applicable_to)}
                             </span>
-                            {code.membership_plan_type && code.membership_plan_type !== 'both' && (
-                              <span className="text-xs text-gray-500 ml-1">
-                                {getMembershipPlanTypeLabel(code.membership_plan_type)}
+                          )}
+                          {code.applicable_to === 'memberships' && (
+                            <>
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                <Crown className="h-3 w-3" />
+                                {getApplicableToLabel(code.applicable_to)}
                               </span>
-                            )}
-                          </div>
-                        )}
-                        {code.applicable_to === 'gift_cards' && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                            <Gift className="h-3 w-3" />
-                            {getApplicableToLabel(code.applicable_to)}
-                          </span>
-                        )}
-                        {code.applicable_to === 'service_fees' && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-800">
-                            <DollarSign className="h-3 w-3" />
-                            {getApplicableToLabel(code.applicable_to)}
-                          </span>
-                        )}
+                              {code.membership_plan_type && code.membership_plan_type !== 'both' && (
+                                <span className="text-xs text-gray-500 ml-1">
+                                  {getMembershipPlanTypeLabel(code.membership_plan_type)}
+                                </span>
+                              )}
+                            </>
+                          )}
+                          {code.applicable_to === 'gift_cards' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                              <Gift className="h-3 w-3" />
+                              {getApplicableToLabel(code.applicable_to)}
+                            </span>
+                          )}
+                          {code.applicable_to === 'service_fees' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-800">
+                              <DollarSign className="h-3 w-3" />
+                              {getApplicableToLabel(code.applicable_to)}
+                            </span>
+                          )}
+                          {code.applicable_to === 'tours' && code.agencies?.name && (
+                            <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                              <Building2 className="h-3 w-3" />
+                              {code.agencies.name}
+                            </span>
+                          )}
+                          {code.applicable_to === 'tours' && code.tours?.name && (
+                            <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                              <Target className="h-3 w-3" />
+                              {code.tours.name}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
@@ -925,7 +1008,8 @@ export default function AdminDiscountCodes() {
                   </div>
                 )}
 
-                {formData.applicable_to === 'service_fees' && formData.discount_type === 'service_fee_percentage' && (
+                {(formData.applicable_to === 'service_fees' && formData.discount_type === 'service_fee_percentage') ||
+                 (formData.applicable_to === 'tours' && formData.discount_type.includes('percentage')) ? (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Monto Máximo de Descuento (Opcional)
@@ -943,6 +1027,78 @@ export default function AdminDiscountCodes() {
                       Opcional: Límite máximo del descuento en pesos. Útil para controlar el costo de promociones con porcentajes altos.
                     </p>
                   </div>
+                ) : null}
+
+                {formData.applicable_to === 'tours' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Descuento aplica sobre *
+                      </label>
+                      <select
+                        value={formData.discount_applies_to}
+                        onChange={(e) => setFormData({ ...formData, discount_applies_to: e.target.value as 'total_price' | 'payment_amount' })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="total_price">Costo total del tour</option>
+                        <option value="payment_amount">Monto a pagar (deposito + cargo por servicio)</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {formData.discount_applies_to === 'total_price'
+                          ? 'El descuento reduce el precio total del tour, afectando deposito, comision y cargo por servicio en cascada.'
+                          : 'El descuento solo reduce lo que el usuario paga (deposito + cargo por servicio), sin modificar el costo total del tour.'}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Agencia (Opcional)
+                        </label>
+                        <select
+                          value={formData.agency_id}
+                          onChange={(e) => {
+                            const newAgencyId = e.target.value;
+                            setFormData({ ...formData, agency_id: newAgencyId, tour_id: '' });
+                            if (newAgencyId) {
+                              fetchAgencyTours(newAgencyId);
+                            } else {
+                              setAgencyTours([]);
+                            }
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="">Todas las agencias (global)</option>
+                          {agencies.map((agency) => (
+                            <option key={agency.id} value={agency.id}>{agency.name}</option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Deja vacio para que aplique a todos los tours de la plataforma
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Tour (Opcional)
+                        </label>
+                        <select
+                          value={formData.tour_id}
+                          onChange={(e) => setFormData({ ...formData, tour_id: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          disabled={!formData.agency_id || loadingAgencyTours}
+                        >
+                          <option value="">Todos los tours de la agencia</option>
+                          {agencyTours.map((tour) => (
+                            <option key={tour.id} value={tour.id}>{tour.name}</option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {!formData.agency_id ? 'Selecciona una agencia primero' : 'Deja vacio para que aplique a todos los tours de la agencia'}
+                        </p>
+                      </div>
+                    </div>
+                  </>
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1107,6 +1263,26 @@ export default function AdminDiscountCodes() {
                       {selectedCode.times_used} {selectedCode.max_uses ? `/ ${selectedCode.max_uses}` : '/ ∞'}
                     </p>
                   </div>
+                  {selectedCode.applicable_to === 'tours' && (
+                    <div>
+                      <p className="text-sm text-gray-600">Aplica sobre</p>
+                      <p className="text-sm text-gray-900">
+                        {selectedCode.discount_applies_to === 'total_price' ? 'Costo total del tour' : 'Monto a pagar'}
+                      </p>
+                    </div>
+                  )}
+                  {selectedCode.agencies?.name && (
+                    <div>
+                      <p className="text-sm text-gray-600">Agencia</p>
+                      <p className="text-sm text-gray-900">{selectedCode.agencies.name}</p>
+                    </div>
+                  )}
+                  {selectedCode.tours?.name && (
+                    <div>
+                      <p className="text-sm text-gray-600">Tour</p>
+                      <p className="text-sm text-gray-900">{selectedCode.tours.name}</p>
+                    </div>
+                  )}
                 </div>
                 {selectedCode.applicable_to === 'service_fees' && (
                   <div className="mt-4 p-3 bg-cyan-50 border border-cyan-200 rounded-lg">

@@ -34,6 +34,7 @@ export default function AgencyDiscountCodes() {
     tour_id: '',
     discount_type: 'agency_tour_percentage' as 'agency_tour_percentage' | 'agency_tour_fixed',
     discount_value: '',
+    discount_applies_to: 'total_price' as 'total_price' | 'payment_amount',
     valid_from: new Date().toISOString().split('T')[0],
     valid_until: '',
     is_single_use: false,
@@ -208,6 +209,7 @@ export default function AgencyDiscountCodes() {
         discount_type: formData.discount_type,
         discount_value: parseFloat(formData.discount_value),
         applicable_to: 'tours' as const,
+        discount_applies_to: formData.discount_applies_to,
         is_single_use: formData.is_single_use,
         is_active: formData.is_active,
         valid_from: formData.valid_from,
@@ -259,6 +261,7 @@ export default function AgencyDiscountCodes() {
       tour_id: code.tour_id || '',
       discount_type: code.discount_type,
       discount_value: code.discount_value.toString(),
+      discount_applies_to: code.discount_applies_to || 'total_price',
       valid_from: code.valid_from.split('T')[0],
       valid_until: code.valid_until.split('T')[0],
       is_single_use: code.is_single_use,
@@ -303,6 +306,7 @@ export default function AgencyDiscountCodes() {
       tour_id: '',
       discount_type: 'agency_tour_percentage',
       discount_value: '',
+      discount_applies_to: 'total_price',
       valid_from: new Date().toISOString().split('T')[0],
       valid_until: '',
       is_single_use: false,
@@ -854,6 +858,25 @@ export default function AgencyDiscountCodes() {
                     {formData.discount_type === 'agency_tour_percentage'
                       ? 'Porcentaje de descuento (1-100)'
                       : 'Monto en pesos'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Descuento aplica sobre *
+                  </label>
+                  <select
+                    value={formData.discount_applies_to}
+                    onChange={(e) => setFormData({ ...formData, discount_applies_to: e.target.value as 'total_price' | 'payment_amount' })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="total_price">Costo total del tour</option>
+                    <option value="payment_amount">Monto a pagar (deposito + cargo por servicio)</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {formData.discount_applies_to === 'total_price'
+                      ? 'El descuento reduce el precio total del tour, afectando deposito, comision y cargo por servicio.'
+                      : 'El descuento solo reduce lo que el usuario paga (deposito + cargo por servicio).'}
                   </p>
                 </div>
 
