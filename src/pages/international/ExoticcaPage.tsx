@@ -1,12 +1,129 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, Info, ExternalLink, MapPin, Clock, Shield, Star, DollarSign, HeadphonesIcon } from 'lucide-react';
+import { ChevronRight, Info, ExternalLink, MapPin, Clock, Shield, Star, DollarSign, HeadphonesIcon, MessageSquare, X, Loader } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { useFormPersistence } from '../../hooks/useFormPersistence';
+import { usePreventUnload } from '../../hooks/usePreventUnload';
 
 const ExoticcaPage: React.FC = () => {
+  const { user } = useAuth();
   const exoticcaUrl = 'https://www.exoticca.com/mx?advisor_token=alan-axel-alvarez-hernandez-019c2fa9-0f7e-717c-9187-65995b917bc6';
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    destination: '',
+    travel_date: '',
+    num_people: 1,
+    message: ''
+  });
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  const formPersistence = useFormPersistence(
+    formData,
+    { key: 'exoticca_inquiry', expirationHours: 24 }
+  );
+
+  usePreventUnload(
+    formData.name.length > 0 ||
+    formData.email.length > 0 ||
+    formData.phone.length > 0 ||
+    formData.message.length > 0
+  );
+
+  useEffect(() => {
+    const savedData = formPersistence.loadFromStorage();
+    if (savedData) {
+      formPersistence.setIsRestoring(true);
+      setFormData(savedData);
+      setTimeout(() => formPersistence.setIsRestoring(false), 100);
+    }
+  }, []);
 
   const handleExploreClick = () => {
     window.open(exoticcaUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'num_people' ? parseInt(value) : value
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+
+    if (!formData.name || !formData.email || !formData.phone || !formData.destination || !formData.num_people) {
+      setError('Por favor completa todos los campos requeridos');
+      setIsLoading(false);
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('Por favor ingresa un email valido');
+      setIsLoading(false);
+      return;
+    }
+
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(formData.phone.replace(/\D/g, ''))) {
+      setError('Por favor ingresa un telefono valido de 10 digitos');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-inquiry-email`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            ...formData,
+            user_id: user?.id || null,
+            source: 'exoticca'
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al enviar la cotizacion');
+      }
+
+      formPersistence.clearStorage();
+      setSuccess(true);
+      setTimeout(() => {
+        setIsModalOpen(false);
+        setSuccess(false);
+        setFormData({
+          name: '',
+          email: '',
+          phone: '',
+          destination: '',
+          travel_date: '',
+          num_people: 1,
+          message: ''
+        });
+      }, 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al enviar la cotizacion');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const features = [
@@ -202,7 +319,182 @@ const ExoticcaPage: React.FC = () => {
             </Link>
           </div>
         </div>
+
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="fixed bottom-6 right-6 bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-full shadow-lg flex items-center space-x-2 transition-transform hover:scale-105 z-40"
+        >
+          <MessageSquare className="h-5 w-5" />
+          <span className="font-semibold">Solicitar Cotizacion</span>
+        </button>
       </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-900">Solicitar Cotizacion</h2>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6">
+              {success && (
+                <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-green-800 font-medium">
+                    Cotizacion enviada exitosamente! Nos pondremos en contacto contigo pronto.
+                  </p>
+                </div>
+              )}
+
+              {error && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-800">{error}</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                    Nombre Completo <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                    Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+                    Telefono <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    placeholder="10 digitos"
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="travel_date" className="block text-sm font-medium text-gray-700 mb-2">
+                    Fecha Aproximada de Viaje
+                  </label>
+                  <input
+                    type="date"
+                    id="travel_date"
+                    name="travel_date"
+                    value={formData.travel_date}
+                    onChange={handleInputChange}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="destination" className="block text-sm font-medium text-gray-700 mb-2">
+                    Nombre del Viaje <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="destination"
+                    name="destination"
+                    value={formData.destination}
+                    onChange={handleInputChange}
+                    placeholder="Ej: Tailandia Esencial"
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="num_people" className="block text-sm font-medium text-gray-700 mb-2">
+                    Numero de Personas <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    id="num_people"
+                    name="num_people"
+                    value={formData.num_people}
+                    onChange={handleInputChange}
+                    min="1"
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
+                  Mensaje o Comentarios Adicionales
+                </label>
+                <textarea
+                  id="message"
+                  name="message"
+                  value={formData.message}
+                  onChange={handleInputChange}
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Cuentanos mas sobre tu viaje ideal..."
+                />
+              </div>
+
+              <div className="mt-6 flex justify-end space-x-4">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  disabled={isLoading}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader className="h-5 w-5 animate-spin" />
+                      <span>Enviando...</span>
+                    </>
+                  ) : (
+                    <span>Enviar Cotizacion</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
