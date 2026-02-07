@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronRight, Info, ExternalLink, MapPin, Clock, Shield, Star, DollarSign, HeadphonesIcon } from 'lucide-react';
 
 const ExoticcaPage: React.FC = () => {
-  const exoticcaUrl = 'https://exoticca.com/mx?advisor_token=alan-axel-alvarez-hernandez-019bc874-6959-72e1-810a-731b15e1b217';
+  const exoticcaUrl = 'https://www.exoticca.com/mx?advisor_token=alan-axel-alvarez-hernandez-019c2fa9-0f7e-717c-9187-65995b917bc6';
 
   const handleExploreClick = () => {
     window.open(exoticcaUrl, '_blank', 'noopener,noreferrer');
