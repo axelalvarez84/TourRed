@@ -43,6 +43,7 @@ import AdminPoints from './pages/admin/AdminPoints';
 import AdminInternationalInquiries from './pages/admin/AdminInternationalInquiries';
 import AdminDiscountCodes from './pages/admin/AdminDiscountCodes';
 import MegaTravelPage from './pages/international/MegaTravelPage';
+import NefertariTravelPage from './pages/international/NefertariTravelPage';
 import ExoticcaPage from './pages/international/ExoticcaPage';
 import ComingSoonPage from './pages/international/ComingSoonPage';
 import AboutPage from './pages/AboutPage';
@@ -88,6 +89,7 @@ const App: React.FC = () => {
           <Route path="/tours" element={<TourCatalogPage />} />
           <Route path="/tours/:id" element={<TourDetailPage />} />
           <Route path="/tours/international/mega-travel" element={<MegaTravelPage />} />
+          <Route path="/tours/international/nefertari-travel" element={<NefertariTravelPage />} />
           <Route path="/tours/international/exoticca" element={<ExoticcaPage />} />
           <Route path="/tours/international/coming-soon" element={<ComingSoonPage />} />
           <Route path="/agencies/:agencyId" element={<AgencyPublicProfile />} />

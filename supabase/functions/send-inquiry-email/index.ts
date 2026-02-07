@@ -46,8 +46,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Format tour code with MT- prefix if provided
-    const formattedTourCode = tour_code ? `MT-${tour_code}` : null;
+    const inquirySource = source || "mega_travel";
+    const formattedTourCode = tour_code
+      ? (inquirySource === 'mega_travel' ? `MT-${tour_code}` : tour_code)
+      : null;
+    const isNefertari = inquirySource === 'nefertari_travel';
+    const destinationLabel = isNefertari ? 'Nombre del Viaje' : 'Destino de Interes';
+    const sourceLabel = isNefertari ? 'Nefertari Travel' : (inquirySource === 'mega_travel' ? 'Mega Travel' : inquirySource);
 
     // Insert inquiry into database
     const { data: inquiry, error: insertError } = await supabase
@@ -62,7 +67,7 @@ Deno.serve(async (req: Request) => {
         num_people,
         tour_code: formattedTourCode,
         message: message || null,
-        source: source || "mega_travel",
+        source: inquirySource,
         status: "pending"
       })
       .select()
@@ -117,11 +122,11 @@ Email: ${email}
 Teléfono: ${phone}
 
 Detalles del Viaje:
-Destino: ${destination}
-${formattedTourCode ? `Código de Viaje: ${formattedTourCode}` : ''}
+${destinationLabel}: ${destination}
+${formattedTourCode ? `Codigo de Viaje: ${formattedTourCode}` : ''}
 Fecha Aproximada: ${travel_date || "No especificada"}
-Número de Personas: ${num_people}
-Fuente: ${source || "mega_travel"}
+Numero de Personas: ${num_people}
+Fuente: ${sourceLabel}
 
 Mensaje/Comentarios:
 ${message || "Sin comentarios adicionales"}
@@ -177,7 +182,7 @@ ID de Cotización: ${inquiry.id}
       <div class=\"section\">
         <h3 style=\"color: #2563eb;\">Detalles del Viaje</h3>
         <div class=\"field\">
-          <span class=\"label\">Destino de Interés:</span>
+          <span class=\"label\">${destinationLabel}:</span>
           <span class=\"value\">${destination}</span>
         </div>
         ${formattedTourCode ? `
@@ -196,7 +201,7 @@ ID de Cotización: ${inquiry.id}
         </div>
         <div class=\"field\">
           <span class=\"label\">Fuente:</span>
-          <span class=\"value\"><span class=\"badge\">${source || "mega_travel"}</span></span>
+          <span class=\"value\"><span class=\"badge\">${sourceLabel}</span></span>
         </div>
       </div>
       
@@ -264,10 +269,10 @@ Hola ${name},
 Hemos recibido tu solicitud de cotización para: ${destination}
 
 Resumen de tu solicitud:
-- Destino: ${destination}
-${formattedTourCode ? `- Código de Viaje: ${formattedTourCode}` : ''}
+- ${destinationLabel}: ${destination}
+${formattedTourCode ? `- Codigo de Viaje: ${formattedTourCode}` : ''}
 - Fecha aproximada: ${travel_date || "Por definir"}
-- Número de personas: ${num_people}
+- Numero de personas: ${num_people}
 
 Nuestro equipo revisará tu solicitud y se pondrá en contacto contigo en un máximo de 24 horas para proporcionarte una cotización personalizada y resolver cualquier duda que tengas.
 
@@ -313,7 +318,7 @@ Equipo ToursRed
       <div class=\"info-box\">
         <h3 style=\"margin-top: 0; color: #2563eb;\">Resumen de tu Solicitud</h3>
         <div class=\"info-item\">
-          <span class=\"label\">Destino:</span> ${destination}
+          <span class=\"label\">${destinationLabel}:</span> ${destination}
         </div>
         ${formattedTourCode ? `
         <div class=\"info-item\">

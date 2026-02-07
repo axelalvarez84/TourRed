@@ -211,6 +211,13 @@ const NavBar: React.FC = () => {
                         Mega Travel
                       </Link>
                       <Link
+                        to="/tours/international/nefertari-travel"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-primary-600"
+                        role="menuitem"
+                      >
+                        Nefertari Travel
+                      </Link>
+                      <Link
                         to="/tours/international/exoticca"
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-primary-600"
                         role="menuitem"
@@ -423,6 +430,13 @@ const NavBar: React.FC = () => {
                     onClick={toggleMenu}
                   >
                     Mega Travel
+                  </Link>
+                  <Link
+                    to="/tours/international/nefertari-travel"
+                    className="block py-2 text-sm text-gray-600 hover:text-gray-900"
+                    onClick={toggleMenu}
+                  >
+                    Nefertari Travel
                   </Link>
                   <Link
                     to="/tours/international/exoticca"

@@ -189,6 +189,33 @@ const AdminInternationalInquiries: React.FC = () => {
     }
   };
 
+  const getSourceLabel = (source: string) => {
+    switch (source) {
+      case 'mega_travel':
+        return 'Mega Travel';
+      case 'nefertari_travel':
+        return 'Nefertari Travel';
+      default:
+        return source;
+    }
+  };
+
+  const getSourceColor = (source: string) => {
+    switch (source) {
+      case 'mega_travel':
+        return 'bg-primary-100 text-primary-800';
+      case 'nefertari_travel':
+        return 'bg-amber-100 text-amber-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getDestinationLabel = (inquiry: Inquiry) => {
+    if (inquiry.source === 'nefertari_travel') return 'Nombre del Viaje';
+    return 'Destino';
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container-custom">
@@ -305,6 +332,7 @@ const AdminInternationalInquiries: React.FC = () => {
                 >
                   <option value="all">Todas las fuentes</option>
                   <option value="mega_travel">Mega Travel</option>
+                  <option value="nefertari_travel">Nefertari Travel</option>
                 </select>
               </div>
             </div>
@@ -367,8 +395,8 @@ const AdminInternationalInquiries: React.FC = () => {
                         {inquiry.num_people}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-primary-100 text-primary-800">
-                          {inquiry.source}
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getSourceColor(inquiry.source)}`}>
+                          {getSourceLabel(inquiry.source)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -467,7 +495,7 @@ const AdminInternationalInquiries: React.FC = () => {
                     <div className="flex items-start space-x-2">
                       <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
                       <div>
-                        <p className="text-sm text-gray-500">Destino</p>
+                        <p className="text-sm text-gray-500">{getDestinationLabel(selectedInquiry)}</p>
                         <p className="font-medium">{selectedInquiry.destination}</p>
                       </div>
                     </div>
@@ -502,7 +530,7 @@ const AdminInternationalInquiries: React.FC = () => {
                       <ExternalLink className="h-5 w-5 text-gray-400 mt-0.5" />
                       <div>
                         <p className="text-sm text-gray-500">Fuente</p>
-                        <p className="font-medium">{selectedInquiry.source}</p>
+                        <p className="font-medium">{getSourceLabel(selectedInquiry.source)}</p>
                       </div>
                     </div>
                   </div>

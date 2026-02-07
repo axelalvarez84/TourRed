@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Compass, Search, Award, CreditCard, Users, Plane, Globe, Clock } from 'lucide-react';
+import { Compass, Search, Award, CreditCard, Users, Plane, Globe, Clock, Palmtree, Ship } from 'lucide-react';
 import SearchBox from '../components/SearchBox';
 import CategoryList from '../components/CategoryList';
 import FeaturedDestinations from '../components/FeaturedDestinations';
@@ -138,44 +138,103 @@ const HomePage: React.FC = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
             <Link
               to="/tours/international/mega-travel"
               className="group bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
             >
-              <div className="relative h-48 bg-gradient-to-r from-primary-600 to-primary-800 flex items-center justify-center">
+              <div className="relative h-44 bg-gradient-to-r from-primary-600 to-primary-800 flex items-center justify-center">
                 <Plane className="h-20 w-20 text-white opacity-20 absolute" />
                 <div className="relative z-10 text-center">
-                  <Plane className="h-12 w-12 text-white mx-auto mb-2" />
-                  <h3 className="text-2xl font-bold text-white">Catálogo Mega Travel</h3>
+                  <Plane className="h-10 w-10 text-white mx-auto mb-2" />
+                  <h3 className="text-xl font-bold text-white">Mega Travel</h3>
                 </div>
               </div>
-              <div className="p-6">
-                <p className="text-gray-600 mb-4">
-                  Más de 100 destinos internacionales en Europa, Asia, América, el Caribe y más
+              <div className="p-5">
+                <p className="text-gray-600 mb-3 text-sm">
+                  Mas de 100 destinos internacionales en Europa, Asia, America, el Caribe y mas
                 </p>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">
-                    Europa
-                  </span>
-                  <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">
-                    Asia
-                  </span>
-                  <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">
-                    América
-                  </span>
-                  <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">
-                    Caribe
-                  </span>
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  <span className="px-2.5 py-0.5 bg-primary-100 text-primary-700 rounded-full text-xs font-medium">Europa</span>
+                  <span className="px-2.5 py-0.5 bg-primary-100 text-primary-700 rounded-full text-xs font-medium">Asia</span>
+                  <span className="px-2.5 py-0.5 bg-primary-100 text-primary-700 rounded-full text-xs font-medium">America</span>
+                  <span className="px-2.5 py-0.5 bg-primary-100 text-primary-700 rounded-full text-xs font-medium">Caribe</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-primary-600 font-semibold group-hover:text-primary-700 flex items-center">
-                    Ver Catálogo
-                    <Compass className="ml-2 h-4 w-4" />
+                  <span className="text-primary-600 font-semibold group-hover:text-primary-700 flex items-center text-sm">
+                    Ver Catalogo
+                    <Compass className="ml-1.5 h-4 w-4" />
                   </span>
-                  <div className="flex items-center text-sm text-gray-500">
-                    <Clock className="h-4 w-4 mr-1" />
-                    Cotización en 24h
+                  <div className="flex items-center text-xs text-gray-500">
+                    <Clock className="h-3.5 w-3.5 mr-1" />
+                    Cotizacion en 24h
+                  </div>
+                </div>
+              </div>
+            </Link>
+
+            <Link
+              to="/tours/international/nefertari-travel"
+              className="group bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+            >
+              <div className="relative h-44 bg-gradient-to-r from-amber-700 to-amber-900 flex items-center justify-center">
+                <Ship className="h-20 w-20 text-white opacity-20 absolute" />
+                <div className="relative z-10 text-center">
+                  <Ship className="h-10 w-10 text-white mx-auto mb-2" />
+                  <h3 className="text-xl font-bold text-white">Nefertari Travel</h3>
+                </div>
+              </div>
+              <div className="p-5">
+                <p className="text-gray-600 mb-3 text-sm">
+                  Experiencias unicas en destinos fascinantes con servicio personalizado y atencion de primera
+                </p>
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  <span className="px-2.5 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">Europa</span>
+                  <span className="px-2.5 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">Medio Oriente</span>
+                  <span className="px-2.5 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">Africa</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-amber-700 font-semibold group-hover:text-amber-800 flex items-center text-sm">
+                    Ver Catalogo
+                    <Compass className="ml-1.5 h-4 w-4" />
+                  </span>
+                  <div className="flex items-center text-xs text-gray-500">
+                    <Clock className="h-3.5 w-3.5 mr-1" />
+                    Cotizacion en 24h
+                  </div>
+                </div>
+              </div>
+            </Link>
+
+            <Link
+              to="/tours/international/exoticca"
+              className="group bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+            >
+              <div className="relative h-44 bg-gradient-to-r from-teal-600 to-teal-800 flex items-center justify-center">
+                <Palmtree className="h-20 w-20 text-white opacity-20 absolute" />
+                <div className="relative z-10 text-center">
+                  <Palmtree className="h-10 w-10 text-white mx-auto mb-2" />
+                  <h3 className="text-xl font-bold text-white">Exoticca</h3>
+                </div>
+              </div>
+              <div className="p-5">
+                <p className="text-gray-600 mb-3 text-sm">
+                  Paquetes todo incluido a mas de 60 paises con vuelos, hoteles, tours y actividades exclusivas
+                </p>
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  <span className="px-2.5 py-0.5 bg-teal-100 text-teal-700 rounded-full text-xs font-medium">Asia</span>
+                  <span className="px-2.5 py-0.5 bg-teal-100 text-teal-700 rounded-full text-xs font-medium">Africa</span>
+                  <span className="px-2.5 py-0.5 bg-teal-100 text-teal-700 rounded-full text-xs font-medium">Sudamerica</span>
+                  <span className="px-2.5 py-0.5 bg-teal-100 text-teal-700 rounded-full text-xs font-medium">Oceania</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-teal-600 font-semibold group-hover:text-teal-700 flex items-center text-sm">
+                    Explorar Tours
+                    <Compass className="ml-1.5 h-4 w-4" />
+                  </span>
+                  <div className="flex items-center text-xs text-gray-500">
+                    <Clock className="h-3.5 w-3.5 mr-1" />
+                    Todo incluido
                   </div>
                 </div>
               </div>
@@ -185,29 +244,29 @@ const HomePage: React.FC = () => {
               to="/tours/international/coming-soon"
               className="group bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
             >
-              <div className="relative h-48 bg-gradient-to-r from-accent-400 to-accent-600 flex items-center justify-center">
+              <div className="relative h-44 bg-gradient-to-r from-gray-400 to-gray-600 flex items-center justify-center">
                 <Globe className="h-20 w-20 text-white opacity-20 absolute" />
                 <div className="relative z-10 text-center">
-                  <Globe className="h-12 w-12 text-white mx-auto mb-2" />
-                  <h3 className="text-2xl font-bold text-white">Más Opciones</h3>
+                  <Globe className="h-10 w-10 text-white mx-auto mb-2" />
+                  <h3 className="text-xl font-bold text-white">Mas Opciones</h3>
                 </div>
               </div>
-              <div className="p-6">
-                <p className="text-gray-600 mb-4">
-                  Estamos agregando más destinos internacionales con agencias verificadas
+              <div className="p-5">
+                <p className="text-gray-600 mb-3 text-sm">
+                  Estamos agregando mas destinos internacionales con agencias verificadas
                 </p>
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-orange-800 font-medium">
-                    Próximamente: Nuevas opciones de viajes internacionales
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-3">
+                  <p className="text-xs text-orange-800 font-medium">
+                    Proximamente: Nuevas opciones de viajes internacionales
                   </p>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-accent-600 font-semibold group-hover:text-accent-700 flex items-center">
-                    Notifícame
-                    <Compass className="ml-2 h-4 w-4" />
+                  <span className="text-gray-600 font-semibold group-hover:text-gray-700 flex items-center text-sm">
+                    Notificame
+                    <Compass className="ml-1.5 h-4 w-4" />
                   </span>
-                  <div className="flex items-center text-sm text-gray-500">
-                    <Clock className="h-4 w-4 mr-1" />
+                  <div className="flex items-center text-xs text-gray-500">
+                    <Clock className="h-3.5 w-3.5 mr-1" />
                     Disponible pronto
                   </div>
                 </div>
