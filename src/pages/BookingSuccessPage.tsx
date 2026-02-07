@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle, Calendar, MapPin, Users, DollarSign, ArrowRight, CreditCard, Mail, Wallet, Award, Ticket } from 'lucide-react';
 import { supabase, parseDateFromDB } from '../lib/supabase';
@@ -14,7 +14,6 @@ const BookingSuccessPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
-  const emailSendAttempted = useRef(false);
   const { user, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
@@ -32,61 +31,6 @@ const BookingSuccessPage: React.FC = () => {
       setIsLoading(false);
     }
   }, [searchParams, authLoading]);
-
-  const sendBookingConfirmationEmails = async (bookingId: string) => {
-    if (emailSendAttempted.current) {
-      console.log('Ya se intentó enviar emails para esta sesión, omitiendo...');
-      return;
-    }
-
-    emailSendAttempted.current = true;
-
-    try {
-      console.log('Iniciando envío de emails de confirmación para booking:', bookingId);
-
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session?.access_token) {
-        console.error('No hay sesión válida para enviar emails');
-        return;
-      }
-
-      console.log('Sesión válida encontrada, llamando a send-booking-confirmation...');
-
-      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-confirmation`;
-      console.log('URL de función:', functionUrl);
-
-      const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ booking_id: bookingId }),
-      });
-
-      console.log('Respuesta de la función:', response.status, response.statusText);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error en respuesta:', errorText);
-        return;
-      }
-
-      const result = await response.json();
-      console.log('Resultado completo:', result);
-
-      if (result.success) {
-        console.log('✅ Emails de confirmación enviados exitosamente:', result.results);
-      } else {
-        console.error('❌ Error enviando emails de confirmación:', result);
-        emailSendAttempted.current = false;
-      }
-    } catch (error) {
-      console.error('❌ Error al llamar a send-booking-confirmation:', error);
-      emailSendAttempted.current = false;
-    }
-  };
 
   const fetchBookingDetails = async (bookingId: string) => {
     try {
@@ -185,7 +129,6 @@ const BookingSuccessPage: React.FC = () => {
           });
         } else {
           console.log('Booking updated successfully!');
-          sendBookingConfirmationEmails(bookingId);
         }
       } else {
         console.log('Booking already paid, emails already sent');

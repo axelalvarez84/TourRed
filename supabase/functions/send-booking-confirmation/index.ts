@@ -90,8 +90,12 @@ Deno.serve(async (req: Request) => {
       paymentMethod = 'ToursRed Cash + Stripe';
     }
 
-    if (booking.confirmation_email_sent) {
-      console.log("Emails de confirmación ya fueron enviados para esta reserva");
+    const { data: lockResult } = await supabase.rpc('claim_booking_email_lock', {
+      p_booking_id: booking_id
+    });
+
+    if (!lockResult) {
+      console.log("Emails de confirmación ya fueron enviados o reclamados por otro proceso");
       return new Response(
         JSON.stringify({
           success: true,
@@ -708,13 +712,13 @@ Deno.serve(async (req: Request) => {
 
     const allSuccess = emailResults.every(r => r.success);
 
-    if (allSuccess) {
+    if (!allSuccess) {
       await supabase
         .from("bookings")
-        .update({ confirmation_email_sent: true })
+        .update({ confirmation_email_sent: false })
         .eq("id", booking_id);
-      
-      console.log("Marked confirmation_email_sent as true for booking:", booking_id);
+
+      console.log("Reset confirmation_email_sent to false due to email failures for booking:", booking_id);
     }
 
     return new Response(
