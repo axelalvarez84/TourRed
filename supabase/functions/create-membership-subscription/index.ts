@@ -36,10 +36,29 @@ Deno.serve(async (req: Request) => {
       throw new Error('Unauthorized');
     }
 
-    const { planType } = await req.json();
+    const { planType, discountCode } = await req.json();
 
     if (!planType || !['monthly', 'annual'].includes(planType)) {
       throw new Error('Invalid plan type');
+    }
+
+    let validDiscountCode: string | null = null;
+    let trialDays = 0;
+
+    if (discountCode && typeof discountCode === 'string') {
+      const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+      const { data: validation } = await supabaseAdmin.rpc('validate_discount_code', {
+        p_code: discountCode.trim(),
+        p_user_id: user.id,
+        p_applicable_to: 'memberships',
+      });
+
+      if (validation?.valid) {
+        if (validation.discount_type === 'membership_free_month' && planType === 'monthly') {
+          trialDays = 30;
+          validDiscountCode = discountCode.trim();
+        }
+      }
     }
 
     const { data: userData, error: userDataError } = await supabase
@@ -92,6 +111,18 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const subscriptionData: any = {
+      metadata: {
+        user_id: user.id,
+        plan_type: planType,
+        ...(validDiscountCode ? { discount_code: validDiscountCode } : {}),
+      },
+    };
+
+    if (trialDays > 0) {
+      subscriptionData.trial_period_days = trialDays;
+    }
+
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
       mode: 'subscription',
@@ -103,13 +134,8 @@ Deno.serve(async (req: Request) => {
         },
       ],
       success_url: `${req.headers.get('origin')}/traveler/membership?success=true`,
-      cancel_url: `${req.headers.get('origin')}/traveler/membership?cancelled=true`,
-      subscription_data: {
-        metadata: {
-          user_id: user.id,
-          plan_type: planType,
-        },
-      },
+      cancel_url: `${req.headers.get('origin')}/traveler/membership/checkout?plan=${planType}&cancelled=true`,
+      subscription_data: subscriptionData,
     });
 
     return new Response(

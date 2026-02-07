@@ -104,37 +104,8 @@ export default function TravelerMembership() {
     }
   };
 
-  const handleSubscribe = async (planType: 'monthly' | 'annual') => {
-    setActionLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-membership-subscription`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-          },
-          body: JSON.stringify({ planType }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al crear la suscripción');
-      }
-
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    } catch (err: any) {
-      setError(err.message || 'Error al procesar la suscripción');
-    } finally {
-      setActionLoading(false);
-    }
+  const handleSubscribe = (planType: 'monthly' | 'annual') => {
+    navigate(`/traveler/membership/checkout?plan=${planType}`);
   };
 
   const handleManageSubscription = async (action: 'cancel' | 'reactivate' | 'upgrade') => {
@@ -471,10 +442,9 @@ export default function TravelerMembership() {
 
               <button
                 onClick={() => handleSubscribe('monthly')}
-                disabled={actionLoading}
-                className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
               >
-                {actionLoading ? 'Procesando...' : 'Suscribirme Mensualmente'}
+                Suscribirme Mensualmente
               </button>
             </div>
 
@@ -521,10 +491,9 @@ export default function TravelerMembership() {
 
               <button
                 onClick={() => handleSubscribe('annual')}
-                disabled={actionLoading}
-                className="w-full bg-white text-yellow-600 px-6 py-3 rounded-lg font-semibold hover:bg-yellow-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-white text-yellow-600 px-6 py-3 rounded-lg font-semibold hover:bg-yellow-50 transition-colors"
               >
-                {actionLoading ? 'Procesando...' : 'Suscribirme Anualmente'}
+                Suscribirme Anualmente
               </button>
             </div>
           </div>

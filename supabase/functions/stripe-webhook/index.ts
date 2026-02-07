@@ -781,6 +781,25 @@ Deno.serve(async (req) => {
         } else {
           console.log(`Successfully updated membership for user ${userId}:`, membershipResult);
 
+          if (isNewSubscription && subscription.metadata?.discount_code && membershipResult?.id) {
+            try {
+              const discountCodeValue = subscription.metadata.discount_code;
+              console.log(`Recording discount code usage: ${discountCodeValue} for membership ${membershipResult.id}`);
+              const { data: applyResult, error: applyError } = await supabase.rpc('apply_discount_code', {
+                p_code: discountCodeValue,
+                p_user_id: userId,
+                p_membership_id: membershipResult.id,
+              });
+              if (applyError) {
+                console.error(`Error applying discount code: ${applyError.message}`);
+              } else {
+                console.log(`Discount code applied successfully:`, applyResult);
+              }
+            } catch (discountErr) {
+              console.error('Error recording discount code usage:', discountErr);
+            }
+          }
+
           if (wasNotActive && isNowActive) {
             try {
               const { data: userData } = await supabase
