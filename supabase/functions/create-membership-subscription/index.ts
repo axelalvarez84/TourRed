@@ -56,14 +56,21 @@ Deno.serve(async (req: Request) => {
       });
 
       if (validation?.valid) {
-        discountType = validation.discount_type;
-        discountValue = validation.discount_value;
+        const planTypeRestriction = validation.membership_plan_type || 'both';
+        const planAllowed = planTypeRestriction === 'both'
+          || (planTypeRestriction === 'monthly' && planType === 'monthly')
+          || (planTypeRestriction === 'annual' && planType === 'annual');
 
-        if (validation.discount_type === 'membership_free_month' && planType === 'monthly') {
-          trialDays = 30;
-          validDiscountCode = discountCode.trim();
-        } else if (validation.discount_type === 'membership_percentage' || validation.discount_type === 'membership_fixed') {
-          validDiscountCode = discountCode.trim();
+        if (planAllowed) {
+          discountType = validation.discount_type;
+          discountValue = validation.discount_value;
+
+          if (validation.discount_type === 'membership_free_month' && planType === 'monthly') {
+            trialDays = 30;
+            validDiscountCode = discountCode.trim();
+          } else if (validation.discount_type === 'membership_percentage' || validation.discount_type === 'membership_fixed') {
+            validDiscountCode = discountCode.trim();
+          }
         }
       }
     }

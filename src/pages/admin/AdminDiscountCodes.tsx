@@ -17,6 +17,7 @@ interface DiscountCode {
   max_uses: number | null;
   times_used: number;
   max_discount_amount?: number | null;
+  membership_plan_type?: 'monthly' | 'annual' | 'both';
   created_at: string;
 }
 
@@ -57,6 +58,7 @@ export default function AdminDiscountCodes() {
     max_uses: '',
     max_discount_amount: '',
     is_active: true,
+    membership_plan_type: 'both' as 'monthly' | 'annual' | 'both',
   });
 
   useEffect(() => {
@@ -118,7 +120,7 @@ export default function AdminDiscountCodes() {
         ? (formData.discount_type === 'service_fee_full' ? 100 : 1)
         : parseFloat(formData.discount_value);
 
-      const codeData = {
+      const codeData: Record<string, any> = {
         code: formData.code.toUpperCase(),
         description: formData.description,
         discount_type: formData.discount_type,
@@ -131,6 +133,7 @@ export default function AdminDiscountCodes() {
         max_uses: formData.max_uses ? parseInt(formData.max_uses) : null,
         max_discount_amount: formData.max_discount_amount ? parseFloat(formData.max_discount_amount) : null,
         created_by: user?.id,
+        membership_plan_type: formData.applicable_to === 'memberships' ? formData.membership_plan_type : 'both',
       };
 
       if (editingCode) {
@@ -171,6 +174,7 @@ export default function AdminDiscountCodes() {
       max_uses: code.max_uses?.toString() || '',
       max_discount_amount: code.max_discount_amount?.toString() || '',
       is_active: code.is_active,
+      membership_plan_type: code.membership_plan_type || 'both',
     });
     setShowModal(true);
   };
@@ -214,6 +218,7 @@ export default function AdminDiscountCodes() {
       max_uses: '',
       max_discount_amount: '',
       is_active: true,
+      membership_plan_type: 'both',
     });
   };
 
@@ -260,6 +265,15 @@ export default function AdminDiscountCodes() {
       service_fee_full: 'Cargo Gratis',
     };
     return labels[type] || type;
+  };
+
+  const getMembershipPlanTypeLabel = (type?: string) => {
+    const labels: Record<string, string> = {
+      monthly: 'Solo Mensual',
+      annual: 'Solo Anual',
+      both: 'Ambos',
+    };
+    return labels[type || 'both'] || 'Ambos';
   };
 
   const getApplicableToLabel = (type: string) => {
@@ -688,10 +702,17 @@ export default function AdminDiscountCodes() {
                           </span>
                         )}
                         {code.applicable_to === 'memberships' && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                            <Crown className="h-3 w-3" />
-                            {getApplicableToLabel(code.applicable_to)}
-                          </span>
+                          <div className="flex flex-col gap-1">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                              <Crown className="h-3 w-3" />
+                              {getApplicableToLabel(code.applicable_to)}
+                            </span>
+                            {code.membership_plan_type && code.membership_plan_type !== 'both' && (
+                              <span className="text-xs text-gray-500 ml-1">
+                                {getMembershipPlanTypeLabel(code.membership_plan_type)}
+                              </span>
+                            )}
+                          </div>
                         )}
                         {code.applicable_to === 'gift_cards' && (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
@@ -795,6 +816,7 @@ export default function AdminDiscountCodes() {
                           applicable_to: newApplicableTo,
                           discount_type: options[0]?.value || '',
                           max_discount_amount: '',
+                          membership_plan_type: 'both',
                         });
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -838,7 +860,8 @@ export default function AdminDiscountCodes() {
                         ...formData,
                         discount_type: e.target.value,
                         discount_value: (e.target.value === 'membership_free_month' || e.target.value === 'service_fee_full') ? '' : formData.discount_value,
-                        max_discount_amount: e.target.value === 'service_fee_full' ? '' : formData.max_discount_amount
+                        max_discount_amount: e.target.value === 'service_fee_full' ? '' : formData.max_discount_amount,
+                        membership_plan_type: e.target.value === 'membership_free_month' ? 'monthly' : formData.membership_plan_type,
                       })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       required
@@ -878,6 +901,29 @@ export default function AdminDiscountCodes() {
                     </div>
                   )}
                 </div>
+
+                {formData.applicable_to === 'memberships' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tipo de Plan *
+                    </label>
+                    <select
+                      value={formData.membership_plan_type}
+                      onChange={(e) => setFormData({ ...formData, membership_plan_type: e.target.value as 'monthly' | 'annual' | 'both' })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      disabled={formData.discount_type === 'membership_free_month'}
+                    >
+                      <option value="both">Ambos (Mensual y Anual)</option>
+                      <option value="monthly">Solo Mensual</option>
+                      <option value="annual">Solo Anual</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {formData.discount_type === 'membership_free_month'
+                        ? 'El descuento de mes gratis solo aplica al plan mensual'
+                        : 'Selecciona a que tipo de plan aplica este codigo'}
+                    </p>
+                  </div>
+                )}
 
                 {formData.applicable_to === 'service_fees' && formData.discount_type === 'service_fee_percentage' && (
                   <div>
@@ -1031,6 +1077,11 @@ export default function AdminDiscountCodes() {
                   <div>
                     <p className="text-sm text-gray-600">Aplicable a</p>
                     <p className="text-sm font-medium text-gray-900">{getApplicableToLabel(selectedCode.applicable_to)}</p>
+                    {selectedCode.applicable_to === 'memberships' && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Plan: {getMembershipPlanTypeLabel(selectedCode.membership_plan_type)}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Valor</p>

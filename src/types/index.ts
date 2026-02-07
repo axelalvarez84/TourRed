@@ -390,6 +390,7 @@ export interface DiscountCode {
   tour_name?: string;
   agencies?: Agency;
   tours?: Tour;
+  membership_plan_type?: 'monthly' | 'annual' | 'both';
 }
 
 export interface AgencyDiscountCode extends DiscountCode {

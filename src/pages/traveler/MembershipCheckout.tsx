@@ -129,9 +129,16 @@ export default function MembershipCheckout() {
         return;
       }
 
-      if (data.discount_type === 'membership_free_month' && !isMonthly) {
-        setDiscountError('Este codigo solo aplica para el plan mensual');
-        return;
+      const planTypeRestriction = data.membership_plan_type || 'both';
+      if (planTypeRestriction !== 'both') {
+        if (planTypeRestriction === 'monthly' && !isMonthly) {
+          setDiscountError('Este codigo solo aplica para el plan mensual');
+          return;
+        }
+        if (planTypeRestriction === 'annual' && isMonthly) {
+          setDiscountError('Este codigo solo aplica para el plan anual');
+          return;
+        }
       }
 
       setAppliedDiscount({
