@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { Users, ArrowLeft, Save, UserPlus, Check, AlertCircle } from 'lucide-react';
+import { Users, ArrowLeft, Save, UserPlus, Check, AlertCircle, AlertTriangle, Lock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Booking, BookingTraveler, Tour, FrequentCompanion } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -730,6 +730,11 @@ const TravelersInfoPage: React.FC = () => {
     );
   }
 
+  const isEditingExistingBooking = booking?.payment_status === 'succeeded' ||
+    booking?.status === 'confirmed' ||
+    booking?.status === 'completed';
+  const nameChangesBlocked = !!(tour as any)?.name_changes_not_allowed && isEditingExistingBooking;
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
@@ -802,6 +807,38 @@ const TravelersInfoPage: React.FC = () => {
             </div>
           )}
 
+          {nameChangesBlocked && (
+            <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-6">
+              <div className="flex items-start">
+                <Lock className="h-5 w-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-bold text-red-800">
+                    Este tour no permite cambios de nombre después del pago
+                  </p>
+                  <p className="text-sm text-red-700 mt-1">
+                    Los nombres de los viajeros no pueden ser modificados porque este tour tiene boletos nominales (aéreos u otros). Si necesitas hacer un cambio, contacta directamente a la agencia.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!nameChangesBlocked && (tour as any)?.name_changes_not_allowed && !isEditingExistingBooking && (
+            <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-6">
+              <div className="flex items-start">
+                <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-bold text-red-800">
+                    Este tour NO permite cambios de nombre una vez realizado el pago
+                  </p>
+                  <p className="text-sm text-red-700 mt-1">
+                    Verifica cuidadosamente que todos los nombres estén escritos correctamente antes de continuar. Una vez pagada la reserva, no será posible modificar los nombres de los viajeros.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-6">
               <p className="text-sm text-red-800">{error}</p>
@@ -851,9 +888,10 @@ const TravelersInfoPage: React.FC = () => {
                       type="text"
                       value={traveler.nombre}
                       onChange={(e) => handleTravelerChange(index, 'nombre', e.target.value)}
-                      className="input"
+                      className={`input ${nameChangesBlocked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
                       placeholder={traveler.categoria_viajero === 'mascota' ? 'Nombre de la mascota' : 'Nombre y apellidos'}
                       required
+                      readOnly={nameChangesBlocked}
                     />
                   </div>
 
@@ -867,8 +905,9 @@ const TravelersInfoPage: React.FC = () => {
                           type="date"
                           value={traveler.fecha_nacimiento}
                           onChange={(e) => handleTravelerChange(index, 'fecha_nacimiento', e.target.value)}
-                          className={`input ${travelerErrors[index] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                          className={`input ${travelerErrors[index] ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''} ${nameChangesBlocked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
                           required
+                          readOnly={nameChangesBlocked}
                         />
                         {travelerErrors[index] && (
                           <div className="mt-2 bg-red-50 border border-red-200 rounded-md p-3">
@@ -900,9 +939,10 @@ const TravelersInfoPage: React.FC = () => {
                           type="email"
                           value={traveler.email}
                           onChange={(e) => handleTravelerChange(index, 'email', e.target.value)}
-                          className="input"
+                          className={`input ${nameChangesBlocked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
                           placeholder="correo@ejemplo.com"
                           required
+                          readOnly={nameChangesBlocked}
                         />
                       </div>
 
@@ -914,8 +954,9 @@ const TravelersInfoPage: React.FC = () => {
                           type="tel"
                           value={traveler.telefono}
                           onChange={(e) => handleTravelerChange(index, 'telefono', e.target.value)}
-                          className="input"
+                          className={`input ${nameChangesBlocked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
                           placeholder="+52 123 456 7890"
+                          readOnly={nameChangesBlocked}
                         />
                       </div>
                     </>
@@ -946,31 +987,41 @@ const TravelersInfoPage: React.FC = () => {
           </div>
 
           <div className="mt-8 flex justify-end">
-            <button
-              onClick={handleSave}
-              disabled={isSaving || travelerErrors.some(e => e !== '')}
-              className={`px-6 py-3 rounded-md font-semibold flex items-center ${
-                isSaving || travelerErrors.some(e => e !== '')
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-primary-600 text-white hover:bg-primary-700'
-              }`}
-            >
-              {isSaving ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Save className="w-5 h-5 mr-2" />
-                  {(booking?.payment_status === 'succeeded' ||
-                    booking?.status === 'confirmed' ||
-                    booking?.status === 'completed')
-                    ? 'Guardar Cambios'
-                    : 'Continuar al Pago'}
-                </>
-              )}
-            </button>
+            {nameChangesBlocked ? (
+              <button
+                disabled
+                className="px-6 py-3 rounded-md font-semibold flex items-center bg-gray-300 text-gray-500 cursor-not-allowed"
+              >
+                <Lock className="w-5 h-5 mr-2" />
+                Cambios no permitidos
+              </button>
+            ) : (
+              <button
+                onClick={handleSave}
+                disabled={isSaving || travelerErrors.some(e => e !== '')}
+                className={`px-6 py-3 rounded-md font-semibold flex items-center ${
+                  isSaving || travelerErrors.some(e => e !== '')
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-primary-600 text-white hover:bg-primary-700'
+                }`}
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5 mr-2" />
+                    {(booking?.payment_status === 'succeeded' ||
+                      booking?.status === 'confirmed' ||
+                      booking?.status === 'completed')
+                      ? 'Guardar Cambios'
+                      : 'Continuar al Pago'}
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>

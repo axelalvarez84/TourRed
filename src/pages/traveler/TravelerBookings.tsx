@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X, Edit, UserCheck, XCircle, CalendarX, Check, Wallet } from 'lucide-react';
+import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X, Edit, UserCheck, XCircle, CalendarX, Check, Wallet, Lock } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getUserBookings, parseDateFromDB, supabase, calculateCancellationPolicy, processCancellation } from '../../lib/supabase';
 import { Booking, PendingReschedule } from '../../types';
@@ -1177,6 +1177,20 @@ const TravelerBookings: React.FC = () => {
                 </button>
               </div>
 
+              {!!(travelersModal.booking as any).tours?.name_changes_not_allowed &&
+                (travelersModal.booking.payment_status === 'succeeded' ||
+                  travelersModal.booking.status === 'confirmed' ||
+                  travelersModal.booking.status === 'completed') && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center">
+                    <Lock className="h-4 w-4 text-red-600 mr-2 flex-shrink-0" />
+                    <p className="text-sm text-red-700">
+                      Este tour no permite cambios de nombre después del pago. Si necesitas hacer un cambio, contacta directamente a la agencia.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {travelersModal.travelers.length === 0 ? (
                 <div className="text-center py-8">
                   <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -1234,18 +1248,35 @@ const TravelerBookings: React.FC = () => {
                 >
                   Cerrar
                 </button>
-                {travelersModal.booking && (
-                  <button
-                    onClick={() => {
-                      handleEditTravelers(travelersModal.booking!.id);
-                      handleCloseTravelersModal();
-                    }}
-                    className="btn btn-primary flex items-center"
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Editar Acompañantes
-                  </button>
-                )}
+                {travelersModal.booking && (() => {
+                  const isPaid = travelersModal.booking.payment_status === 'succeeded' ||
+                    travelersModal.booking.status === 'confirmed' ||
+                    travelersModal.booking.status === 'completed';
+                  const nameChangesBlocked = !!(travelersModal.booking as any).tours?.name_changes_not_allowed && isPaid;
+                  return nameChangesBlocked ? (
+                    <div className="flex flex-col items-end gap-1">
+                      <button
+                        disabled
+                        className="btn bg-gray-300 text-gray-500 cursor-not-allowed flex items-center"
+                      >
+                        <Lock className="h-4 w-4 mr-2" />
+                        Editar Acompañantes
+                      </button>
+                      <span className="text-xs text-red-600">Este tour no permite cambios de nombre</span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        handleEditTravelers(travelersModal.booking!.id);
+                        handleCloseTravelersModal();
+                      }}
+                      className="btn btn-primary flex items-center"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Editar Acompañantes
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           </div>

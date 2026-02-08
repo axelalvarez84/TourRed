@@ -105,6 +105,7 @@ const AgencyTours: React.FC = () => {
     booking_deadline: '',
     booking_approval_type: 'automatic',
     cancellation_not_allowed: false,
+    name_changes_not_allowed: false,
     pet_friendly: false,
     precio_adulto: '',
     precio_nino: '',
@@ -427,6 +428,7 @@ const AgencyTours: React.FC = () => {
       booking_deadline: tour.booking_deadline || defaultDeadline.toISOString().split('T')[0],
       booking_approval_type: tour.booking_approval_type || 'automatic',
       cancellation_not_allowed: tour.cancellation_not_allowed || false,
+      name_changes_not_allowed: tour.name_changes_not_allowed || false,
       pet_friendly: tour.pet_friendly || false,
       precio_adulto: tour.precio_adulto?.toString() || '',
       precio_nino: tour.precio_nino?.toString() || '',
@@ -568,6 +570,7 @@ const AgencyTours: React.FC = () => {
         booking_deadline: bookingDeadline,
         booking_approval_type: duplicatingTour.booking_approval_type,
         cancellation_not_allowed: duplicatingTour.cancellation_not_allowed || false,
+        name_changes_not_allowed: duplicatingTour.name_changes_not_allowed || false,
         pet_friendly: duplicatingTour.pet_friendly || false,
         precio_adulto: duplicatingTour.precio_adulto || null,
         precio_nino: duplicatingTour.precio_nino || null,
@@ -1069,6 +1072,7 @@ const AgencyTours: React.FC = () => {
         booking_deadline: bookingDeadline,
         booking_approval_type: formData.booking_approval_type,
         cancellation_not_allowed: formData.cancellation_not_allowed,
+        name_changes_not_allowed: formData.name_changes_not_allowed,
         pet_friendly: formData.pet_friendly,
         precio_adulto: formData.precio_adulto ? parseFloat(formData.precio_adulto) : null,
         precio_nino: formData.precio_nino ? parseFloat(formData.precio_nino) : null,
@@ -1930,6 +1934,25 @@ const AgencyTours: React.FC = () => {
                       <span className="text-sm font-semibold text-gray-900">Este tour NO permite cancelaciones con reembolso</span>
                       <p className="text-xs text-gray-600 mt-1">
                         Si marcas esta opción, los viajeros no podrán obtener reembolsos al cancelar. Solo podrán cancelar para evitar la penalización de No Show. Esta restricción será claramente visible en la página del tour.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="col-span-2">
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <label className="flex items-start space-x-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.name_changes_not_allowed}
+                      onChange={(e) => setFormData({...formData, name_changes_not_allowed: e.target.checked})}
+                      className="w-5 h-5 mt-0.5 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-semibold text-gray-900">Este tour NO permite cambios de nombre una vez pagada la reserva</span>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Si marcas esta opción, los viajeros no podrán modificar los nombres de los acompañantes después de pagar. Ideal para tours aéreos o con boletos nominales. El viajero verá una advertencia al capturar los nombres.
                       </p>
                     </div>
                   </label>
