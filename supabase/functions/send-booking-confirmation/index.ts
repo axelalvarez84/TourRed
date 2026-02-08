@@ -246,18 +246,48 @@ Deno.serve(async (req: Request) => {
       </div>
 
       <div class="section">
-        <div class="section-title">💰 Desglose de Pagos</div>
+        <div class="section-title">💰 Desglose de Costos</div>
+        ${booking.adults_count > 0 ? `
         <div class="info-row">
-          <span class="info-label">Precio total del tour:</span>
-          <span class="info-value">${formatCurrency(totalPrice)}</span>
+          <span class="info-label">${booking.adults_count} ${booking.adults_count === 1 ? 'Adulto' : 'Adultos'} × ${formatCurrency(booking.adult_price || 0)}:</span>
+          <span class="info-value">${formatCurrency((booking.adult_price || 0) * (booking.adults_count || 0))}</span>
+        </div>
+        ` : ''}
+        ${booking.children_count > 0 ? `
+        <div class="info-row">
+          <span class="info-label">${booking.children_count} ${booking.children_count === 1 ? 'Niño' : 'Niños'} × ${formatCurrency(booking.child_price || 0)}:</span>
+          <span class="info-value">${formatCurrency((booking.child_price || 0) * (booking.children_count || 0))}</span>
+        </div>
+        ` : ''}
+        ${booking.infants_count > 0 ? `
+        <div class="info-row">
+          <span class="info-label">${booking.infants_count} ${booking.infants_count === 1 ? 'Infante' : 'Infantes'} × ${formatCurrency(booking.infant_price || 0)}:</span>
+          <span class="info-value">${formatCurrency((booking.infant_price || 0) * (booking.infants_count || 0))}</span>
+        </div>
+        ` : ''}
+        ${booking.seniors_count > 0 ? `
+        <div class="info-row">
+          <span class="info-label">${booking.seniors_count} ${booking.seniors_count === 1 ? 'Adulto Mayor' : 'Adultos Mayores'} × ${formatCurrency(booking.senior_price || 0)}:</span>
+          <span class="info-value">${formatCurrency((booking.senior_price || 0) * (booking.seniors_count || 0))}</span>
+        </div>
+        ` : ''}
+        ${booking.pets_count > 0 ? `
+        <div class="info-row">
+          <span class="info-label">${booking.pets_count} ${booking.pets_count === 1 ? 'Mascota' : 'Mascotas'} × ${formatCurrency(booking.pet_price || 0)}:</span>
+          <span class="info-value">${formatCurrency((booking.pet_price || 0) * (booking.pets_count || 0))}</span>
+        </div>
+        ` : ''}
+        <div class="info-row" style="border-top: 2px solid #e5e7eb; padding-top: 10px; margin-top: 10px;">
+          <span class="info-label" style="font-weight: 700;">Precio Total del Tour:</span>
+          <span class="info-value" style="font-weight: 700;">${formatCurrency(totalPrice)}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Anticipo (${depositPercentage}%):</span>
+          <span class="info-label">Depósito (${depositPercentage}%):</span>
           <span class="info-value">${formatCurrency(depositAmount)}</span>
         </div>
         ${serviceChargeDiscount > 0 ? `
         <div class="info-row">
-          <span class="info-label">Cargo por uso de plataforma (${serviceChargePercentage}%):</span>
+          <span class="info-label">Cargo por Servicio (${serviceChargePercentage}%):</span>
           <span class="info-value" style="text-decoration: line-through; color: #9ca3af;">${formatCurrency(serviceCharge + serviceChargeDiscount)}</span>
         </div>
         <div class="info-row" style="background-color: #dcfce7; margin: 5px -5px; padding: 8px 5px;">
@@ -272,12 +302,12 @@ Deno.serve(async (req: Request) => {
         ` : ''}
         ` : serviceCharge > 0 ? `
         <div class="info-row">
-          <span class="info-label">Cargo por uso de plataforma (${serviceChargePercentage}%):</span>
+          <span class="info-label">Cargo por Servicio (${serviceChargePercentage}%):</span>
           <span class="info-value">${formatCurrency(serviceCharge)}</span>
         </div>
         ` : `
         <div class="info-row">
-          <span class="info-label">Cargo por uso de plataforma:</span>
+          <span class="info-label">Cargo por Servicio:</span>
           <span class="info-value" style="color: #059669;">$0.00 (ToursRed Plus)</span>
         </div>
         `}
@@ -293,32 +323,32 @@ Deno.serve(async (req: Request) => {
           <span class="info-value" style="color: #d97706;">-${pointsUsed.toLocaleString('es-MX')} puntos (${formatCurrency(pointsValueUsed)})</span>
         </div>
         ` : ''}
-        ${cashAfterPoints > 0 ? `
+        ${toursRedCashUsed > 0 ? `
         <div class="info-row" style="background-color: #fef3c7; margin: 5px -5px; padding: 8px 5px;">
           <span class="info-label" style="font-weight: 600;">💰 ToursRed Cash Aplicado:</span>
-          <span class="info-value" style="color: #d97706;">-${formatCurrency(cashAfterPoints)}</span>
+          <span class="info-value" style="color: #d97706;">-${formatCurrency(toursRedCashUsed)}</span>
         </div>
         ` : ''}
-        <div class="info-row">
-          <span class="info-label">Método de pago:</span>
-          <span class="info-value">${paymentMethod}</span>
-        </div>
-        <div class="total-box">
+        <div class="total-box" style="margin-top: 15px;">
           <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: bold;">
-            <span>Total pagado:</span>
+            <span>Total Pagado:</span>
             <span style="color: #059669;">${formatCurrency(userPayment)}</span>
           </div>
           ${(pointsUsed > 0 || toursRedCashUsed > 0) ? `
           <div style="font-size: 12px; color: #6b7280; text-align: right; margin-top: 5px;">
-            ${pointsUsed > 0 && cashAfterPoints > 0 && stripePayment > 0
-              ? `(${pointsUsed.toLocaleString('es-MX')} puntos + ${formatCurrency(cashAfterPoints)} ToursRed Cash + ${formatCurrency(stripePayment)} Stripe)`
+            ${pointsUsed > 0 && toursRedCashUsed > 0 && stripePayment > 0
+              ? `(${pointsUsed.toLocaleString('es-MX')} puntos + ${formatCurrency(toursRedCashUsed)} ToursRed Cash + ${formatCurrency(stripePayment)} Stripe)`
               : pointsUsed > 0 && stripePayment > 0
                 ? `(${pointsUsed.toLocaleString('es-MX')} puntos + ${formatCurrency(stripePayment)} Stripe)`
-                : pointsUsed > 0 && cashAfterPoints > 0
-                  ? `(${pointsUsed.toLocaleString('es-MX')} puntos + ${formatCurrency(cashAfterPoints)} ToursRed Cash)`
+                : pointsUsed > 0 && toursRedCashUsed > 0
+                  ? `(${pointsUsed.toLocaleString('es-MX')} puntos + ${formatCurrency(toursRedCashUsed)} ToursRed Cash)`
                   : toursRedCashUsed > 0 && stripePayment > 0
                     ? `(${formatCurrency(toursRedCashUsed)} ToursRed Cash + ${formatCurrency(stripePayment)} Stripe)`
-                    : ''
+                    : toursRedCashUsed > 0
+                      ? `(${formatCurrency(toursRedCashUsed)} ToursRed Cash)`
+                      : pointsUsed > 0
+                        ? `(${pointsUsed.toLocaleString('es-MX')} puntos)`
+                        : ''
             }
           </div>
           ` : ''}
@@ -329,8 +359,8 @@ Deno.serve(async (req: Request) => {
           <span class="info-value" style="color: #059669;">+${pointsEarned.toLocaleString('es-MX')} puntos</span>
         </div>
         ` : ''}
-        <div class="info-row">
-          <span class="info-label">Monto restante a pagar a la agencia:</span>
+        <div class="info-row" style="border-top: 2px solid #e5e7eb; padding-top: 10px; margin-top: 10px;">
+          <span class="info-label">Saldo Restante (a pagar a la agencia):</span>
           <span class="info-value" style="color: #dc2626;">${formatCurrency(remainingAmount)}</span>
         </div>
       </div>
@@ -570,37 +600,116 @@ Deno.serve(async (req: Request) => {
       </div>
 
       <div class="section">
-        <div class="section-title">💰 Información Financiera</div>
+        <div class="section-title">💰 Desglose Financiero Completo</div>
+        ${booking.adults_count > 0 ? `
         <div class="info-row">
-          <span class="info-label">Monto cobrado al usuario:</span>
-          <span class="info-value">${formatCurrency(userPayment)}</span>
+          <span class="info-label">${booking.adults_count} ${booking.adults_count === 1 ? 'Adulto' : 'Adultos'} × ${formatCurrency(booking.adult_price || 0)}:</span>
+          <span class="info-value">${formatCurrency((booking.adult_price || 0) * (booking.adults_count || 0))}</span>
+        </div>
+        ` : ''}
+        ${booking.children_count > 0 ? `
+        <div class="info-row">
+          <span class="info-label">${booking.children_count} ${booking.children_count === 1 ? 'Niño' : 'Niños'} × ${formatCurrency(booking.child_price || 0)}:</span>
+          <span class="info-value">${formatCurrency((booking.child_price || 0) * (booking.children_count || 0))}</span>
+        </div>
+        ` : ''}
+        ${booking.infants_count > 0 ? `
+        <div class="info-row">
+          <span class="info-label">${booking.infants_count} ${booking.infants_count === 1 ? 'Infante' : 'Infantes'} × ${formatCurrency(booking.infant_price || 0)}:</span>
+          <span class="info-value">${formatCurrency((booking.infant_price || 0) * (booking.infants_count || 0))}</span>
+        </div>
+        ` : ''}
+        ${booking.seniors_count > 0 ? `
+        <div class="info-row">
+          <span class="info-label">${booking.seniors_count} ${booking.seniors_count === 1 ? 'Adulto Mayor' : 'Adultos Mayores'} × ${formatCurrency(booking.senior_price || 0)}:</span>
+          <span class="info-value">${formatCurrency((booking.senior_price || 0) * (booking.seniors_count || 0))}</span>
+        </div>
+        ` : ''}
+        ${booking.pets_count > 0 ? `
+        <div class="info-row">
+          <span class="info-label">${booking.pets_count} ${booking.pets_count === 1 ? 'Mascota' : 'Mascotas'} × ${formatCurrency(booking.pet_price || 0)}:</span>
+          <span class="info-value">${formatCurrency((booking.pet_price || 0) * (booking.pets_count || 0))}</span>
+        </div>
+        ` : ''}
+        <div class="info-row" style="border-top: 2px solid #e5e7eb; padding-top: 10px; margin-top: 10px;">
+          <span class="info-label" style="font-weight: 700;">Precio Total del Tour:</span>
+          <span class="info-value" style="font-weight: 700;">${formatCurrency(totalPrice)}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">- Anticipo:</span>
+          <span class="info-label">Anticipo (${depositPercentage}%):</span>
           <span class="info-value">${formatCurrency(depositAmount)}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">- Cargo por plataforma (${serviceChargePercentage}%):</span>
-          <span class="info-value">${formatCurrency(serviceCharge)}</span>
         </div>
         ${serviceChargeDiscount > 0 ? `
         <div class="info-row">
-          <span class="info-label">- Desc. Cargo por Servicio (código):</span>
+          <span class="info-label">Cargo por plataforma (${serviceChargePercentage}%):</span>
+          <span class="info-value" style="text-decoration: line-through; color: #9ca3af;">${formatCurrency(serviceCharge + serviceChargeDiscount)}</span>
+        </div>
+        <div class="info-row" style="background-color: #dcfce7; margin: 5px -5px; padding: 8px 5px;">
+          <span class="info-label" style="font-weight: 600;">🏷️ Desc. Cargo por Servicio (código):</span>
           <span class="info-value" style="color: #059669;">-${formatCurrency(serviceChargeDiscount)}</span>
         </div>
-        ` : ''}
-        ${discountAmount > 0 ? `
+        ${serviceCharge > 0 ? `
         <div class="info-row">
-          <span class="info-label">- Descuento aplicado:</span>
+          <span class="info-label">Cargo por plataforma (a cobrar):</span>
+          <span class="info-value">${formatCurrency(serviceCharge)}</span>
+        </div>
+        ` : ''}
+        ` : serviceCharge > 0 ? `
+        <div class="info-row">
+          <span class="info-label">Cargo por plataforma (${serviceChargePercentage}%):</span>
+          <span class="info-value">${formatCurrency(serviceCharge)}</span>
+        </div>
+        ` : `
+        <div class="info-row">
+          <span class="info-label">Cargo por plataforma:</span>
+          <span class="info-value" style="color: #059669;">$0.00 (ToursRed Plus)</span>
+        </div>
+        `}
+        ${discountAmount > 0 ? `
+        <div class="info-row" style="background-color: #dcfce7; margin: 5px -5px; padding: 8px 5px;">
+          <span class="info-label" style="font-weight: 600;">🏷️ Descuento aplicado al viajero:</span>
           <span class="info-value" style="color: #059669;">-${formatCurrency(discountAmount)}</span>
         </div>
         ` : ''}
-        <div class="info-row">
-          <span class="info-label">Método de pago:</span>
-          <span class="info-value">${paymentMethod}</span>
+        ${pointsUsed > 0 ? `
+        <div class="info-row" style="background-color: #fef3c7; margin: 5px -5px; padding: 8px 5px;">
+          <span class="info-label" style="font-weight: 600;">⭐ Puntos ToursRed Usados:</span>
+          <span class="info-value" style="color: #d97706;">-${pointsUsed.toLocaleString('es-MX')} puntos (${formatCurrency(pointsValueUsed)})</span>
         </div>
+        ` : ''}
+        ${toursRedCashUsed > 0 ? `
+        <div class="info-row" style="background-color: #fef3c7; margin: 5px -5px; padding: 8px 5px;">
+          <span class="info-label" style="font-weight: 600;">💰 ToursRed Cash Usado:</span>
+          <span class="info-value" style="color: #d97706;">-${formatCurrency(toursRedCashUsed)}</span>
+        </div>
+        ` : ''}
+        <div class="info-row" style="border-top: 2px solid #e5e7eb; padding-top: 10px; margin-top: 10px;">
+          <span class="info-label" style="font-weight: 700;">Total Cobrado al Viajero:</span>
+          <span class="info-value" style="font-weight: 700;">${formatCurrency(userPayment)}</span>
+        </div>
+        ${(pointsUsed > 0 || toursRedCashUsed > 0) ? `
         <div class="info-row">
-          <span class="info-label">Comisión descontada a la agencia (${agencyCommissionPercentage}%):</span>
+          <span class="info-label" style="font-size: 12px;">Desglose de métodos de pago:</span>
+          <span class="info-value" style="font-size: 12px; color: #6b7280;">
+            ${pointsUsed > 0 && toursRedCashUsed > 0 && stripePayment > 0
+              ? `${pointsUsed.toLocaleString('es-MX')} pts + ${formatCurrency(toursRedCashUsed)} Cash + ${formatCurrency(stripePayment)} Stripe`
+              : pointsUsed > 0 && stripePayment > 0
+                ? `${pointsUsed.toLocaleString('es-MX')} pts + ${formatCurrency(stripePayment)} Stripe`
+                : pointsUsed > 0 && toursRedCashUsed > 0
+                  ? `${pointsUsed.toLocaleString('es-MX')} pts + ${formatCurrency(toursRedCashUsed)} Cash`
+                  : toursRedCashUsed > 0 && stripePayment > 0
+                    ? `${formatCurrency(toursRedCashUsed)} Cash + ${formatCurrency(stripePayment)} Stripe`
+                    : toursRedCashUsed > 0
+                      ? `${formatCurrency(toursRedCashUsed)} Cash`
+                      : pointsUsed > 0
+                        ? `${pointsUsed.toLocaleString('es-MX')} puntos`
+                        : ''
+            }
+          </span>
+        </div>
+        ` : ''}
+        <div class="info-row">
+          <span class="info-label">Comisión de agencia (${agencyCommissionPercentage}%):</span>
           <span class="info-value" style="color: #16a34a;">${formatCurrency(agencyCommission)}</span>
         </div>
         <div class="highlight">
@@ -608,10 +717,13 @@ Deno.serve(async (req: Request) => {
             <span>Ingresos netos de la plataforma:</span>
             <span style="color: #059669;">${formatCurrency(agencyCommission + serviceCharge)}</span>
           </div>
+          <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">
+            (Comisión ${formatCurrency(agencyCommission)} + Cargo ${formatCurrency(serviceCharge)})
+          </div>
         </div>
         <div class="info-row">
           <span class="info-label">Monto a depositar a la agencia:</span>
-          <span class="info-value">${formatCurrency(agencyReceives)}</span>
+          <span class="info-value" style="color: #1e40af; font-weight: 700;">${formatCurrency(agencyReceives)}</span>
         </div>
       </div>
 

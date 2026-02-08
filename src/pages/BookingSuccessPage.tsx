@@ -273,39 +273,86 @@ const BookingSuccessPage: React.FC = () => {
               </div>
 
               <div>
-                <h3 className="text-lg font-semibold mb-4">Resumen de Pago</h3>
+                <h3 className="text-lg font-semibold mb-4">Desglose de Costos</h3>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Precio Total del Tour:</span>
-                    <span className="font-medium">${booking.total_price?.toLocaleString()}</span>
+                  {/* Desglose por categoría de viajeros */}
+                  {booking.adults_count > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">{booking.adults_count} {booking.adults_count === 1 ? 'Adulto' : 'Adultos'} × ${booking.adult_price?.toLocaleString()}:</span>
+                      <span className="font-medium">${((booking.adult_price || 0) * (booking.adults_count || 0)).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {booking.children_count > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">{booking.children_count} {booking.children_count === 1 ? 'Niño' : 'Niños'} × ${booking.child_price?.toLocaleString()}:</span>
+                      <span className="font-medium">${((booking.child_price || 0) * (booking.children_count || 0)).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {booking.infants_count > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">{booking.infants_count} {booking.infants_count === 1 ? 'Infante' : 'Infantes'} × ${booking.infant_price?.toLocaleString()}:</span>
+                      <span className="font-medium">${((booking.infant_price || 0) * (booking.infants_count || 0)).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {booking.seniors_count > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">{booking.seniors_count} {booking.seniors_count === 1 ? 'Adulto Mayor' : 'Adultos Mayores'} × ${booking.senior_price?.toLocaleString()}:</span>
+                      <span className="font-medium">${((booking.senior_price || 0) * (booking.seniors_count || 0)).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {booking.pets_count > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">{booking.pets_count} {booking.pets_count === 1 ? 'Mascota' : 'Mascotas'} × ${booking.pet_price?.toLocaleString()}:</span>
+                      <span className="font-medium">${((booking.pet_price || 0) * (booking.pets_count || 0)).toLocaleString()}</span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between border-t pt-2 mt-2">
+                    <span className="text-gray-700 font-medium">Precio Total del Tour:</span>
+                    <span className="font-bold">${booking.total_price?.toLocaleString()}</span>
                   </div>
 
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Depósito Pagado:</span>
+                    <span className="text-gray-600">Depósito ({tour.deposit_percentage}%):</span>
                     <span className="font-medium">${booking.deposit_amount?.toLocaleString()}</span>
                   </div>
 
                   {booking.service_charge !== undefined && booking.service_charge !== null && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Cargo por Servicio:</span>
-                      <span className="font-medium">
-                        {booking.service_charge === 0 ? (
-                          <span className="text-green-600">$0 (ToursRed Plus)</span>
-                        ) : (
-                          `$${booking.service_charge.toLocaleString()}`
-                        )}
-                      </span>
-                    </div>
-                  )}
-
-                  {Number(booking.service_charge_discount) > 0 && (
-                    <div className="flex justify-between bg-green-50 border border-green-200 rounded px-2 py-1.5 -mx-1">
-                      <span className="text-green-700 font-medium flex items-center">
-                        <Ticket className="h-4 w-4 mr-1" />
-                        Desc. Cargo por Servicio:
-                      </span>
-                      <span className="font-bold text-green-600">-${Number(booking.service_charge_discount).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
+                    <>
+                      {Number(booking.service_charge_discount) > 0 ? (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Cargo por Servicio (5%):</span>
+                            <span className="font-medium text-gray-400 line-through">
+                              ${((booking.service_charge || 0) + Number(booking.service_charge_discount || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div className="flex justify-between bg-green-50 border border-green-200 rounded px-2 py-1.5 -mx-1">
+                            <span className="text-green-700 font-medium flex items-center">
+                              <Ticket className="h-4 w-4 mr-1" />
+                              Desc. Cargo por Servicio:
+                            </span>
+                            <span className="font-bold text-green-600">-${Number(booking.service_charge_discount).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                          {booking.service_charge > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Cargo por Servicio (a pagar):</span>
+                              <span className="font-medium">${booking.service_charge.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
+                        </>
+                      ) : booking.service_charge > 0 ? (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Cargo por Servicio (5%):</span>
+                          <span className="font-medium">${booking.service_charge.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                      ) : (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Cargo por Servicio:</span>
+                          <span className="font-medium text-green-600">$0.00 (ToursRed Plus)</span>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {booking.discount_amount != null && booking.discount_amount > 0 && (
@@ -341,7 +388,7 @@ const BookingSuccessPage: React.FC = () => {
                   <div className="border-t border-gray-200 pt-2 mt-2">
                     <div className="flex justify-between text-lg font-bold">
                       <span className="text-green-600">Total Pagado:</span>
-                      <span className="text-green-600">${booking.user_payment?.toLocaleString()}</span>
+                      <span className="text-green-600">${booking.user_payment?.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     {((Number(booking.points_used) > 0) || (Number(booking.toursred_cash_used) > 0)) && (
                       <div className="text-xs text-gray-500 mt-1 text-right">
