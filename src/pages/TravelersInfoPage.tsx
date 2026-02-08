@@ -337,39 +337,53 @@ const TravelersInfoPage: React.FC = () => {
 
       if (isEditingExisting) {
         navigate('/traveler/bookings');
-      } else if (tour?.booking_approval_type === 'manual') {
-        // Enviar notificación por email a la agencia
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            console.log('📧 Enviando notificación de reserva a la agencia...');
-            const response = await fetch(
-              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-request-notification`,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${session.access_token}`,
-                },
-                body: JSON.stringify({ booking_id: bookingId }),
-              }
-            );
-
-            const result = await response.json();
-            console.log('📧 Respuesta del servidor:', result);
-
-            if (!response.ok) {
-              console.error('❌ Error al enviar notificación:', result);
-            } else {
-              console.log('✅ Notificación enviada exitosamente');
-            }
-          }
-        } catch (emailError) {
-          console.error('❌ Error enviando notificación a la agencia:', emailError);
-        }
-        navigate(`/booking-pending/${bookingId}`);
       } else {
-        proceedToPayment();
+        if (booking?.status === 'draft') {
+          const { data: activationResult, error: activationError } = await supabase.rpc(
+            'activate_draft_booking',
+            { p_booking_id: bookingId }
+          );
+
+          if (activationError) {
+            throw new Error(`Error al activar la reserva: ${activationError.message}`);
+          }
+
+          if (activationResult && !activationResult.success) {
+            const availSpots = activationResult.available_spots || 0;
+            throw new Error(
+              `No hay suficientes lugares disponibles. Solo quedan ${availSpots} lugar${availSpots !== 1 ? 'es' : ''}.`
+            );
+          }
+        }
+
+        if (tour?.booking_approval_type === 'manual') {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+              const response = await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-request-notification`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                  },
+                  body: JSON.stringify({ booking_id: bookingId }),
+                }
+              );
+
+              if (!response.ok) {
+                const result = await response.json();
+                console.error('Error al enviar notificacion:', result);
+              }
+            }
+          } catch (emailError) {
+            console.error('Error enviando notificacion a la agencia:', emailError);
+          }
+          navigate(`/booking-pending/${bookingId}`);
+        } else {
+          proceedToPayment();
+        }
       }
 
     } catch (err: any) {

@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
 
     const { data: existingBookings, error: existingError } = await supabase
       .from("bookings")
-      .select("travelers_count, status")
+      .select("travelers_count, status, approval_status")
       .eq("tour_id", booking.tour_id)
       .in("status", ["confirmed", "pending"])
       .neq("id", bookingId);
@@ -132,7 +132,11 @@ Deno.serve(async (req) => {
       console.error("Error fetching existing bookings:", existingError);
     }
 
-    const totalBooked = existingBookings?.reduce((sum, b) => sum + b.travelers_count, 0) || 0;
+    const totalBooked = existingBookings?.reduce((sum, b) => {
+      if (b.status === 'confirmed') return sum + b.travelers_count;
+      if (b.status === 'pending' && b.approval_status === 'approved') return sum + b.travelers_count;
+      return sum;
+    }, 0) || 0;
 
     const maxCapacity = booking.tours?.available_spots !== null && booking.tours?.available_spots !== undefined
       ? booking.tours.available_spots

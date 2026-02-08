@@ -568,9 +568,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
       setIsSubmitting(true);
       setError('');
 
-      const initialStatus = tour.booking_approval_type === 'manual' ? 'pending' : 'pending';
+      const initialStatus = 'draft';
       const initialApprovalStatus = tour.booking_approval_type === 'manual' ? 'pending' : 'approved';
-      const initialPaymentStatus = tour.booking_approval_type === 'manual' ? 'pending' : 'pending';
+      const initialPaymentStatus = 'pending';
 
       const bookingData: Record<string, any> = {
         user_id: user.id,

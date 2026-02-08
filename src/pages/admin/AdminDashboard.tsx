@@ -48,7 +48,7 @@ const AdminDashboard: React.FC = () => {
         supabase.from('users').select('id', { count: 'exact', head: true }),
         supabase.from('agencies').select('id', { count: 'exact', head: true }),
         supabase.from('tours').select('id', { count: 'exact', head: true }),
-        supabase.from('bookings').select('id', { count: 'exact', head: true }),
+        supabase.from('bookings').select('id', { count: 'exact', head: true }).neq('status', 'draft'),
         supabase.from('destinations').select('id', { count: 'exact', head: true })
       ]);
 
@@ -69,6 +69,7 @@ const AdminDashboard: React.FC = () => {
           tours(name),
           agencies(name)
         `)
+        .neq('status', 'draft')
         .order('created_at', { ascending: false })
         .limit(5);
 

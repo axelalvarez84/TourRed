@@ -727,6 +727,7 @@ export const getUserBookings = async (userId: string) => {
         agencies:agency_id(id, name, contact_email)
       `)
       .eq('user_id', userId)
+      .neq('status', 'draft')
       .order('created_at', { ascending: false });
 
     if (error || !bookings) {
@@ -781,6 +782,7 @@ export const getAgencyBookings = async (agencyId: string) => {
         users:user_id(id, first_name, last_name, email, profile_picture_url, phone_number)
       `)
       .eq('agency_id', agencyId)
+      .neq('status', 'draft')
       .order('created_at', { ascending: false });
 
     if (error || !bookings) {
