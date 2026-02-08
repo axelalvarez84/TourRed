@@ -257,7 +257,7 @@ Deno.serve(async (req) => {
             try {
               const { data: booking } = await supabase
                 .from('bookings')
-                .select('user_id, total_price, service_charge, used_membership_benefit')
+                .select('user_id, total_price, service_charge, service_charge_discount, used_membership_benefit')
                 .eq('id', bookingId)
                 .single();
 
@@ -278,7 +278,8 @@ Deno.serve(async (req) => {
                   const serviceChargeRate = settings?.service_charge_percentage || 5;
                   const fullServiceCharge = (booking.total_price * serviceChargeRate) / 100;
                   const actualServiceCharge = parseFloat(booking.service_charge || 0);
-                  const exemptionUsed = fullServiceCharge - actualServiceCharge;
+                  const codeDiscount = parseFloat(booking.service_charge_discount || 0);
+                  const exemptionUsed = fullServiceCharge - actualServiceCharge - codeDiscount;
 
                   if (exemptionUsed > 0) {
                     const { error: membershipError } = await supabase
@@ -631,7 +632,7 @@ Deno.serve(async (req) => {
             try {
               const { data: booking } = await supabase
                 .from('bookings')
-                .select('user_id, total_price, service_charge, used_membership_benefit')
+                .select('user_id, total_price, service_charge, service_charge_discount, used_membership_benefit')
                 .eq('id', bookingId)
                 .single();
 
@@ -652,7 +653,8 @@ Deno.serve(async (req) => {
                   const serviceChargeRate = settings?.service_charge_percentage || 5;
                   const fullServiceCharge = (booking.total_price * serviceChargeRate) / 100;
                   const actualServiceCharge = parseFloat(booking.service_charge || 0);
-                  const exemptionUsed = fullServiceCharge - actualServiceCharge;
+                  const codeDiscount = parseFloat(booking.service_charge_discount || 0);
+                  const exemptionUsed = fullServiceCharge - actualServiceCharge - codeDiscount;
 
                   if (exemptionUsed > 0) {
                     const { error: membershipError } = await supabase

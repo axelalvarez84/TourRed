@@ -166,6 +166,7 @@ export interface Booking {
   original_booking_date?: string;
   discount_code_id?: string;
   discount_amount?: number;
+  service_charge_discount?: number;
   discount_codes?: DiscountCode;
 }
 

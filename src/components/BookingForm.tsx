@@ -56,6 +56,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     discount_value: number;
     discount_applies_to: 'total_price' | 'payment_amount';
     max_discount_amount: number | null;
+    applicable_to: 'tours' | 'service_fees';
   } | null>(null);
 
   const [travelerCounts, setTravelerCounts] = useState<TravelerCounts>({
@@ -368,6 +369,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           discount_value: data.discount_value,
           discount_applies_to: data.discount_applies_to || 'total_price',
           max_discount_amount: data.max_discount_amount || null,
+          applicable_to: data.applicable_to || 'tours',
         });
         setDiscountCodeError('');
         setDiscountCodeInput('');
@@ -439,8 +441,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   let depositAmount: number;
   let agencyCommission: number;
   let discountAmount = 0;
+  const isServiceFeeDiscount = appliedDiscount?.applicable_to === 'service_fees';
 
-  if (appliedDiscount && appliedDiscount.discount_applies_to === 'total_price') {
+  if (appliedDiscount && !isServiceFeeDiscount && appliedDiscount.discount_applies_to === 'total_price') {
     discountAmount = calculateDiscountAmount(grossTotalPrice);
     totalPrice = grossTotalPrice - discountAmount;
     depositAmount = totalPrice * (effectiveDepositPercentage / 100);
@@ -457,19 +460,36 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const fullServiceCharge = totalPrice * (serviceChargePercentage / 100);
   const shouldWaiveServiceCharge = hasMembership || addMembershipToBooking;
 
+  let serviceChargeDiscountAmount = 0;
+  if (isServiceFeeDiscount && appliedDiscount) {
+    if (appliedDiscount.discount_type === 'service_fee_full') {
+      serviceChargeDiscountAmount = fullServiceCharge;
+    } else if (appliedDiscount.discount_type === 'service_fee_percentage') {
+      serviceChargeDiscountAmount = fullServiceCharge * (appliedDiscount.discount_value / 100);
+    } else if (appliedDiscount.discount_type === 'service_fee_fixed') {
+      serviceChargeDiscountAmount = Math.min(appliedDiscount.discount_value, fullServiceCharge);
+    }
+    if (appliedDiscount.max_discount_amount && serviceChargeDiscountAmount > appliedDiscount.max_discount_amount) {
+      serviceChargeDiscountAmount = appliedDiscount.max_discount_amount;
+    }
+    serviceChargeDiscountAmount = Math.round(serviceChargeDiscountAmount * 100) / 100;
+  }
+
+  const serviceChargeAfterCodeDiscount = fullServiceCharge - serviceChargeDiscountAmount;
+
   let serviceCharge = 0;
   let exemptionUsed = 0;
   let hasReachedExemptionLimit = false;
 
   if (shouldWaiveServiceCharge && hasMembership) {
-    exemptionUsed = Math.min(fullServiceCharge, remainingExemption);
-    serviceCharge = fullServiceCharge - exemptionUsed;
-    hasReachedExemptionLimit = remainingExemption < fullServiceCharge;
+    exemptionUsed = Math.min(serviceChargeAfterCodeDiscount, remainingExemption);
+    serviceCharge = serviceChargeAfterCodeDiscount - exemptionUsed;
+    hasReachedExemptionLimit = remainingExemption < serviceChargeAfterCodeDiscount;
   } else if (addMembershipToBooking) {
     serviceCharge = 0;
-    exemptionUsed = fullServiceCharge;
+    exemptionUsed = serviceChargeAfterCodeDiscount;
   } else {
-    serviceCharge = fullServiceCharge;
+    serviceCharge = serviceChargeAfterCodeDiscount;
   }
 
   const platformRevenue = agencyCommission + serviceCharge;
@@ -480,7 +500,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
   let userPayment = depositAmount + serviceCharge;
 
-  if (appliedDiscount && appliedDiscount.discount_applies_to === 'payment_amount') {
+  if (appliedDiscount && !isServiceFeeDiscount && appliedDiscount.discount_applies_to === 'payment_amount') {
     discountAmount = calculateDiscountAmount(userPayment);
     userPayment = userPayment - discountAmount;
   }
@@ -576,6 +596,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         toursred_cash_used: toursRedCashApplied,
         discount_code_id: appliedDiscount?.code_id || null,
         discount_amount: discountAmount,
+        service_charge_discount: serviceChargeDiscountAmount,
       };
 
       console.log('📝 Creando reserva con datos:', bookingData);
@@ -1180,9 +1201,15 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <div>
                       <span className="text-sm font-bold text-green-800">{appliedDiscount.code}</span>
                       <span className="text-sm text-green-700 ml-2">
-                        {appliedDiscount.discount_type.includes('percentage')
-                          ? `${appliedDiscount.discount_value}% de descuento`
-                          : `$${appliedDiscount.discount_value} de descuento`}
+                        {isServiceFeeDiscount
+                          ? appliedDiscount.discount_type === 'service_fee_full'
+                            ? 'Cargo por Servicio Gratis'
+                            : appliedDiscount.discount_type === 'service_fee_percentage'
+                              ? `${appliedDiscount.discount_value}% desc. en Cargo por Servicio`
+                              : `$${appliedDiscount.discount_value} desc. en Cargo por Servicio`
+                          : appliedDiscount.discount_type.includes('percentage')
+                            ? `${appliedDiscount.discount_value}% de descuento`
+                            : `$${appliedDiscount.discount_value} de descuento`}
                       </span>
                     </div>
                   </div>
@@ -1194,7 +1221,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                {discountAmount > 0 && (
+                {isServiceFeeDiscount && serviceChargeDiscountAmount > 0 && (
+                  <p className="text-xs text-green-700 mt-1 ml-7">
+                    Ahorro en Cargo por Servicio: -${serviceChargeDiscountAmount.toLocaleString()} MXN
+                  </p>
+                )}
+                {!isServiceFeeDiscount && discountAmount > 0 && (
                   <p className="text-xs text-green-700 mt-1 ml-7">
                     Ahorro: -${discountAmount.toLocaleString()} MXN
                     {appliedDiscount.discount_applies_to === 'payment_amount' ? ' (sobre monto a pagar)' : ' (sobre costo total)'}
@@ -1311,40 +1343,110 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                 <span className="font-medium">${depositAmount.toLocaleString()}</span>
               </div>
 
-              {shouldWaiveServiceCharge && !hasReachedExemptionLimit ? (
-                <div className="flex justify-between text-sm text-green-600 mt-1">
-                  <span className="flex items-center">
-                    <Crown className="h-3 w-3 mr-1" />
-                    Cargo por Servicio ({serviceChargePercentage}%):
-                  </span>
-                  <span className="font-medium line-through text-gray-400">${fullServiceCharge.toLocaleString()}</span>
-                </div>
-              ) : shouldWaiveServiceCharge && hasReachedExemptionLimit ? (
-                <>
-                  <div className="flex justify-between text-sm text-gray-600 mt-1">
-                    <span>Cargo por Servicio ({serviceChargePercentage}%):</span>
-                    <span className="font-medium">${fullServiceCharge.toFixed(2)}</span>
-                  </div>
-                  {exemptionUsed > 0 && (
-                    <div className="flex justify-between text-sm text-green-600">
+              {(() => {
+                const showCodeDiscount = isServiceFeeDiscount && serviceChargeDiscountAmount > 0;
+                const chargeFullyWaived = shouldWaiveServiceCharge && !hasReachedExemptionLimit && !showCodeDiscount;
+                const chargeFullyFreeByCode = showCodeDiscount && serviceChargeAfterCodeDiscount === 0;
+
+                if (chargeFullyFreeByCode) {
+                  return (
+                    <>
+                      <div className="flex justify-between text-sm text-gray-600 mt-1">
+                        <span>Cargo por Servicio ({serviceChargePercentage}%):</span>
+                        <span className="font-medium line-through text-gray-400">${fullServiceCharge.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span className="flex items-center">
+                          <Ticket className="h-3 w-3 mr-1" />
+                          Descuento ({appliedDiscount!.code}):
+                        </span>
+                        <span className="font-medium">-${serviceChargeDiscountAmount.toFixed(2)}</span>
+                      </div>
+                    </>
+                  );
+                }
+
+                if (showCodeDiscount) {
+                  return (
+                    <>
+                      <div className="flex justify-between text-sm text-gray-600 mt-1">
+                        <span>Cargo por Servicio ({serviceChargePercentage}%):</span>
+                        <span className="font-medium">${fullServiceCharge.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span className="flex items-center">
+                          <Ticket className="h-3 w-3 mr-1" />
+                          Descuento ({appliedDiscount!.code}):
+                        </span>
+                        <span className="font-medium">-${serviceChargeDiscountAmount.toFixed(2)}</span>
+                      </div>
+                      {shouldWaiveServiceCharge && exemptionUsed > 0 && (
+                        <div className="flex justify-between text-sm text-green-600">
+                          <span className="flex items-center">
+                            <Crown className="h-3 w-3 mr-1" />
+                            Descuento ToursRed+:
+                          </span>
+                          <span className="font-medium">-${exemptionUsed.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {serviceCharge > 0 ? (
+                        <div className="flex justify-between text-sm text-orange-600">
+                          <span>Cargo por Servicio (a pagar):</span>
+                          <span className="font-medium">+${serviceCharge.toFixed(2)}</span>
+                        </div>
+                      ) : (
+                        <div className="flex justify-between text-sm text-green-600">
+                          <span>Cargo por Servicio (a pagar):</span>
+                          <span className="font-medium">$0</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                }
+
+                if (chargeFullyWaived) {
+                  return (
+                    <div className="flex justify-between text-sm text-green-600 mt-1">
                       <span className="flex items-center">
                         <Crown className="h-3 w-3 mr-1" />
-                        Descuento ToursRed+:
+                        Cargo por Servicio ({serviceChargePercentage}%):
                       </span>
-                      <span className="font-medium">-${exemptionUsed.toFixed(2)}</span>
+                      <span className="font-medium line-through text-gray-400">${fullServiceCharge.toLocaleString()}</span>
                     </div>
-                  )}
-                  <div className="flex justify-between text-sm text-orange-600">
-                    <span>Cargo por Servicio (a pagar):</span>
-                    <span className="font-medium">+${serviceCharge.toFixed(2)}</span>
+                  );
+                }
+
+                if (shouldWaiveServiceCharge && hasReachedExemptionLimit) {
+                  return (
+                    <>
+                      <div className="flex justify-between text-sm text-gray-600 mt-1">
+                        <span>Cargo por Servicio ({serviceChargePercentage}%):</span>
+                        <span className="font-medium">${fullServiceCharge.toFixed(2)}</span>
+                      </div>
+                      {exemptionUsed > 0 && (
+                        <div className="flex justify-between text-sm text-green-600">
+                          <span className="flex items-center">
+                            <Crown className="h-3 w-3 mr-1" />
+                            Descuento ToursRed+:
+                          </span>
+                          <span className="font-medium">-${exemptionUsed.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-sm text-orange-600">
+                        <span>Cargo por Servicio (a pagar):</span>
+                        <span className="font-medium">+${serviceCharge.toFixed(2)}</span>
+                      </div>
+                    </>
+                  );
+                }
+
+                return (
+                  <div className="flex justify-between text-sm text-orange-600 mt-1">
+                    <span>Cargo por Servicio ({serviceChargePercentage}%):</span>
+                    <span className="font-medium">+${serviceCharge.toLocaleString()}</span>
                   </div>
-                </>
-              ) : (
-                <div className="flex justify-between text-sm text-orange-600 mt-1">
-                  <span>Cargo por Servicio ({serviceChargePercentage}%):</span>
-                  <span className="font-medium">+${serviceCharge.toLocaleString()}</span>
-                </div>
-              )}
+                );
+              })()}
 
               {appliedDiscount && appliedDiscount.discount_applies_to === 'payment_amount' && discountAmount > 0 && (
                 <div className="flex justify-between text-sm text-green-600 mt-1">

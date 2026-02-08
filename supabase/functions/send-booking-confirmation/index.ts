@@ -151,6 +151,7 @@ Deno.serve(async (req: Request) => {
     const serviceChargePercentage = platformSettings.service_charge_percentage;
     const agencyCommissionPercentage = platformSettings.agency_commission_percentage;
     const serviceCharge = booking.service_charge || 0;
+    const serviceChargeDiscount = Number(booking.service_charge_discount) || 0;
     const discountAmount = Number(booking.discount_amount) || 0;
     const toursRedCashUsed = booking.toursred_cash_used || 0;
     const userPayment = booking.user_payment || (depositAmount + serviceCharge);
@@ -254,7 +255,22 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">Anticipo (${depositPercentage}%):</span>
           <span class="info-value">${formatCurrency(depositAmount)}</span>
         </div>
+        ${serviceChargeDiscount > 0 ? `
+        <div class="info-row">
+          <span class="info-label">Cargo por uso de plataforma (${serviceChargePercentage}%):</span>
+          <span class="info-value" style="text-decoration: line-through; color: #9ca3af;">${formatCurrency(serviceCharge + serviceChargeDiscount)}</span>
+        </div>
+        <div class="info-row" style="background-color: #dcfce7; margin: 5px -5px; padding: 8px 5px;">
+          <span class="info-label" style="font-weight: 600;">🏷️ Desc. Cargo por Servicio:</span>
+          <span class="info-value" style="color: #059669;">-${formatCurrency(serviceChargeDiscount)}</span>
+        </div>
         ${serviceCharge > 0 ? `
+        <div class="info-row">
+          <span class="info-label">Cargo por Servicio (a pagar):</span>
+          <span class="info-value">${formatCurrency(serviceCharge)}</span>
+        </div>
+        ` : ''}
+        ` : serviceCharge > 0 ? `
         <div class="info-row">
           <span class="info-label">Cargo por uso de plataforma (${serviceChargePercentage}%):</span>
           <span class="info-value">${formatCurrency(serviceCharge)}</span>
@@ -567,6 +583,12 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">- Cargo por plataforma (${serviceChargePercentage}%):</span>
           <span class="info-value">${formatCurrency(serviceCharge)}</span>
         </div>
+        ${serviceChargeDiscount > 0 ? `
+        <div class="info-row">
+          <span class="info-label">- Desc. Cargo por Servicio (código):</span>
+          <span class="info-value" style="color: #059669;">-${formatCurrency(serviceChargeDiscount)}</span>
+        </div>
+        ` : ''}
         ${discountAmount > 0 ? `
         <div class="info-row">
           <span class="info-label">- Descuento aplicado:</span>

@@ -298,6 +298,16 @@ const BookingSuccessPage: React.FC = () => {
                     </div>
                   )}
 
+                  {Number(booking.service_charge_discount) > 0 && (
+                    <div className="flex justify-between bg-green-50 border border-green-200 rounded px-2 py-1.5 -mx-1">
+                      <span className="text-green-700 font-medium flex items-center">
+                        <Ticket className="h-4 w-4 mr-1" />
+                        Desc. Cargo por Servicio:
+                      </span>
+                      <span className="font-bold text-green-600">-${Number(booking.service_charge_discount).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+
                   {booking.discount_amount != null && booking.discount_amount > 0 && (
                     <div className="flex justify-between bg-green-50 border border-green-200 rounded px-2 py-1.5 -mx-1">
                       <span className="text-green-700 font-medium flex items-center">
