@@ -378,6 +378,25 @@ const AgencyFinancials: React.FC = () => {
         commissionRecordsData?.map(cr => [cr.booking_id, cr]) || []
       );
 
+      const getBookingStatusLabel = (status: string, cancelled_at: any) => {
+        if (cancelled_at) return 'Cancelada';
+        switch (status) {
+          case 'completed': return 'Completada';
+          case 'confirmed': return 'Confirmada';
+          case 'pending': return 'Pendiente Aprobación';
+          case 'cancelled': return 'Cancelada';
+          default: return status || 'Desconocido';
+        }
+      };
+
+      const getCommissionStatusLabel = (booking: any, commission: any) => {
+        if (booking.cancelled_at || booking.status === 'cancelled') return 'Cancelada';
+        if (!commission) return 'Sin Comisión';
+        if (commission.status === 'paid_out') return 'Pagado';
+        if (commission.status === 'processed') return 'Procesado';
+        return 'Pendiente';
+      };
+
       const wb = XLSX.utils.book_new();
 
       const summarySheet = [
@@ -404,6 +423,7 @@ const AgencyFinancials: React.FC = () => {
         [''],
         [
           'Código Reserva',
+          'Estado Reserva',
           'Fecha Reserva',
           'Tour',
           'Fecha Tour',
@@ -413,47 +433,65 @@ const AgencyFinancials: React.FC = () => {
           'Adultos',
           'Niños',
           'Infantes',
+          'Adultos Mayores',
           'Mascotas',
-          'Precio Tour',
+          'Precio Tour Base',
           'Cargo Servicio',
+          'Descuento Servicio',
           'ToursRed Cash Usado',
-          'Puntos Usados',
-          'Descuento',
+          'Puntos Usados (Valor)',
+          'Descuento Código',
           'Total Pagado',
           'Comisión Agencia (%)',
           'Comisión Agencia ($)',
           'Cargo Servicio ($)',
           'Neto para Agencia',
-          'Estado Pago',
+          'Estado Pago Comisión',
           'Método Pago',
           'Fecha Procesado',
         ],
         ...(bookings?.map(booking => {
           const commission = commissionMap.get(booking.id);
           const user = usersMap.get(booking.user_id);
+
+          const totalPrice = Number(booking.total_price) || 0;
+          const serviceCharge = Number(booking.service_charge) || 0;
+          const serviceChargeDiscount = Number(booking.service_charge_discount) || 0;
+          const toursredCashUsed = Number(booking.toursred_cash_used) || 0;
+          const discountAmount = Number(booking.discount_amount) || 0;
+          const membershipServiceFeeSaved = Number(booking.membership_service_fee_saved) || 0;
+
+          const pointsUsed = booking.points_used || 0;
+          const pointsValue = pointsUsed * 0.1;
+
+          const tourBasePrice = totalPrice - serviceCharge + serviceChargeDiscount + toursredCashUsed + discountAmount + pointsValue + membershipServiceFeeSaved;
+
           return [
             booking.booking_code || booking.id.slice(0, 8),
+            getBookingStatusLabel(booking.status, booking.cancelled_at),
             format(new Date(booking.booking_date), 'dd/MM/yyyy HH:mm'),
             booking.tour?.name || 'N/A',
             booking.tour?.start_date ? format(new Date(booking.tour.start_date), 'dd/MM/yyyy') : 'N/A',
             `${user?.first_name || ''} ${user?.last_name || ''}`.trim(),
             user?.email || 'N/A',
-            booking.total_travelers || 0,
-            booking.num_adults || 0,
-            booking.num_children || 0,
-            booking.num_infants || 0,
-            booking.num_pets || 0,
-            Number(booking.tour_price) || 0,
-            Number(booking.service_charge) || 0,
-            Number(booking.toursred_cash_amount) || 0,
-            Number(booking.points_used_value) || 0,
-            Number(booking.discount_amount) || 0,
-            Number(booking.total_price) || 0,
+            booking.travelers_count || 0,
+            booking.count_adultos || 0,
+            booking.count_ninos || 0,
+            booking.count_infantes || 0,
+            booking.count_adultos_mayores || 0,
+            booking.count_mascotas || 0,
+            tourBasePrice,
+            serviceCharge,
+            serviceChargeDiscount,
+            toursredCashUsed,
+            pointsValue,
+            discountAmount,
+            totalPrice,
             commission?.agency_commission_rate || 0,
             Number(commission?.agency_commission_amount) || 0,
             Number(commission?.service_charge_amount) || 0,
             Number(commission?.agency_net_amount) || 0,
-            commission?.status === 'processed' || commission?.status === 'paid_out' ? 'Pagado' : 'Pendiente',
+            getCommissionStatusLabel(booking, commission),
             commission?.payment_method ? getPaymentMethodLabel(commission.payment_method) : '-',
             commission?.processed_at ? format(new Date(commission.processed_at), 'dd/MM/yyyy') : '-',
           ];
@@ -462,11 +500,12 @@ const AgencyFinancials: React.FC = () => {
 
       const ws2 = XLSX.utils.aoa_to_sheet(bookingsSheet);
       ws2['!cols'] = [
-        { wch: 15 }, { wch: 18 }, { wch: 30 }, { wch: 12 }, { wch: 25 },
-        { wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
-        { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 12 },
-        { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
-        { wch: 15 }, { wch: 12 }, { wch: 20 }, { wch: 15 },
+        { wch: 15 }, { wch: 18 }, { wch: 18 }, { wch: 30 }, { wch: 12 },
+        { wch: 25 }, { wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 10 },
+        { wch: 10 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 },
+        { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 15 }, { wch: 15 },
+        { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 20 },
+        { wch: 20 }, { wch: 15 },
       ];
       XLSX.utils.book_append_sheet(wb, ws2, 'Detalle Reservas');
 
