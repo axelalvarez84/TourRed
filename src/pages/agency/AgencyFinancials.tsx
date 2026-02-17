@@ -378,19 +378,19 @@ const AgencyFinancials: React.FC = () => {
         commissionRecordsData?.map(cr => [cr.booking_id, cr]) || []
       );
 
-      const getBookingStatusLabel = (status: string, cancelled_at: any) => {
-        if (cancelled_at) return 'Cancelada';
-        switch (status) {
-          case 'completed': return 'Completada';
-          case 'confirmed': return 'Confirmada';
-          case 'pending': return 'Pendiente Aprobación';
-          case 'cancelled': return 'Cancelada';
-          default: return status || 'Desconocido';
-        }
+      const getBookingStatusLabel = (booking: any) => {
+        if (booking.cancelled_at || booking.status === 'cancelled') return 'Cancelada';
+        if (booking.approval_status === 'rejected') return 'Rechazada';
+        if (booking.approval_status === 'pending') return 'Pendiente Aprobación';
+        if (booking.status === 'completed') return 'Completada';
+        if (booking.status === 'confirmed') return 'Confirmada';
+        return booking.status || 'Desconocido';
       };
 
       const getCommissionStatusLabel = (booking: any, commission: any) => {
         if (booking.cancelled_at || booking.status === 'cancelled') return 'Cancelada';
+        if (booking.approval_status === 'rejected') return 'Rechazada';
+        if (booking.payment_status !== 'succeeded') return 'Sin Comisión';
         if (!commission) return 'Sin Comisión';
         if (commission.status === 'paid_out') return 'Pagado';
         if (commission.status === 'processed') return 'Procesado';
@@ -454,21 +454,23 @@ const AgencyFinancials: React.FC = () => {
           const commission = commissionMap.get(booking.id);
           const user = usersMap.get(booking.user_id);
 
-          const totalPrice = Number(booking.total_price) || 0;
-          const serviceCharge = Number(booking.service_charge) || 0;
-          const serviceChargeDiscount = Number(booking.service_charge_discount) || 0;
-          const toursredCashUsed = Number(booking.toursred_cash_used) || 0;
-          const discountAmount = Number(booking.discount_amount) || 0;
-          const membershipServiceFeeSaved = Number(booking.membership_service_fee_saved) || 0;
+          const isPaid = booking.payment_status === 'succeeded';
 
-          const pointsUsed = booking.points_used || 0;
+          const totalPrice = isPaid ? (Number(booking.total_price) || 0) : 0;
+          const serviceCharge = isPaid ? (Number(booking.service_charge) || 0) : 0;
+          const serviceChargeDiscount = isPaid ? (Number(booking.service_charge_discount) || 0) : 0;
+          const toursredCashUsed = isPaid ? (Number(booking.toursred_cash_used) || 0) : 0;
+          const discountAmount = isPaid ? (Number(booking.discount_amount) || 0) : 0;
+          const membershipServiceFeeSaved = isPaid ? (Number(booking.membership_service_fee_saved) || 0) : 0;
+
+          const pointsUsed = isPaid ? (booking.points_used || 0) : 0;
           const pointsValue = pointsUsed * 0.1;
 
-          const tourBasePrice = totalPrice - serviceCharge + serviceChargeDiscount + toursredCashUsed + discountAmount + pointsValue + membershipServiceFeeSaved;
+          const tourBasePrice = isPaid ? (totalPrice - serviceCharge + serviceChargeDiscount + toursredCashUsed + discountAmount + pointsValue + membershipServiceFeeSaved) : 0;
 
           return [
             booking.booking_code || booking.id.slice(0, 8),
-            getBookingStatusLabel(booking.status, booking.cancelled_at),
+            getBookingStatusLabel(booking),
             format(new Date(booking.booking_date), 'dd/MM/yyyy HH:mm'),
             booking.tour?.name || 'N/A',
             booking.tour?.start_date ? format(new Date(booking.tour.start_date), 'dd/MM/yyyy') : 'N/A',
@@ -487,13 +489,13 @@ const AgencyFinancials: React.FC = () => {
             pointsValue,
             discountAmount,
             totalPrice,
-            commission?.agency_commission_rate || 0,
-            Number(commission?.agency_commission_amount) || 0,
-            Number(commission?.service_charge_amount) || 0,
-            Number(commission?.agency_net_amount) || 0,
+            isPaid && commission ? (commission.agency_commission_rate || 0) : 0,
+            isPaid && commission ? (Number(commission.agency_commission_amount) || 0) : 0,
+            isPaid && commission ? (Number(commission.service_charge_amount) || 0) : 0,
+            isPaid && commission ? (Number(commission.agency_net_amount) || 0) : 0,
             getCommissionStatusLabel(booking, commission),
-            commission?.payment_method ? getPaymentMethodLabel(commission.payment_method) : '-',
-            commission?.processed_at ? format(new Date(commission.processed_at), 'dd/MM/yyyy') : '-',
+            isPaid && commission?.payment_method ? getPaymentMethodLabel(commission.payment_method) : '-',
+            isPaid && commission?.processed_at ? format(new Date(commission.processed_at), 'dd/MM/yyyy') : '-',
           ];
         }) || []),
       ];
