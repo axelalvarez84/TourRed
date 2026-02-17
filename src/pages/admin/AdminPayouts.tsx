@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { DollarSign, Calendar, Clock, CheckCircle, AlertCircle, Download } from 'lucide-react';
+import { DollarSign, Calendar, Clock, CheckCircle, AlertCircle, Download, Plus, RefreshCw } from 'lucide-react';
 import { format, isAfter } from 'date-fns';
 import type { CommissionRecord, Agency, Tour, AgencyPayout } from '../../types';
 
@@ -16,13 +16,33 @@ interface AgencyPayoutSummary {
   next_scheduled_payout?: string;
 }
 
+interface CompletedTourData {
+  tour_id: string;
+  tour_name: string;
+  tour_code: string;
+  agency_id: string;
+  agency_name: string;
+  end_date: string;
+  days_completed: number;
+  bookings_count: number;
+  total_revenue: number;
+  commission_records_exist: boolean;
+  commission_records_count: number;
+  total_commission_pending: number;
+  ready_for_payout: boolean;
+  can_create_commissions: boolean;
+}
+
 const AdminPayouts: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [view, setView] = useState<'by-agency' | 'by-tour'>('by-agency');
+  const [view, setView] = useState<'by-agency' | 'by-tour'>('by-tour');
   const [agencySummaries, setAgencySummaries] = useState<AgencyPayoutSummary[]>([]);
-  const [completedTours, setCompletedTours] = useState<any[]>([]);
+  const [completedTours, setCompletedTours] = useState<CompletedTourData[]>([]);
   const [selectedAgency, setSelectedAgency] = useState<string | null>(null);
+  const [selectedTour, setSelectedTour] = useState<string | null>(null);
   const [showProcessModal, setShowProcessModal] = useState(false);
+  const [isCreatingCommissions, setIsCreatingCommissions] = useState(false);
+  const [creationMessage, setCreationMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
   useEffect(() => {
     fetchPayoutData();
@@ -89,52 +109,53 @@ const AdminPayouts: React.FC = () => {
   };
 
   const fetchTourView = async () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { data, error } = await supabase.rpc('get_completed_tours_with_commission_status');
 
-    const { data: tours, error } = await supabase
-      .from('tours')
-      .select(`
-        *,
-        agencies(name),
-        bookings!inner(
-          id,
-          status,
-          payment_status,
-          total_price
-        )
-      `)
-      .lt('end_date', today.toISOString())
-      .eq('bookings.status', 'confirmed')
-      .eq('bookings.payment_status', 'succeeded');
+    if (error) {
+      console.error('Error fetching completed tours:', error);
+      throw error;
+    }
 
-    if (error) throw error;
+    setCompletedTours(data || []);
+  };
 
-    const tourMap = new Map();
+  const createCommissionRecords = async (tourId: string) => {
+    setIsCreatingCommissions(true);
+    setCreationMessage(null);
 
-    tours?.forEach((tour) => {
-      if (!tourMap.has(tour.id)) {
-        const daysCompleted = Math.floor((Date.now() - new Date(tour.end_date).getTime()) / (1000 * 60 * 60 * 24));
-        tourMap.set(tour.id, {
-          tour_id: tour.id,
-          tour_name: tour.name,
-          agency_name: tour.agencies.name,
-          end_date: tour.end_date,
-          days_completed: daysCompleted,
-          bookings_count: 0,
-          total_revenue: 0,
-          ready_for_payout: daysCompleted >= 3,
+    try {
+      const { data, error } = await supabase.rpc('create_commission_records_for_tour', {
+        p_tour_id: tourId
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setCreationMessage({
+          type: 'success',
+          text: `${data.created_count} comisiones creadas para "${data.tour_name}". ${data.skipped_count > 0 ? `${data.skipped_count} ya existían.` : ''}`
+        });
+
+        await fetchPayoutData();
+      } else {
+        setCreationMessage({
+          type: 'error',
+          text: data.message || 'Error al crear comisiones'
         });
       }
+    } catch (error: any) {
+      console.error('Error creating commission records:', error);
+      setCreationMessage({
+        type: 'error',
+        text: error.message || 'Error al crear comisiones'
+      });
+    } finally {
+      setIsCreatingCommissions(false);
 
-      const tourData = tourMap.get(tour.id);
-      tourData.bookings_count++;
-      tourData.total_revenue += Number(tour.bookings[0]?.total_price || 0);
-    });
-
-    setCompletedTours(
-      Array.from(tourMap.values()).sort((a, b) => b.days_completed - a.days_completed)
-    );
+      setTimeout(() => {
+        setCreationMessage(null);
+      }, 5000);
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -293,96 +314,389 @@ const AdminPayouts: React.FC = () => {
             </table>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tour
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Agencia
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Fecha Fin
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Días Completado
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Reservas
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estado
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {completedTours.length === 0 ? (
+          <div>
+            {creationMessage && (
+              <div className={`mb-4 p-4 rounded-lg ${
+                creationMessage.type === 'success'
+                  ? 'bg-green-100 text-green-800 border border-green-200'
+                  : 'bg-red-100 text-red-800 border border-red-200'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {creationMessage.type === 'success' ? (
+                    <CheckCircle className="h-5 w-5" />
+                  ) : (
+                    <AlertCircle className="h-5 w-5" />
+                  )}
+                  <p className="text-sm font-medium">{creationMessage.text}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                      No hay tours completados pendientes de pago
-                    </td>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Tour
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Agencia
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Fecha Fin
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Días Completado
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Reservas
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Comisión Pendiente
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Estado
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Acciones
+                    </th>
                   </tr>
-                ) : (
-                  completedTours.map((tour) => (
-                    <tr key={tour.tour_id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">{tour.tour_name}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">{tour.agency_name}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">
-                          {format(new Date(tour.end_date), 'dd/MM/yyyy')}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">{tour.days_completed} días</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">{tour.bookings_count}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {tour.ready_for_payout ? (
-                          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
-                            Listo para Pago
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium">
-                            En Espera
-                          </span>
-                        )}
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {completedTours.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                        No hay tours completados pendientes de pago
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    completedTours.map((tour) => (
+                      <tr key={tour.tour_id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-gray-900">{tour.tour_name}</div>
+                          {tour.tour_code && (
+                            <div className="text-xs text-gray-500">{tour.tour_code}</div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">{tour.agency_name}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">
+                            {format(new Date(tour.end_date), 'dd/MM/yyyy')}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">{tour.days_completed} días</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">{tour.bookings_count}</div>
+                          {tour.commission_records_exist && (
+                            <div className="text-xs text-gray-500">
+                              {tour.commission_records_count} comisiones
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          {tour.commission_records_exist ? (
+                            <div className="text-sm font-bold text-green-600">
+                              {formatCurrency(tour.total_commission_pending)}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          {!tour.commission_records_exist ? (
+                            <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full font-medium">
+                              Sin Comisiones
+                            </span>
+                          ) : tour.ready_for_payout ? (
+                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
+                              Listo para Pago
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium">
+                              En Espera
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          {!tour.commission_records_exist && tour.can_create_commissions ? (
+                            <button
+                              onClick={() => createCommissionRecords(tour.tour_id)}
+                              disabled={isCreatingCommissions}
+                              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {isCreatingCommissions ? (
+                                <>
+                                  <RefreshCw className="h-4 w-4 animate-spin" />
+                                  Creando...
+                                </>
+                              ) : (
+                                <>
+                                  <Plus className="h-4 w-4" />
+                                  Crear Comisiones
+                                </>
+                              )}
+                            </button>
+                          ) : tour.commission_records_exist && tour.ready_for_payout ? (
+                            <button
+                              onClick={() => {
+                                setSelectedTour(tour.tour_id);
+                                setSelectedAgency(tour.agency_id);
+                                setShowProcessModal(true);
+                              }}
+                              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm font-medium"
+                            >
+                              <DollarSign className="h-4 w-4" />
+                              Procesar Pago
+                            </button>
+                          ) : tour.commission_records_exist ? (
+                            <div className="flex items-center gap-2 text-sm text-gray-500">
+                              <Clock className="h-4 w-4" />
+                              <span>Esperando {3 - tour.days_completed} días</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-400">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
 
       {showProcessModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Procesar Pago</h3>
-            <p className="text-gray-600 mb-6">
-              La funcionalidad de procesamiento de pagos estará disponible próximamente.
-            </p>
-            <button
-              onClick={() => {
-                setShowProcessModal(false);
-                setSelectedAgency(null);
-              }}
-              className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-            >
-              Cerrar
-            </button>
-          </div>
-        </div>
+        <ProcessPaymentModal
+          isOpen={showProcessModal}
+          onClose={() => {
+            setShowProcessModal(false);
+            setSelectedAgency(null);
+            setSelectedTour(null);
+          }}
+          agencyId={selectedAgency}
+          tourId={selectedTour}
+          onSuccess={async () => {
+            await fetchPayoutData();
+            setShowProcessModal(false);
+            setSelectedAgency(null);
+            setSelectedTour(null);
+          }}
+        />
       )}
+    </div>
+  );
+};
+
+interface ProcessPaymentModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  agencyId: string | null;
+  tourId: string | null;
+  onSuccess: () => void;
+}
+
+const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
+  isOpen,
+  onClose,
+  agencyId,
+  tourId,
+  onSuccess
+}) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState<any>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'bank_transfer' | 'other'>('bank_transfer');
+  const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+    if (isOpen && (agencyId || tourId)) {
+      fetchPaymentDetails();
+    }
+  }, [isOpen, agencyId, tourId]);
+
+  const fetchPaymentDetails = async () => {
+    try {
+      let query = supabase
+        .from('commission_records')
+        .select(`
+          *,
+          agencies!inner(id, name),
+          tours!inner(id, name, tour_code)
+        `)
+        .eq('status', 'pending');
+
+      if (tourId) {
+        query = query.eq('tour_id', tourId);
+      } else if (agencyId) {
+        query = query.eq('agency_id', agencyId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      const totalAmount = data?.reduce((sum, record) => sum + Number(record.agency_net_amount), 0) || 0;
+      const recordsCount = data?.length || 0;
+
+      setPaymentDetails({
+        records: data,
+        totalAmount,
+        recordsCount,
+        agencyName: data?.[0]?.agencies?.name || '',
+        tourName: data?.[0]?.tours?.name || ''
+      });
+    } catch (error) {
+      console.error('Error fetching payment details:', error);
+    }
+  };
+
+  const processPayment = async () => {
+    if (!paymentDetails || !paymentDetails.records) return;
+
+    setIsProcessing(true);
+
+    try {
+      const commissionIds = paymentDetails.records.map((r: any) => r.id);
+
+      const { error: updateError } = await supabase
+        .from('commission_records')
+        .update({
+          status: 'processed',
+          processed_at: new Date().toISOString()
+        })
+        .in('id', commissionIds);
+
+      if (updateError) throw updateError;
+
+      onSuccess();
+    } catch (error: any) {
+      console.error('Error processing payment:', error);
+      alert('Error al procesar el pago: ' + error.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: 'MXN',
+    }).format(amount);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="mb-6">
+          <h3 className="text-2xl font-bold text-gray-900">Procesar Pago</h3>
+          {paymentDetails && (
+            <p className="mt-2 text-gray-600">
+              {tourId
+                ? `Tour: ${paymentDetails.tourName}`
+                : `Agencia: ${paymentDetails.agencyName}`}
+            </p>
+          )}
+        </div>
+
+        {paymentDetails ? (
+          <div className="space-y-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600">Total a Pagar</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {formatCurrency(paymentDetails.totalAmount)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Comisiones</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {paymentDetails.recordsCount}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Método de Pago
+              </label>
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value as any)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="bank_transfer">Transferencia Bancaria</option>
+                <option value="other">Otro</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Notas (opcional)
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Agregar notas sobre este pago..."
+              />
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-yellow-800">
+                  <p className="font-medium mb-1">Importante:</p>
+                  <p>
+                    Al confirmar, las comisiones se marcarán como procesadas. Asegúrate de
+                    haber realizado la transferencia bancaria antes de continuar.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                onClick={onClose}
+                disabled={isProcessing}
+                className="flex-1 bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300 font-medium disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={processPayment}
+                disabled={isProcessing}
+                className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isProcessing ? (
+                  <>
+                    <RefreshCw className="h-5 w-5 animate-spin" />
+                    Procesando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-5 w-5" />
+                    Confirmar Pago
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center py-12">
+            <RefreshCw className="h-8 w-8 animate-spin text-blue-600" />
+          </div>
+        )}
+      </div>
     </div>
   );
 };
