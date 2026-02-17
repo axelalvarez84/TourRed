@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { DollarSign, TrendingUp, Calendar, Download, FileText, CheckCircle, Clock, Eye, CreditCard } from 'lucide-react';
+import { DollarSign, TrendingUp, Calendar, Download, FileText, CheckCircle, Clock, Eye, CreditCard, FileSpreadsheet } from 'lucide-react';
 import { format } from 'date-fns';
 import type { FinancialSummary, TourFinancialSummary, CommissionRecord } from '../../types';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 const AgencyFinancials: React.FC = () => {
   const { user } = useAuth();
@@ -211,6 +214,176 @@ const AgencyFinancials: React.FC = () => {
       other: 'Otro',
     };
     return labels[method] || method;
+  };
+
+  const generatePDFStatement = async () => {
+    if (!agencyId) return;
+
+    try {
+      const { data: agencyData } = await supabase
+        .from('agencies')
+        .select('name, email, phone')
+        .eq('id', agencyId)
+        .single();
+
+      const doc = new jsPDF();
+
+      doc.setFontSize(20);
+      doc.text('Estado de Cuenta', 105, 20, { align: 'center' });
+
+      doc.setFontSize(12);
+      doc.text(`Agencia: ${agencyData?.name || 'N/A'}`, 20, 35);
+      doc.text(`Fecha: ${format(new Date(), 'dd/MM/yyyy')}`, 20, 42);
+
+      if (startDate || endDate) {
+        const period = `Período: ${startDate ? format(new Date(startDate), 'dd/MM/yyyy') : 'Inicio'} - ${endDate ? format(new Date(endDate), 'dd/MM/yyyy') : 'Actual'}`;
+        doc.text(period, 20, 49);
+      }
+
+      doc.setFontSize(14);
+      doc.text('Resumen Financiero', 20, 65);
+
+      const summaryData = [
+        ['Concepto', 'Monto'],
+        ['Saldo Pendiente', formatCurrency(summary.pending_balance)],
+        ['Cobrado Este Mes', formatCurrency(summary.paid_this_month)],
+        ['Total Histórico', formatCurrency(summary.total_lifetime)],
+      ];
+
+      (doc as any).autoTable({
+        startY: 70,
+        head: [summaryData[0]],
+        body: summaryData.slice(1),
+        theme: 'grid',
+        headStyles: { fillColor: [79, 70, 229] },
+      });
+
+      let currentY = (doc as any).lastAutoTable.finalY + 15;
+
+      doc.setFontSize(14);
+      doc.text('Detalle por Tour', 20, currentY);
+
+      const tourData = [
+        ['Tour', 'Fecha', 'Reservas', 'Ingreso Bruto', 'Comisión', 'Neto', 'Estado'],
+        ...tourSummaries.map(tour => [
+          tour.tour_name,
+          format(new Date(tour.tour_date), 'dd/MM/yyyy'),
+          tour.bookings_count.toString(),
+          formatCurrency(tour.gross_revenue),
+          formatCurrency(tour.platform_commission),
+          formatCurrency(tour.net_to_agency),
+          tour.payment_status === 'paid' ? 'Pagado' : 'Pendiente',
+        ]),
+      ];
+
+      (doc as any).autoTable({
+        startY: currentY + 5,
+        head: [tourData[0]],
+        body: tourData.slice(1),
+        theme: 'striped',
+        headStyles: { fillColor: [79, 70, 229] },
+        styles: { fontSize: 8 },
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 15;
+
+      if (processedPayments.length > 0) {
+        doc.setFontSize(14);
+        doc.text('Pagos Recibidos', 20, currentY);
+
+        const paymentsData = [
+          ['Fecha', 'Monto', 'Método', 'Comisiones'],
+          ...processedPayments.map(payment => [
+            format(new Date(payment.payment_date), 'dd/MM/yyyy'),
+            formatCurrency(payment.total_amount),
+            getPaymentMethodLabel(payment.payment_method),
+            payment.records_count.toString(),
+          ]),
+        ];
+
+        (doc as any).autoTable({
+          startY: currentY + 5,
+          head: [paymentsData[0]],
+          body: paymentsData.slice(1),
+          theme: 'striped',
+          headStyles: { fillColor: [16, 185, 129] },
+        });
+      }
+
+      doc.save(`estado-cuenta-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Error al generar el PDF');
+    }
+  };
+
+  const generateExcelStatement = async () => {
+    if (!agencyId) return;
+
+    try {
+      const { data: agencyData } = await supabase
+        .from('agencies')
+        .select('name, email, phone')
+        .eq('id', agencyId)
+        .single();
+
+      const wb = XLSX.utils.book_new();
+
+      const summarySheet = [
+        ['Estado de Cuenta - ' + (agencyData?.name || 'Agencia')],
+        ['Fecha:', format(new Date(), 'dd/MM/yyyy')],
+        [''],
+        ['Resumen Financiero'],
+        ['Concepto', 'Monto'],
+        ['Saldo Pendiente', summary.pending_balance],
+        ['Cobrado Este Mes', summary.paid_this_month],
+        ['Total Histórico', summary.total_lifetime],
+      ];
+
+      const ws1 = XLSX.utils.aoa_to_sheet(summarySheet);
+      XLSX.utils.book_append_sheet(wb, ws1, 'Resumen');
+
+      const tourSheet = [
+        ['Detalle por Tour'],
+        [''],
+        ['Tour', 'Fecha', 'Reservas', 'Ingreso Bruto', 'Comisión Plataforma', 'Neto para Agencia', 'Estado'],
+        ...tourSummaries.map(tour => [
+          tour.tour_name,
+          format(new Date(tour.tour_date), 'dd/MM/yyyy'),
+          tour.bookings_count,
+          tour.gross_revenue,
+          tour.platform_commission,
+          tour.net_to_agency,
+          tour.payment_status === 'paid' ? 'Pagado' : 'Pendiente',
+        ]),
+      ];
+
+      const ws2 = XLSX.utils.aoa_to_sheet(tourSheet);
+      XLSX.utils.book_append_sheet(wb, ws2, 'Tours');
+
+      if (processedPayments.length > 0) {
+        const paymentsSheet = [
+          ['Pagos Recibidos'],
+          [''],
+          ['Fecha', 'Monto', 'Método de Pago', 'Comisiones Pagadas', 'Notas'],
+          ...processedPayments.map(payment => [
+            format(new Date(payment.payment_date), 'dd/MM/yyyy'),
+            payment.total_amount,
+            getPaymentMethodLabel(payment.payment_method),
+            payment.records_count,
+            payment.payment_notes || '-',
+          ]),
+        ];
+
+        const ws3 = XLSX.utils.aoa_to_sheet(paymentsSheet);
+        XLSX.utils.book_append_sheet(wb, ws3, 'Pagos');
+      }
+
+      XLSX.writeFile(wb, `estado-cuenta-${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    } catch (error) {
+      console.error('Error generating Excel:', error);
+      alert('Error al generar el archivo Excel');
+    }
   };
 
   if (isLoading && !agencyId) {
@@ -434,10 +607,18 @@ const AgencyFinancials: React.FC = () => {
         </div>
       </div>
 
-      {processedPayments.length > 0 && (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">Pagos Recibidos</h2>
+      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h2 className="text-xl font-bold text-gray-900 mb-6">Pagos Recibidos</h2>
 
+        {processedPayments.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-600 font-medium">No hay pagos recibidos aún</p>
+            <p className="text-sm text-gray-500 mt-1">
+              Los pagos procesados aparecerán aquí
+            </p>
+          </div>
+        ) : (
           <div className="space-y-4">
             {processedPayments.map((payment, index) => (
               <div
@@ -492,23 +673,35 @@ const AgencyFinancials: React.FC = () => {
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <div className="flex items-start gap-3">
-          <FileText className="h-6 w-6 text-blue-600 mt-1" />
-          <div>
+        <div className="flex flex-col sm:flex-row items-start gap-4">
+          <FileText className="h-6 w-6 text-blue-600 mt-1 flex-shrink-0" />
+          <div className="flex-1">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              ¿Necesitas un estado de cuenta detallado?
+              Descargar Estado de Cuenta
             </h3>
             <p className="text-gray-700 mb-4">
-              Contacta a nuestro equipo de soporte para solicitar un estado de cuenta completo con el desglose de todas tus transacciones, pagos recibidos y saldos pendientes.
+              Genera y descarga tu estado de cuenta completo con el desglose de todas tus transacciones, pagos recibidos y saldos pendientes.
             </p>
-            <button className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-              <Download className="h-4 w-4" />
-              Solicitar Estado de Cuenta
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={generatePDFStatement}
+                className="flex items-center gap-2 bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium"
+              >
+                <Download className="h-4 w-4" />
+                Descargar PDF
+              </button>
+              <button
+                onClick={generateExcelStatement}
+                className="flex items-center gap-2 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                Descargar Excel
+              </button>
+            </div>
           </div>
         </div>
       </div>
