@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Mail, Calendar, Shield, Save, Edit } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import ChangePasswordSection from '../../components/ChangePasswordSection';
 
 const AdminProfile: React.FC = () => {
   const { user } = useAuth();
@@ -258,6 +259,11 @@ const AdminProfile: React.FC = () => {
                     </button>
                   </div>
                 )}
+              </div>
+
+              {/* Seguridad - Cambiar Contraseña */}
+              <div className="border-t pt-6">
+                <ChangePasswordSection />
               </div>
 
               {/* System Information */}

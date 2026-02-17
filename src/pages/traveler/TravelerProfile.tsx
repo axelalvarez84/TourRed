@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import TravelerReviewsDisplay from '../../components/TravelerReviewsDisplay';
 import ProfilePictureUploader from '../../components/ProfilePictureUploader';
+import ChangePasswordSection from '../../components/ChangePasswordSection';
 
 interface TravelerProfile {
   id: string;
@@ -858,6 +859,11 @@ const TravelerProfile: React.FC = () => {
         {/* Calificaciones del Viajero */}
         <div className="mt-6">
           <TravelerReviewsDisplay travelerId={profile.id} />
+        </div>
+
+        {/* Seguridad - Cambiar Contraseña */}
+        <div className="mt-6">
+          <ChangePasswordSection />
         </div>
 
         {/* Información Adicional */}

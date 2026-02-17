@@ -3,6 +3,7 @@ import { Building, Mail, Phone, Globe, Star, CreditCard as Edit, Save, X, Upload
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import ImageUploader from '../../components/ImageUploader';
+import ChangePasswordSection from '../../components/ChangePasswordSection';
 
 interface AgencyProfile {
   id: string;
@@ -1023,6 +1024,11 @@ const AgencyProfile: React.FC = () => {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Seguridad - Cambiar Contraseña */}
+            <div className="mt-6">
+              <ChangePasswordSection />
             </div>
           </div>
         </div>
