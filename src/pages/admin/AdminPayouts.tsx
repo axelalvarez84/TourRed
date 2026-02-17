@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { DollarSign, Calendar, Clock, CheckCircle, AlertCircle, Download, Plus, RefreshCw } from 'lucide-react';
+import { DollarSign, Calendar, Clock, CheckCircle, AlertCircle, Download, Plus, RefreshCw, Upload } from 'lucide-react';
 import { format, isAfter } from 'date-fns';
 import type { CommissionRecord, Agency, Tour, AgencyPayout } from '../../types';
 
@@ -522,8 +522,10 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'bank_transfer' | 'other'>('bank_transfer');
+  const [paymentMethod, setPaymentMethod] = useState<'bank_transfer' | 'check' | 'paypal' | 'mercadopago' | 'other'>('bank_transfer');
   const [notes, setNotes] = useState('');
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
 
   useEffect(() => {
     const loadPaymentDetails = async () => {
@@ -573,16 +575,61 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
 
     try {
       const commissionIds = paymentDetails.records.map((r: any) => r.id);
+      let receiptUrl = null;
+      let receiptFilename = null;
+
+      if (receiptFile) {
+        setUploadingReceipt(true);
+        const fileExt = receiptFile.name.split('.').pop();
+        const timestamp = Date.now();
+        const fileName = `${agencyId || tourId}_${timestamp}.${fileExt}`;
+
+        const { error: uploadError, data: uploadData } = await supabase.storage
+          .from('payment-receipts')
+          .upload(fileName, receiptFile);
+
+        if (uploadError) {
+          throw new Error('Error al subir comprobante: ' + uploadError.message);
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('payment-receipts')
+          .getPublicUrl(fileName);
+
+        receiptUrl = publicUrl;
+        receiptFilename = receiptFile.name;
+        setUploadingReceipt(false);
+      }
 
       const { error: updateError } = await supabase
         .from('commission_records')
         .update({
           status: 'processed',
-          processed_at: new Date().toISOString()
+          processed_at: new Date().toISOString(),
+          payment_method: paymentMethod,
+          payment_notes: notes || null,
+          payment_receipt_url: receiptUrl,
+          payment_receipt_filename: receiptFilename,
+          notified_at: new Date().toISOString()
         })
         .in('id', commissionIds);
 
       if (updateError) throw updateError;
+
+      const agencyIdToNotify = agencyId || paymentDetails.records[0]?.agency_id;
+
+      if (agencyIdToNotify) {
+        await supabase.functions.invoke('send-payout-confirmation', {
+          body: {
+            agency_id: agencyIdToNotify,
+            commission_ids: commissionIds,
+            total_amount: paymentDetails.totalAmount,
+            payment_method: paymentMethod,
+            payment_notes: notes,
+            receipt_url: receiptUrl
+          }
+        });
+      }
 
       onSuccess();
     } catch (error: any) {
@@ -590,6 +637,7 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
       alert('Error al procesar el pago: ' + error.message);
     } finally {
       setIsProcessing(false);
+      setUploadingReceipt(false);
     }
   };
 
@@ -645,8 +693,31 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="bank_transfer">Transferencia Bancaria</option>
+                <option value="check">Cheque</option>
+                <option value="paypal">PayPal</option>
+                <option value="mercadopago">Mercado Pago</option>
                 <option value="other">Otro</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Comprobante de Pago (opcional)
+              </label>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/jpg,application/pdf"
+                onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Formatos permitidos: JPG, PNG, PDF (máx. 5MB)
+              </p>
+              {receiptFile && (
+                <p className="mt-2 text-sm text-green-600">
+                  Archivo seleccionado: {receiptFile.name}
+                </p>
+              )}
             </div>
 
             <div>
@@ -685,10 +756,15 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
               </button>
               <button
                 onClick={processPayment}
-                disabled={isProcessing}
+                disabled={isProcessing || uploadingReceipt}
                 className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isProcessing ? (
+                {uploadingReceipt ? (
+                  <>
+                    <Upload className="h-5 w-5 animate-pulse" />
+                    Subiendo comprobante...
+                  </>
+                ) : isProcessing ? (
                   <>
                     <RefreshCw className="h-5 w-5 animate-spin" />
                     Procesando...

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { DollarSign, TrendingUp, Calendar, Download, FileText, CheckCircle, Clock } from 'lucide-react';
+import { DollarSign, TrendingUp, Calendar, Download, FileText, CheckCircle, Clock, Eye, CreditCard } from 'lucide-react';
 import { format } from 'date-fns';
 import type { FinancialSummary, TourFinancialSummary, CommissionRecord } from '../../types';
 
@@ -16,6 +16,7 @@ const AgencyFinancials: React.FC = () => {
   });
   const [tourSummaries, setTourSummaries] = useState<TourFinancialSummary[]>([]);
   const [commissionRecords, setCommissionRecords] = useState<CommissionRecord[]>([]);
+  const [processedPayments, setProcessedPayments] = useState<any[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -84,19 +85,19 @@ const AgencyFinancials: React.FC = () => {
 
       setCommissionRecords(records || []);
 
-      const pending = records?.filter(r => r.status === 'pending' || r.status === 'processed').reduce((sum, r) => sum + Number(r.agency_net_amount), 0) || 0;
+      const pending = records?.filter(r => r.status === 'pending').reduce((sum, r) => sum + Number(r.agency_net_amount), 0) || 0;
 
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
 
       const paidThisMonth = records?.filter(r => {
-        if (r.status !== 'paid_out') return false;
+        if (r.status !== 'processed' && r.status !== 'paid_out') return false;
         const processedDate = new Date(r.processed_at || r.created_at);
         return processedDate >= startOfMonth;
       }).reduce((sum, r) => sum + Number(r.agency_net_amount), 0) || 0;
 
-      const totalLifetime = records?.filter(r => r.status === 'paid_out').reduce((sum, r) => sum + Number(r.agency_net_amount), 0) || 0;
+      const totalLifetime = records?.filter(r => r.status === 'processed' || r.status === 'paid_out').reduce((sum, r) => sum + Number(r.agency_net_amount), 0) || 0;
 
       setSummary({
         pending_balance: pending,
@@ -124,7 +125,7 @@ const AgencyFinancials: React.FC = () => {
             gross_revenue: 0,
             platform_commission: 0,
             net_to_agency: 0,
-            payment_status: record.status === 'paid_out' ? 'paid' : 'pending',
+            payment_status: (record.status === 'processed' || record.status === 'paid_out') ? 'paid' : 'pending',
           });
         }
 
@@ -137,6 +138,32 @@ const AgencyFinancials: React.FC = () => {
 
       setTourSummaries(Array.from(tourMap.values()).sort((a, b) =>
         new Date(b.tour_date).getTime() - new Date(a.tour_date).getTime()
+      ));
+
+      const processedPaymentsMap = new Map<string, any>();
+
+      records?.filter(r => r.status === 'processed' && r.processed_at).forEach(record => {
+        const paymentDate = format(new Date(record.processed_at), 'yyyy-MM-dd');
+        const paymentMethod = record.payment_method || 'bank_transfer';
+
+        if (!processedPaymentsMap.has(paymentDate)) {
+          processedPaymentsMap.set(paymentDate, {
+            payment_date: record.processed_at,
+            payment_method: paymentMethod,
+            total_amount: 0,
+            records_count: 0,
+            payment_receipt_url: record.payment_receipt_url,
+            payment_notes: record.payment_notes,
+          });
+        }
+
+        const payment = processedPaymentsMap.get(paymentDate)!;
+        payment.total_amount += Number(record.agency_net_amount);
+        payment.records_count++;
+      });
+
+      setProcessedPayments(Array.from(processedPaymentsMap.values()).sort((a, b) =>
+        new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()
       ));
 
     } catch (error) {
@@ -173,6 +200,17 @@ const AgencyFinancials: React.FC = () => {
         {labels[status as keyof typeof labels] || status}
       </span>
     );
+  };
+
+  const getPaymentMethodLabel = (method: string) => {
+    const labels: Record<string, string> = {
+      bank_transfer: 'Transferencia Bancaria',
+      check: 'Cheque',
+      paypal: 'PayPal',
+      mercadopago: 'Mercado Pago',
+      other: 'Otro',
+    };
+    return labels[method] || method;
   };
 
   if (isLoading && !agencyId) {
@@ -395,6 +433,67 @@ const AgencyFinancials: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {processedPayments.length > 0 && (
+        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+          <h2 className="text-xl font-bold text-gray-900 mb-6">Pagos Recibidos</h2>
+
+          <div className="space-y-4">
+            {processedPayments.map((payment, index) => (
+              <div
+                key={index}
+                className="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <CreditCard className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {formatCurrency(payment.total_amount)}
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                          {format(new Date(payment.payment_date), "dd 'de' MMMM, yyyy")}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="ml-11 space-y-1">
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium">Método:</span> {getPaymentMethodLabel(payment.payment_method)}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium">Comisiones pagadas:</span> {payment.records_count}
+                      </p>
+                      {payment.payment_notes && (
+                        <p className="text-sm text-gray-600">
+                          <span className="font-medium">Notas:</span> {payment.payment_notes}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {payment.payment_receipt_url && (
+                    <div>
+                      <a
+                        href={payment.payment_receipt_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                      >
+                        <Eye className="h-4 w-4" />
+                        Ver Comprobante
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
         <div className="flex items-start gap-3">
