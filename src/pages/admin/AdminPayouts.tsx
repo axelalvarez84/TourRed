@@ -514,46 +514,45 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
-    if (isOpen && (agencyId || tourId)) {
-      fetchPaymentDetails();
-    }
-  }, [isOpen, agencyId, tourId]);
+    const loadPaymentDetails = async () => {
+      if (isOpen && (agencyId || tourId)) {
+        try {
+          let query = supabase
+            .from('commission_records')
+            .select(`
+              *,
+              agencies!inner(id, name),
+              tours!inner(id, name, tour_code)
+            `)
+            .eq('status', 'pending');
 
-  const fetchPaymentDetails = async () => {
-    try {
-      let query = supabase
-        .from('commission_records')
-        .select(`
-          *,
-          agencies!inner(id, name),
-          tours!inner(id, name, tour_code)
-        `)
-        .eq('status', 'pending');
+          if (tourId) {
+            query = query.eq('tour_id', tourId);
+          } else if (agencyId) {
+            query = query.eq('agency_id', agencyId);
+          }
 
-      if (tourId) {
-        query = query.eq('tour_id', tourId);
-      } else if (agencyId) {
-        query = query.eq('agency_id', agencyId);
+          const { data, error } = await query;
+
+          if (error) throw error;
+
+          const totalAmount = data?.reduce((sum, record) => sum + Number(record.agency_net_amount), 0) || 0;
+          const recordsCount = data?.length || 0;
+
+          setPaymentDetails({
+            records: data,
+            totalAmount,
+            recordsCount,
+            agencyName: data?.[0]?.agencies?.name || '',
+            tourName: data?.[0]?.tours?.name || ''
+          });
+        } catch (error) {
+          console.error('Error fetching payment details:', error);
+        }
       }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      const totalAmount = data?.reduce((sum, record) => sum + Number(record.agency_net_amount), 0) || 0;
-      const recordsCount = data?.length || 0;
-
-      setPaymentDetails({
-        records: data,
-        totalAmount,
-        recordsCount,
-        agencyName: data?.[0]?.agencies?.name || '',
-        tourName: data?.[0]?.tours?.name || ''
-      });
-    } catch (error) {
-      console.error('Error fetching payment details:', error);
-    }
-  };
+    };
+    loadPaymentDetails();
+  }, [isOpen, agencyId, tourId]);
 
   const processPayment = async () => {
     if (!paymentDetails || !paymentDetails.records) return;
