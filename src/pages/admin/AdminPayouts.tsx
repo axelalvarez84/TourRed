@@ -19,7 +19,6 @@ interface AgencyPayoutSummary {
 interface CompletedTourData {
   tour_id: string;
   tour_name: string;
-  tour_code: string;
   agency_id: string;
   agency_name: string;
   end_date: string;
@@ -374,9 +373,6 @@ const AdminPayouts: React.FC = () => {
                       <tr key={tour.tour_id} className="hover:bg-gray-50">
                         <td className="px-6 py-4">
                           <div className="text-sm font-medium text-gray-900">{tour.tour_name}</div>
-                          {tour.tour_code && (
-                            <div className="text-xs text-gray-500">{tour.tour_code}</div>
-                          )}
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-900">{tour.agency_name}</div>
@@ -522,7 +518,7 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
             .select(`
               *,
               agencies!inner(id, name),
-              tours!inner(id, name, tour_code)
+              tours!inner(id, name)
             `)
             .eq('status', 'pending');
 
