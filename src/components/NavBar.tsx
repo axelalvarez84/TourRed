@@ -141,6 +141,7 @@ const NavBar: React.FC = () => {
       }
 
       menuItems.push({ to: '/admin/payouts', label: 'Gestión de Pagos' });
+      menuItems.push({ to: '/admin/referrals', label: 'Referidos' });
 
       return menuItems;
     }
@@ -164,6 +165,7 @@ const NavBar: React.FC = () => {
         { to: '/traveler/membership', label: 'ToursRed Plus' },
         { to: '/traveler/wallet', label: 'ToursRed Cash' },
         { to: '/traveler/points', label: 'ToursRed Points' },
+        { to: '/traveler/referrals', label: 'Referidos' },
       ];
     }
 
