@@ -68,19 +68,35 @@ const AdminPayouts: React.FC = () => {
       .from('commission_records')
       .select(`
         *,
-        agencies!inner(id, name),
-        payout_schedules(frequency, last_payout_date, next_scheduled_payout)
+        agencies!inner(id, name)
       `)
-      .in('status', ['pending', 'processed']);
+      .eq('status', 'pending');
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching commission records:', error);
+      throw error;
+    }
+
+    if (!commissionRecords || commissionRecords.length === 0) {
+      setAgencySummaries([]);
+      return;
+    }
+
+    const agencyIds = [...new Set(commissionRecords.map(r => r.agency_id))];
+
+    const { data: payoutSchedules } = await supabase
+      .from('payout_schedules')
+      .select('*')
+      .in('agency_id', agencyIds);
+
+    const scheduleMap = new Map(payoutSchedules?.map(s => [s.agency_id, s]) || []);
 
     const agencyMap = new Map<string, AgencyPayoutSummary>();
 
     commissionRecords?.forEach((record) => {
       const agencyId = record.agency_id;
       if (!agencyMap.has(agencyId)) {
-        const schedule = record.payout_schedules;
+        const schedule = scheduleMap.get(agencyId);
         const lastPayoutDate = schedule?.last_payout_date;
         const daysSince = lastPayoutDate
           ? Math.floor((Date.now() - new Date(lastPayoutDate).getTime()) / (1000 * 60 * 60 * 24))
