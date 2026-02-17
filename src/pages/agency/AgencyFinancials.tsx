@@ -4,8 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { DollarSign, TrendingUp, Calendar, Download, FileText, CheckCircle, Clock, Eye, CreditCard, FileSpreadsheet } from 'lucide-react';
 import { format } from 'date-fns';
 import type { FinancialSummary, TourFinancialSummary, CommissionRecord } from '../../types';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
 const AgencyFinancials: React.FC = () => {
@@ -244,16 +244,15 @@ const AgencyFinancials: React.FC = () => {
       doc.text('Resumen Financiero', 20, 65);
 
       const summaryData = [
-        ['Concepto', 'Monto'],
         ['Saldo Pendiente', formatCurrency(summary.pending_balance)],
         ['Cobrado Este Mes', formatCurrency(summary.paid_this_month)],
         ['Total Histórico', formatCurrency(summary.total_lifetime)],
       ];
 
-      (doc as any).autoTable({
+      autoTable(doc, {
         startY: 70,
-        head: [summaryData[0]],
-        body: summaryData.slice(1),
+        head: [['Concepto', 'Monto']],
+        body: summaryData,
         theme: 'grid',
         headStyles: { fillColor: [79, 70, 229] },
       });
@@ -263,23 +262,20 @@ const AgencyFinancials: React.FC = () => {
       doc.setFontSize(14);
       doc.text('Detalle por Tour', 20, currentY);
 
-      const tourData = [
-        ['Tour', 'Fecha', 'Reservas', 'Ingreso Bruto', 'Comisión', 'Neto', 'Estado'],
-        ...tourSummaries.map(tour => [
-          tour.tour_name,
-          format(new Date(tour.tour_date), 'dd/MM/yyyy'),
-          tour.bookings_count.toString(),
-          formatCurrency(tour.gross_revenue),
-          formatCurrency(tour.platform_commission),
-          formatCurrency(tour.net_to_agency),
-          tour.payment_status === 'paid' ? 'Pagado' : 'Pendiente',
-        ]),
-      ];
+      const tourData = tourSummaries.map(tour => [
+        tour.tour_name,
+        format(new Date(tour.tour_date), 'dd/MM/yyyy'),
+        tour.bookings_count.toString(),
+        formatCurrency(tour.gross_revenue),
+        formatCurrency(tour.platform_commission),
+        formatCurrency(tour.net_to_agency),
+        tour.payment_status === 'paid' ? 'Pagado' : 'Pendiente',
+      ]);
 
-      (doc as any).autoTable({
+      autoTable(doc, {
         startY: currentY + 5,
-        head: [tourData[0]],
-        body: tourData.slice(1),
+        head: [['Tour', 'Fecha', 'Reservas', 'Ingreso Bruto', 'Comisión', 'Neto', 'Estado']],
+        body: tourData,
         theme: 'striped',
         headStyles: { fillColor: [79, 70, 229] },
         styles: { fontSize: 8 },
@@ -291,20 +287,17 @@ const AgencyFinancials: React.FC = () => {
         doc.setFontSize(14);
         doc.text('Pagos Recibidos', 20, currentY);
 
-        const paymentsData = [
-          ['Fecha', 'Monto', 'Método', 'Comisiones'],
-          ...processedPayments.map(payment => [
-            format(new Date(payment.payment_date), 'dd/MM/yyyy'),
-            formatCurrency(payment.total_amount),
-            getPaymentMethodLabel(payment.payment_method),
-            payment.records_count.toString(),
-          ]),
-        ];
+        const paymentsData = processedPayments.map(payment => [
+          format(new Date(payment.payment_date), 'dd/MM/yyyy'),
+          formatCurrency(payment.total_amount),
+          getPaymentMethodLabel(payment.payment_method),
+          payment.records_count.toString(),
+        ]);
 
-        (doc as any).autoTable({
+        autoTable(doc, {
           startY: currentY + 5,
-          head: [paymentsData[0]],
-          body: paymentsData.slice(1),
+          head: [['Fecha', 'Monto', 'Método', 'Comisiones']],
+          body: paymentsData,
           theme: 'striped',
           headStyles: { fillColor: [16, 185, 129] },
         });
@@ -313,7 +306,7 @@ const AgencyFinancials: React.FC = () => {
       doc.save(`estado-cuenta-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Error al generar el PDF');
+      alert('Error al generar el PDF: ' + (error as Error).message);
     }
   };
 
@@ -327,24 +320,192 @@ const AgencyFinancials: React.FC = () => {
         .eq('id', agencyId)
         .single();
 
+      let bookingsQuery = supabase
+        .from('bookings')
+        .select(`
+          *,
+          tour:tours(name, start_date),
+          user:users!bookings_user_id_fkey(first_name, last_name, email),
+          travelers(*)
+        `)
+        .eq('tours.agency_id', agencyId)
+        .order('booking_date', { ascending: false });
+
+      if (startDate) {
+        bookingsQuery = bookingsQuery.gte('booking_date', startDate);
+      }
+      if (endDate) {
+        bookingsQuery = bookingsQuery.lte('booking_date', endDate);
+      }
+
+      const { data: bookings, error: bookingsError } = await bookingsQuery;
+
+      if (bookingsError) throw bookingsError;
+
+      const { data: commissionRecordsData } = await supabase
+        .from('commission_records')
+        .select('*')
+        .eq('agency_id', agencyId);
+
+      const commissionMap = new Map(
+        commissionRecordsData?.map(cr => [cr.booking_id, cr]) || []
+      );
+
       const wb = XLSX.utils.book_new();
 
       const summarySheet = [
-        ['Estado de Cuenta - ' + (agencyData?.name || 'Agencia')],
-        ['Fecha:', format(new Date(), 'dd/MM/yyyy')],
+        ['ESTADO DE CUENTA DETALLADO'],
+        ['Agencia:', agencyData?.name || 'N/A'],
+        ['Fecha de Generación:', format(new Date(), 'dd/MM/yyyy HH:mm')],
+        ['Período:', startDate && endDate ? `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}` : 'Completo'],
         [''],
-        ['Resumen Financiero'],
-        ['Concepto', 'Monto'],
-        ['Saldo Pendiente', summary.pending_balance],
-        ['Cobrado Este Mes', summary.paid_this_month],
-        ['Total Histórico', summary.total_lifetime],
+        ['RESUMEN FINANCIERO'],
+        ['Concepto', 'Monto (MXN)'],
+        ['Saldo Pendiente de Pago', summary.pending_balance],
+        ['Cobrado en el Mes Actual', summary.paid_this_month],
+        ['Total Histórico Cobrado', summary.total_lifetime],
+        [''],
+        ['TOTAL DE RESERVAS', bookings?.length || 0],
       ];
 
       const ws1 = XLSX.utils.aoa_to_sheet(summarySheet);
+      ws1['!cols'] = [{ wch: 30 }, { wch: 20 }];
       XLSX.utils.book_append_sheet(wb, ws1, 'Resumen');
 
-      const tourSheet = [
-        ['Detalle por Tour'],
+      const bookingsSheet = [
+        ['DETALLE COMPLETO DE RESERVAS'],
+        [''],
+        [
+          'Código Reserva',
+          'Fecha Reserva',
+          'Tour',
+          'Fecha Tour',
+          'Cliente',
+          'Email Cliente',
+          'Total Viajeros',
+          'Adultos',
+          'Niños',
+          'Infantes',
+          'Mascotas',
+          'Precio Tour',
+          'Cargo Servicio',
+          'ToursRed Cash Usado',
+          'Puntos Usados',
+          'Descuento',
+          'Total Pagado',
+          'Comisión Agencia (%)',
+          'Comisión Agencia ($)',
+          'Cargo Servicio ($)',
+          'Neto para Agencia',
+          'Estado Pago',
+          'Método Pago',
+          'Fecha Procesado',
+        ],
+        ...(bookings?.map(booking => {
+          const commission = commissionMap.get(booking.id);
+          return [
+            booking.booking_code || booking.id.slice(0, 8),
+            format(new Date(booking.booking_date), 'dd/MM/yyyy HH:mm'),
+            booking.tour?.name || 'N/A',
+            booking.tour?.start_date ? format(new Date(booking.tour.start_date), 'dd/MM/yyyy') : 'N/A',
+            `${booking.user?.first_name || ''} ${booking.user?.last_name || ''}`.trim(),
+            booking.user?.email || 'N/A',
+            booking.total_travelers || 0,
+            booking.num_adults || 0,
+            booking.num_children || 0,
+            booking.num_infants || 0,
+            booking.num_pets || 0,
+            Number(booking.tour_price) || 0,
+            Number(booking.service_charge) || 0,
+            Number(booking.toursred_cash_amount) || 0,
+            Number(booking.points_used_value) || 0,
+            Number(booking.discount_amount) || 0,
+            Number(booking.total_price) || 0,
+            commission?.agency_commission_rate || 0,
+            Number(commission?.agency_commission_amount) || 0,
+            Number(commission?.service_charge_amount) || 0,
+            Number(commission?.agency_net_amount) || 0,
+            commission?.status === 'processed' || commission?.status === 'paid_out' ? 'Pagado' : 'Pendiente',
+            commission?.payment_method ? getPaymentMethodLabel(commission.payment_method) : '-',
+            commission?.processed_at ? format(new Date(commission.processed_at), 'dd/MM/yyyy') : '-',
+          ];
+        }) || []),
+      ];
+
+      const ws2 = XLSX.utils.aoa_to_sheet(bookingsSheet);
+      ws2['!cols'] = [
+        { wch: 15 }, { wch: 18 }, { wch: 30 }, { wch: 12 }, { wch: 25 },
+        { wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+        { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 12 },
+        { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
+        { wch: 15 }, { wch: 12 }, { wch: 20 }, { wch: 15 },
+      ];
+      XLSX.utils.book_append_sheet(wb, ws2, 'Detalle Reservas');
+
+      const travelersSheet = [
+        ['DETALLE DE VIAJEROS POR RESERVA'],
+        [''],
+        [
+          'Código Reserva',
+          'Tour',
+          'Viajero',
+          'Categoría',
+          'Edad',
+          'CURP',
+          'Pasaporte',
+          'País',
+          'Teléfono',
+          'Email',
+        ],
+      ];
+
+      bookings?.forEach(booking => {
+        if (booking.travelers && Array.isArray(booking.travelers)) {
+          booking.travelers.forEach((traveler: any) => {
+            travelersSheet.push([
+              booking.booking_code || booking.id.slice(0, 8),
+              booking.tour?.name || 'N/A',
+              `${traveler.nombre || ''} ${traveler.apellido_paterno || ''} ${traveler.apellido_materno || ''}`.trim(),
+              traveler.categoria_viajero || 'N/A',
+              traveler.edad || '-',
+              traveler.curp || '-',
+              traveler.numero_pasaporte || '-',
+              traveler.pais_pasaporte || '-',
+              traveler.telefono || '-',
+              traveler.email || '-',
+            ]);
+          });
+        }
+      });
+
+      const ws3 = XLSX.utils.aoa_to_sheet(travelersSheet);
+      ws3['!cols'] = [
+        { wch: 15 }, { wch: 30 }, { wch: 35 }, { wch: 12 }, { wch: 8 },
+        { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 30 },
+      ];
+      XLSX.utils.book_append_sheet(wb, ws3, 'Viajeros');
+
+      if (processedPayments.length > 0) {
+        const paymentsSheet = [
+          ['HISTORIAL DE PAGOS RECIBIDOS'],
+          [''],
+          ['Fecha Pago', 'Monto Total', 'Método de Pago', 'Comisiones Incluidas', 'Notas'],
+          ...processedPayments.map(payment => [
+            format(new Date(payment.payment_date), 'dd/MM/yyyy'),
+            payment.total_amount,
+            getPaymentMethodLabel(payment.payment_method),
+            payment.records_count,
+            payment.payment_notes || '-',
+          ]),
+        ];
+
+        const ws4 = XLSX.utils.aoa_to_sheet(paymentsSheet);
+        ws4['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 50 }];
+        XLSX.utils.book_append_sheet(wb, ws4, 'Pagos Recibidos');
+      }
+
+      const tourSummarySheet = [
+        ['RESUMEN POR TOUR'],
         [''],
         ['Tour', 'Fecha', 'Reservas', 'Ingreso Bruto', 'Comisión Plataforma', 'Neto para Agencia', 'Estado'],
         ...tourSummaries.map(tour => [
@@ -358,31 +519,14 @@ const AgencyFinancials: React.FC = () => {
         ]),
       ];
 
-      const ws2 = XLSX.utils.aoa_to_sheet(tourSheet);
-      XLSX.utils.book_append_sheet(wb, ws2, 'Tours');
+      const ws5 = XLSX.utils.aoa_to_sheet(tourSummarySheet);
+      ws5['!cols'] = [{ wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 12 }];
+      XLSX.utils.book_append_sheet(wb, ws5, 'Resumen Tours');
 
-      if (processedPayments.length > 0) {
-        const paymentsSheet = [
-          ['Pagos Recibidos'],
-          [''],
-          ['Fecha', 'Monto', 'Método de Pago', 'Comisiones Pagadas', 'Notas'],
-          ...processedPayments.map(payment => [
-            format(new Date(payment.payment_date), 'dd/MM/yyyy'),
-            payment.total_amount,
-            getPaymentMethodLabel(payment.payment_method),
-            payment.records_count,
-            payment.payment_notes || '-',
-          ]),
-        ];
-
-        const ws3 = XLSX.utils.aoa_to_sheet(paymentsSheet);
-        XLSX.utils.book_append_sheet(wb, ws3, 'Pagos');
-      }
-
-      XLSX.writeFile(wb, `estado-cuenta-${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+      XLSX.writeFile(wb, `estado-cuenta-detallado-${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
     } catch (error) {
       console.error('Error generating Excel:', error);
-      alert('Error al generar el archivo Excel');
+      alert('Error al generar el archivo Excel: ' + (error as Error).message);
     }
   };
 
