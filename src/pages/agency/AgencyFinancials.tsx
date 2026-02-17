@@ -324,11 +324,9 @@ const AgencyFinancials: React.FC = () => {
         .from('bookings')
         .select(`
           *,
-          tour:tours(name, start_date),
-          user:users!bookings_user_id_fkey(first_name, last_name, email),
-          travelers(*)
+          tour:tours!inner(name, start_date, agency_id)
         `)
-        .eq('tours.agency_id', agencyId)
+        .eq('tour.agency_id', agencyId)
         .order('booking_date', { ascending: false });
 
       if (startDate) {
@@ -341,6 +339,35 @@ const AgencyFinancials: React.FC = () => {
       const { data: bookings, error: bookingsError } = await bookingsQuery;
 
       if (bookingsError) throw bookingsError;
+
+      const userIds = [...new Set(bookings?.map(b => b.user_id).filter(Boolean))];
+      const usersMap = new Map();
+
+      if (userIds.length > 0) {
+        const { data: usersData } = await supabase
+          .from('users')
+          .select('id, first_name, last_name, email')
+          .in('id', userIds);
+
+        usersData?.forEach(u => usersMap.set(u.id, u));
+      }
+
+      const bookingIds = bookings?.map(b => b.id) || [];
+      const travelersMap = new Map<string, any[]>();
+
+      if (bookingIds.length > 0) {
+        const { data: travelersData } = await supabase
+          .from('booking_travelers')
+          .select('*')
+          .in('booking_id', bookingIds);
+
+        travelersData?.forEach(traveler => {
+          if (!travelersMap.has(traveler.booking_id)) {
+            travelersMap.set(traveler.booking_id, []);
+          }
+          travelersMap.get(traveler.booking_id)!.push(traveler);
+        });
+      }
 
       const { data: commissionRecordsData } = await supabase
         .from('commission_records')
@@ -403,13 +430,14 @@ const AgencyFinancials: React.FC = () => {
         ],
         ...(bookings?.map(booking => {
           const commission = commissionMap.get(booking.id);
+          const user = usersMap.get(booking.user_id);
           return [
             booking.booking_code || booking.id.slice(0, 8),
             format(new Date(booking.booking_date), 'dd/MM/yyyy HH:mm'),
             booking.tour?.name || 'N/A',
             booking.tour?.start_date ? format(new Date(booking.tour.start_date), 'dd/MM/yyyy') : 'N/A',
-            `${booking.user?.first_name || ''} ${booking.user?.last_name || ''}`.trim(),
-            booking.user?.email || 'N/A',
+            `${user?.first_name || ''} ${user?.last_name || ''}`.trim(),
+            user?.email || 'N/A',
             booking.total_travelers || 0,
             booking.num_adults || 0,
             booking.num_children || 0,
@@ -450,38 +478,33 @@ const AgencyFinancials: React.FC = () => {
           'Tour',
           'Viajero',
           'Categoría',
-          'Edad',
-          'CURP',
-          'Pasaporte',
-          'País',
+          'Fecha Nacimiento',
           'Teléfono',
           'Email',
+          'Precio Aplicado',
         ],
       ];
 
       bookings?.forEach(booking => {
-        if (booking.travelers && Array.isArray(booking.travelers)) {
-          booking.travelers.forEach((traveler: any) => {
-            travelersSheet.push([
-              booking.booking_code || booking.id.slice(0, 8),
-              booking.tour?.name || 'N/A',
-              `${traveler.nombre || ''} ${traveler.apellido_paterno || ''} ${traveler.apellido_materno || ''}`.trim(),
-              traveler.categoria_viajero || 'N/A',
-              traveler.edad || '-',
-              traveler.curp || '-',
-              traveler.numero_pasaporte || '-',
-              traveler.pais_pasaporte || '-',
-              traveler.telefono || '-',
-              traveler.email || '-',
-            ]);
-          });
-        }
+        const travelers = travelersMap.get(booking.id) || [];
+        travelers.forEach((traveler: any) => {
+          travelersSheet.push([
+            booking.booking_code || booking.id.slice(0, 8),
+            booking.tour?.name || 'N/A',
+            traveler.nombre || '-',
+            traveler.categoria_viajero || 'N/A',
+            traveler.fecha_nacimiento ? format(new Date(traveler.fecha_nacimiento), 'dd/MM/yyyy') : '-',
+            traveler.telefono || '-',
+            traveler.email || '-',
+            Number(traveler.precio_aplicado) || 0,
+          ]);
+        });
       });
 
       const ws3 = XLSX.utils.aoa_to_sheet(travelersSheet);
       ws3['!cols'] = [
-        { wch: 15 }, { wch: 30 }, { wch: 35 }, { wch: 12 }, { wch: 8 },
-        { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 30 },
+        { wch: 15 }, { wch: 30 }, { wch: 35 }, { wch: 15 }, { wch: 18 },
+        { wch: 15 }, { wch: 30 }, { wch: 15 },
       ];
       XLSX.utils.book_append_sheet(wb, ws3, 'Viajeros');
 
