@@ -29,6 +29,7 @@ import AgencyBookings from './pages/agency/AgencyBookings';
 import AgencyProfile from './pages/agency/AgencyProfile';
 import AgencyDestinations from './pages/agency/AgencyDestinations';
 import AgencyDiscountCodes from './pages/agency/AgencyDiscountCodes';
+import AgencyFinancials from './pages/agency/AgencyFinancials';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminAgencies from './pages/admin/AdminAgencies';
 import AdminUsers from './pages/admin/AdminUsers';
@@ -44,6 +45,7 @@ import AdminMemberships from './pages/admin/AdminMemberships';
 import AdminPoints from './pages/admin/AdminPoints';
 import AdminInternationalInquiries from './pages/admin/AdminInternationalInquiries';
 import AdminDiscountCodes from './pages/admin/AdminDiscountCodes';
+import AdminPayouts from './pages/admin/AdminPayouts';
 import MegaTravelPage from './pages/international/MegaTravelPage';
 import NefertariTravelPage from './pages/international/NefertariTravelPage';
 import ExoticcaPage from './pages/international/ExoticcaPage';
@@ -242,6 +244,14 @@ const App: React.FC = () => {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/agency/financials"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.AGENCY]}>
+                <AgencyFinancials />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Admin Routes */}
           <Route
@@ -369,6 +379,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                 <AdminDiscountCodes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/payouts"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminPayouts />
               </ProtectedRoute>
             }
           />

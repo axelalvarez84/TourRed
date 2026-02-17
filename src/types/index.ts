@@ -425,3 +425,141 @@ export interface AgencyTour {
   end_date: string;
   image_url: string;
 }
+
+export interface AgencyPayout {
+  id: string;
+  payout_code: string;
+  agency_id: string;
+  payout_batch_id?: string;
+  amount: number;
+  payment_method: string;
+  bank_reference?: string;
+  payment_date: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  receipt_url?: string;
+  notes?: string;
+  commission_records_count: number;
+  processed_by?: string;
+  external_transaction_id?: string;
+  bank_account_id?: string;
+  erp_sync_status: 'not_synced' | 'syncing' | 'synced' | 'failed';
+  erp_invoice_id?: string;
+  erp_reference?: string;
+  email_sent: boolean;
+  created_at: string;
+  updated_at: string;
+  agencies?: Agency;
+  processed_by_user?: User;
+}
+
+export interface PayoutBatch {
+  id: string;
+  batch_code: string;
+  period_start: string;
+  period_end: string;
+  total_amount: number;
+  agencies_count: number;
+  payouts_count: number;
+  status: 'draft' | 'processing' | 'completed' | 'cancelled';
+  processed_by?: string;
+  processed_at?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  processed_by_user?: User;
+  agency_payouts?: AgencyPayout[];
+}
+
+export interface FinancialTransaction {
+  id: string;
+  transaction_code: string;
+  transaction_type: 'booking_confirmed' | 'cancellation_full' | 'cancellation_partial' | 'no_show' | 'tour_cancelled_by_agency' | 'adjustment' | 'payout';
+  booking_id?: string;
+  cancellation_id?: string;
+  tour_id: string;
+  agency_id: string;
+  payout_id?: string;
+  transaction_date: string;
+  tour_start_date: string;
+  gross_amount: number;
+  commission_rate: number;
+  commission_amount: number;
+  net_to_agency: number;
+  platform_revenue: number;
+  reconciliation_status: 'pending' | 'reconciled' | 'disputed';
+  payment_status: 'pending' | 'scheduled' | 'paid';
+  notes?: string;
+  metadata?: any;
+  created_at: string;
+  updated_at: string;
+  bookings?: Booking;
+  tours?: Tour;
+  agencies?: Agency;
+  payouts?: AgencyPayout;
+}
+
+export interface PayoutSchedule {
+  id: string;
+  agency_id: string;
+  frequency: 'weekly' | 'biweekly' | 'monthly' | 'custom';
+  payment_day?: number;
+  minimum_amount: number;
+  preferred_payment_method?: string;
+  bank_name?: string;
+  bank_account_number?: string;
+  bank_account_holder?: string;
+  bank_clabe?: string;
+  is_active: boolean;
+  auto_payout_enabled: boolean;
+  last_payout_date?: string;
+  next_scheduled_payout?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  agencies?: Agency;
+}
+
+export interface IntegrationConfig {
+  id: string;
+  provider: 'zoho_books' | 'odoo' | 'quickbooks' | 'bank_api' | 'other';
+  agency_id?: string;
+  is_active: boolean;
+  credentials_encrypted?: string;
+  api_endpoint?: string;
+  sync_frequency?: 'hourly' | 'daily' | 'weekly' | 'manual';
+  last_sync_at?: string;
+  last_sync_status?: 'success' | 'failed' | 'in_progress';
+  error_log?: any;
+  config_data?: any;
+  created_at: string;
+  updated_at: string;
+  agencies?: Agency;
+}
+
+export interface FinancialSummary {
+  pending_balance: number;
+  paid_this_month: number;
+  total_lifetime: number;
+  next_payout_date?: string;
+  next_payout_amount?: number;
+}
+
+export interface TourFinancialSummary {
+  tour_id: string;
+  tour_name: string;
+  tour_date: string;
+  bookings_count: number;
+  gross_revenue: number;
+  platform_commission: number;
+  net_to_agency: number;
+  payment_status: 'pending' | 'scheduled' | 'paid';
+  paid_date?: string;
+}
+
+export interface PayoutRequest {
+  agency_id: string;
+  commission_record_ids: string[];
+  payment_method: string;
+  bank_reference?: string;
+  notes?: string;
+}

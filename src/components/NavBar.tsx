@@ -140,6 +140,8 @@ const NavBar: React.FC = () => {
         menuItems.push({ to: '/admin/discount-codes', label: 'Códigos Descuento' });
       }
 
+      menuItems.push({ to: '/admin/payouts', label: 'Gestión de Pagos' });
+
       return menuItems;
     }
 
@@ -150,6 +152,7 @@ const NavBar: React.FC = () => {
         { to: '/agency/destinations', label: 'Destinos' },
         { to: '/agency/bookings', label: 'Reservas' },
         { to: '/agency/discount-codes', label: 'Códigos Descuento' },
+        { to: '/agency/financials', label: 'Finanzas' },
       ];
     }
 
