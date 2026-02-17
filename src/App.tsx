@@ -23,6 +23,7 @@ import MembershipCheckout from './pages/traveler/MembershipCheckout';
 import TravelerWallet from './pages/traveler/TravelerWallet';
 import TravelerPoints from './pages/traveler/TravelerPoints';
 import TravelerCompanions from './pages/traveler/TravelerCompanions';
+import TravelerReferrals from './pages/traveler/TravelerReferrals';
 import AgencyDashboard from './pages/agency/AgencyDashboard';
 import AgencyTours from './pages/agency/AgencyTours';
 import AgencyBookings from './pages/agency/AgencyBookings';
@@ -46,6 +47,7 @@ import AdminPoints from './pages/admin/AdminPoints';
 import AdminInternationalInquiries from './pages/admin/AdminInternationalInquiries';
 import AdminDiscountCodes from './pages/admin/AdminDiscountCodes';
 import AdminPayouts from './pages/admin/AdminPayouts';
+import AdminReferrals from './pages/admin/AdminReferrals';
 import MegaTravelPage from './pages/international/MegaTravelPage';
 import NefertariTravelPage from './pages/international/NefertariTravelPage';
 import ExoticcaPage from './pages/international/ExoticcaPage';
@@ -191,6 +193,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.TRAVELER]}>
                 <TravelerCompanions />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/traveler/referrals"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.TRAVELER]}>
+                <TravelerReferrals />
               </ProtectedRoute>
             }
           />
@@ -387,6 +397,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                 <AdminPayouts />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/referrals"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminReferrals />
               </ProtectedRoute>
             }
           />

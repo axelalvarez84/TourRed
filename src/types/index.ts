@@ -14,6 +14,8 @@ export interface User {
   verification_code_attempts?: number;
   phone_number?: string;
   profile_picture_url?: string;
+  referred_by_user_id?: string;
+  referral_code_used?: string;
 }
 
 export interface Agency {
@@ -196,7 +198,7 @@ export interface FrequentCompanion {
 export interface Notification {
   id: string;
   user_id: string;
-  type: 'booking_pending_approval' | 'booking_approved' | 'booking_rejected' | 'booking_confirmed' | 'booking_cancelled' | 'message_received' | 'tour_updated' | 'system_announcement' | 'tour_rescheduled';
+  type: 'booking_pending_approval' | 'booking_approved' | 'booking_rejected' | 'booking_confirmed' | 'booking_cancelled' | 'message_received' | 'tour_updated' | 'system_announcement' | 'tour_rescheduled' | 'referral_signup' | 'referral_completed' | 'referral_bonus_earned';
   title: string;
   message: string;
   data?: any;
@@ -562,4 +564,87 @@ export interface PayoutRequest {
   payment_method: string;
   bank_reference?: string;
   notes?: string;
+}
+
+export interface ReferralCode {
+  id: string;
+  user_id: string;
+  code: string;
+  is_active: boolean;
+  successful_referrals_count: number;
+  max_referrals_allowed: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReferralRelationship {
+  id: string;
+  referrer_user_id: string;
+  referred_user_id: string;
+  referral_code_used: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  referrer_bonus_awarded: boolean;
+  referred_bonus_awarded: boolean;
+  first_booking_id?: string;
+  created_at: string;
+  completed_at?: string;
+  is_suspicious: boolean;
+  referrer?: User;
+  referred?: User;
+  bookings?: Booking;
+}
+
+export interface ReferralBonus {
+  id: string;
+  referral_relationship_id: string;
+  user_id: string;
+  points_amount: number;
+  status: 'pending' | 'awarded' | 'expired';
+  awarded_at?: string;
+  reason: string;
+  created_at: string;
+}
+
+export interface ReferralStats {
+  total_referrals: number;
+  completed_referrals: number;
+  pending_referrals: number;
+  total_points_earned: number;
+  referral_code: string;
+  max_referrals: number;
+  is_max_reached: boolean;
+}
+
+export interface ReferralValidationResult {
+  valid: boolean;
+  code?: string;
+  referrer_name?: string;
+  referrer_id?: string;
+  message?: string;
+}
+
+export interface PointsWallet {
+  id: string;
+  user_id: string;
+  balance: number;
+  total_earned: number;
+  total_used: number;
+  total_expired: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PointsTransaction {
+  id: string;
+  user_id: string;
+  amount: number;
+  balance_after: number;
+  type: 'earned' | 'redeemed' | 'expired' | 'refund' | 'adjustment';
+  description: string;
+  reference_type: string | null;
+  reference_id: string | null;
+  expires_at: string | null;
+  created_at: string;
+  booking_code?: string | null;
 }

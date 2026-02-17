@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle, XCircle, Loader } from 'lucide-react';
 import { signUp, supabase, UserRole } from '../../lib/supabase';
 
 const SignupPage: React.FC = () => {
@@ -11,9 +11,19 @@ const SignupPage: React.FC = () => {
   const [isForeignTraveler, setIsForeignTraveler] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [referralCode, setReferralCode] = useState('');
+  const [isValidatingReferral, setIsValidatingReferral] = useState(false);
+  const [referralValidation, setReferralValidation] = useState<{
+    valid: boolean;
+    message: string;
+    referrer_name?: string;
+    referrer_id?: string;
+  } | null>(null);
 
   const searchParams = new URLSearchParams(location.search);
   const redirectUrl = searchParams.get('redirect');
+  const refCode = searchParams.get('ref');
+
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -34,6 +44,12 @@ const SignupPage: React.FC = () => {
     country: 'México'
   });
 
+  useEffect(() => {
+    if (refCode) {
+      setReferralCode(refCode.toUpperCase());
+    }
+  }, [refCode]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -41,6 +57,51 @@ const SignupPage: React.FC = () => {
       [name]: name === 'curp' || name === 'passportNumber' ? value.toUpperCase() : value
     }));
   };
+
+  const validateReferralCode = async (code: string) => {
+    if (!code || code.trim().length === 0) {
+      setReferralValidation(null);
+      return;
+    }
+
+    setIsValidatingReferral(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/validate-referral-code`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ code: code.toUpperCase() }),
+        }
+      );
+
+      const data = await response.json();
+      setReferralValidation(data);
+    } catch (err) {
+      console.error('Error validating referral code:', err);
+      setReferralValidation({
+        valid: false,
+        message: 'Error al validar código'
+      });
+    } finally {
+      setIsValidatingReferral(false);
+    }
+  };
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (referralCode && referralCode.trim().length >= 4) {
+        validateReferralCode(referralCode);
+      } else {
+        setReferralValidation(null);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [referralCode]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -120,6 +181,44 @@ const SignupPage: React.FC = () => {
       }
 
       console.log('✅ Registro exitoso:', { user: data.user, profile: profileData, isExistingUser });
+
+      if (referralValidation?.valid && referralValidation.referrer_id && !isExistingUser) {
+        try {
+          const { error: referrerUpdateError } = await supabase
+            .from('users')
+            .update({
+              referred_by_user_id: referralValidation.referrer_id,
+              referral_code_used: referralCode.toUpperCase()
+            })
+            .eq('id', data.user.id);
+
+          if (referrerUpdateError) {
+            console.error('Error updating referrer info:', referrerUpdateError);
+          }
+
+          const { error: relationshipError } = await supabase
+            .from('referral_relationships')
+            .insert({
+              referrer_user_id: referralValidation.referrer_id,
+              referred_user_id: data.user.id,
+              referral_code_used: referralCode.toUpperCase(),
+              status: 'pending'
+            });
+
+          if (relationshipError) {
+            console.error('Error creating referral relationship:', relationshipError);
+          } else {
+            await supabase.from('notifications').insert({
+              user_id: referralValidation.referrer_id,
+              type: 'referral_signup',
+              title: '¡Nuevo referido!',
+              message: `${firstName} ${lastName} se ha registrado usando tu código de referido`,
+            });
+          }
+        } catch (refError) {
+          console.error('Error processing referral:', refError);
+        }
+      }
 
       if (isExistingUser) {
         setError('Usuario ya registrado. Se ha iniciado sesión automáticamente.');
@@ -259,6 +358,50 @@ const SignupPage: React.FC = () => {
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                 />
               </div>
+            </div>
+
+            <div>
+              <label htmlFor="referralCode" className="block text-sm font-medium text-gray-700">
+                Código de Referido <span className="text-gray-400 font-normal">(Opcional)</span>
+              </label>
+              <div className="mt-1 relative">
+                <input
+                  id="referralCode"
+                  name="referralCode"
+                  type="text"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                  placeholder="Ej: ABC12345"
+                  maxLength={8}
+                  className="appearance-none block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm uppercase"
+                />
+                {isValidatingReferral && (
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <Loader className="h-5 w-5 text-gray-400 animate-spin" />
+                  </div>
+                )}
+                {!isValidatingReferral && referralValidation && (
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    {referralValidation.valid ? (
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-500" />
+                    )}
+                  </div>
+                )}
+              </div>
+              {referralValidation && (
+                <p className={`mt-1 text-sm ${referralValidation.valid ? 'text-green-600' : 'text-red-600'}`}>
+                  {referralValidation.valid && referralValidation.referrer_name
+                    ? `Código válido - Referido por ${referralValidation.referrer_name}`
+                    : referralValidation.message}
+                </p>
+              )}
+              {!referralValidation && !isValidatingReferral && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Gana 5,000 puntos al completar tu primera reserva
+                </p>
+              )}
             </div>
 
             <div>

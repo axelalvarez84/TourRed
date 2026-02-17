@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard, Crown } from 'lucide-react';
+import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard, Crown, Gift, Award } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface EmailSettings {
@@ -20,6 +20,9 @@ interface PlatformSettings {
   stripe_annual_price_id: string;
   membership_monthly_price: number;
   membership_annual_price: number;
+  default_max_referrals_per_user: number;
+  referral_bonus_points: number;
+  referral_program_enabled: boolean;
 }
 
 const AdminSettings: React.FC = () => {
@@ -40,6 +43,9 @@ const AdminSettings: React.FC = () => {
     stripe_annual_price_id: '',
     membership_monthly_price: 49,
     membership_annual_price: 490,
+    default_max_referrals_per_user: 10,
+    referral_bonus_points: 5000,
+    referral_program_enabled: true,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -112,6 +118,9 @@ const AdminSettings: React.FC = () => {
             stripe_annual_price_id: platformSettings.stripe_annual_price_id,
             membership_monthly_price: platformSettings.membership_monthly_price,
             membership_annual_price: platformSettings.membership_annual_price,
+            default_max_referrals_per_user: platformSettings.default_max_referrals_per_user,
+            referral_bonus_points: platformSettings.referral_bonus_points,
+            referral_program_enabled: platformSettings.referral_program_enabled,
             updated_at: new Date().toISOString(),
             updated_by: user?.id
           })
@@ -149,11 +158,11 @@ const AdminSettings: React.FC = () => {
   };
 
   const handlePlatformChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    const numericFields = ['service_charge_percentage', 'agency_commission_percentage', 'membership_monthly_price', 'membership_annual_price'];
+    const { name, value, type, checked } = e.target;
+    const numericFields = ['service_charge_percentage', 'agency_commission_percentage', 'membership_monthly_price', 'membership_annual_price', 'default_max_referrals_per_user', 'referral_bonus_points'];
     setPlatformSettings(prev => ({
       ...prev,
-      [name]: numericFields.includes(name) ? (parseFloat(value) || 0) : value,
+      [name]: type === 'checkbox' ? checked : (numericFields.includes(name) ? (parseFloat(value) || 0) : value),
     }));
   };
 
@@ -445,6 +454,100 @@ const AdminSettings: React.FC = () => {
                 ({Math.round((((platformSettings.membership_monthly_price * 12) - platformSettings.membership_annual_price) / (platformSettings.membership_monthly_price * 12)) * 100)}% de descuento)
               </p>
               <p>• Equivalente Mensual del Plan Anual = ${(platformSettings.membership_annual_price / 12).toFixed(2)} MXN/mes</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <Gift className="w-6 h-6 text-blue-600" />
+            <h2 className="text-xl font-semibold text-gray-900">
+              Programa de Referidos
+            </h2>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-4">
+            <div className="flex items-start">
+              <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
+              <div className="text-sm text-blue-800">
+                <p className="font-medium mb-2">Configuración del programa de referidos:</p>
+                <ul className="space-y-1 text-xs">
+                  <li>• Los usuarios pueden invitar amigos usando su código de referido único</li>
+                  <li>• Ambos usuarios ganan puntos cuando el referido completa su primera reserva</li>
+                  <li>• Los puntos solo se pueden usar con membresía activa</li>
+                  <li>• El límite de referidos puede ajustarse individualmente desde la página de gestión</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="referral_program_enabled"
+                name="referral_program_enabled"
+                checked={platformSettings.referral_program_enabled}
+                onChange={handlePlatformChange}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="referral_program_enabled" className="ml-2 block text-sm font-medium text-gray-700">
+                Habilitar Programa de Referidos
+              </label>
+            </div>
+
+            <div>
+              <label htmlFor="referral_bonus_points" className="block text-sm font-medium text-gray-700 mb-1">
+                Puntos de Bono por Referido
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                Cantidad de puntos que ganan tanto el referidor como el referido
+              </p>
+              <div className="relative">
+                <Award className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="number"
+                  id="referral_bonus_points"
+                  name="referral_bonus_points"
+                  value={platformSettings.referral_bonus_points}
+                  onChange={handlePlatformChange}
+                  min="100"
+                  step="100"
+                  required
+                  disabled={!platformSettings.referral_program_enabled}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                />
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Equivalente a ${(platformSettings.referral_bonus_points / 100).toFixed(2)} MXN
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="default_max_referrals_per_user" className="block text-sm font-medium text-gray-700 mb-1">
+                Límite de Referidos por Usuario
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                Número máximo de referidos que cada usuario puede tener por defecto
+              </p>
+              <div className="relative">
+                <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="number"
+                  id="default_max_referrals_per_user"
+                  name="default_max_referrals_per_user"
+                  value={platformSettings.default_max_referrals_per_user}
+                  onChange={handlePlatformChange}
+                  min="1"
+                  max="100"
+                  required
+                  disabled={!platformSettings.referral_program_enabled}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                />
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Este límite puede ajustarse individualmente por usuario desde la página de gestión de referidos
+              </p>
             </div>
           </div>
         </div>

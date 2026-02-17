@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Heart, Clock, CheckCircle, Crown, Sparkles, Wallet, Award } from 'lucide-react';
+import { Calendar, MapPin, Heart, Clock, CheckCircle, Crown, Sparkles, Wallet, Award, Gift, Copy, ExternalLink } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Link } from 'react-router-dom';
@@ -62,6 +62,9 @@ const TravelerDashboard: React.FC = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [referralCode, setReferralCode] = useState<string>('');
+  const [referralStats, setReferralStats] = useState<{completed: number; max: number; points: number}>({completed: 0, max: 10, points: 0});
+  const [copySuccess, setCopySuccess] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -174,6 +177,30 @@ const TravelerDashboard: React.FC = () => {
       }
 
       setPointsWalletActive(membershipData?.status === 'active' || false);
+
+      const { data: referralData } = await supabase
+        .from('referral_codes')
+        .select('code, successful_referrals_count, max_referrals_allowed')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (referralData) {
+        setReferralCode(referralData.code);
+
+        const { data: bonusData } = await supabase
+          .from('referral_bonuses')
+          .select('points_amount')
+          .eq('user_id', user.id)
+          .eq('status', 'awarded');
+
+        const totalPointsFromReferrals = bonusData?.reduce((sum, b) => sum + b.points_amount, 0) || 0;
+
+        setReferralStats({
+          completed: referralData.successful_referrals_count,
+          max: referralData.max_referrals_allowed,
+          points: totalPointsFromReferrals
+        });
+      }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -188,6 +215,14 @@ const TravelerDashboard: React.FC = () => {
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  const handleCopyReferralCode = () => {
+    if (referralCode) {
+      navigator.clipboard.writeText(referralCode);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    }
   };
 
   const removeSavedTour = async (tourId: string) => {
@@ -528,6 +563,80 @@ const TravelerDashboard: React.FC = () => {
           <div className="mt-3 bg-white/10 backdrop-blur-sm rounded-lg p-3 text-xs text-amber-100">
             <p>Gana 1 punto por cada peso gastado. Usa hasta el 50% del total de tu reserva con puntos. Tus puntos nunca expiran.</p>
           </div>
+        </div>
+      )}
+
+      {referralCode && (
+        <div className="mb-8 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 rounded-xl shadow-lg p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
+                <Gift className="h-8 w-8" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold">Programa de Referidos</h3>
+                <p className="text-blue-100 text-sm">Invita amigos y gana puntos</p>
+              </div>
+            </div>
+            <Link
+              to="/traveler/referrals"
+              className="bg-white text-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-blue-50 transition-colors text-sm flex items-center gap-2"
+            >
+              Ver Detalles
+              <ExternalLink className="w-4 h-4" />
+            </Link>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+              <p className="text-blue-100 text-sm mb-2">Tu código de referido</p>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-bold font-mono tracking-wider flex-1">{referralCode}</span>
+                <button
+                  onClick={handleCopyReferralCode}
+                  className="bg-white/20 hover:bg-white/30 p-2 rounded-lg transition-colors"
+                  title="Copiar código"
+                >
+                  {copySuccess ? (
+                    <CheckCircle className="w-5 h-5" />
+                  ) : (
+                    <Copy className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+              <p className="text-blue-100 text-sm mb-2">Tu progreso</p>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-2xl font-bold">{referralStats.completed}/{referralStats.max}</span>
+                <span className="text-sm text-blue-100">Referidos completados</span>
+              </div>
+              <div className="w-full bg-white/20 rounded-full h-2">
+                <div
+                  className="bg-white rounded-full h-2 transition-all duration-300"
+                  style={{ width: `${(referralStats.completed / referralStats.max) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          {referralStats.points > 0 && (
+            <div className="mt-4 bg-green-500/20 border border-green-400/30 rounded-lg p-3">
+              <p className="text-sm text-green-100">
+                Has ganado <strong className="font-bold">{referralStats.points.toLocaleString()} puntos</strong> por tus referidos completados
+                {!membership && ' (activa tu membresía para usarlos)'}
+              </p>
+            </div>
+          )}
+
+          {referralStats.completed >= referralStats.max && (
+            <div className="mt-4 bg-amber-500/20 border border-amber-300/30 rounded-lg p-3">
+              <p className="text-sm text-amber-100">
+                Has alcanzado tu límite de referidos. Contacta al administrador para aumentarlo.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
