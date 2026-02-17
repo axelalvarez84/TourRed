@@ -182,12 +182,12 @@ const AgencyFinancials: React.FC = () => {
         const summary = tourMap.get(tourId)!;
         summary.bookings_count++;
 
-        if (!isCancelled) {
-          summary.gross_revenue += Number(booking.user_payment) || 0;
-          summary.platform_commission += Number(record.agency_commission_amount) + Number(record.service_charge_amount);
-        }
+        const commissionAmount = Number(record.agency_commission_amount) + Number(record.service_charge_amount);
+        const netAmount = Number(record.agency_net_amount);
 
-        summary.net_to_agency += Number(record.agency_net_amount);
+        summary.gross_revenue += netAmount + commissionAmount;
+        summary.platform_commission += commissionAmount;
+        summary.net_to_agency += netAmount;
       });
 
       setTourSummaries(Array.from(tourMap.values()).sort((a, b) =>
