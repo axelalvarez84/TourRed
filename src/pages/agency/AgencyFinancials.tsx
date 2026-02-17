@@ -69,6 +69,7 @@ const AgencyFinancials: React.FC = () => {
             payment_status,
             status,
             cancelled_at,
+            user_payment,
             tours!inner(name, start_date)
           )
         `)
@@ -182,7 +183,7 @@ const AgencyFinancials: React.FC = () => {
         summary.bookings_count++;
 
         if (!isCancelled) {
-          summary.gross_revenue += Number(record.total_tour_price);
+          summary.gross_revenue += Number(booking.user_payment) || 0;
           summary.platform_commission += Number(record.agency_commission_amount) + Number(record.service_charge_amount);
         }
 
