@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination, getTourCategories } from '../../lib/supabase';
-import { Plus, Search, X, Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle } from 'lucide-react';
+import { Plus, Search, X, Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban } from 'lucide-react';
 import { Tour, Destination, DeparturePoint } from '../../types';
 import { format } from 'date-fns';
 import ImageUploader from '../../components/ImageUploader';
@@ -1409,581 +1409,654 @@ const AgencyTours: React.FC = () => {
 
       {/* Formulario de Crear/Editar */}
       {(isCreating || editingTour) && (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">
-              {editingTour ? `Editar Tour: ${editingTour.name}` : 'Crear Nuevo Tour'}
-            </h2>
-            {isCreating && (
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <Save className="w-4 h-4" />
-                <span>Guardado automático activo</span>
+        <div className="mb-6 space-y-5">
+          {/* Header del formulario */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  {editingTour ? `Editando: ${editingTour.name}` : 'Crear Nuevo Tour'}
+                </h2>
+                <p className="text-sm text-gray-500 mt-0.5">Completa cada sección para publicar tu tour</p>
               </div>
-            )}
+              {isCreating && (
+                <div className="flex items-center gap-2 text-sm text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full">
+                  <Save className="w-4 h-4" />
+                  <span>Borrador guardado automáticamente</span>
+                </div>
+              )}
+            </div>
           </div>
-          
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre del Tour *
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="input"
-                  required
-                />
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Categorías * <span className="text-xs text-gray-500">(Selecciona al menos una)</span>
-                </label>
-                <div className="space-y-2">
+          <form onSubmit={handleSubmit} className="space-y-5">
+
+            {/* SECCIÓN 1 — Información General */}
+            <div className="bg-white rounded-xl shadow-sm border border-blue-100 overflow-hidden">
+              <div className="bg-blue-600 px-5 py-3 flex items-center gap-2">
+                <div className="bg-white/20 rounded-lg p-1.5">
+                  <FileText className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold text-sm">Paso 1 — Información General</h3>
+                  <p className="text-blue-100 text-xs">Nombre, categoría y descripción del tour</p>
+                </div>
+                <span className="ml-auto bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">Requerido</span>
+              </div>
+              <div className="p-5 space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Nombre del Tour <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    className="input"
+                    placeholder="Ej: Tour Mágico por Oaxaca 3 días"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Categorías <span className="text-red-500">*</span>
+                    <span className="ml-2 text-xs font-normal text-gray-500">Selecciona al menos una</span>
+                  </label>
                   {categories.length === 0 ? (
                     <p className="text-sm text-gray-500 italic">Cargando categorías...</p>
                   ) : (
-                    categories.map((cat) => (
-                      <label key={cat.slug} className="flex items-center space-x-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.category.includes(cat.slug)}
-                        onChange={() => handleCategoryToggle(cat.slug)}
-                        className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                      />
-                      <span className="text-sm text-gray-700">{cat.name}</span>
-                    </label>
-                  ))
+                    <div className="flex flex-wrap gap-2">
+                      {categories.map((cat) => {
+                        const isSelected = formData.category.includes(cat.slug);
+                        return (
+                          <button
+                            key={cat.slug}
+                            type="button"
+                            onClick={() => handleCategoryToggle(cat.slug)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all ${
+                              isSelected
+                                ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                                : 'bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600'
+                            }`}
+                          >
+                            <Tag className="w-3 h-3" />
+                            {cat.name}
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
-
+                  {formData.category.length === 0 && (
+                    <p className="text-sm text-red-500 mt-2 flex items-center gap-1">
+                      <AlertCircle className="w-4 h-4" />
+                      Debes seleccionar al menos una categoría
+                    </p>
+                  )}
                 </div>
-                {formData.category.length === 0 && (
-                  <p className="text-sm text-red-500 mt-1">⚠️ Debes seleccionar al menos una categoría</p>
-                )}
-              </div>
 
-              <div className="space-y-2">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.pet_friendly}
-                    onChange={(e) => setFormData({...formData, pet_friendly: e.target.checked})}
-                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Pet Friendly (Admite mascotas)</span>
-                </label>
-                {formData.pet_friendly && (
-                  <input
-                    type="number"
-                    value={formData.precio_mascota}
-                    onChange={(e) => setFormData({...formData, precio_mascota: e.target.value})}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Descripción <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({...formData, description: e.target.value})}
                     className="input"
-                    min="0"
-                    step="0.01"
-                    placeholder="Precio por mascota"
+                    rows={3}
+                    placeholder="Describe brevemente qué hace especial a este tour..."
+                    required
                   />
-                )}
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Descripción *
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  className="input"
-                  rows={3}
-                  required
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Itinerario Detallado *
-                </label>
-                <textarea
-                  value={formData.itinerary}
-                  onChange={(e) => setFormData({...formData, itinerary: e.target.value})}
-                  className="input"
-                  rows={5}
-                  required
-                />
-              </div>
-
-              {/* Imagen del Tour */}
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Imagen Principal del Tour *
-                </label>
-                <ImageUploader
-                  onImageSelect={handleImageSelect}
-                  currentImage={formData.image_url}
-                  maxSizeMB={5}
-                  placeholder="Subir imagen del tour"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  También puedes proporcionar una URL de imagen en el campo de abajo
-                </p>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  URL de Imagen (Alternativa)
-                </label>
-                <input
-                  type="url"
-                  value={tourImageData ? '' : formData.image_url}
-                  onChange={(e) => {
-                    setFormData({...formData, image_url: e.target.value});
-                    if (e.target.value) {
-                      setTourImageData(null); // Clear uploaded image if URL is provided
-                    }
-                  }}
-                  className="input"
-                  placeholder="https://ejemplo.com/imagen.jpg"
-                  disabled={!!tourImageData}
-                />
-                {tourImageData && (
-                  <p className="text-xs text-success-600 mt-1">
-                    ✓ Imagen subida correctamente. Borra la imagen subida para usar URL.
-                  </p>
-                )}
-              </div>
-
-              {/* Qué Incluye */}
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Qué Incluye el Tour
-                </label>
-                <div className="space-y-2">
-                  {includes.map((include, index) => (
-                    <div key={index} className="flex items-center space-x-2">
-                      <input
-                        type="text"
-                        value={include}
-                        onChange={(e) => handleIncludeChange(index, e.target.value)}
-                        className="input flex-1"
-                        placeholder="Ej: Alojamiento por 3 noches"
-                      />
-                      {includes.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeInclude(index)}
-                          className="p-2 text-error-600 hover:text-error-700"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={addInclude}
-                    className="text-primary-600 hover:text-primary-700 text-sm font-medium"
-                  >
-                    + Agregar elemento incluido
-                  </button>
                 </div>
               </div>
+            </div>
 
-              {/* Qué No Incluye */}
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Qué NO Incluye el Tour
-                </label>
-                <div className="space-y-2">
-                  {excludes.map((exclude, index) => (
-                    <div key={index} className="flex items-center space-x-2">
-                      <input
-                        type="text"
-                        value={exclude}
-                        onChange={(e) => handleExcludeChange(index, e.target.value)}
-                        className="input flex-1"
-                        placeholder="Ej: Vuelos hacia y desde el destino"
-                      />
-                      {excludes.length > 1 && (
+            {/* SECCIÓN 2 — Fechas y Destinos */}
+            <div className="bg-white rounded-xl shadow-sm border border-teal-100 overflow-hidden">
+              <div className="bg-teal-600 px-5 py-3 flex items-center gap-2">
+                <div className="bg-white/20 rounded-lg p-1.5">
+                  <Calendar className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold text-sm">Paso 2 — Fechas y Destinos</h3>
+                  <p className="text-teal-100 text-xs">¿Cuándo sale y a dónde va el tour?</p>
+                </div>
+                <span className="ml-auto bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">Requerido</span>
+              </div>
+              <div className="p-5 space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Fecha de Inicio <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.start_date}
+                      onChange={(e) => setFormData({...formData, start_date: e.target.value})}
+                      className="input"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Fecha de Fin <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.end_date}
+                      onChange={(e) => setFormData({...formData, end_date: e.target.value})}
+                      className="input"
+                      min={formData.start_date}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Destinos <span className="text-red-500">*</span>
+                    <span className="ml-2 text-xs font-normal text-gray-500">Escribe y presiona Enter para agregar</span>
+                  </label>
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {selectedDestinations.map((destination) => (
+                      <span
+                        key={destination.id}
+                        className="inline-flex items-center bg-teal-100 text-teal-800 px-3 py-1 rounded-full text-sm font-medium"
+                      >
+                        <MapPin className="w-3 h-3 mr-1" />
+                        {destination.name}
                         <button
                           type="button"
-                          onClick={() => removeExclude(index)}
-                          className="p-2 text-error-600 hover:text-error-700"
+                          onClick={() => removeDestination(destination.id)}
+                          className="ml-2 text-teal-600 hover:text-teal-900 transition-colors"
                         >
-                          <Minus className="h-4 w-4" />
+                          <X className="h-3.5 w-3.5" />
                         </button>
-                      )}
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={addExclude}
-                    className="text-primary-600 hover:text-primary-700 text-sm font-medium"
-                  >
-                    + Agregar elemento no incluido
-                  </button>
-                </div>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Destinos * <span className="text-sm text-gray-500">(Presiona Enter para agregar)</span>
-                </label>
-                <div className="mb-2 flex flex-wrap gap-2">
-                  {selectedDestinations.map((destination) => (
-                    <span
-                      key={destination.id}
-                      className="inline-flex items-center bg-primary-100 text-primary-800 px-3 py-1 rounded-full text-sm"
-                    >
-                      {destination.name}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="relative">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        className="input flex-1"
+                        placeholder="Ej: Cancún, Oaxaca, Los Cabos..."
+                      />
                       <button
                         type="button"
-                        onClick={() => removeDestination(destination.id)}
-                        className="ml-2 text-primary-600 hover:text-primary-800"
+                        onClick={addDestinationFromInput}
+                        className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 flex items-center gap-1.5 font-medium text-sm transition-colors"
+                        disabled={!searchQuery.trim()}
                       >
-                        <X className="h-4 w-4" />
+                        <Plus className="h-4 w-4" />
+                        Agregar
                       </button>
-                    </span>
-                  ))}
-                </div>
-                <div className="relative">
-                  <div className="flex">
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      className="input flex-1"
-                      placeholder="Escribe un destino y presiona Enter..."
-                    />
-                    <button
-                      type="button"
-                      onClick={addDestinationFromInput}
-                      className="ml-2 px-3 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 flex items-center"
-                      disabled={!searchQuery.trim()}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
-                  </div>
-                  
-                  {showSearchResults && searchResults.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg border">
-                      <div className="py-1">
-                        <div className="px-3 py-2 text-xs text-gray-500 border-b">
-                          Destinos existentes:
-                        </div>
-                        {searchResults.map((result) => (
-                          <button
-                            key={result.id}
-                            type="button"
-                            className="w-full text-left px-3 py-2 hover:bg-gray-100 text-sm"
-                            onClick={() => addDestination(result.name)}
-                          >
-                            {result.name}
-                          </button>
-                        ))}
-                        {searchResults.length === 0 && searchQuery.trim() && (
-                          <div className="px-3 py-2 text-xs text-gray-500">
-                            No se encontraron destinos existentes
+                    </div>
+                    {showSearchResults && searchResults.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200">
+                        <div className="py-1">
+                          <div className="px-3 py-2 text-xs text-gray-500 border-b bg-gray-50 rounded-t-lg">
+                            Destinos existentes
                           </div>
-                        )}
+                          {searchResults.map((result) => (
+                            <button
+                              key={result.id}
+                              type="button"
+                              className="w-full text-left px-3 py-2 hover:bg-teal-50 text-sm flex items-center gap-2"
+                              onClick={() => addDestination(result.name)}
+                            >
+                              <MapPin className="w-3.5 h-3.5 text-teal-500" />
+                              {result.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {selectedDestinations.length === 0 && (
+                    <p className="text-sm text-red-500 mt-1.5 flex items-center gap-1">
+                      <AlertCircle className="w-4 h-4" />
+                      Debe seleccionar al menos un destino
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    Si el destino no existe en el sistema, se creará automáticamente al guardar el tour.
+                  </p>
+                </div>
+
+                <div>
+                  <DeparturePointSelector
+                    selectedPoints={selectedDeparturePoints}
+                    onPointsChange={setSelectedDeparturePoints}
+                    onCreateNew={() => setShowCreateDepartureForm(true)}
+                    maxPoints={4}
+                    minPoints={1}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* SECCIÓN 3 — Itinerario e Imagen */}
+            <div className="bg-white rounded-xl shadow-sm border border-amber-100 overflow-hidden">
+              <div className="bg-amber-500 px-5 py-3 flex items-center gap-2">
+                <div className="bg-white/20 rounded-lg p-1.5">
+                  <Image className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold text-sm">Paso 3 — Itinerario e Imagen</h3>
+                  <p className="text-amber-100 text-xs">Detalla el recorrido y agrega una foto atractiva</p>
+                </div>
+                <span className="ml-auto bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">Requerido</span>
+              </div>
+              <div className="p-5 space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Itinerario Detallado <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={formData.itinerary}
+                    onChange={(e) => setFormData({...formData, itinerary: e.target.value})}
+                    className="input"
+                    rows={6}
+                    placeholder="Día 1: Llegada al destino, traslado al hotel...&#10;Día 2: Visita a sitios turísticos...&#10;Día 3: Actividades y regreso..."
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Qué Incluye
+                    </label>
+                    <div className="space-y-2">
+                      {includes.map((include, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                            <span className="text-green-600 text-xs font-bold">+</span>
+                          </div>
+                          <input
+                            type="text"
+                            value={include}
+                            onChange={(e) => handleIncludeChange(index, e.target.value)}
+                            className="input flex-1 text-sm"
+                            placeholder="Ej: Alojamiento por 3 noches"
+                          />
+                          {includes.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeInclude(index)}
+                              className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={addInclude}
+                        className="text-green-600 hover:text-green-700 text-sm font-medium flex items-center gap-1 mt-1"
+                      >
+                        <Plus className="w-4 h-4" /> Agregar elemento
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Qué NO Incluye
+                    </label>
+                    <div className="space-y-2">
+                      {excludes.map((exclude, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                            <span className="text-red-500 text-xs font-bold">−</span>
+                          </div>
+                          <input
+                            type="text"
+                            value={exclude}
+                            onChange={(e) => handleExcludeChange(index, e.target.value)}
+                            className="input flex-1 text-sm"
+                            placeholder="Ej: Vuelos de llegada y salida"
+                          />
+                          {excludes.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeExclude(index)}
+                              className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={addExclude}
+                        className="text-red-500 hover:text-red-600 text-sm font-medium flex items-center gap-1 mt-1"
+                      >
+                        <Plus className="w-4 h-4" /> Agregar elemento
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Imagen Principal del Tour <span className="text-red-500">*</span>
+                  </label>
+                  <ImageUploader
+                    onImageSelect={handleImageSelect}
+                    currentImage={formData.image_url}
+                    maxSizeMB={5}
+                    placeholder="Subir imagen del tour"
+                  />
+                  <div className="mt-3">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">O pega una URL de imagen</label>
+                    <input
+                      type="url"
+                      value={tourImageData ? '' : formData.image_url}
+                      onChange={(e) => {
+                        setFormData({...formData, image_url: e.target.value});
+                        if (e.target.value) setTourImageData(null);
+                      }}
+                      className="input text-sm"
+                      placeholder="https://ejemplo.com/imagen.jpg"
+                      disabled={!!tourImageData}
+                    />
+                    {tourImageData && (
+                      <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                        <CheckSquare className="w-3.5 h-3.5" />
+                        Imagen subida correctamente
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SECCIÓN 4 — Precios */}
+            <div className="bg-white rounded-xl shadow-sm border border-green-100 overflow-hidden">
+              <div className="bg-green-600 px-5 py-3 flex items-center gap-2">
+                <div className="bg-white/20 rounded-lg p-1.5">
+                  <DollarSign className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold text-sm">Paso 4 — Precios</h3>
+                  <p className="text-green-100 text-xs">Precio base, depósito y tarifas por tipo de viajero</p>
+                </div>
+                <span className="ml-auto bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">Requerido</span>
+              </div>
+              <div className="p-5 space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Precio Base del Tour (MXN) <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">$</span>
+                      <input
+                        type="number"
+                        value={formData.price}
+                        onChange={(e) => setFormData({...formData, price: e.target.value})}
+                        className="input pl-7"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        required
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Precio de referencia si no defines tarifas por categoría</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Porcentaje de Anticipo <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={formData.deposit_percentage}
+                        onChange={(e) => setFormData({...formData, deposit_percentage: e.target.value})}
+                        className="input pr-8"
+                        min="30"
+                        max="100"
+                        placeholder="30"
+                        required
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">%</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Mínimo 30% — Máximo 100%</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-green-600" />
+                    Tarifas por Categoría de Viajero
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { key: 'admite_adultos', priceKey: 'precio_adulto', label: 'Adultos', age: '13-59 años', color: 'blue' },
+                      { key: 'admite_ninos', priceKey: 'precio_nino', label: 'Niños', age: '3-12 años', color: 'yellow' },
+                      { key: 'admite_infantes', priceKey: 'precio_infante', label: 'Infantes', age: '0-2 años', color: 'pink' },
+                      { key: 'admite_adultos_mayores', priceKey: 'precio_adulto_mayor', label: 'Adultos Mayores', age: '60+ con INAPAM', color: 'orange' },
+                    ].map(({ key, priceKey, label, age, color }) => {
+                      const isAdmitted = formData[key as keyof typeof formData] as boolean;
+                      const colorMap: Record<string, string> = {
+                        blue: 'border-blue-200 bg-blue-50',
+                        yellow: 'border-yellow-200 bg-yellow-50',
+                        pink: 'border-pink-200 bg-pink-50',
+                        orange: 'border-orange-200 bg-orange-50',
+                      };
+                      const checkMap: Record<string, string> = {
+                        blue: 'text-blue-600',
+                        yellow: 'text-yellow-600',
+                        pink: 'text-pink-600',
+                        orange: 'text-orange-600',
+                      };
+                      return (
+                        <div key={key} className={`rounded-lg border-2 p-3 transition-all ${isAdmitted ? colorMap[color] : 'border-gray-200 bg-gray-50'}`}>
+                          <label className="flex items-center gap-2 cursor-pointer mb-2">
+                            <input
+                              type="checkbox"
+                              checked={isAdmitted}
+                              onChange={(e) => setFormData({...formData, [key]: e.target.checked})}
+                              className={`w-4 h-4 border-gray-300 rounded focus:ring-2 ${checkMap[color]}`}
+                            />
+                            <div>
+                              <span className={`text-sm font-semibold ${isAdmitted ? 'text-gray-800' : 'text-gray-500'}`}>{label}</span>
+                              <span className="ml-1.5 text-xs text-gray-400">({age})</span>
+                            </div>
+                          </label>
+                          {isAdmitted && (
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                              <input
+                                type="number"
+                                value={formData[priceKey as keyof typeof formData] as string}
+                                onChange={(e) => setFormData({...formData, [priceKey]: e.target.value})}
+                                className="input pl-7 text-sm py-2"
+                                min="0"
+                                step="0.01"
+                                placeholder="Precio por persona"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Si no especificas un precio, se usará el precio base como referencia.
+                  </p>
+                </div>
+
+                {/* Pet Friendly dentro de precios */}
+                <div className={`rounded-xl border-2 p-4 transition-all ${formData.pet_friendly ? 'border-emerald-300 bg-emerald-50' : 'border-gray-200 bg-gray-50'}`}>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.pet_friendly}
+                      onChange={(e) => setFormData({...formData, pet_friendly: e.target.checked})}
+                      className="w-5 h-5 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                    />
+                    <div className="flex items-center gap-2">
+                      <PawPrint className={`w-5 h-5 ${formData.pet_friendly ? 'text-emerald-600' : 'text-gray-400'}`} />
+                      <div>
+                        <span className={`text-sm font-semibold ${formData.pet_friendly ? 'text-emerald-800' : 'text-gray-600'}`}>
+                          Este tour es Pet Friendly (admite mascotas)
+                        </span>
+                        <p className="text-xs text-gray-500">Activa esta opción si el tour permite llevar mascotas</p>
+                      </div>
+                    </div>
+                  </label>
+                  {formData.pet_friendly && (
+                    <div className="mt-3 ml-8">
+                      <label className="block text-xs font-semibold text-emerald-700 mb-1.5">Costo adicional por mascota (MXN)</label>
+                      <div className="relative max-w-xs">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                        <input
+                          type="number"
+                          value={formData.precio_mascota}
+                          onChange={(e) => setFormData({...formData, precio_mascota: e.target.value})}
+                          className="input pl-7 text-sm"
+                          min="0"
+                          step="0.01"
+                          placeholder="0.00 — gratis si se deja vacío"
+                        />
                       </div>
                     </div>
                   )}
                 </div>
-                {selectedDestinations.length === 0 && (
-                  <p className="text-sm text-red-500 mt-1">⚠️ Debe seleccionar al menos un destino</p>
-                )}
-                <p className="text-xs text-gray-500 mt-1">
-                  💡 Tip: Escribe el nombre del destino y presiona Enter o haz clic en el botón + para agregarlo. Si el destino no existe, se creará automáticamente.
-                </p>
               </div>
+            </div>
 
-              <div className="md:col-span-2">
-                <DeparturePointSelector
-                  selectedPoints={selectedDeparturePoints}
-                  onPointsChange={setSelectedDeparturePoints}
-                  onCreateNew={() => setShowCreateDepartureForm(true)}
-                  maxPoints={4}
-                  minPoints={1}
-                />
+            {/* SECCIÓN 5 — Capacidad y Reservas */}
+            <div className="bg-white rounded-xl shadow-sm border border-rose-100 overflow-hidden">
+              <div className="bg-rose-600 px-5 py-3 flex items-center gap-2">
+                <div className="bg-white/20 rounded-lg p-1.5">
+                  <Settings className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold text-sm">Paso 5 — Capacidad y Reservas</h3>
+                  <p className="text-rose-100 text-xs">Cuántas personas y cómo se gestionan las reservas</p>
+                </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Precio Total (MXN) *
-                </label>
-                <input
-                  type="number"
-                  value={formData.price}
-                  onChange={(e) => setFormData({...formData, price: e.target.value})}
-                  className="input"
-                  min="0"
-                  step="0.01"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Porcentaje de Depósito *
-                </label>
-                <input
-                  type="number"
-                  value={formData.deposit_percentage}
-                  onChange={(e) => setFormData({...formData, deposit_percentage: e.target.value})}
-                  className="input"
-                  min="30"
-                  max="100"
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  El porcentaje de anticipo debe estar entre 30% y 100%
-                </p>
-              </div>
-
-              <div className="md:col-span-2 border-t pt-4">
-                <h3 className="text-md font-semibold text-gray-800 mb-4">Precios por Categoría de Viajero</h3>
+              <div className="p-5 space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          checked={formData.admite_adultos}
-                          onChange={(e) => setFormData({...formData, admite_adultos: e.target.checked})}
-                          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                        />
-                        <span className="text-sm font-medium text-gray-700">Admite Adultos (13-59 años)</span>
-                      </label>
-                    </div>
-                    {formData.admite_adultos && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Tamaño Máximo del Grupo
+                    </label>
+                    <div className="relative">
+                      <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
                         type="number"
-                        value={formData.precio_adulto}
-                        onChange={(e) => setFormData({...formData, precio_adulto: e.target.value})}
-                        className="input"
-                        min="0"
-                        step="0.01"
-                        placeholder="Precio por adulto"
+                        value={formData.max_travelers}
+                        onChange={(e) => setFormData({...formData, max_travelers: e.target.value})}
+                        className="input pl-9"
+                        min="1"
+                        placeholder="Ej: 20"
                       />
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          checked={formData.admite_ninos}
-                          onChange={(e) => setFormData({...formData, admite_ninos: e.target.checked})}
-                          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                        />
-                        <span className="text-sm font-medium text-gray-700">Admite Niños (3-12 años)</span>
-                      </label>
                     </div>
-                    {formData.admite_ninos && (
+                    <p className="text-xs text-gray-500 mt-1">Capacidad total del tour</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Lugares Disponibles para Reserva
+                    </label>
+                    <div className="relative">
+                      <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
                         type="number"
-                        value={formData.precio_nino}
-                        onChange={(e) => setFormData({...formData, precio_nino: e.target.value})}
-                        className="input"
+                        value={formData.available_spots}
+                        onChange={(e) => setFormData({...formData, available_spots: e.target.value})}
+                        className="input pl-9"
                         min="0"
-                        step="0.01"
-                        placeholder="Precio por niño"
+                        max={formData.max_travelers || undefined}
+                        placeholder="Deja vacío para usar el máximo"
                       />
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          checked={formData.admite_infantes}
-                          onChange={(e) => setFormData({...formData, admite_infantes: e.target.checked})}
-                          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                        />
-                        <span className="text-sm font-medium text-gray-700">Admite Infantes (0-2 años)</span>
-                      </label>
                     </div>
-                    {formData.admite_infantes && (
-                      <input
-                        type="number"
-                        value={formData.precio_infante}
-                        onChange={(e) => setFormData({...formData, precio_infante: e.target.value})}
-                        className="input"
-                        min="0"
-                        step="0.01"
-                        placeholder="Precio por infante"
-                      />
-                    )}
+                    <p className="text-xs text-gray-500 mt-1">Útil si ya tienes reservas previas o cupos comprometidos</p>
                   </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          checked={formData.admite_adultos_mayores}
-                          onChange={(e) => setFormData({...formData, admite_adultos_mayores: e.target.checked})}
-                          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                        />
-                        <span className="text-sm font-medium text-gray-700">Admite Adultos Mayores (60+ con INAPAM)</span>
-                      </label>
-                    </div>
-                    {formData.admite_adultos_mayores && (
-                      <input
-                        type="number"
-                        value={formData.precio_adulto_mayor}
-                        onChange={(e) => setFormData({...formData, precio_adulto_mayor: e.target.value})}
-                        className="input"
-                        min="0"
-                        step="0.01"
-                        placeholder="Precio por adulto mayor"
-                      />
-                    )}
-                  </div>
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  💡 Configura precios diferenciados por categoría. Si no especificas un precio, se usará el precio total como referencia.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tamaño Máximo del Grupo
-                </label>
-                <input
-                  type="number"
-                  value={formData.max_travelers}
-                  onChange={(e) => setFormData({...formData, max_travelers: e.target.value})}
-                  className="input"
-                  min="1"
-                  placeholder="Ej: 15"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Capacidad máxima teórica del tour
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Lugares Disponibles para Reserva
-                </label>
-                <input
-                  type="number"
-                  value={formData.available_spots}
-                  onChange={(e) => setFormData({...formData, available_spots: e.target.value})}
-                  className="input"
-                  min="0"
-                  max={formData.max_travelers || undefined}
-                  placeholder="Opcional - Deja vacío para usar el máximo"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Controla cuántos lugares están realmente disponibles para reservar (considerando logística, alojamiento, transporte, etc.)
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Fecha Límite de Reserva
-                </label>
-                <input
-                  type="date"
-                  value={formData.booking_deadline}
-                  onChange={(e) => setFormData({...formData, booking_deadline: e.target.value})}
-                  className="input"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Si no se especifica, será 14 días antes del inicio del tour
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tipo de Reserva *
-                </label>
-                <select
-                  value={formData.booking_approval_type}
-                  onChange={(e) => setFormData({...formData, booking_approval_type: e.target.value as 'automatic' | 'manual'})}
-                  className="input"
-                  required
-                >
-                  <option value="automatic">Automática (pago inmediato)</option>
-                  <option value="manual">Sujeta a aprobación (sin cargo inicial)</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  {formData.booking_approval_type === 'automatic' 
-                    ? 'Los usuarios pagarán el depósito inmediatamente al reservar'
-                    : 'Deberás aprobar cada reserva antes de que el usuario pueda pagar'
-                  }
-                </p>
-              </div>
-
-              <div className="col-span-2">
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  <label className="flex items-start space-x-3 cursor-pointer">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Fecha Límite de Reserva
+                    </label>
                     <input
-                      type="checkbox"
-                      checked={formData.cancellation_not_allowed}
-                      onChange={(e) => setFormData({...formData, cancellation_not_allowed: e.target.checked})}
-                      className="w-5 h-5 mt-0.5 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                      type="date"
+                      value={formData.booking_deadline}
+                      onChange={(e) => setFormData({...formData, booking_deadline: e.target.value})}
+                      className="input"
                     />
-                    <div className="flex-1">
-                      <span className="text-sm font-semibold text-gray-900">Este tour NO permite cancelaciones con reembolso</span>
-                      <p className="text-xs text-gray-600 mt-1">
-                        Si marcas esta opción, los viajeros no podrán obtener reembolsos al cancelar. Solo podrán cancelar para evitar la penalización de No Show. Esta restricción será claramente visible en la página del tour.
-                      </p>
-                    </div>
-                  </label>
+                    <p className="text-xs text-gray-500 mt-1">Por defecto: 14 días antes del inicio</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Tipo de Reserva <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formData.booking_approval_type}
+                      onChange={(e) => setFormData({...formData, booking_approval_type: e.target.value as 'automatic' | 'manual'})}
+                      className="input"
+                      required
+                    >
+                      <option value="automatic">Automática (pago inmediato)</option>
+                      <option value="manual">Con aprobación manual (sin cargo inicial)</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {formData.booking_approval_type === 'automatic'
+                        ? 'El viajero paga el anticipo en el momento de reservar'
+                        : 'Tú apruebas cada reserva antes de que el viajero pague'
+                      }
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="col-span-2">
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  <label className="flex items-start space-x-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.name_changes_not_allowed}
-                      onChange={(e) => setFormData({...formData, name_changes_not_allowed: e.target.checked})}
-                      className="w-5 h-5 mt-0.5 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                    />
-                    <div className="flex-1">
-                      <span className="text-sm font-semibold text-gray-900">Este tour NO permite cambios de nombre una vez pagada la reserva</span>
-                      <p className="text-xs text-gray-600 mt-1">
-                        Si marcas esta opción, los viajeros no podrán modificar los nombres de los acompañantes después de pagar. Ideal para tours aéreos o con boletos nominales. El viajero verá una advertencia al capturar los nombres.
-                      </p>
-                    </div>
-                  </label>
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Ban className="w-4 h-4 text-rose-500" />
+                    Restricciones del Tour
+                  </h4>
+                  <div className={`rounded-xl border-2 p-4 transition-all ${formData.cancellation_not_allowed ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50'}`}>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.cancellation_not_allowed}
+                        onChange={(e) => setFormData({...formData, cancellation_not_allowed: e.target.checked})}
+                        className="w-5 h-5 mt-0.5 text-red-600 border-gray-300 rounded focus:ring-red-500 flex-shrink-0"
+                      />
+                      <div>
+                        <span className={`text-sm font-semibold ${formData.cancellation_not_allowed ? 'text-red-800' : 'text-gray-700'}`}>
+                          Este tour NO permite cancelaciones con reembolso
+                        </span>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Los viajeros solo podrán cancelar para evitar la penalización de No Show. Esta restricción será visible en la página del tour.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                  <div className={`rounded-xl border-2 p-4 transition-all ${formData.name_changes_not_allowed ? 'border-orange-300 bg-orange-50' : 'border-gray-200 bg-gray-50'}`}>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.name_changes_not_allowed}
+                        onChange={(e) => setFormData({...formData, name_changes_not_allowed: e.target.checked})}
+                        className="w-5 h-5 mt-0.5 text-orange-600 border-gray-300 rounded focus:ring-orange-500 flex-shrink-0"
+                      />
+                      <div>
+                        <span className={`text-sm font-semibold ${formData.name_changes_not_allowed ? 'text-orange-800' : 'text-gray-700'}`}>
+                          Este tour NO permite cambios de nombre una vez pagada la reserva
+                        </span>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Ideal para tours aéreos o con boletos nominales. El viajero verá una advertencia al capturar los nombres de los acompañantes.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Fecha de Inicio *
-                </label>
-                <input
-                  type="date"
-                  value={formData.start_date}
-                  onChange={(e) => setFormData({...formData, start_date: e.target.value})}
-                  className="input"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Fecha de Fin *
-                </label>
-                <input
-                  type="date"
-                  value={formData.end_date}
-                  onChange={(e) => setFormData({...formData, end_date: e.target.value})}
-                  className="input"
-                  min={formData.start_date}
-                  required
-                />
               </div>
             </div>
 
