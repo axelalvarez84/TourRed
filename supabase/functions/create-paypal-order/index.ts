@@ -161,6 +161,18 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    if (context === "gift_card") {
+      await supabase
+        .from("gift_cards")
+        .update({ paypal_order_id: order.id })
+        .eq("id", bookingId);
+    } else {
+      await supabase
+        .from("bookings")
+        .update({ paypal_order_id: order.id })
+        .eq("id", bookingId);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

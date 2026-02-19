@@ -84,6 +84,7 @@ Deno.serve(async (req: Request) => {
 
     if (captureStatus === "COMPLETED") {
       const referenceId = bookingId || captureData.purchase_units?.[0]?.reference_id;
+      const paypalTransactionId = captureData.purchase_units?.[0]?.payments?.captures?.[0]?.id || null;
 
       if (context === "gift_card" && (giftCardId || referenceId)) {
         const id = giftCardId || referenceId;
@@ -92,6 +93,7 @@ Deno.serve(async (req: Request) => {
           .update({
             payment_status: "paid",
             payment_provider: "paypal",
+            paypal_transaction_id: paypalTransactionId,
             updated_at: new Date().toISOString(),
           })
           .eq("id", id);
@@ -114,6 +116,7 @@ Deno.serve(async (req: Request) => {
             status: "confirmed",
             payment_method: "paypal",
             payment_provider: "paypal",
+            paypal_transaction_id: paypalTransactionId,
             paid_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })

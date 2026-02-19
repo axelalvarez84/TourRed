@@ -1064,6 +1064,12 @@ const TravelerBookings: React.FC = () => {
                           ${((booking.total_price || 0) - (booking.deposit_amount || 0)).toLocaleString()}
                         </div>
                       </div>
+                      {(booking as any).paypal_transaction_id && (
+                        <div className="col-span-2">
+                          <div className="text-gray-500">ID de Transacción PayPal:</div>
+                          <div className="font-medium font-mono text-xs tracking-wide">{(booking as any).paypal_transaction_id}</div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

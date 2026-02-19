@@ -1068,6 +1068,15 @@ const AgencyBookings: React.FC = () => {
                     </div>
                   </div>
 
+                  {(booking as any).paypal_transaction_id && (
+                    <div className="flex items-center bg-blue-50 border border-blue-100 rounded-lg px-4 py-2 mb-4">
+                      <div className="flex-1">
+                        <div className="text-xs text-blue-600 font-medium">ID de Transacción PayPal</div>
+                        <div className="font-mono text-sm tracking-wide text-blue-900">{(booking as any).paypal_transaction_id}</div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Optional Services */}
                   {bookingOptionalServices[booking.id] && bookingOptionalServices[booking.id].length > 0 && (
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
