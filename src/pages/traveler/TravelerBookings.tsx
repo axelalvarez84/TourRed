@@ -9,6 +9,7 @@ import ReviewForm from '../../components/ReviewForm';
 import { useFormPersistence } from '../../hooks/useFormPersistence';
 import { usePreventUnload } from '../../hooks/usePreventUnload';
 import { validateAllTravelers } from '../../utils/birthDateValidation';
+import PaymentProviderSelector from '../../components/PaymentProviderSelector';
 
 const TravelerBookings: React.FC = () => {
   const { user } = useAuth();
@@ -55,12 +56,14 @@ const TravelerBookings: React.FC = () => {
     walletBalance: number;
     toursRedCashToUse: number;
     isProcessing: boolean;
+    selectedProvider: 'stripe' | 'mercadopago' | 'paypal';
   }>({
     open: false,
     booking: null,
     walletBalance: 0,
     toursRedCashToUse: 0,
     isProcessing: false,
+    selectedProvider: 'stripe',
   });
   const [rescheduleModal, setRescheduleModal] = useState<{
     open: boolean;
@@ -515,6 +518,7 @@ const TravelerBookings: React.FC = () => {
         walletBalance: walletBalance,
         toursRedCashToUse: 0,
         isProcessing: false,
+        selectedProvider: 'stripe',
       });
     } catch (err: any) {
       console.error('Error al abrir modal de pago:', err);
@@ -614,6 +618,7 @@ const TravelerBookings: React.FC = () => {
           walletBalance: 0,
           toursRedCashToUse: 0,
           isProcessing: false,
+          selectedProvider: 'stripe',
         });
 
         fetchBookings();
@@ -621,39 +626,104 @@ const TravelerBookings: React.FC = () => {
         return;
       }
 
-      // Si hay monto pendiente, ir a Stripe
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            bookingId: booking.id,
-            amount: amountToCharge,
-            currency: 'mxn',
-            description: `Pago de reserva - ${booking.tours?.name || 'Tour'}`,
-            success_url: `${window.location.origin}/booking-success?booking_id=${booking.id}`,
-            cancel_url: `${window.location.origin}/traveler/bookings`,
-            toursRedCashUsed: toursRedCashToUse,
-          }),
+      const { selectedProvider } = paymentModal;
+
+      if (selectedProvider === 'mercadopago') {
+        const mpResponse = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-mercadopago-preference`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              bookingId: booking.id,
+              customerEmail: user?.email,
+              amount: amountToCharge,
+              description: `Depósito para ${booking.tours?.name || 'Tour'}`,
+              context: 'booking',
+            }),
+          }
+        );
+
+        if (!mpResponse.ok) {
+          const errorData = await mpResponse.json();
+          throw new Error(errorData.error || 'Error al crear preferencia de MercadoPago');
         }
-      );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response:', errorText);
-        throw new Error(`Error al crear la sesión de pago: ${errorText}`);
-      }
+        const mpResult = await mpResponse.json();
+        if (!mpResult.success) throw new Error(mpResult.error || 'Error al crear preferencia de MercadoPago');
+        if (mpResult.url) {
+          window.location.href = mpResult.url;
+        } else {
+          throw new Error('No se recibió la URL de MercadoPago');
+        }
+      } else if (selectedProvider === 'paypal') {
+        const ppResponse = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-paypal-order`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              bookingId: booking.id,
+              amount: amountToCharge,
+              description: `Depósito para ${booking.tours?.name || 'Tour'}`,
+              context: 'booking',
+            }),
+          }
+        );
 
-      const data = await response.json();
+        if (!ppResponse.ok) {
+          const errorData = await ppResponse.json();
+          throw new Error(errorData.error || 'Error al crear orden de PayPal');
+        }
 
-      if (data.url) {
-        window.location.href = data.url;
+        const ppResult = await ppResponse.json();
+        if (!ppResult.success) throw new Error(ppResult.error || 'Error al crear orden de PayPal');
+        if (ppResult.url) {
+          window.location.href = ppResult.url;
+        } else {
+          throw new Error('No se recibió la URL de PayPal');
+        }
       } else {
-        throw new Error('No se recibió URL de checkout');
+        // Stripe
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              bookingId: booking.id,
+              amount: amountToCharge,
+              currency: 'mxn',
+              description: `Pago de reserva - ${booking.tours?.name || 'Tour'}`,
+              success_url: `${window.location.origin}/booking-success?booking_id=${booking.id}`,
+              cancel_url: `${window.location.origin}/traveler/bookings`,
+              toursRedCashUsed: toursRedCashToUse,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Error response:', errorText);
+          throw new Error(`Error al crear la sesión de pago: ${errorText}`);
+        }
+
+        const data = await response.json();
+
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          throw new Error('No se recibió URL de checkout');
+        }
       }
     } catch (err: any) {
       console.error('Error al proceder al pago:', err);
@@ -1604,7 +1674,7 @@ const TravelerBookings: React.FC = () => {
               <div className="flex justify-between items-start mb-6">
                 <h2 className="text-2xl font-bold text-gray-900">Completar Pago</h2>
                 <button
-                  onClick={() => setPaymentModal({ open: false, booking: null, walletBalance: 0, toursRedCashToUse: 0, isProcessing: false })}
+                  onClick={() => setPaymentModal({ open: false, booking: null, walletBalance: 0, toursRedCashToUse: 0, isProcessing: false, selectedProvider: 'stripe' })}
                   className="text-gray-400 hover:text-gray-500"
                   disabled={paymentModal.isProcessing}
                 >
@@ -1621,6 +1691,24 @@ const TravelerBookings: React.FC = () => {
                     <p>Viajeros: {paymentModal.booking?.travelers_count}</p>
                   </div>
                 </div>
+
+                {/* Payment Provider Selector */}
+                {(() => {
+                  const originalAmount = paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0;
+                  const pointsAlreadyUsed = ((paymentModal.booking?.points_used || 0) / 100);
+                  const finalAmount = originalAmount - pointsAlreadyUsed - paymentModal.toursRedCashToUse;
+                  if (finalAmount > 0) {
+                    return (
+                      <PaymentProviderSelector
+                        context="booking"
+                        value={paymentModal.selectedProvider}
+                        onChange={(provider) => setPaymentModal(prev => ({ ...prev, selectedProvider: provider }))}
+                        disabled={paymentModal.isProcessing}
+                      />
+                    );
+                  }
+                  return null;
+                })()}
 
                 {/* Payment Summary */}
                 <div className="space-y-3">
@@ -1739,7 +1827,7 @@ const TravelerBookings: React.FC = () => {
 
                   <div className="border-t pt-3">
                     <div className="flex justify-between text-lg font-bold">
-                      <span>Total a Pagar{paymentModal.toursRedCashToUse > 0 ? ' con Stripe' : ''}:</span>
+                      <span>Total a Pagar{paymentModal.toursRedCashToUse > 0 ? ` con ${paymentModal.selectedProvider === 'mercadopago' ? 'MercadoPago' : paymentModal.selectedProvider === 'paypal' ? 'PayPal' : 'Stripe'}` : ''}:</span>
                       <span className="text-primary-600">
                         ${(() => {
                           const originalAmount = paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0;
@@ -1755,7 +1843,7 @@ const TravelerBookings: React.FC = () => {
                 {/* Action Buttons */}
                 <div className="flex gap-3 pt-4">
                   <button
-                    onClick={() => setPaymentModal({ open: false, booking: null, walletBalance: 0, toursRedCashToUse: 0, isProcessing: false })}
+                    onClick={() => setPaymentModal({ open: false, booking: null, walletBalance: 0, toursRedCashToUse: 0, isProcessing: false, selectedProvider: 'stripe' })}
                     className="flex-1 px-4 py-3 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                     disabled={paymentModal.isProcessing}
                   >
@@ -1778,7 +1866,10 @@ const TravelerBookings: React.FC = () => {
                           const pointsAlreadyUsed = ((paymentModal.booking?.points_used || 0) / 100);
                           const remainingAmount = originalAmount - pointsAlreadyUsed;
                           const finalAmount = remainingAmount - paymentModal.toursRedCashToUse;
-                          return finalAmount <= 0 ? 'Confirmar Pago' : 'Proceder a Stripe';
+                          if (finalAmount <= 0) return 'Confirmar Pago';
+                          if (paymentModal.selectedProvider === 'mercadopago') return 'Proceder a MercadoPago';
+                          if (paymentModal.selectedProvider === 'paypal') return 'Proceder a PayPal';
+                          return 'Proceder a Stripe';
                         })()}
                       </>
                     )}
