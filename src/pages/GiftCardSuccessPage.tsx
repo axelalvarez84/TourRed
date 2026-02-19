@@ -25,6 +25,8 @@ export default function GiftCardSuccessPage() {
       setTimeout(() => {
         setIsProcessing(false);
       }, 2000);
+    } else {
+      setIsProcessing(false);
     }
   }, [searchParams]);
 
