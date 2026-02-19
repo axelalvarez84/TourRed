@@ -96,9 +96,12 @@ Deno.serve(async (req: Request) => {
       cancelUrl = `${origin}/payment-return?provider=mercadopago&booking_id=${bookingId}&tr_status=cancel`;
     }
 
+    const isSandbox = mpAccessToken.startsWith("TEST-");
+    const payerEmail = isSandbox ? "test_user_123456@testuser.com" : customerEmail;
+
     const preferencePayload = {
       items,
-      payer: customerEmail ? { email: customerEmail } : undefined,
+      payer: payerEmail ? { email: payerEmail } : undefined,
       back_urls: {
         success: successUrl,
         failure: cancelUrl,
