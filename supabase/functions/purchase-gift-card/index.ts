@@ -134,13 +134,16 @@ Deno.serve(async (req: Request) => {
     const expiresAt = new Date();
     expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
+    const isPendingPayment = createOnly && (provider === "paypal" || provider === "mercadopago");
+
     const { data: giftCard, error: insertError } = await supabase
       .from("gift_cards")
       .insert({
         code,
         amount,
         currency: "MXN",
-        status: "active",
+        status: isPendingPayment ? "pending_payment" : "active",
+        payment_status: isPendingPayment ? "pending" : "paid",
         payment_provider: provider || "stripe",
         purchaser_email: purchaserEmail,
         purchaser_name: purchaserName,
