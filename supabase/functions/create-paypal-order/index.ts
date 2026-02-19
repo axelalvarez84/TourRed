@@ -7,8 +7,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-async function getPayPalAccessToken(clientId: string, clientSecret: string): Promise<string> {
-  const base = Deno.env.get("PAYPAL_SANDBOX") === "true"
+async function getPayPalAccessToken(clientId: string, clientSecret: string, sandbox: boolean): Promise<string> {
+  const base = sandbox
     ? "https://api-m.sandbox.paypal.com"
     : "https://api-m.paypal.com";
 
@@ -23,6 +23,8 @@ async function getPayPalAccessToken(clientId: string, clientSecret: string): Pro
   });
 
   if (!response.ok) {
+    const errorBody = await response.text();
+    console.error("PayPal token error:", errorBody);
     throw new Error("Failed to get PayPal access token");
   }
 
@@ -70,14 +72,17 @@ Deno.serve(async (req: Request) => {
 
     let paypalClientId = Deno.env.get("PAYPAL_CLIENT_ID");
     let paypalClientSecret = Deno.env.get("PAYPAL_CLIENT_SECRET");
+    let isSandbox = Deno.env.get("PAYPAL_SANDBOX") === "true";
 
-    if (!paypalClientId || !paypalClientSecret) {
-      const { data: settings } = await supabase
-        .from("platform_settings")
-        .select("paypal_client_id, paypal_client_secret")
-        .maybeSingle();
-      if (settings?.paypal_client_id) paypalClientId = settings.paypal_client_id;
-      if (settings?.paypal_client_secret) paypalClientSecret = settings.paypal_client_secret;
+    const { data: settings } = await supabase
+      .from("platform_settings")
+      .select("paypal_client_id, paypal_client_secret, paypal_sandbox")
+      .maybeSingle();
+
+    if (!paypalClientId && settings?.paypal_client_id) paypalClientId = settings.paypal_client_id;
+    if (!paypalClientSecret && settings?.paypal_client_secret) paypalClientSecret = settings.paypal_client_secret;
+    if (settings?.paypal_sandbox !== undefined && settings?.paypal_sandbox !== null) {
+      isSandbox = settings.paypal_sandbox;
     }
 
     if (!paypalClientId || !paypalClientSecret) {
@@ -88,7 +93,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const origin = req.headers.get("origin") || "https://toursred.com";
-    const base = Deno.env.get("PAYPAL_SANDBOX") === "true"
+    const base = isSandbox
       ? "https://api-m.sandbox.paypal.com"
       : "https://api-m.paypal.com";
 
@@ -103,7 +108,7 @@ Deno.serve(async (req: Request) => {
       cancelUrl = `${origin}/payment-return?provider=paypal&booking_id=${bookingId}&status=cancel`;
     }
 
-    const accessToken = await getPayPalAccessToken(paypalClientId, paypalClientSecret);
+    const accessToken = await getPayPalAccessToken(paypalClientId, paypalClientSecret, isSandbox);
 
     const orderPayload = {
       intent: "CAPTURE",
