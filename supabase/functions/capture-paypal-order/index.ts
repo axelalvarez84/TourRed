@@ -91,7 +91,7 @@ Deno.serve(async (req: Request) => {
         await supabase
           .from("gift_cards")
           .update({
-            payment_status: "paid",
+            status: "active",
             payment_provider: "paypal",
             paypal_transaction_id: paypalTransactionId,
             updated_at: new Date().toISOString(),
