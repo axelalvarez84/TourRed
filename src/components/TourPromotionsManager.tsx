@@ -138,6 +138,8 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
       ? parseInt(formData.min_travelers.toString())
       : groupConfig.min_travelers;
 
+    const { data: { user } } = await supabase.auth.getUser();
+
     const payload = {
       tour_id: tourId,
       agency_id: agencyId,
@@ -150,6 +152,7 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
       valid_until: new Date(formData.valid_until + 'T23:59:59').toISOString(),
       max_uses: formData.max_uses ? parseInt(formData.max_uses) : null,
       is_active: true,
+      created_by: user?.id ?? null,
     };
 
     try {
@@ -162,11 +165,15 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
         if (updateError) throw updateError;
         setSuccess('Promoción actualizada correctamente.');
       } else {
-        const { error: insertError } = await supabase
+        const { data: insertData, error: insertError } = await supabase
           .from('tour_promotions')
-          .insert(payload);
+          .insert(payload)
+          .select();
 
         if (insertError) throw insertError;
+        if (!insertData || insertData.length === 0) {
+          throw new Error('No se pudo guardar la promoción. Verifica que tu sesión esté activa.');
+        }
         setSuccess('Promoción creada correctamente.');
       }
 
