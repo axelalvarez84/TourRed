@@ -141,7 +141,6 @@ Deno.serve(async (req: Request) => {
         amount,
         currency: "MXN",
         status: "active",
-        payment_status: "unpaid",
         payment_provider: provider || "stripe",
         purchaser_email: purchaserEmail,
         purchaser_name: purchaserName,
