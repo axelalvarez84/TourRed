@@ -17,6 +17,8 @@ interface PurchaseGiftCardRequest {
   personalMessage?: string;
   scheduledSendDate?: string;
   discountCode?: string;
+  provider?: string;
+  createOnly?: boolean;
 }
 
 Deno.serve(async (req: Request) => {
@@ -32,10 +34,6 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
-
-    if (!stripeSecretKey) {
-      throw new Error("Stripe secret key not configured");
-    }
 
     const authHeader = req.headers.get("Authorization");
     let userId: string | null = null;
@@ -55,30 +53,32 @@ Deno.serve(async (req: Request) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const stripe = new Stripe(stripeSecretKey, {
-      apiVersion: "2023-10-16",
-    });
 
     const requestData: PurchaseGiftCardRequest = await req.json();
-    const { amount, purchaserEmail, purchaserName, recipientEmail, recipientName, personalMessage, scheduledSendDate, discountCode } = requestData;
+    const {
+      amount,
+      purchaserEmail,
+      purchaserName,
+      recipientEmail,
+      recipientName,
+      personalMessage,
+      scheduledSendDate,
+      discountCode,
+      provider,
+      createOnly,
+    } = requestData;
 
     if (!amount || ![100, 200, 500, 1000].includes(amount)) {
       return new Response(
         JSON.stringify({ error: "Invalid amount. Must be 100, 200, 500, or 1000" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     if (!purchaserEmail || !purchaserName) {
       return new Response(
         JSON.stringify({ error: "Purchaser email and name are required" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -93,10 +93,7 @@ Deno.serve(async (req: Request) => {
             error: "Para usar un código de descuento debes iniciar sesión primero",
             requiresAuth: true
           }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
@@ -110,20 +107,14 @@ Deno.serve(async (req: Request) => {
         console.error("Error validating discount code:", validationError);
         return new Response(
           JSON.stringify({ error: "Error al validar el código de descuento" }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
       if (validationData && validationData.error) {
         return new Response(
           JSON.stringify({ error: validationData.error }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
@@ -150,6 +141,8 @@ Deno.serve(async (req: Request) => {
         amount,
         currency: "MXN",
         status: "active",
+        payment_status: "unpaid",
+        payment_provider: provider || "stripe",
         purchaser_email: purchaserEmail,
         purchaser_name: purchaserName,
         recipient_email: recipientEmail || null,
@@ -165,10 +158,7 @@ Deno.serve(async (req: Request) => {
       console.error("Error creating gift card:", insertError);
       return new Response(
         JSON.stringify({ error: "Failed to create gift card" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -204,12 +194,29 @@ Deno.serve(async (req: Request) => {
           giftCardId: giftCard.id,
           isFree: true,
         }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    if (createOnly) {
+      return new Response(
+        JSON.stringify({
+          giftCardId: giftCard.id,
+          amount: finalAmount,
+          originalAmount: amount,
+          discountAmount,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!stripeSecretKey) {
+      throw new Error("Stripe secret key not configured");
+    }
+
+    const stripe = new Stripe(stripeSecretKey, {
+      apiVersion: "2023-10-16",
+    });
 
     let customerId: string;
     const existingCustomers = await stripe.customers.list({
@@ -302,19 +309,13 @@ Deno.serve(async (req: Request) => {
         url: session.url,
         giftCardId: giftCard.id,
       }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("Error in purchase-gift-card function:", error);
     return new Response(
       JSON.stringify({ error: error.message || "Internal server error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
