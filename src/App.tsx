@@ -48,6 +48,7 @@ import AdminInternationalInquiries from './pages/admin/AdminInternationalInquiri
 import AdminDiscountCodes from './pages/admin/AdminDiscountCodes';
 import AdminPayouts from './pages/admin/AdminPayouts';
 import AdminReferrals from './pages/admin/AdminReferrals';
+import AdminPromotions from './pages/admin/AdminPromotions';
 import MegaTravelPage from './pages/international/MegaTravelPage';
 import NefertariTravelPage from './pages/international/NefertariTravelPage';
 import ExoticcaPage from './pages/international/ExoticcaPage';
@@ -407,6 +408,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                 <AdminReferrals />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/promotions"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminPromotions />
               </ProtectedRoute>
             }
           />

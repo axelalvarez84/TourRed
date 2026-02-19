@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet, Award, Ticket, X, Check, Loader2, ShoppingBag, Info } from 'lucide-react';
+import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet, Award, Ticket, X, Check, Loader2, ShoppingBag, Info, Tag } from 'lucide-react';
 import PaymentProviderSelector, { PaymentProvider } from './PaymentProviderSelector';
 
 interface TourOptionalService {
@@ -62,6 +62,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
   const [optionalServices, setOptionalServices] = useState<TourOptionalService[]>([]);
   const [optionalServiceQuantities, setOptionalServiceQuantities] = useState<Record<string, number>>({});
+
+  const [activePromotion, setActivePromotion] = useState<{
+    id: string;
+    promotion_type: string;
+    min_travelers: number;
+    group_size: number;
+    pay_count: number;
+    fixed_group_price: number | null;
+    valid_until: string;
+  } | null>(null);
   const [isLoadingOptionalServices, setIsLoadingOptionalServices] = useState(true);
 
   const [discountCodeInput, setDiscountCodeInput] = useState('');
@@ -322,6 +332,22 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   }, [tour.id]);
 
   React.useEffect(() => {
+    const loadActivePromotion = async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_active_promotion_for_tour', { p_tour_id: tour.id });
+        if (!error && data && data.length > 0) {
+          setActivePromotion(data[0]);
+        } else {
+          setActivePromotion(null);
+        }
+      } catch {
+        setActivePromotion(null);
+      }
+    };
+    loadActivePromotion();
+  }, [tour.id]);
+
+  React.useEffect(() => {
     const fetchAvailability = async () => {
       try {
         setIsLoadingAvailability(true);
@@ -482,8 +508,62 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   // Precio total del tour (sin descuento, sin opcionales)
   const grossTourPrice = precioAdultos + precioNinos + precioInfantes + precioAdultosMayores + precioMascotas;
 
-  // Precio total del tour (sin descuento)
-  const grossTotalPrice = grossTourPrice + optionalServicesSubtotal;
+  // Calcular descuento por promoción grupal
+  const calculatePromoDiscount = (): { discount: number; isActive: boolean; label: string; nearMissMessage: string | null } => {
+    if (!activePromotion) return { discount: 0, isActive: false, label: '', nearMissMessage: null };
+
+    const { promotion_type, min_travelers, group_size, pay_count, fixed_group_price } = activePromotion;
+    const totalHuman = totalTravelers; // no mascotas
+
+    if (promotion_type === 'grupo_precio_fijo') {
+      if (totalHuman >= min_travelers && fixed_group_price !== null) {
+        const originalPrice = grossTourPrice;
+        const discount = Math.max(0, originalPrice - fixed_group_price);
+        return {
+          discount,
+          isActive: discount > 0,
+          label: `Precio especial grupal (${min_travelers}+ viajeros)`,
+          nearMissMessage: null,
+        };
+      }
+      const needed = min_travelers - totalHuman;
+      if (needed > 0 && needed <= 2) {
+        return { discount: 0, isActive: false, label: '', nearMissMessage: `Agrega ${needed} viajero${needed > 1 ? 's' : ''} más y activa el precio especial grupal.` };
+      }
+      return { discount: 0, isActive: false, label: '', nearMissMessage: null };
+    }
+
+    if (promotion_type === '2x1' || promotion_type === '3x2') {
+      if (totalHuman < min_travelers) {
+        const needed = min_travelers - totalHuman;
+        if (needed <= 2) {
+          return { discount: 0, isActive: false, label: '', nearMissMessage: `Agrega ${needed} viajero${needed > 1 ? 's' : ''} más y activa el ${promotion_type}.` };
+        }
+        return { discount: 0, isActive: false, label: '', nearMissMessage: null };
+      }
+
+      const pricePerAdulto = getPrecioPorCategoria('adulto');
+      const freeGroups = Math.floor(totalHuman / group_size);
+      const freePerGroup = group_size - pay_count;
+      const freeCount = freeGroups * freePerGroup;
+      const discount = freeCount * pricePerAdulto;
+
+      return {
+        discount,
+        isActive: discount > 0,
+        label: `Promoción ${promotion_type} — ${freeCount} viajero${freeCount > 1 ? 's' : ''} gratis`,
+        nearMissMessage: null,
+      };
+    }
+
+    return { discount: 0, isActive: false, label: '', nearMissMessage: null };
+  };
+
+  const promoResult = calculatePromoDiscount();
+  const promoDiscountAmount = promoResult.discount;
+
+  // Precio total del tour (sin descuento de código, pero con promo)
+  const grossTotalPrice = grossTourPrice - promoDiscountAmount + optionalServicesSubtotal;
 
   // Si el usuario es de alto riesgo (más de 3 no shows), debe pagar el 100%
   const effectiveDepositPercentage = isHighRisk ? 100 : tour.deposit_percentage;
@@ -679,6 +759,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         discount_amount: discountAmount,
         service_charge_discount: serviceChargeDiscountAmount,
         payment_provider: addMembershipToBooking ? 'stripe' : paymentProvider,
+        promotion_id: promoResult.isActive && activePromotion ? activePromotion.id : null,
+        promo_discount_amount: promoResult.isActive ? promoDiscountAmount : 0,
       };
 
       console.log('📝 Creando reserva con datos:', bookingData);
@@ -1010,6 +1092,34 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
             </div>
           )}
         </div>
+
+        {/* Promo Activa Aplicada */}
+        {activePromotion && promoResult.isActive && totalTravelers > 0 && (
+          <div className="mb-4 bg-gradient-to-br from-rose-50 to-pink-50 border-2 border-rose-300 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <Tag className="h-5 w-5 text-rose-600 flex-shrink-0" />
+              <div className="flex-1">
+                <h4 className="text-sm font-bold text-rose-900">
+                  Promoción Aplicada
+                </h4>
+                <p className="text-xs text-rose-700 mt-0.5">{promoResult.label}</p>
+              </div>
+              <span className="text-sm font-bold text-rose-700 flex-shrink-0">
+                -${promoDiscountAmount.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Mensaje motivador para activar promo */}
+        {activePromotion && !promoResult.isActive && promoResult.nearMissMessage && totalTravelers > 0 && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+            <Tag className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-800">
+              <span className="font-semibold">{promoResult.nearMissMessage}</span>
+            </p>
+          </div>
+        )}
 
         {/* Servicios Opcionales */}
         {!isLoadingOptionalServices && optionalServices.length > 0 && totalTravelers > 0 && (
@@ -1503,6 +1613,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">{travelerCounts.mascotas} Mascota{travelerCounts.mascotas > 1 ? 's' : ''} × ${getPrecioPorCategoria('mascota').toLocaleString()}:</span>
                 <span className="font-medium">${precioMascotas.toLocaleString()}</span>
+              </div>
+            )}
+
+            {promoResult.isActive && promoDiscountAmount > 0 && (
+              <div className="flex justify-between text-sm text-rose-600 border-t pt-2 mt-1">
+                <span className="flex items-center gap-1">
+                  <Tag className="h-3 w-3" />
+                  {promoResult.label}:
+                </span>
+                <span className="font-medium">-${promoDiscountAmount.toLocaleString()}</span>
               </div>
             )}
 

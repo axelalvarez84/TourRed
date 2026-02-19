@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination, getTourCategories } from '../../lib/supabase';
-import { Plus, Search, X, Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban, ShoppingBag, Info } from 'lucide-react';
+import { Plus, Search, X, Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban, ShoppingBag, Info, Percent } from 'lucide-react';
+import TourPromotionsManager from '../../components/TourPromotionsManager';
 
 interface OptionalService {
   id?: string;
@@ -2300,6 +2301,29 @@ const AgencyTours: React.FC = () => {
                 </button>
               </div>
             </div>
+
+            {/* SECCIÓN 7 — Promociones Grupales (solo cuando se edita un tour existente) */}
+            {editingTour && (
+              <div className="bg-white rounded-xl shadow-sm border border-rose-100 overflow-hidden">
+                <div className="bg-rose-600 px-5 py-3 flex items-center gap-2">
+                  <div className="bg-white/20 rounded-lg p-1.5">
+                    <Percent className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-semibold text-sm">Paso 7 — Promociones Grupales</h3>
+                    <p className="text-rose-100 text-xs">Configura 2x1, 3x2 o precio especial para grupos</p>
+                  </div>
+                  <span className="ml-auto bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">Opcional</span>
+                </div>
+                <div className="p-5">
+                  <TourPromotionsManager
+                    tourId={editingTour.id}
+                    agencyId={editingTour.agency_id}
+                    tourPrice={parseFloat(formData.price) || editingTour.price}
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-end space-x-4">
               <button

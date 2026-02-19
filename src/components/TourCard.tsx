@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Star, Users, Building, Heart } from 'lucide-react';
+import { MapPin, Calendar, Star, Users, Building, Heart, Tag } from 'lucide-react';
 import { Tour } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -19,6 +19,23 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
   const { user } = useAuth();
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [activePromoType, setActivePromoType] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadPromo = async () => {
+      try {
+        const { data } = await supabase.rpc('get_active_promotion_for_tour', { p_tour_id: tour.id });
+        if (data && data.length > 0) {
+          setActivePromoType(data[0].promotion_type);
+        } else {
+          setActivePromoType(null);
+        }
+      } catch {
+        setActivePromoType(null);
+      }
+    };
+    loadPromo();
+  }, [tour.id]);
 
   const formatDistance = (meters: number) => {
     const km = meters / 1000;
@@ -123,6 +140,16 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
         {tour.is_featured && (
           <div className="absolute top-2 left-2 bg-accent-500 text-white text-xs font-semibold px-2 py-1 rounded">
             Destacado
+          </div>
+        )}
+        {activePromoType && (
+          <div className={`absolute ${tour.is_featured ? 'top-10 left-2' : 'top-2 left-2'} flex items-center gap-1 text-white text-xs font-bold px-2 py-1 rounded shadow-md ${
+            activePromoType === '2x1' ? 'bg-rose-600' :
+            activePromoType === '3x2' ? 'bg-orange-500' :
+            'bg-emerald-600'
+          }`}>
+            <Tag className="w-3 h-3" />
+            {activePromoType === '2x1' ? '2x1' : activePromoType === '3x2' ? '3x2' : 'Oferta'}
           </div>
         )}
         {user && (
