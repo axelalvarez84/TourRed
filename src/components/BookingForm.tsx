@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet, Award, Ticket, X, Check, Loader2, ShoppingBag, Info } from 'lucide-react';
+import PaymentProviderSelector, { PaymentProvider } from './PaymentProviderSelector';
 
 interface TourOptionalService {
   id: string;
@@ -44,6 +45,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [isLoadingMembership, setIsLoadingMembership] = useState(true);
   const [addMembershipToBooking, setAddMembershipToBooking] = useState(false);
   const [selectedMembershipPlan, setSelectedMembershipPlan] = useState<'monthly' | 'annual'>('monthly');
+  const [paymentProvider, setPaymentProvider] = useState<PaymentProvider>('stripe');
   const [walletBalance, setWalletBalance] = useState(0);
   const [isLoadingWallet, setIsLoadingWallet] = useState(true);
   const [useToursRedCash, setUseToursRedCash] = useState(false);
@@ -676,6 +678,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         discount_code_id: appliedDiscount?.code_id || null,
         discount_amount: discountAmount,
         service_charge_discount: serviceChargeDiscountAmount,
+        payment_provider: addMembershipToBooking ? 'stripe' : paymentProvider,
       };
 
       console.log('📝 Creando reserva con datos:', bookingData);
@@ -1721,6 +1724,15 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
               <div>Saldo Restante: ${(grossTotalPrice - depositAmount - (appliedDiscount?.discount_applies_to === 'total_price' ? discountAmount : 0)).toLocaleString()}</div>
             </div>
           </div>
+        )}
+
+        {totalTravelers > 0 && user && isTraveler && (
+          <PaymentProviderSelector
+            context={addMembershipToBooking ? 'booking_with_membership' : 'booking'}
+            value={paymentProvider}
+            onChange={setPaymentProvider}
+            disabled={isSubmitting}
+          />
         )}
 
         {bookingDeadlinePassed && (

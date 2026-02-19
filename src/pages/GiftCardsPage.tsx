@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useFormPersistence } from '../hooks/useFormPersistence';
 import { usePreventUnload } from '../hooks/usePreventUnload';
 import { useAuth } from '../context/AuthContext';
+import PaymentProviderSelector, { PaymentProvider } from '../components/PaymentProviderSelector';
 
 const GIFT_CARD_AMOUNTS = [100, 200, 500, 1000];
 
@@ -20,6 +21,7 @@ export default function GiftCardsPage() {
   const [personalMessage, setPersonalMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [paymentProvider, setPaymentProvider] = useState<PaymentProvider>('stripe');
 
   const [discountCode, setDiscountCode] = useState('');
   const [isValidatingCode, setIsValidatingCode] = useState(false);
@@ -166,6 +168,103 @@ export default function GiftCardsPage() {
     }, 30000);
 
     try {
+      const finalAmount = calculateFinalAmount();
+
+      if (paymentProvider === 'mercadopago' && finalAmount > 0) {
+        const { data: gcData, error: gcError } = await supabase.functions.invoke('purchase-gift-card', {
+          body: {
+            amount: selectedAmount,
+            purchaserEmail,
+            purchaserName,
+            recipientEmail: isGift ? recipientEmail : undefined,
+            recipientName: isGift ? recipientName : undefined,
+            personalMessage: isGift && personalMessage ? personalMessage : undefined,
+            discountCode: appliedDiscount?.code,
+            provider: 'mercadopago',
+            createOnly: true,
+          },
+        });
+
+        clearTimeout(timeoutId);
+        if (gcError || !gcData) throw new Error(gcError?.message || 'Error al crear tarjeta de regalo');
+        if (gcData.error) throw new Error(gcData.error);
+
+        const giftCardId = gcData.giftCardId;
+        if (!giftCardId) throw new Error('No se recibio ID de tarjeta de regalo');
+
+        const session = (await supabase.auth.getSession()).data.session;
+        const mpResponse = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-mercadopago-preference`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({
+              bookingId: giftCardId,
+              customerEmail: purchaserEmail,
+              amount: finalAmount,
+              description: `Tarjeta de Regalo ToursRed $${finalAmount} MXN`,
+              context: 'gift_card',
+            }),
+          }
+        );
+
+        const mpResult = await mpResponse.json();
+        if (!mpResult.success) throw new Error(mpResult.error || 'Error al crear preferencia de MercadoPago');
+        giftCardFormPersistence.clearStorage();
+        window.location.href = mpResult.url;
+        return;
+      }
+
+      if (paymentProvider === 'paypal' && finalAmount > 0) {
+        const { data: gcData, error: gcError } = await supabase.functions.invoke('purchase-gift-card', {
+          body: {
+            amount: selectedAmount,
+            purchaserEmail,
+            purchaserName,
+            recipientEmail: isGift ? recipientEmail : undefined,
+            recipientName: isGift ? recipientName : undefined,
+            personalMessage: isGift && personalMessage ? personalMessage : undefined,
+            discountCode: appliedDiscount?.code,
+            provider: 'paypal',
+            createOnly: true,
+          },
+        });
+
+        clearTimeout(timeoutId);
+        if (gcError || !gcData) throw new Error(gcError?.message || 'Error al crear tarjeta de regalo');
+        if (gcData.error) throw new Error(gcData.error);
+
+        const giftCardId = gcData.giftCardId;
+        if (!giftCardId) throw new Error('No se recibio ID de tarjeta de regalo');
+
+        const session = (await supabase.auth.getSession()).data.session;
+        const ppResponse = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-paypal-order`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({
+              bookingId: giftCardId,
+              amount: finalAmount,
+              description: `Tarjeta de Regalo ToursRed $${finalAmount} MXN`,
+              context: 'gift_card',
+            }),
+          }
+        );
+
+        const ppResult = await ppResponse.json();
+        if (!ppResult.success) throw new Error(ppResult.error || 'Error al crear orden de PayPal');
+        giftCardFormPersistence.clearStorage();
+        window.location.href = ppResult.url;
+        return;
+      }
+
       console.log('Sending purchase request...');
       const { data, error: functionError } = await supabase.functions.invoke('purchase-gift-card', {
         body: {
@@ -181,41 +280,23 @@ export default function GiftCardsPage() {
 
       clearTimeout(timeoutId);
 
-      console.log('Response received:', { data, functionError });
-
       if (functionError) {
-        console.error('Function error details:', functionError);
         throw new Error(functionError.message || 'Error al comunicarse con el servidor');
       }
 
-      if (!data) {
-        console.error('No data received from function');
-        throw new Error('No se recibió respuesta del servidor');
-      }
-
-      if (data.error) {
-        console.error('Error in response:', data.error);
-        throw new Error(data.error);
-      }
-
-      if (data.requiresAuth) {
-        throw new Error('Para usar un código de descuento debes iniciar sesión');
-      }
+      if (!data) throw new Error('No se recibió respuesta del servidor');
+      if (data.error) throw new Error(data.error);
+      if (data.requiresAuth) throw new Error('Para usar un código de descuento debes iniciar sesión');
 
       if (data?.url) {
-        console.log('Redirecting to:', data.url);
         giftCardFormPersistence.clearStorage();
-
         if (data.isFree && data.giftCardId) {
-          console.log('Free gift card, navigating internally to success page');
           navigate(`/gift-card/success?gift_card_id=${data.giftCardId}&free=true`);
         } else {
-          console.log('Paid gift card, redirecting to Stripe');
           window.location.href = data.url;
         }
         return;
       } else {
-        console.error('No URL in response:', data);
         throw new Error('No se pudo crear la sesión de pago');
       }
     } catch (err: any) {
@@ -479,14 +560,12 @@ export default function GiftCardsPage() {
               </div>
             )}
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-              <h4 className="font-semibold text-blue-900 mb-2">Métodos de Pago Disponibles:</h4>
-              <ul className="text-sm text-blue-800 space-y-1">
-                <li>• Tarjeta de Crédito/Débito</li>
-                <li>• OXXO (pago en efectivo)</li>
-                <li>• Transferencia Bancaria</li>
-              </ul>
-            </div>
+            <PaymentProviderSelector
+              context="gift_card"
+              value={paymentProvider}
+              onChange={setPaymentProvider}
+              disabled={isProcessing}
+            />
 
             <button
               type="submit"

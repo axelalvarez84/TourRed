@@ -408,9 +408,10 @@ export default function MembershipCheckout() {
                     ? `El descuento aplica solo al primer pago. Las renovaciones se cobran a $${planPrice.toFixed(0)} MXN. Puedes cancelar en cualquier momento.`
                     : `Se renueva automaticamente. Puedes cancelar en cualquier momento.`}
               </p>
-              <p className="text-xs text-gray-400">
-                Pago seguro procesado por Stripe
-              </p>
+              <div className="inline-flex items-center gap-1.5 text-xs text-gray-400 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
+                <CreditCard className="h-3 w-3" />
+                Cobro recurrente seguro procesado por Stripe. Las membresias requieren tarjeta de credito o debito para habilitar la renovacion automatica.
+              </div>
             </div>
           </div>
         </div>

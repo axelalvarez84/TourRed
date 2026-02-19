@@ -653,48 +653,113 @@ const TravelersInfoPage: React.FC = () => {
         return;
       }
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            bookingId: bookingId,
-            customerEmail: user?.email,
-            amount: amountToCharge,
-            description: `Depósito para ${tour?.name}`,
-            success_url: `${window.location.origin}/booking-success?booking_id=${bookingId}`,
-            cancel_url: `${window.location.origin}/booking-cancel?booking_id=${bookingId}`,
-            toursRedCashUsed: toursRedCashUsed,
-            pointsUsed: pointsUsed,
-            metadata: {
-              points_used: pointsUsed.toString(),
-              points_discount: pointsDiscountAmount.toString(),
-              discount_code_id: booking?.discount_code_id || '',
-              discount_amount: (booking?.discount_amount || 0).toString(),
-            }
-          }),
+      const paymentProvider = (booking as any)?.payment_provider || 'stripe';
+
+      if (paymentProvider === 'mercadopago') {
+        const mpResponse = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-mercadopago-preference`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              bookingId: bookingId,
+              customerEmail: user?.email,
+              amount: amountToCharge,
+              description: `Depósito para ${tour?.name}`,
+              context: 'booking',
+            }),
+          }
+        );
+
+        if (!mpResponse.ok) {
+          const errorData = await mpResponse.json();
+          throw new Error(errorData.error || 'Error al crear preferencia de MercadoPago');
         }
-      );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al crear la sesión de pago');
-      }
+        const mpResult = await mpResponse.json();
+        if (!mpResult.success) throw new Error(mpResult.error || 'Error al crear preferencia de MercadoPago');
+        if (mpResult.url) {
+          window.location.href = mpResult.url;
+        } else {
+          throw new Error('No se recibió la URL de MercadoPago');
+        }
+      } else if (paymentProvider === 'paypal') {
+        const ppResponse = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-paypal-order`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              bookingId: bookingId,
+              amount: amountToCharge,
+              description: `Depósito para ${tour?.name}`,
+              context: 'booking',
+            }),
+          }
+        );
 
-      const result = await response.json();
+        if (!ppResponse.ok) {
+          const errorData = await ppResponse.json();
+          throw new Error(errorData.error || 'Error al crear orden de PayPal');
+        }
 
-      if (!result.success) {
-        throw new Error(result.error || 'Error al crear la sesión de pago');
-      }
-
-      if (result.url) {
-        window.location.href = result.url;
+        const ppResult = await ppResponse.json();
+        if (!ppResult.success) throw new Error(ppResult.error || 'Error al crear orden de PayPal');
+        if (ppResult.url) {
+          window.location.href = ppResult.url;
+        } else {
+          throw new Error('No se recibió la URL de PayPal');
+        }
       } else {
-        throw new Error('No se recibió la URL de pago');
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              bookingId: bookingId,
+              customerEmail: user?.email,
+              amount: amountToCharge,
+              description: `Depósito para ${tour?.name}`,
+              success_url: `${window.location.origin}/booking-success?booking_id=${bookingId}`,
+              cancel_url: `${window.location.origin}/booking-cancel?booking_id=${bookingId}`,
+              toursRedCashUsed: toursRedCashUsed,
+              pointsUsed: pointsUsed,
+              metadata: {
+                points_used: pointsUsed.toString(),
+                points_discount: pointsDiscountAmount.toString(),
+                discount_code_id: booking?.discount_code_id || '',
+                discount_amount: (booking?.discount_amount || 0).toString(),
+              }
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Error al crear la sesión de pago');
+        }
+
+        const result = await response.json();
+
+        if (!result.success) {
+          throw new Error(result.error || 'Error al crear la sesión de pago');
+        }
+
+        if (result.url) {
+          window.location.href = result.url;
+        } else {
+          throw new Error('No se recibió la URL de pago');
+        }
       }
 
     } catch (error: any) {

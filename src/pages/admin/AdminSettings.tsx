@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard, Crown, Gift, Award } from 'lucide-react';
+import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard, Crown, Gift, Award, Users, Globe } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface EmailSettings {
@@ -23,6 +23,10 @@ interface PlatformSettings {
   default_max_referrals_per_user: number;
   referral_bonus_points: number;
   referral_program_enabled: boolean;
+  mercadopago_enabled: boolean;
+  paypal_enabled: boolean;
+  mercadopago_public_key: string;
+  paypal_client_id: string;
 }
 
 const AdminSettings: React.FC = () => {
@@ -46,6 +50,10 @@ const AdminSettings: React.FC = () => {
     default_max_referrals_per_user: 10,
     referral_bonus_points: 5000,
     referral_program_enabled: true,
+    mercadopago_enabled: false,
+    paypal_enabled: false,
+    mercadopago_public_key: '',
+    paypal_client_id: '',
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -121,6 +129,10 @@ const AdminSettings: React.FC = () => {
             default_max_referrals_per_user: platformSettings.default_max_referrals_per_user,
             referral_bonus_points: platformSettings.referral_bonus_points,
             referral_program_enabled: platformSettings.referral_program_enabled,
+            mercadopago_enabled: platformSettings.mercadopago_enabled,
+            paypal_enabled: platformSettings.paypal_enabled,
+            mercadopago_public_key: platformSettings.mercadopago_public_key,
+            paypal_client_id: platformSettings.paypal_client_id,
             updated_at: new Date().toISOString(),
             updated_by: user?.id
           })
@@ -160,9 +172,10 @@ const AdminSettings: React.FC = () => {
   const handlePlatformChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     const numericFields = ['service_charge_percentage', 'agency_commission_percentage', 'membership_monthly_price', 'membership_annual_price', 'default_max_referrals_per_user', 'referral_bonus_points'];
+    const booleanFields = ['referral_program_enabled', 'mercadopago_enabled', 'paypal_enabled'];
     setPlatformSettings(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : (numericFields.includes(name) ? (parseFloat(value) || 0) : value),
+      [name]: booleanFields.includes(name) ? checked : (numericFields.includes(name) ? (parseFloat(value) || 0) : value),
     }));
   };
 
@@ -548,6 +561,124 @@ const AdminSettings: React.FC = () => {
               <p className="mt-1 text-xs text-gray-500">
                 Este límite puede ajustarse individualmente por usuario desde la página de gestión de referidos
               </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <Globe className="w-6 h-6 text-primary-600" />
+            <h2 className="text-xl font-semibold text-gray-900">
+              Proveedores de Pago Adicionales
+            </h2>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-4">
+            <div className="flex items-start">
+              <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
+              <div className="text-sm text-blue-800">
+                <p className="font-medium mb-1">Informacion importante:</p>
+                <ul className="space-y-1 text-xs">
+                  <li>• Stripe siempre esta disponible y es el unico proveedor para membresias (requiere cobro recurrente)</li>
+                  <li>• MercadoPago y PayPal aplican solo para reservas sin membresia y tarjetas de regalo</li>
+                  <li>• Las claves secretas se configuran como secrets de Supabase Edge Functions</li>
+                  <li>• Aqui solo se guardan las claves publicas (no sensibles) necesarias para el frontend</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-sky-100 rounded-lg flex items-center justify-center">
+                    <CreditCard className="w-4 h-4 text-sky-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">MercadoPago</h3>
+                    <p className="text-xs text-gray-500">Para reservas y tarjetas de regalo</p>
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="mercadopago_enabled"
+                    checked={platformSettings.mercadopago_enabled}
+                    onChange={handlePlatformChange}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Habilitado</span>
+                </label>
+              </div>
+
+              {platformSettings.mercadopago_enabled && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Public Key de MercadoPago
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Clave publica de tu cuenta MercadoPago (empieza con APP_USR- o TEST-)
+                  </p>
+                  <input
+                    type="text"
+                    name="mercadopago_public_key"
+                    value={platformSettings.mercadopago_public_key}
+                    onChange={handlePlatformChange}
+                    placeholder="APP_USR-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                  />
+                  <p className="text-xs text-amber-700 mt-1 font-medium">
+                    Recuerda configurar MERCADOPAGO_ACCESS_TOKEN como secret de Edge Functions
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <CreditCard className="w-4 h-4 text-blue-700" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">PayPal</h3>
+                    <p className="text-xs text-gray-500">Para reservas y tarjetas de regalo</p>
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="paypal_enabled"
+                    checked={platformSettings.paypal_enabled}
+                    onChange={handlePlatformChange}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Habilitado</span>
+                </label>
+              </div>
+
+              {platformSettings.paypal_enabled && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Client ID de PayPal
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Client ID de tu app en PayPal Developer (empieza con AV o At en produccion)
+                  </p>
+                  <input
+                    type="text"
+                    name="paypal_client_id"
+                    value={platformSettings.paypal_client_id}
+                    onChange={handlePlatformChange}
+                    placeholder="AVxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                  />
+                  <p className="text-xs text-amber-700 mt-1 font-medium">
+                    Recuerda configurar PAYPAL_CLIENT_ID y PAYPAL_CLIENT_SECRET como secrets de Edge Functions
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

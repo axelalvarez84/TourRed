@@ -69,6 +69,7 @@ import NotFoundPage from './pages/NotFoundPage';
 import GiftCardsPage from './pages/GiftCardsPage';
 import GiftCardRedeemPage from './pages/GiftCardRedeemPage';
 import GiftCardSuccessPage from './pages/GiftCardSuccessPage';
+import PaymentReturnPage from './pages/PaymentReturnPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
 import { UserRole } from './lib/supabase';
@@ -120,6 +121,7 @@ const App: React.FC = () => {
           <Route path="/gift-cards" element={<GiftCardsPage />} />
           <Route path="/gift-card/redeem" element={<GiftCardRedeemPage />} />
           <Route path="/gift-card/success" element={<GiftCardSuccessPage />} />
+          <Route path="/payment-return" element={<PaymentReturnPage />} />
 
           {/* Messaging Route - Available to all authenticated users */}
           <Route
