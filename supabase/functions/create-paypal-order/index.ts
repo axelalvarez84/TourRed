@@ -68,8 +68,18 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const paypalClientId = Deno.env.get("PAYPAL_CLIENT_ID");
-    const paypalClientSecret = Deno.env.get("PAYPAL_CLIENT_SECRET");
+    let paypalClientId = Deno.env.get("PAYPAL_CLIENT_ID");
+    let paypalClientSecret = Deno.env.get("PAYPAL_CLIENT_SECRET");
+
+    if (!paypalClientId || !paypalClientSecret) {
+      const { data: settings } = await supabase
+        .from("platform_settings")
+        .select("paypal_client_id, paypal_client_secret")
+        .maybeSingle();
+      if (settings?.paypal_client_id) paypalClientId = settings.paypal_client_id;
+      if (settings?.paypal_client_secret) paypalClientSecret = settings.paypal_client_secret;
+    }
+
     if (!paypalClientId || !paypalClientSecret) {
       return new Response(JSON.stringify({ error: "PayPal no configurado" }), {
         status: 500,

@@ -26,7 +26,9 @@ interface PlatformSettings {
   mercadopago_enabled: boolean;
   paypal_enabled: boolean;
   mercadopago_public_key: string;
+  mercadopago_access_token: string;
   paypal_client_id: string;
+  paypal_client_secret: string;
 }
 
 const AdminSettings: React.FC = () => {
@@ -53,7 +55,9 @@ const AdminSettings: React.FC = () => {
     mercadopago_enabled: false,
     paypal_enabled: false,
     mercadopago_public_key: '',
+    mercadopago_access_token: '',
     paypal_client_id: '',
+    paypal_client_secret: '',
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -132,7 +136,9 @@ const AdminSettings: React.FC = () => {
             mercadopago_enabled: platformSettings.mercadopago_enabled,
             paypal_enabled: platformSettings.paypal_enabled,
             mercadopago_public_key: platformSettings.mercadopago_public_key,
+            mercadopago_access_token: platformSettings.mercadopago_access_token,
             paypal_client_id: platformSettings.paypal_client_id,
+            paypal_client_secret: platformSettings.paypal_client_secret,
             updated_at: new Date().toISOString(),
             updated_by: user?.id
           })
@@ -613,24 +619,39 @@ const AdminSettings: React.FC = () => {
               </div>
 
               {platformSettings.mercadopago_enabled && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Public Key de MercadoPago
-                  </label>
-                  <p className="text-xs text-gray-500 mb-2">
-                    Clave publica de tu cuenta MercadoPago (empieza con APP_USR- o TEST-)
-                  </p>
-                  <input
-                    type="text"
-                    name="mercadopago_public_key"
-                    value={platformSettings.mercadopago_public_key}
-                    onChange={handlePlatformChange}
-                    placeholder="APP_USR-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
-                  />
-                  <p className="text-xs text-amber-700 mt-1 font-medium">
-                    Recuerda configurar MERCADOPAGO_ACCESS_TOKEN como secret de Edge Functions
-                  </p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Public Key de MercadoPago
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Clave publica de tu cuenta MercadoPago (empieza con APP_USR- o TEST-)
+                    </p>
+                    <input
+                      type="text"
+                      name="mercadopago_public_key"
+                      value={platformSettings.mercadopago_public_key}
+                      onChange={handlePlatformChange}
+                      placeholder="APP_USR-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Access Token de MercadoPago
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Token privado de acceso de tu cuenta MercadoPago (empieza con APP_USR- o TEST-)
+                    </p>
+                    <input
+                      type="password"
+                      name="mercadopago_access_token"
+                      value={platformSettings.mercadopago_access_token}
+                      onChange={handlePlatformChange}
+                      placeholder="APP_USR-xxxxxxxxxxxxxxxxxxxx"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -659,24 +680,39 @@ const AdminSettings: React.FC = () => {
               </div>
 
               {platformSettings.paypal_enabled && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Client ID de PayPal
-                  </label>
-                  <p className="text-xs text-gray-500 mb-2">
-                    Client ID de tu app en PayPal Developer (empieza con AV o At en produccion)
-                  </p>
-                  <input
-                    type="text"
-                    name="paypal_client_id"
-                    value={platformSettings.paypal_client_id}
-                    onChange={handlePlatformChange}
-                    placeholder="AVxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
-                  />
-                  <p className="text-xs text-amber-700 mt-1 font-medium">
-                    Recuerda configurar PAYPAL_CLIENT_ID y PAYPAL_CLIENT_SECRET como secrets de Edge Functions
-                  </p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Client ID de PayPal
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Client ID de tu app en PayPal Developer (empieza con AV o At en produccion)
+                    </p>
+                    <input
+                      type="text"
+                      name="paypal_client_id"
+                      value={platformSettings.paypal_client_id}
+                      onChange={handlePlatformChange}
+                      placeholder="AVxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Client Secret de PayPal
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Secret de tu app en PayPal Developer
+                    </p>
+                    <input
+                      type="password"
+                      name="paypal_client_secret"
+                      value={platformSettings.paypal_client_secret}
+                      onChange={handlePlatformChange}
+                      placeholder="EGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                    />
+                  </div>
                 </div>
               )}
             </div>

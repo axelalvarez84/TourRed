@@ -45,7 +45,16 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const mpAccessToken = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
+    let mpAccessToken = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
+
+    if (!mpAccessToken) {
+      const { data: settings } = await supabase
+        .from("platform_settings")
+        .select("mercadopago_access_token")
+        .maybeSingle();
+      if (settings?.mercadopago_access_token) mpAccessToken = settings.mercadopago_access_token;
+    }
+
     if (!mpAccessToken) {
       return new Response(JSON.stringify({ error: "MercadoPago no configurado" }), {
         status: 500,
