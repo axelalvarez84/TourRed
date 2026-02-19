@@ -31,6 +31,81 @@ async function getPayPalAccessToken(clientId: string, clientSecret: string, isSa
   return data.access_token;
 }
 
+async function getPayPalOrderDetails(base: string, accessToken: string, orderId: string): Promise<any> {
+  const response = await fetch(`${base}/v2/checkout/orders/${orderId}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (!response.ok) {
+    const errorBody = await response.text();
+    console.error("PayPal get order error:", errorBody);
+    throw new Error("Failed to get PayPal order details");
+  }
+  return response.json();
+}
+
+async function activateGiftCard(supabase: any, giftCardId: string, paypalTransactionId: string | null) {
+  const { error } = await supabase
+    .from("gift_cards")
+    .update({
+      status: "active",
+      payment_status: "paid",
+      payment_provider: "paypal",
+      paypal_transaction_id: paypalTransactionId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", giftCardId)
+    .in("status", ["pending_payment", "active"]);
+
+  if (error) {
+    console.error("Error updating gift card:", error);
+  }
+
+  EdgeRuntime.waitUntil(
+    fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-gift-card-email`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      },
+      body: JSON.stringify({ gift_card_id: giftCardId }),
+    })
+  );
+}
+
+async function confirmBooking(supabase: any, bookingId: string, paypalTransactionId: string | null) {
+  const { error } = await supabase
+    .from("bookings")
+    .update({
+      payment_status: "succeeded",
+      status: "confirmed",
+      payment_method: "paypal",
+      payment_provider: "paypal",
+      paypal_transaction_id: paypalTransactionId,
+      paid_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", bookingId);
+
+  if (error) {
+    console.error("Error updating booking:", error);
+  }
+
+  EdgeRuntime.waitUntil(
+    fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-booking-confirmation`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      },
+      body: JSON.stringify({ booking_id: bookingId }),
+    })
+  );
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -88,17 +163,63 @@ Deno.serve(async (req: Request) => {
       },
     });
 
+    let captureData: any;
+    let captureStatus: string;
+
     if (!captureResponse.ok) {
       const errorBody = await captureResponse.text();
-      console.error("PayPal capture error:", errorBody);
+      console.error("PayPal capture error status:", captureResponse.status, "body:", errorBody);
+
+      let errorJson: any = {};
+      try { errorJson = JSON.parse(errorBody); } catch {}
+
+      const isAlreadyCaptured =
+        captureResponse.status === 422 &&
+        errorJson?.details?.some((d: any) => d.issue === "ORDER_ALREADY_CAPTURED");
+
+      if (isAlreadyCaptured) {
+        console.log("Order already captured, fetching order details to confirm payment:", orderId);
+        try {
+          const orderDetails = await getPayPalOrderDetails(base, accessToken, orderId);
+          console.log("PayPal order details status:", orderDetails.status);
+
+          if (orderDetails.status === "COMPLETED") {
+            const referenceId = giftCardId || bookingId || orderDetails.purchase_units?.[0]?.reference_id;
+            const paypalTransactionId = orderDetails.purchase_units?.[0]?.payments?.captures?.[0]?.id || null;
+
+            if (context === "gift_card" && referenceId) {
+              await activateGiftCard(supabase, referenceId, paypalTransactionId);
+            } else if (referenceId) {
+              await confirmBooking(supabase, referenceId, paypalTransactionId);
+            }
+
+            return new Response(JSON.stringify({ success: true, status: "COMPLETED", alreadyCaptured: true }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          } else {
+            console.error("Order not COMPLETED after already captured check, status:", orderDetails.status);
+            return new Response(JSON.stringify({ success: false, status: orderDetails.status, error: "Pago no completado" }), {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        } catch (orderErr: any) {
+          console.error("Error fetching order details after already captured:", orderErr);
+          return new Response(JSON.stringify({ error: "Error al verificar estado del pago" }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
       return new Response(JSON.stringify({ error: "Error al capturar pago de PayPal", details: errorBody }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const captureData = await captureResponse.json();
-    const captureStatus = captureData.status;
+    captureData = await captureResponse.json();
+    captureStatus = captureData.status;
 
     console.log("PayPal capture status:", captureStatus, "orderId:", orderId);
 
@@ -107,59 +228,9 @@ Deno.serve(async (req: Request) => {
       const paypalTransactionId = captureData.purchase_units?.[0]?.payments?.captures?.[0]?.id || null;
 
       if (context === "gift_card" && referenceId) {
-        const { error: updateError } = await supabase
-          .from("gift_cards")
-          .update({
-            status: "active",
-            payment_status: "paid",
-            payment_provider: "paypal",
-            paypal_transaction_id: paypalTransactionId,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", referenceId);
-
-        if (updateError) {
-          console.error("Error updating gift card:", updateError);
-        }
-
-        EdgeRuntime.waitUntil(
-          fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-gift-card-email`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-            },
-            body: JSON.stringify({ gift_card_id: referenceId }),
-          })
-        );
+        await activateGiftCard(supabase, referenceId, paypalTransactionId);
       } else if (referenceId) {
-        const { error: updateError } = await supabase
-          .from("bookings")
-          .update({
-            payment_status: "succeeded",
-            status: "confirmed",
-            payment_method: "paypal",
-            payment_provider: "paypal",
-            paypal_transaction_id: paypalTransactionId,
-            paid_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", referenceId);
-
-        if (updateError) {
-          console.error("Error updating booking:", updateError);
-        }
-
-        EdgeRuntime.waitUntil(
-          fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-booking-confirmation`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-            },
-            body: JSON.stringify({ booking_id: referenceId }),
-          })
-        );
+        await confirmBooking(supabase, referenceId, paypalTransactionId);
       }
 
       return new Response(JSON.stringify({ success: true, status: captureStatus }), {
