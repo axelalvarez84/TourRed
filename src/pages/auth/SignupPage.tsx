@@ -213,7 +213,40 @@ const SignupPage: React.FC = () => {
               type: 'referral_signup',
               title: '¡Nuevo referido!',
               message: `${firstName} ${lastName} se ha registrado usando tu código de referido`,
+              data: {}
             });
+
+            try {
+              const { data: referrerData } = await supabase
+                .from('users')
+                .select('email, first_name, last_name')
+                .eq('id', referralValidation.referrer_id)
+                .single();
+
+              if (referrerData) {
+                const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-referral-signup-notification`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                  },
+                  body: JSON.stringify({
+                    referrerEmail: referrerData.email,
+                    referrerName: referrerData.first_name && referrerData.last_name
+                      ? `${referrerData.first_name} ${referrerData.last_name}`
+                      : referrerData.email,
+                    referredName: `${firstName} ${lastName}`,
+                    referralCode: referralCode.toUpperCase()
+                  })
+                });
+
+                if (!response.ok) {
+                  console.error('Error sending referral signup email:', await response.text());
+                }
+              }
+            } catch (emailError) {
+              console.error('Error sending referral signup email:', emailError);
+            }
           }
         } catch (refError) {
           console.error('Error processing referral:', refError);
