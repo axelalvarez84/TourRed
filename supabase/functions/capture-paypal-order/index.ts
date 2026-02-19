@@ -71,7 +71,7 @@ async function activateGiftCard(supabase: any, giftCardId: string, paypalTransac
         "Content-Type": "application/json",
         Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
       },
-      body: JSON.stringify({ gift_card_id: giftCardId }),
+      body: JSON.stringify({ giftCardId: giftCardId }),
     })
   );
 }
