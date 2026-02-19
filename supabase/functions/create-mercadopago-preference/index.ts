@@ -83,8 +83,8 @@ Deno.serve(async (req: Request) => {
           currency_id: "MXN",
         },
       ];
-      successUrl = `${origin}/payment-return?provider=mercadopago&booking_id=${bookingId}&status=success`;
-      cancelUrl = `${origin}/payment-return?provider=mercadopago&booking_id=${bookingId}&status=cancel`;
+      successUrl = `${origin}/payment-return?provider=mercadopago&booking_id=${bookingId}&tr_status=success`;
+      cancelUrl = `${origin}/payment-return?provider=mercadopago&booking_id=${bookingId}&tr_status=cancel`;
     }
 
     const preferencePayload = {
@@ -93,7 +93,7 @@ Deno.serve(async (req: Request) => {
       back_urls: {
         success: successUrl,
         failure: cancelUrl,
-        pending: `${origin}/payment-return?provider=mercadopago&booking_id=${bookingId}&status=pending`,
+        pending: `${origin}/payment-return?provider=mercadopago&booking_id=${bookingId}&tr_status=pending`,
       },
       auto_return: "approved",
       external_reference: bookingId,

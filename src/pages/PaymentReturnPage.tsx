@@ -14,14 +14,44 @@ export default function PaymentReturnPage() {
   const provider = searchParams.get('provider');
   const bookingId = searchParams.get('booking_id');
   const giftCardId = searchParams.get('gift_card_id');
-  const returnStatus = searchParams.get('status');
   const paypalOrderId = searchParams.get('token');
+
+  // Our custom status param, but MercadoPago may override 'status' with its own value
+  // Use 'tr_status' as our param to avoid conflicts, falling back to 'status' for backwards compat
+  const returnStatus = searchParams.get('tr_status') || searchParams.get('status');
+
+  // MercadoPago sends collection_status on return (approved, null, rejected, etc.)
+  const mpCollectionStatus = searchParams.get('collection_status');
 
   useEffect(() => {
     handleReturn();
   }, []);
 
   const handleReturn = async () => {
+    // MercadoPago collection_status takes priority for MP payments
+    if (mpCollectionStatus) {
+      if (mpCollectionStatus === 'approved') {
+        setStatus('success');
+        if (giftCardId) {
+          setMessage('Pago exitoso. Tu tarjeta de regalo fue procesada.');
+          setTimeout(() => navigate(`/gift-card/success?gift_card_id=${giftCardId}&provider=mercadopago`), 2000);
+        } else if (bookingId) {
+          setMessage('Pago exitoso. Tu reserva ha sido confirmada.');
+          setTimeout(() => navigate(`/booking-success?booking_id=${bookingId}`), 2000);
+        }
+        return;
+      } else if (mpCollectionStatus === 'pending' || mpCollectionStatus === 'in_process') {
+        setStatus('pending');
+        setMessage('Tu pago esta siendo procesado. Te notificaremos cuando sea confirmado.');
+        return;
+      } else {
+        // null, rejected, cancelled — treat as cancel
+        setStatus('cancel');
+        setMessage('Cancelaste el proceso de pago. Tu reserva fue guardada pero no ha sido pagada.');
+        return;
+      }
+    }
+
     if (returnStatus === 'cancel') {
       setStatus('cancel');
       setMessage('Cancelaste el proceso de pago. Tu reserva fue guardada pero no ha sido pagada.');
