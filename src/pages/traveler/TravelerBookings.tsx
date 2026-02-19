@@ -17,6 +17,7 @@ const TravelerBookings: React.FC = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [bookingOptionalServices, setBookingOptionalServices] = useState<Record<string, any[]>>({});
   const [reviewModal, setReviewModal] = useState<{
     open: boolean;
     booking: Booking | null;
@@ -133,6 +134,27 @@ const TravelerBookings: React.FC = () => {
 
       console.log('✅ Reservas cargadas:', data);
       setBookings(data || []);
+
+      // Load optional services for all bookings
+      if (data && data.length > 0) {
+        const ids = data.map((b: any) => b.id);
+        const { data: optSvcs } = await supabase
+          .from('booking_optional_services')
+          .select(`
+            *,
+            tour_optional_services(name, is_refundable)
+          `)
+          .in('booking_id', ids);
+
+        if (optSvcs) {
+          const grouped: Record<string, any[]> = {};
+          for (const bos of optSvcs) {
+            if (!grouped[bos.booking_id]) grouped[bos.booking_id] = [];
+            grouped[bos.booking_id].push(bos);
+          }
+          setBookingOptionalServices(grouped);
+        }
+      }
 
       // Load pending reschedules for bookings that have them
       if (data && data.length > 0) {
@@ -906,6 +928,44 @@ const TravelerBookings: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Optional Services */}
+                  {bookingOptionalServices[booking.id] && bookingOptionalServices[booking.id].length > 0 && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                      <h4 className="font-medium mb-2 flex items-center gap-2 text-amber-800">
+                        <span>Servicios Adicionales Contratados</span>
+                      </h4>
+                      <div className="space-y-2">
+                        {bookingOptionalServices[booking.id].map((bos: any) => (
+                          <div key={bos.id} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className={bos.is_cancelled ? 'line-through text-gray-400' : 'text-gray-800'}>
+                                {bos.tour_optional_services?.name} × {bos.quantity}
+                              </span>
+                              {!bos.tour_optional_services?.is_refundable && !bos.is_cancelled && (
+                                <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">No reembolsable</span>
+                              )}
+                              {bos.is_cancelled && (
+                                <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+                                  {bos.cancelled_by_agency ? 'Cancelado por agencia' : 'Cancelado'}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <span className={`font-medium ${bos.is_cancelled ? 'text-gray-400' : 'text-amber-700'}`}>
+                                ${Number(bos.subtotal).toLocaleString()}
+                              </span>
+                              {bos.is_cancelled && bos.refund_amount > 0 && (
+                                <span className="block text-xs text-green-600">
+                                  Reembolso: ${Number(bos.refund_amount).toLocaleString()}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Payment Summary */}
                   <div className="bg-gray-50 rounded-lg p-4 mb-4">
                     <h4 className="font-medium mb-2">Resumen de Pago</h4>
@@ -1411,6 +1471,20 @@ const TravelerBookings: React.FC = () => {
                             <p className="text-sm text-orange-800">
                               <strong>Nota importante:</strong> El cargo por servicio de ${cancellationModal.policy.originalServiceCharge.toFixed(2)} no es reembolsable. Si utilizaste beneficios de ToursRed+, estos tampoco son recuperables ya que fueron cobrados por Stripe.
                             </p>
+                          </div>
+                        )}
+
+                        {(cancellationModal.policy as any).optionalServicesNonRefundable > 0 && (
+                          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                            <p className="text-sm text-red-800 font-semibold mb-1">Servicios opcionales NO reembolsables:</p>
+                            <p className="text-sm text-red-700">
+                              Tienes ${((cancellationModal.policy as any).optionalServicesNonRefundable as number).toFixed(2)} en servicios adicionales marcados como no reembolsables. Al cancelar, este monto <strong>no se devolverá</strong>, ya que fue contratado con esa condición.
+                            </p>
+                            {(cancellationModal.policy as any).optionalServicesRefundable > 0 && (
+                              <p className="text-sm text-red-600 mt-1">
+                                Los servicios reembolsables (${ ((cancellationModal.policy as any).optionalServicesRefundable as number).toFixed(2)}) sí se devuelven.
+                              </p>
+                            )}
                           </div>
                         )}
 

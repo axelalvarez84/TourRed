@@ -38,6 +38,7 @@ const AgencyBookings: React.FC = () => {
     reason: string;
   }>({ open: false, booking: null, isSubmitting: false, reason: '' });
   const [activeTab, setActiveTab] = useState<'bookings' | 'reports'>('bookings');
+  const [bookingOptionalServices, setBookingOptionalServices] = useState<Record<string, any[]>>({});
   const [availableTours, setAvailableTours] = useState<any[]>([]);
   const [selectedTourForReport, setSelectedTourForReport] = useState<string>('');
   const [reportData, setReportData] = useState<any>(null);
@@ -92,6 +93,24 @@ const AgencyBookings: React.FC = () => {
 
       console.log('✅ Reservas de agencia cargadas:', bookingsData);
       setBookings(bookingsData || []);
+
+      // Load optional services for all bookings
+      if (bookingsData && bookingsData.length > 0) {
+        const ids = bookingsData.map((b: any) => b.id);
+        const { data: optSvcs } = await supabase
+          .from('booking_optional_services')
+          .select(`*, tour_optional_services(name, is_refundable)`)
+          .in('booking_id', ids);
+
+        if (optSvcs) {
+          const grouped: Record<string, any[]> = {};
+          for (const bos of optSvcs) {
+            if (!grouped[bos.booking_id]) grouped[bos.booking_id] = [];
+            grouped[bos.booking_id].push(bos);
+          }
+          setBookingOptionalServices(grouped);
+        }
+      }
 
       // OPTIMIZED: Limit tours and only count IDs
       const { data: toursData, error: toursError } = await supabase
@@ -1049,6 +1068,33 @@ const AgencyBookings: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Optional Services */}
+                  {bookingOptionalServices[booking.id] && bookingOptionalServices[booking.id].length > 0 && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                      <h4 className="text-sm font-semibold text-amber-800 mb-2">Servicios Adicionales Contratados</h4>
+                      <div className="space-y-1.5">
+                        {bookingOptionalServices[booking.id].map((bos: any) => (
+                          <div key={bos.id} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className={bos.is_cancelled ? 'line-through text-gray-400' : 'text-gray-800'}>
+                                {bos.tour_optional_services?.name} × {bos.quantity}
+                              </span>
+                              {!bos.tour_optional_services?.is_refundable && !bos.is_cancelled && (
+                                <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">No reemb. del viajero</span>
+                              )}
+                              {bos.is_cancelled && (
+                                <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Cancelado</span>
+                              )}
+                            </div>
+                            <span className={`font-medium ${bos.is_cancelled ? 'text-gray-400' : 'text-amber-700'}`}>
+                              ${Number(bos.subtotal).toLocaleString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Actions */}
                   <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
                     <Link
@@ -1780,7 +1826,7 @@ const AgencyBookings: React.FC = () => {
                 <div className="flex gap-2">
                   <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                   <div className="text-sm text-yellow-800">
-                    <p className="font-semibold mb-1">⚠️ Importante: Política de Cancelación por Agencia</p>
+                    <p className="font-semibold mb-1">Importante: Política de Cancelación por Agencia</p>
                     <ul className="list-disc list-inside space-y-1 ml-2">
                       <li>El viajero recibirá un <strong>reembolso del 100%</strong> en su ToursRed Cash</li>
                       <li>Los cargos por servicio NO son reembolsables (ya cobrados por Stripe)</li>
@@ -1790,6 +1836,24 @@ const AgencyBookings: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {(() => {
+                const optSvcs = bookingOptionalServices[cancelBookingModal.booking.id] || [];
+                const nonRefundable = optSvcs.filter(b => !b.tour_optional_services?.is_refundable && !b.is_cancelled);
+                if (nonRefundable.length === 0) return null;
+                const totalNonRefundable = nonRefundable.reduce((s: number, b: any) => s + Number(b.subtotal), 0);
+                return (
+                  <div className="bg-orange-50 border-l-4 border-orange-500 p-4 mb-6">
+                    <div className="flex gap-2">
+                      <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-orange-800">
+                        <p className="font-semibold mb-1">Servicios adicionales no reembolsables incluidos</p>
+                        <p>Esta reserva tiene <strong>${totalNonRefundable.toFixed(2)}</strong> en servicios marcados como no reembolsables. Como eres tú quien cancela, <strong>todos los servicios se reembolsan al viajero</strong>, incluyendo los no reembolsables. Tu agencia absorbe ese costo.</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">

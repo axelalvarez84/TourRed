@@ -1,6 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet, Award, Ticket, X, Check, Loader2 } from 'lucide-react';
+import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet, Award, Ticket, X, Check, Loader2, ShoppingBag, Info } from 'lucide-react';
+
+interface TourOptionalService {
+  id: string;
+  name: string;
+  description: string | null;
+  price_per_person: number;
+  max_capacity: number | null;
+  is_refundable: boolean;
+  is_active: boolean;
+  display_order: number;
+  available_capacity?: number | null;
+}
 import { Tour } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { createBooking, formatDateForDB, supabase } from '../lib/supabase';
@@ -45,6 +57,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [isHighRisk, setIsHighRisk] = useState(false);
   const [remainingExemption, setRemainingExemption] = useState(500);
   const [isLoadingExemption, setIsLoadingExemption] = useState(true);
+
+  const [optionalServices, setOptionalServices] = useState<TourOptionalService[]>([]);
+  const [optionalServiceQuantities, setOptionalServiceQuantities] = useState<Record<string, number>>({});
+  const [isLoadingOptionalServices, setIsLoadingOptionalServices] = useState(true);
 
   const [discountCodeInput, setDiscountCodeInput] = useState('');
   const [isValidatingCode, setIsValidatingCode] = useState(false);
@@ -265,6 +281,45 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   }, [user, isTraveler, hasMembership]);
 
   React.useEffect(() => {
+    const loadOptionalServices = async () => {
+      try {
+        setIsLoadingOptionalServices(true);
+        const { data, error } = await supabase
+          .from('tour_optional_services')
+          .select('*')
+          .eq('tour_id', tour.id)
+          .eq('is_active', true)
+          .order('display_order');
+
+        if (error || !data) {
+          setOptionalServices([]);
+          return;
+        }
+
+        const servicesWithCapacity = await Promise.all(
+          data.map(async (svc) => {
+            if (svc.max_capacity === null) {
+              return { ...svc, available_capacity: null };
+            }
+            const { data: capData } = await supabase
+              .rpc('get_optional_service_available_capacity', { p_service_id: svc.id });
+            return { ...svc, available_capacity: capData };
+          })
+        );
+
+        setOptionalServices(servicesWithCapacity);
+      } catch (err) {
+        console.error('Error loading optional services:', err);
+        setOptionalServices([]);
+      } finally {
+        setIsLoadingOptionalServices(false);
+      }
+    };
+
+    loadOptionalServices();
+  }, [tour.id]);
+
+  React.useEffect(() => {
     const fetchAvailability = async () => {
       try {
         setIsLoadingAvailability(true);
@@ -416,8 +471,17 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const precioAdultosMayores = getPrecioPorCategoria('adulto_mayor') * travelerCounts.adultos_mayores;
   const precioMascotas = getPrecioPorCategoria('mascota') * travelerCounts.mascotas;
 
+  // Subtotal de servicios opcionales seleccionados
+  const optionalServicesSubtotal = optionalServices.reduce((sum, svc) => {
+    const qty = optionalServiceQuantities[svc.id] || 0;
+    return sum + qty * svc.price_per_person;
+  }, 0);
+
+  // Precio total del tour (sin descuento, sin opcionales)
+  const grossTourPrice = precioAdultos + precioNinos + precioInfantes + precioAdultosMayores + precioMascotas;
+
   // Precio total del tour (sin descuento)
-  const grossTotalPrice = precioAdultos + precioNinos + precioInfantes + precioAdultosMayores + precioMascotas;
+  const grossTotalPrice = grossTourPrice + optionalServicesSubtotal;
 
   // Si el usuario es de alto riesgo (más de 3 no shows), debe pagar el 100%
   const effectiveDepositPercentage = isHighRisk ? 100 : tour.deposit_percentage;
@@ -522,6 +586,21 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
   const agencyReceives = depositAmount - agencyCommission;
 
+  const handleOptionalServiceChange = (serviceId: string, delta: number, service: TourOptionalService) => {
+    const totalPeople = totalTravelers + travelerCounts.mascotas;
+    const maxByPeople = totalTravelers > 0 ? totalTravelers : 1;
+    const maxByCapacity = service.available_capacity !== null && service.available_capacity !== undefined
+      ? service.available_capacity
+      : Infinity;
+    const maxAllowed = Math.min(maxByPeople, maxByCapacity);
+
+    setOptionalServiceQuantities(prev => {
+      const current = prev[serviceId] || 0;
+      const newVal = Math.max(0, Math.min(maxAllowed, current + delta));
+      return { ...prev, [serviceId]: newVal };
+    });
+  };
+
   const handleCountChange = (categoria: keyof TravelerCounts, delta: number) => {
     setTravelerCounts(prev => {
       const newValue = Math.max(0, prev[categoria] + delta);
@@ -613,6 +692,21 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
       }
 
       console.log('✅ Reserva creada exitosamente:', data);
+
+      // Save selected optional services
+      const selectedOptionals = optionalServices
+        .filter(svc => (optionalServiceQuantities[svc.id] || 0) > 0)
+        .map(svc => ({
+          booking_id: data.id,
+          tour_optional_service_id: svc.id,
+          quantity: optionalServiceQuantities[svc.id],
+          unit_price: svc.price_per_person,
+          subtotal: optionalServiceQuantities[svc.id] * svc.price_per_person,
+        }));
+
+      if (selectedOptionals.length > 0) {
+        await supabase.from('booking_optional_services').insert(selectedOptionals);
+      }
 
       navigate(`/booking-travelers/${data.id}`);
 
@@ -913,6 +1007,99 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
             </div>
           )}
         </div>
+
+        {/* Servicios Opcionales */}
+        {!isLoadingOptionalServices && optionalServices.length > 0 && totalTravelers > 0 && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <ShoppingBag className="h-4 w-4 text-amber-600" />
+              <span className="text-sm font-semibold text-gray-800">Servicios Adicionales</span>
+            </div>
+            <div className="space-y-3">
+              {optionalServices.map(svc => {
+                const qty = optionalServiceQuantities[svc.id] || 0;
+                const isSoldOut = svc.available_capacity !== null && svc.available_capacity !== undefined && svc.available_capacity === 0;
+                const maxAllowed = Math.min(
+                  totalTravelers,
+                  svc.available_capacity !== null && svc.available_capacity !== undefined
+                    ? svc.available_capacity
+                    : Infinity
+                );
+
+                return (
+                  <div
+                    key={svc.id}
+                    className={`border rounded-lg p-3 ${
+                      isSoldOut
+                        ? 'border-gray-200 bg-gray-50 opacity-60'
+                        : qty > 0
+                          ? 'border-amber-300 bg-amber-50'
+                          : 'border-gray-200 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-gray-900">{svc.name}</span>
+                          {!svc.is_refundable && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
+                              No reembolsable si cancelas
+                            </span>
+                          )}
+                          {isSoldOut && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-600">
+                              Agotado
+                            </span>
+                          )}
+                          {!isSoldOut && svc.available_capacity !== null && svc.available_capacity !== undefined && (
+                            <span className="text-xs text-gray-500">
+                              {svc.available_capacity} {svc.available_capacity === 1 ? 'lugar' : 'lugares'} disponibles
+                            </span>
+                          )}
+                        </div>
+                        {svc.description && (
+                          <p className="text-xs text-gray-500 mt-0.5">{svc.description}</p>
+                        )}
+                        <p className="text-sm font-medium text-primary-600 mt-1">
+                          ${svc.price_per_person.toLocaleString()} / persona
+                        </p>
+                      </div>
+
+                      {!isSoldOut && (
+                        <div className="flex items-center space-x-2 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleOptionalServiceChange(svc.id, -1, svc)}
+                            disabled={qty === 0}
+                            className="w-7 h-7 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-amber-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="w-6 text-center text-sm font-semibold">{qty}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleOptionalServiceChange(svc.id, 1, svc)}
+                            disabled={qty >= maxAllowed}
+                            className="w-7 h-7 rounded-full border-2 border-amber-500 bg-amber-500 text-white flex items-center justify-center hover:bg-amber-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {qty > 0 && (
+                      <div className="mt-2 pt-2 border-t border-amber-200 flex justify-between text-xs">
+                        <span className="text-gray-600">{qty} × ${svc.price_per_person.toLocaleString()}</span>
+                        <span className="font-semibold text-amber-700">+${(qty * svc.price_per_person).toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {!isLoadingMembership && !hasMembership && totalTravelers > 0 && serviceCharge > 0 && (
           <div className="mb-4 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-lg p-4">
@@ -1313,6 +1500,29 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">{travelerCounts.mascotas} Mascota{travelerCounts.mascotas > 1 ? 's' : ''} × ${getPrecioPorCategoria('mascota').toLocaleString()}:</span>
                 <span className="font-medium">${precioMascotas.toLocaleString()}</span>
+              </div>
+            )}
+
+            {optionalServicesSubtotal > 0 && (
+              <div className="border-t pt-2 mt-1 space-y-1">
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Servicios Adicionales</div>
+                {optionalServices
+                  .filter(svc => (optionalServiceQuantities[svc.id] || 0) > 0)
+                  .map(svc => {
+                    const qty = optionalServiceQuantities[svc.id];
+                    return (
+                      <div key={svc.id} className="flex justify-between text-sm">
+                        <span className="text-gray-600 flex items-center gap-1">
+                          {svc.name} × {qty}
+                          {!svc.is_refundable && (
+                            <span className="text-orange-600 text-xs">(no reemb.)</span>
+                          )}
+                        </span>
+                        <span className="font-medium">${(qty * svc.price_per_person).toLocaleString()}</span>
+                      </div>
+                    );
+                  })
+                }
               </div>
             )}
 

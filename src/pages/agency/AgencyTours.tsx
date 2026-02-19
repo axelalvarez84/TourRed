@@ -1,7 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination, getTourCategories } from '../../lib/supabase';
-import { Plus, Search, X, Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban } from 'lucide-react';
+import { Plus, Search, X, Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban, ShoppingBag, Info } from 'lucide-react';
+
+interface OptionalService {
+  id?: string;
+  name: string;
+  description: string;
+  price_per_person: string;
+  max_capacity: string;
+  is_refundable: boolean;
+  is_active: boolean;
+}
 import { Tour, Destination, DeparturePoint } from '../../types';
 import { format } from 'date-fns';
 import ImageUploader from '../../components/ImageUploader';
@@ -125,6 +135,7 @@ const AgencyTours: React.FC = () => {
   const [showCreateDepartureForm, setShowCreateDepartureForm] = useState(false);
   const [tourImageData, setTourImageData] = useState<{base64: string, type: string, size: number} | null>(null);
   const [hasDraft, setHasDraft] = useState(false);
+  const [optionalServices, setOptionalServices] = useState<OptionalService[]>([]);
 
   const DRAFT_KEY = `tour_draft_${user?.id}`;
 
@@ -356,6 +367,7 @@ const AgencyTours: React.FC = () => {
     setDeparturePoints(['']);
     setSelectedDeparturePoints([]);
     setTourImageData(null);
+    setOptionalServices([]);
 
     // Limpiar borrador guardado
     if (user) {
@@ -485,6 +497,33 @@ const AgencyTours: React.FC = () => {
     }
 
     setTourImageData(null); // Reset image data when editing
+
+    // Load optional services for this tour
+    try {
+      const { data: servicesData } = await supabase
+        .from('tour_optional_services')
+        .select('*')
+        .eq('tour_id', tour.id)
+        .order('display_order');
+
+      if (servicesData) {
+        setOptionalServices(servicesData.map(s => ({
+          id: s.id,
+          name: s.name,
+          description: s.description || '',
+          price_per_person: s.price_per_person.toString(),
+          max_capacity: s.max_capacity ? s.max_capacity.toString() : '',
+          is_refundable: s.is_refundable,
+          is_active: s.is_active,
+        })));
+      } else {
+        setOptionalServices([]);
+      }
+    } catch (err) {
+      console.error('Error loading optional services:', err);
+      setOptionalServices([]);
+    }
+
     setEditingTour(tour);
     setIsCreating(false);
   };
@@ -954,6 +993,27 @@ const AgencyTours: React.FC = () => {
     }
   };
 
+  const addOptionalService = () => {
+    setOptionalServices([...optionalServices, {
+      name: '',
+      description: '',
+      price_per_person: '',
+      max_capacity: '',
+      is_refundable: true,
+      is_active: true,
+    }]);
+  };
+
+  const removeOptionalService = (index: number) => {
+    setOptionalServices(optionalServices.filter((_, i) => i !== index));
+  };
+
+  const updateOptionalService = (index: number, field: keyof OptionalService, value: any) => {
+    const updated = [...optionalServices];
+    updated[index] = { ...updated[index], [field]: value };
+    setOptionalServices(updated);
+  };
+
   const handleDeparturePointChange = (index: number, value: string) => {
     const newDeparturePoints = [...departurePoints];
     newDeparturePoints[index] = value;
@@ -1208,6 +1268,55 @@ const AgencyTours: React.FC = () => {
         }
 
         console.log(`✅ ${departurePointsToInsert.length} puntos de salida guardados correctamente`);
+      }
+
+      // Save optional services
+      const validServices = optionalServices.filter(s => s.name.trim() && s.price_per_person);
+      if (editingTour) {
+        const { data: existingServices } = await supabase
+          .from('tour_optional_services')
+          .select('id')
+          .eq('tour_id', tourId);
+
+        const existingIds = new Set(existingServices?.map(s => s.id) || []);
+        const incomingIds = new Set(validServices.filter(s => s.id).map(s => s.id!));
+
+        const toDelete = Array.from(existingIds).filter(id => !incomingIds.has(id));
+        if (toDelete.length > 0) {
+          await supabase.from('tour_optional_services').delete().in('id', toDelete);
+        }
+
+        for (let i = 0; i < validServices.length; i++) {
+          const svc = validServices[i];
+          const payload = {
+            tour_id: tourId,
+            name: svc.name.trim(),
+            description: svc.description.trim() || null,
+            price_per_person: parseFloat(svc.price_per_person),
+            max_capacity: svc.max_capacity ? parseInt(svc.max_capacity) : null,
+            is_refundable: svc.is_refundable,
+            is_active: svc.is_active,
+            display_order: i + 1,
+            updated_at: new Date().toISOString(),
+          };
+          if (svc.id) {
+            await supabase.from('tour_optional_services').update(payload).eq('id', svc.id);
+          } else {
+            await supabase.from('tour_optional_services').insert(payload);
+          }
+        }
+      } else if (validServices.length > 0) {
+        const toInsert = validServices.map((svc, i) => ({
+          tour_id: tourId,
+          name: svc.name.trim(),
+          description: svc.description.trim() || null,
+          price_per_person: parseFloat(svc.price_per_person),
+          max_capacity: svc.max_capacity ? parseInt(svc.max_capacity) : null,
+          is_refundable: svc.is_refundable,
+          is_active: svc.is_active,
+          display_order: i + 1,
+        }));
+        await supabase.from('tour_optional_services').insert(toInsert);
       }
 
       // Recargar destinos disponibles después de crear nuevos
@@ -2057,6 +2166,138 @@ const AgencyTours: React.FC = () => {
                     </label>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* SECCIÓN 6 — Servicios Opcionales */}
+            <div className="bg-white rounded-xl shadow-sm border border-amber-100 overflow-hidden">
+              <div className="bg-amber-600 px-5 py-3 flex items-center gap-2">
+                <div className="bg-white/20 rounded-lg p-1.5">
+                  <ShoppingBag className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold text-sm">Paso 6 — Servicios Opcionales</h3>
+                  <p className="text-amber-100 text-xs">Extras que el viajero puede agregar al reservar (boletos, snorkel, cenas, etc.)</p>
+                </div>
+                <span className="ml-auto bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">Opcional</span>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-2 text-sm text-amber-800">
+                  <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <p>
+                    Agrega servicios extras con precio y cupo propio. Si el <strong>viajero</strong> cancela, los servicios marcados como <em>no reembolsables</em> no se devuelven. Si <strong>tú</strong> cancelas la reserva, todos los opcionales se reembolsan al viajero sin excepción.
+                  </p>
+                </div>
+
+                {optionalServices.length === 0 && (
+                  <p className="text-sm text-gray-500 text-center py-2">No hay servicios opcionales. Haz clic en "Agregar servicio" para crear uno.</p>
+                )}
+
+                {optionalServices.map((svc, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Servicio {index + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeOptionalService(index)}
+                        className="text-red-500 hover:text-red-700 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          Nombre <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={svc.name}
+                          onChange={(e) => updateOptionalService(index, 'name', e.target.value)}
+                          className="input text-sm"
+                          placeholder="Ej: Snorkel, Entrada Museo, Cena Romántica"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          Descripción breve
+                        </label>
+                        <input
+                          type="text"
+                          value={svc.description}
+                          onChange={(e) => updateOptionalService(index, 'description', e.target.value)}
+                          className="input text-sm"
+                          placeholder="Información visible al viajero"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          Precio por persona (MXN) <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium text-sm">$</span>
+                          <input
+                            type="number"
+                            value={svc.price_per_person}
+                            onChange={(e) => updateOptionalService(index, 'price_per_person', e.target.value)}
+                            className="input pl-7 text-sm"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          Cupo máximo
+                        </label>
+                        <input
+                          type="number"
+                          value={svc.max_capacity}
+                          onChange={(e) => updateOptionalService(index, 'max_capacity', e.target.value)}
+                          className="input text-sm"
+                          min="1"
+                          placeholder="Sin límite (dejar vacío)"
+                        />
+                        <p className="text-xs text-gray-400 mt-0.5">Vacío = sin límite de cupo</p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-4 pt-1">
+                      <label className="flex items-start gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!svc.is_refundable}
+                          onChange={(e) => updateOptionalService(index, 'is_refundable', !e.target.checked)}
+                          className="mt-0.5 w-4 h-4 text-amber-600 rounded border-gray-300 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-gray-700">
+                          <span className="font-medium">No reembolsable si el viajero cancela</span>
+                          <span className="block text-xs text-gray-500">Si tú cancelas, siempre se reembolsa al viajero</span>
+                        </span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={svc.is_active}
+                          onChange={(e) => updateOptionalService(index, 'is_active', e.target.checked)}
+                          className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
+                        />
+                        <span className="text-sm text-gray-700 font-medium">Activo (visible al viajero)</span>
+                      </label>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={addOptionalService}
+                  className="btn btn-outline btn-sm w-full text-amber-700 border-amber-300 hover:bg-amber-50"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Agregar servicio opcional
+                </button>
               </div>
             </div>
 

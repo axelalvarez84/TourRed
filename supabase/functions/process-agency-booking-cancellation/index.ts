@@ -118,7 +118,26 @@ Deno.serve(async (req: Request) => {
       wallet.data = newWallet;
     }
 
-    const refundAmount = Number(booking.deposit_amount) || 0;
+    // When agency cancels: ALL optional services are refunded (even non-refundable ones)
+    const { data: optionalServicesData } = await supabase
+      .from("booking_optional_services")
+      .select("subtotal")
+      .eq("booking_id", booking_id)
+      .eq("is_cancelled", false);
+
+    const optionalServicesTotal = (optionalServicesData || []).reduce(
+      (sum: number, bos: any) => sum + Number(bos.subtotal || 0),
+      0
+    );
+
+    // Cancel all optional services marking them as cancelled by agency
+    await supabase.rpc("cancel_booking_optional_services", {
+      p_booking_id: booking_id,
+      p_cancelled_by_agency: true,
+    });
+
+    const depositRefundAmount = Number(booking.deposit_amount) || 0;
+    const refundAmount = depositRefundAmount + optionalServicesTotal;
     const newBalance = Number(wallet.data.balance) + refundAmount;
 
     const { data: transaction, error: transactionError } = await supabase
@@ -129,7 +148,7 @@ Deno.serve(async (req: Request) => {
         amount: refundAmount,
         balance_after: newBalance,
         type: "refund",
-        description: `Reembolso completo por cancelación de la agencia - ${booking.tour.name}`,
+        description: `Reembolso completo por cancelación de la agencia - ${booking.tour.name}${optionalServicesTotal > 0 ? ` (incluye $${optionalServicesTotal.toFixed(2)} de servicios adicionales)` : ""}`,
         reference_id: booking_id,
         reference_type: "booking_cancellation"
       })
