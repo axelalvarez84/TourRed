@@ -705,7 +705,6 @@ const AdminSettings: React.FC = () => {
                 name="contact_email"
                 value={settings.contact_email}
                 onChange={handleChange}
-                required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
@@ -731,7 +730,6 @@ const AdminSettings: React.FC = () => {
                 name="smtp_host"
                 value={settings.smtp_host}
                 onChange={handleChange}
-                required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
@@ -746,7 +744,6 @@ const AdminSettings: React.FC = () => {
                 name="smtp_port"
                 value={settings.smtp_port}
                 onChange={handleChange}
-                required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
@@ -761,7 +758,6 @@ const AdminSettings: React.FC = () => {
                 name="smtp_user"
                 value={settings.smtp_user}
                 onChange={handleChange}
-                required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
@@ -776,7 +772,6 @@ const AdminSettings: React.FC = () => {
                 name="smtp_password"
                 value={settings.smtp_password}
                 onChange={handleChange}
-                required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
@@ -794,7 +789,6 @@ const AdminSettings: React.FC = () => {
                 name="smtp_api_key"
                 value={settings.smtp_api_key}
                 onChange={handleChange}
-                required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
               />
             </div>
