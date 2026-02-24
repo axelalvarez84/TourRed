@@ -17,6 +17,7 @@ const TourCatalogPage: React.FC = () => {
   const [popularDeparturePoints, setPopularDeparturePoints] = useState<any[]>([]);
 
   const initialFilters: SearchFilters = useMemo(() => ({
+    tourName: searchParams.get('tourName') || '',
     destination: searchParams.get('destination') || '',
     category: searchParams.get('category') || '',
     startDate: searchParams.get('startDate') || '',
@@ -472,6 +473,7 @@ const TourCatalogPage: React.FC = () => {
                     {hasGeoSearch && initialFilters.locationName &&
                       ` cerca de "${initialFilters.locationName}"`
                     }
+                    {initialFilters.tourName && ` con nombre "${initialFilters.tourName}"`}
                     {initialFilters.destination && ` para "${initialFilters.destination}"`}
                     {initialFilters.category && ` en ${initialFilters.category}`}
                   </p>

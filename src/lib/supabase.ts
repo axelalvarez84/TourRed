@@ -438,6 +438,10 @@ export const getTours = async (filters: any = {}) => {
         query = query.gte('end_date', today);
       }
 
+      if (filters.tourName) {
+        query = query.ilike('title', `%${filters.tourName}%`);
+      }
+
       if (filters.category) {
         query = query.contains('category', [filters.category]);
       }
@@ -504,6 +508,10 @@ export const getTours = async (filters: any = {}) => {
     if (filters.includeExpired !== true) {
       const today = formatDateForDB(new Date());
       query = query.gte('end_date', today);
+    }
+
+    if (filters.tourName) {
+      query = query.ilike('title', `%${filters.tourName}%`);
     }
 
     if (filters.destination) {

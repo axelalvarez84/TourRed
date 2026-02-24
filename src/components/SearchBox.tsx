@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Tag, Calendar, Building2, DollarSign, Dog, X, MapPin } from 'lucide-react';
+import { Search, Tag, Calendar, Building2, DollarSign, Dog, X, MapPin, FileSearch } from 'lucide-react';
 import { SearchFilters } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -10,6 +10,7 @@ interface SearchBoxProps {
 }
 
 const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = '' }) => {
+  const [tourName, setTourName] = useState(initialFilters.tourName || '');
   const [destination, setDestination] = useState(initialFilters.destination || '');
   const [category, setCategory] = useState(initialFilters.category || '');
   const [startDate, setStartDate] = useState(initialFilters.startDate || '');
@@ -194,6 +195,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
     e.preventDefault();
 
     const queryParams = new URLSearchParams();
+    if (tourName) queryParams.set('tourName', tourName);
     if (destination) queryParams.set('destination', destination);
     if (category) queryParams.set('category', category);
     if (startDate) queryParams.set('startDate', startDate);
@@ -219,6 +221,34 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
       <form onSubmit={handleSearch}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="relative">
+            <label htmlFor="tourName" className="block text-sm font-medium text-gray-700 mb-1">
+              Nombre del Tour
+            </label>
+            <div className="relative rounded-md shadow-sm">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FileSearch className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                id="tourName"
+                value={tourName}
+                onChange={(e) => setTourName(e.target.value)}
+                className="block w-full pl-10 pr-8 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
+                placeholder="Buscar por nombre del tour..."
+              />
+              {tourName && (
+                <button
+                  type="button"
+                  onClick={() => setTourName('')}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                >
+                  <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="relative">
             <label htmlFor="destination" className="block text-sm font-medium text-gray-700 mb-1">
               Destino (opcional)
             </label>
@@ -231,30 +261,6 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
                 className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
                 placeholder="¿A dónde quieres ir?"
               />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
-              Categoría
-            </label>
-            <div className="relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Tag className="h-5 w-5 text-gray-400" />
-              </div>
-              <select
-                id="category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
-              >
-                <option value="">Todas las Categorías</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.slug}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
             </div>
           </div>
 
@@ -457,6 +463,30 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
                 <option value="">Todos los Tours</option>
                 <option value="true">Solo Pet Friendly</option>
                 <option value="false">Sin Mascotas</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
+              Categoría
+            </label>
+            <div className="relative rounded-md shadow-sm">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Tag className="h-5 w-5 text-gray-400" />
+              </div>
+              <select
+                id="category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
+              >
+                <option value="">Todas las Categorías</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.slug}>
+                    {cat.name}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

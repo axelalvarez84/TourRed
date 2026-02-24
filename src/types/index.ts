@@ -261,6 +261,7 @@ export interface TourCategory {
 }
 
 export interface SearchFilters {
+  tourName?: string;
   destination?: string;
   category?: string;
   startDate?: string;
