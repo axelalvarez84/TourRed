@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { Booking, BookingTraveler, Tour, FrequentCompanion } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { validateBirthDateForCategory, validateAllTravelers } from '../utils/birthDateValidation';
+import MercadoPagoBrick from '../components/MercadoPagoBrick';
 
 interface TravelerFormData {
   categoria_viajero: 'adulto' | 'nino' | 'infante' | 'adulto_mayor' | 'mascota';
@@ -30,6 +31,7 @@ const TravelersInfoPage: React.FC = () => {
   const [error, setError] = useState('');
   const [travelerErrors, setTravelerErrors] = useState<string[]>([]);
   const [showCompanionsSection, setShowCompanionsSection] = useState(true);
+  const [mpBrick, setMpBrick] = useState<{ preferenceId: string; publicKey: string } | null>(null);
 
   useEffect(() => {
     if (!bookingId) {
@@ -681,10 +683,12 @@ const TravelersInfoPage: React.FC = () => {
 
         const mpResult = await mpResponse.json();
         if (!mpResult.success) throw new Error(mpResult.error || 'Error al crear preferencia de MercadoPago');
-        if (mpResult.url) {
+        if (mpResult.preference_id && mpResult.public_key) {
+          setMpBrick({ preferenceId: mpResult.preference_id, publicKey: mpResult.public_key });
+        } else if (mpResult.url) {
           window.location.href = mpResult.url;
         } else {
-          throw new Error('No se recibió la URL de MercadoPago');
+          throw new Error('No se recibió la información de MercadoPago');
         }
       } else if (paymentProvider === 'paypal') {
         const ppResponse = await fetch(
@@ -799,6 +803,36 @@ const TravelersInfoPage: React.FC = () => {
     booking?.status === 'confirmed' ||
     booking?.status === 'completed';
   const nameChangesBlocked = !!(tour as any)?.name_changes_not_allowed && isEditingExistingBooking;
+
+  if (mpBrick) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-xl mx-auto px-4">
+          <button
+            onClick={() => setMpBrick(null)}
+            className="flex items-center text-gray-600 hover:text-gray-900 mb-6"
+          >
+            <ArrowLeft className="w-5 h-5 mr-2" />
+            Volver
+          </button>
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-bold mb-2">Completa tu pago</h2>
+            <p className="text-sm text-gray-500 mb-6">Pago seguro con MercadoPago</p>
+            <MercadoPagoBrick
+              preferenceId={mpBrick.preferenceId}
+              publicKey={mpBrick.publicKey}
+              onSuccess={() => navigate(`/booking-success?booking_id=${bookingId}`)}
+              onPending={() => navigate(`/payment-return?provider=mercadopago&booking_id=${bookingId}&tr_status=pending`)}
+              onError={(err) => {
+                setMpBrick(null);
+                setError(err);
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">

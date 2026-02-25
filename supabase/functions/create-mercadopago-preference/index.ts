@@ -96,12 +96,18 @@ Deno.serve(async (req: Request) => {
       cancelUrl = `${origin}/payment-return?provider=mercadopago&booking_id=${bookingId}&tr_status=cancel`;
     }
 
-    const isSandbox = mpAccessToken.startsWith("TEST-");
-    const payerEmail = isSandbox ? "test_user_123456@testuser.com" : customerEmail;
+    let mpPublicKey = Deno.env.get("MERCADOPAGO_PUBLIC_KEY");
+    if (!mpPublicKey) {
+      const { data: settings } = await supabase
+        .from("platform_settings")
+        .select("mercadopago_public_key")
+        .maybeSingle();
+      if (settings?.mercadopago_public_key) mpPublicKey = settings.mercadopago_public_key;
+    }
 
     const preferencePayload = {
       items,
-      payer: payerEmail ? { email: payerEmail } : undefined,
+      payer: customerEmail ? { email: customerEmail } : undefined,
       back_urls: {
         success: successUrl,
         failure: cancelUrl,
@@ -139,6 +145,7 @@ Deno.serve(async (req: Request) => {
         success: true,
         url: preference.init_point,
         preference_id: preference.id,
+        public_key: mpPublicKey || null,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
