@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 interface MercadoPagoBrickProps {
   preferenceId: string;
@@ -96,7 +97,6 @@ export default function MercadoPagoBrick({
               creditCard: 'all',
               debitCard: 'all',
               ticket: 'all',
-              bankTransfer: 'all',
               mercadoPago: 'all',
             },
             visual: {
@@ -111,11 +111,15 @@ export default function MercadoPagoBrick({
             },
             onSubmit: async ({ formData }: any) => {
               try {
+                const { data: { session } } = await supabase.auth.getSession();
                 const response = await fetch(
                   `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-mercadopago-brick-payment`,
                   {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                    },
                     body: JSON.stringify({ formData, preferenceId }),
                   }
                 );
