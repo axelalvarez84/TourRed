@@ -27,6 +27,7 @@ interface MercadoPagoBrickProps {
   preferenceId: string;
   publicKey: string;
   amount: number;
+  bookingId: string;
   onSuccess: () => void;
   onError: (error: string) => void;
   onPending?: () => void;
@@ -42,6 +43,7 @@ export default function MercadoPagoBrick({
   preferenceId,
   publicKey,
   amount,
+  bookingId,
   onSuccess,
   onError,
   onPending,
@@ -142,7 +144,7 @@ export default function MercadoPagoBrick({
                       'Content-Type': 'application/json',
                       'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
                     },
-                    body: JSON.stringify({ formData, preferenceId }),
+                    body: JSON.stringify({ formData, preferenceId, bookingId }),
                   }
                 );
 

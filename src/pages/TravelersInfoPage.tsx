@@ -822,6 +822,7 @@ const TravelersInfoPage: React.FC = () => {
               preferenceId={mpBrick.preferenceId}
               publicKey={mpBrick.publicKey}
               amount={mpBrick.amount}
+              bookingId={bookingId}
               onSuccess={() => navigate(`/booking-success?booking_id=${bookingId}`)}
               onPending={() => navigate(`/payment-return?provider=mercadopago&booking_id=${bookingId}&tr_status=pending`)}
               onError={(err) => {

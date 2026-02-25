@@ -18,7 +18,7 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { formData, preferenceId } = await req.json();
+    const { formData, preferenceId, bookingId } = await req.json();
 
     if (!formData) {
       return new Response(JSON.stringify({ error: "Datos del formulario requeridos" }), {
@@ -48,6 +48,7 @@ Deno.serve(async (req: Request) => {
       metadata: {
         ...(formData.metadata || {}),
         preference_id: preferenceId,
+        booking_id: bookingId,
       },
     };
 
@@ -75,6 +76,63 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
+    }
+
+    if (bookingId && payment.status === "approved") {
+      const { error: updateError } = await supabase
+        .from("bookings")
+        .update({
+          payment_status: "succeeded",
+          status: "confirmed",
+          paid_at: new Date().toISOString(),
+          payment_method: "mercadopago",
+        })
+        .eq("id", bookingId);
+
+      if (updateError) {
+        console.error("Error updating booking after approved MP payment:", updateError);
+      } else {
+        console.log("Booking confirmed after MP payment approval:", bookingId);
+
+        const { data: booking } = await supabase
+          .from("bookings")
+          .select("agency_id, deposit_amount, service_charge")
+          .eq("id", bookingId)
+          .maybeSingle();
+
+        if (booking) {
+          const { data: existing } = await supabase
+            .from("commission_records")
+            .select("id")
+            .eq("booking_id", bookingId)
+            .maybeSingle();
+
+          if (!existing) {
+            const { data: platformSettings } = await supabase
+              .from("platform_settings")
+              .select("agency_commission_percentage")
+              .maybeSingle();
+
+            const commissionRate = (platformSettings?.agency_commission_percentage || 15) / 100;
+            const depositAmount = Number(booking.deposit_amount || 0);
+            const platformAmount = depositAmount * commissionRate;
+            const agencyAmount = depositAmount - platformAmount;
+
+            await supabase.from("commission_records").insert({
+              booking_id: bookingId,
+              agency_id: booking.agency_id,
+              agency_amount: agencyAmount,
+              platform_amount: platformAmount,
+              status: "pending",
+            });
+          }
+        }
+      }
+    } else if (bookingId && (payment.status === "in_process" || payment.status === "pending")) {
+      await supabase
+        .from("bookings")
+        .update({ payment_status: "processing" })
+        .eq("id", bookingId);
     }
 
     return new Response(
