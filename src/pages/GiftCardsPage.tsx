@@ -33,7 +33,7 @@ export default function GiftCardsPage() {
     discountAmount: number;
   } | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
-  const [mpBrick, setMpBrick] = useState<{ preferenceId: string; publicKey: string; giftCardId: string } | null>(null);
+  const [mpBrick, setMpBrick] = useState<{ preferenceId: string; publicKey: string; giftCardId: string; amount: number } | null>(null);
 
   const giftCardFormPersistence = useFormPersistence(
     { purchaserName, purchaserEmail, recipientName, recipientEmail, personalMessage, selectedAmount },
@@ -217,7 +217,7 @@ export default function GiftCardsPage() {
         if (!mpResult.success) throw new Error(mpResult.error || 'Error al crear preferencia de MercadoPago');
         giftCardFormPersistence.clearStorage();
         if (mpResult.preference_id && mpResult.public_key) {
-          setMpBrick({ preferenceId: mpResult.preference_id, publicKey: mpResult.public_key, giftCardId });
+          setMpBrick({ preferenceId: mpResult.preference_id, publicKey: mpResult.public_key, giftCardId, amount: finalAmount });
           setIsProcessing(false);
         } else if (mpResult.url) {
           window.location.href = mpResult.url;
@@ -341,6 +341,7 @@ export default function GiftCardsPage() {
             <MercadoPagoBrick
               preferenceId={mpBrick.preferenceId}
               publicKey={mpBrick.publicKey}
+              amount={mpBrick.amount}
               onSuccess={() => navigate(`/gift-card/success?gift_card_id=${mpBrick.giftCardId}&provider=mercadopago`)}
               onPending={() => navigate(`/gift-card/success?gift_card_id=${mpBrick.giftCardId}&provider=mercadopago&pending=true`)}
               onError={(err) => {

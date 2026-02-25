@@ -71,6 +71,7 @@ const TravelerBookings: React.FC = () => {
     preferenceId: string;
     publicKey: string;
     bookingId: string;
+    amount: number;
   } | null>(null);
   const [rescheduleModal, setRescheduleModal] = useState<{
     open: boolean;
@@ -663,7 +664,7 @@ const TravelerBookings: React.FC = () => {
         if (!mpResult.success) throw new Error(mpResult.error || 'Error al crear preferencia de MercadoPago');
         if (mpResult.preference_id && mpResult.public_key) {
           setPaymentModal({ open: false, booking: null, walletBalance: 0, toursRedCashToUse: 0, isProcessing: false, selectedProvider: 'stripe' });
-          setMpBrickModal({ open: true, preferenceId: mpResult.preference_id, publicKey: mpResult.public_key, bookingId: booking.id });
+          setMpBrickModal({ open: true, preferenceId: mpResult.preference_id, publicKey: mpResult.public_key, bookingId: booking.id, amount: amountToCharge });
         } else if (mpResult.url) {
           window.location.href = mpResult.url;
         } else {
@@ -1916,6 +1917,7 @@ const TravelerBookings: React.FC = () => {
               <MercadoPagoBrick
                 preferenceId={mpBrickModal.preferenceId}
                 publicKey={mpBrickModal.publicKey}
+                amount={mpBrickModal.amount}
                 onSuccess={() => {
                   setMpBrickModal(null);
                   fetchBookings();

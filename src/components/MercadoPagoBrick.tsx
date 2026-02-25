@@ -4,6 +4,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 interface MercadoPagoBrickProps {
   preferenceId: string;
   publicKey: string;
+  amount: number;
   onSuccess: () => void;
   onError: (error: string) => void;
   onPending?: () => void;
@@ -18,6 +19,7 @@ declare global {
 export default function MercadoPagoBrick({
   preferenceId,
   publicKey,
+  amount,
   onSuccess,
   onError,
   onPending,
@@ -25,9 +27,9 @@ export default function MercadoPagoBrick({
   const [sdkLoaded, setSdkLoaded] = useState(false);
   const [brickReady, setBrickReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const brickContainerRef = useRef<HTMLDivElement>(null);
   const brickControllerRef = useRef<any>(null);
   const mountedRef = useRef(true);
+  const initializedRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -37,6 +39,7 @@ export default function MercadoPagoBrick({
         try {
           brickControllerRef.current.unmount();
         } catch (_) {}
+        brickControllerRef.current = null;
       }
     };
   }, []);
@@ -44,6 +47,15 @@ export default function MercadoPagoBrick({
   useEffect(() => {
     if (window.MercadoPago) {
       setSdkLoaded(true);
+      return;
+    }
+
+    const existing = document.querySelector('script[src="https://sdk.mercadopago.com/js/v2"]');
+    if (existing) {
+      existing.addEventListener('load', () => {
+        if (mountedRef.current) setSdkLoaded(true);
+      });
+      if (window.MercadoPago) setSdkLoaded(true);
       return;
     }
 
@@ -57,27 +69,26 @@ export default function MercadoPagoBrick({
       if (mountedRef.current) setLoadError('No se pudo cargar el SDK de MercadoPago.');
     };
     document.head.appendChild(script);
-
-    return () => {
-      if (document.head.contains(script)) {
-        document.head.removeChild(script);
-      }
-    };
   }, []);
 
   useEffect(() => {
-    if (!sdkLoaded || !preferenceId || !publicKey) return;
+    if (!sdkLoaded || !preferenceId || !publicKey || !amount || initializedRef.current) return;
 
-    let brickController: any = null;
+    initializedRef.current = true;
 
     const initBrick = async () => {
       try {
+        if (brickControllerRef.current) {
+          try { brickControllerRef.current.unmount(); } catch (_) {}
+          brickControllerRef.current = null;
+        }
+
         const mp = new window.MercadoPago(publicKey);
         const bricksBuilder = mp.bricks();
 
-        brickController = await bricksBuilder.create('payment', 'mp-payment-brick', {
+        const controller = await bricksBuilder.create('payment', 'mp-payment-brick-container', {
           initialization: {
-            amount: 0,
+            amount,
             preferenceId,
           },
           customization: {
@@ -98,14 +109,14 @@ export default function MercadoPagoBrick({
             onReady: () => {
               if (mountedRef.current) setBrickReady(true);
             },
-            onSubmit: async ({ selectedPaymentMethod, formData }: any) => {
+            onSubmit: async ({ formData }: any) => {
               try {
                 const response = await fetch(
                   `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-mercadopago-brick-payment`,
                   {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ formData, selectedPaymentMethod, preferenceId }),
+                    body: JSON.stringify({ formData, preferenceId }),
                   }
                 );
 
@@ -129,28 +140,24 @@ export default function MercadoPagoBrick({
             },
             onError: (error: any) => {
               console.error('Brick error:', error);
-              onError(error?.message || 'Error en el formulario de pago');
+              if (mountedRef.current) {
+                setLoadError(error?.message || 'Error en el formulario de pago');
+              }
             },
           },
         });
 
-        brickControllerRef.current = brickController;
+        brickControllerRef.current = controller;
       } catch (err: any) {
         console.error('Error initializing brick:', err);
-        if (mountedRef.current) setLoadError(err.message || 'Error al inicializar el pago');
+        if (mountedRef.current) {
+          setLoadError(err.message || 'Error al inicializar el pago');
+        }
       }
     };
 
     initBrick();
-
-    return () => {
-      if (brickController) {
-        try {
-          brickController.unmount();
-        } catch (_) {}
-      }
-    };
-  }, [sdkLoaded, preferenceId, publicKey]);
+  }, [sdkLoaded, preferenceId, publicKey, amount]);
 
   if (loadError) {
     return (
@@ -169,11 +176,7 @@ export default function MercadoPagoBrick({
           <span className="text-sm">Cargando formulario de pago...</span>
         </div>
       )}
-      <div
-        id="mp-payment-brick"
-        ref={brickContainerRef}
-        className={brickReady ? 'block' : 'invisible h-0 overflow-hidden'}
-      />
+      <div id="mp-payment-brick-container" />
     </div>
   );
 }

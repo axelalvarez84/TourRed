@@ -31,7 +31,7 @@ const TravelersInfoPage: React.FC = () => {
   const [error, setError] = useState('');
   const [travelerErrors, setTravelerErrors] = useState<string[]>([]);
   const [showCompanionsSection, setShowCompanionsSection] = useState(true);
-  const [mpBrick, setMpBrick] = useState<{ preferenceId: string; publicKey: string } | null>(null);
+  const [mpBrick, setMpBrick] = useState<{ preferenceId: string; publicKey: string; amount: number } | null>(null);
 
   useEffect(() => {
     if (!bookingId) {
@@ -684,7 +684,7 @@ const TravelersInfoPage: React.FC = () => {
         const mpResult = await mpResponse.json();
         if (!mpResult.success) throw new Error(mpResult.error || 'Error al crear preferencia de MercadoPago');
         if (mpResult.preference_id && mpResult.public_key) {
-          setMpBrick({ preferenceId: mpResult.preference_id, publicKey: mpResult.public_key });
+          setMpBrick({ preferenceId: mpResult.preference_id, publicKey: mpResult.public_key, amount: amountToCharge });
         } else if (mpResult.url) {
           window.location.href = mpResult.url;
         } else {
@@ -821,6 +821,7 @@ const TravelersInfoPage: React.FC = () => {
             <MercadoPagoBrick
               preferenceId={mpBrick.preferenceId}
               publicKey={mpBrick.publicKey}
+              amount={mpBrick.amount}
               onSuccess={() => navigate(`/booking-success?booking_id=${bookingId}`)}
               onPending={() => navigate(`/payment-return?provider=mercadopago&booking_id=${bookingId}&tr_status=pending`)}
               onError={(err) => {
