@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
 
 const NotificationBell: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -16,12 +16,11 @@ const NotificationBell: React.FC = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (user) {
+    if (user && !authLoading) {
       fetchNotifications();
-      
-      // Set up real-time subscription for new notifications
+
       const channel = supabase
-        .channel('notifications-changes')
+        .channel(`notifications-${user.id}`)
         .on(
           'postgres_changes',
           {
@@ -30,18 +29,21 @@ const NotificationBell: React.FC = () => {
             table: 'notifications',
             filter: `user_id=eq.${user.id}`,
           },
-          (payload) => {
-            console.log('Nueva notificación recibida:', payload);
+          () => {
             fetchNotifications();
           }
         )
-        .subscribe();
-      
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR') {
+            console.warn('Realtime notifications subscription error (non-critical)');
+          }
+        });
+
       return () => {
         supabase.removeChannel(channel);
       };
     }
-  }, [user]);
+  }, [user, authLoading]);
 
   useEffect(() => {
     // Close dropdown when clicking outside
