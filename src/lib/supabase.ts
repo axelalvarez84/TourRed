@@ -906,10 +906,6 @@ export const getTourBookingReport = async (tourId: string, agencyId: string) => 
       })
     );
 
-    const totalTravelers = bookingsWithTravelers.reduce((sum, b) => {
-      return sum + (b.travelers?.length || 0);
-    }, 0);
-
     const totalsByCategory = {
       adultos: bookingsWithTravelers.reduce((sum, b) => sum + (b.count_adultos || 0), 0),
       ninos: bookingsWithTravelers.reduce((sum, b) => sum + (b.count_ninos || 0), 0),
@@ -917,6 +913,13 @@ export const getTourBookingReport = async (tourId: string, agencyId: string) => 
       adultos_mayores: bookingsWithTravelers.reduce((sum, b) => sum + (b.count_adultos_mayores || 0), 0),
       mascotas: bookingsWithTravelers.reduce((sum, b) => sum + (b.count_mascotas || 0), 0)
     };
+
+    const totalTravelers =
+      totalsByCategory.adultos +
+      totalsByCategory.ninos +
+      totalsByCategory.infantes +
+      totalsByCategory.adultos_mayores +
+      totalsByCategory.mascotas;
 
     const totalDeposit = bookingsWithTravelers.reduce((sum, b) => sum + Number(b.deposit_amount || 0), 0);
     const totalRemaining = bookingsWithTravelers.reduce((sum, b) => sum + (Number(b.total_price || 0) - Number(b.deposit_amount || 0)), 0);
