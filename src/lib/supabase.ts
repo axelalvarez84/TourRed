@@ -879,11 +879,44 @@ export const getTourBookingReport = async (tourId: string, agencyId: string) => 
 
     const bookingsWithTravelers = await Promise.all(
       (bookings || []).map(async (booking) => {
-        const { data: travelers, error: travelersError } = await supabase
+        const { data: travelersRaw } = await supabase
           .from('booking_travelers')
           .select('*')
           .eq('booking_id', booking.id)
           .order('created_at', { ascending: true });
+
+        // Build travelers list from count_* fields (source of truth) using booking_travelers data when available
+        const categoryMap: { key: string; label: string; count: number }[] = [
+          { key: 'adulto', label: 'adulto', count: booking.count_adultos || 0 },
+          { key: 'nino', label: 'nino', count: booking.count_ninos || 0 },
+          { key: 'infante', label: 'infante', count: booking.count_infantes || 0 },
+          { key: 'adulto_mayor', label: 'adulto_mayor', count: booking.count_adultos_mayores || 0 },
+          { key: 'mascota', label: 'mascota', count: booking.count_mascotas || 0 },
+        ];
+
+        const travelersFromCounts: any[] = [];
+        for (const cat of categoryMap) {
+          if (cat.count <= 0) continue;
+          const registered = (travelersRaw || []).filter(
+            (t: any) => t.categoria_viajero === cat.key
+          );
+          for (let i = 0; i < cat.count; i++) {
+            if (registered[i]) {
+              travelersFromCounts.push(registered[i]);
+            } else {
+              // Viajero sin datos de acompañante registrado (ej. 2x1)
+              const firstName = (booking as any).users?.first_name || '';
+              const lastName = (booking as any).users?.last_name || '';
+              travelersFromCounts.push({
+                id: `${booking.id}-${cat.key}-${i}`,
+                booking_id: booking.id,
+                categoria_viajero: cat.key,
+                nombre: `${firstName} ${lastName}`.trim(),
+                precio_aplicado: 0,
+              });
+            }
+          }
+        }
 
         let paymentMethod = booking.payment_method || null;
         if (!paymentMethod) {
@@ -900,7 +933,7 @@ export const getTourBookingReport = async (tourId: string, agencyId: string) => 
 
         return {
           ...booking,
-          travelers: travelers || [],
+          travelers: travelersFromCounts,
           payment_method: paymentMethod
         };
       })
