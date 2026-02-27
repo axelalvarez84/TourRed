@@ -43,7 +43,7 @@ const TravelerWallet: React.FC = () => {
     if (user) {
       loadWalletData();
     }
-  }, [user]);
+  }, [user?.id]);
 
   const loadWalletData = async () => {
     if (!user) return;

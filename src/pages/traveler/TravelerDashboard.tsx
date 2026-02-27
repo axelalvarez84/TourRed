@@ -70,7 +70,7 @@ const TravelerDashboard: React.FC = () => {
     if (user) {
       loadDashboardData();
     }
-  }, [user]);
+  }, [user?.id]);
 
   const loadDashboardData = async () => {
     if (!user) return;

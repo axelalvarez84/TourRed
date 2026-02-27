@@ -34,7 +34,7 @@ const TravelerCompanions: React.FC = () => {
 
   useEffect(() => {
     if (user) loadCompanions();
-  }, [user]);
+  }, [user?.id]);
 
   const loadCompanions = async () => {
     if (!user) return;

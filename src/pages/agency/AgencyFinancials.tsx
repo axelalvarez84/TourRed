@@ -28,7 +28,7 @@ const AgencyFinancials: React.FC = () => {
     if (user?.id) {
       fetchAgencyData();
     }
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     if (agencyId) {

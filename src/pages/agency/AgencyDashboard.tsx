@@ -36,7 +36,7 @@ const AgencyDashboard: React.FC = () => {
     if (user?.id) {
       fetchAgencyData();
     }
-  }, [user]);
+  }, [user?.id]);
 
   const fetchAgencyData = async () => {
     if (!user?.id) return;

@@ -67,7 +67,7 @@ const TravelerPointsPage: React.FC = () => {
     };
 
     loadWallet();
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     const loadTransactions = async () => {
@@ -127,7 +127,7 @@ const TravelerPointsPage: React.FC = () => {
     };
 
     loadTransactions();
-  }, [user]);
+  }, [user?.id]);
 
   const getTransactionIcon = (type: string) => {
     switch (type) {

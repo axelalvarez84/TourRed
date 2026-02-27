@@ -74,7 +74,7 @@ const AgencyProfile: React.FC = () => {
 
   useEffect(() => {
     fetchAgencyProfile();
-  }, [user]);
+  }, [user?.id]);
 
   const fetchAgencyProfile = async () => {
     if (!user?.id) return;

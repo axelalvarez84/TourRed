@@ -31,7 +31,7 @@ export default function MembershipCheckout() {
 
   useEffect(() => {
     checkExistingMembership();
-  }, [user]);
+  }, [user?.id]);
 
   const checkExistingMembership = async () => {
     if (!user) return;

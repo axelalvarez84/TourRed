@@ -110,7 +110,7 @@ const TravelerBookings: React.FC = () => {
     if (user?.id) {
       fetchBookings();
     }
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     const action = searchParams.get('action');

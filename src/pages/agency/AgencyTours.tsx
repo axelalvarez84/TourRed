@@ -144,7 +144,7 @@ const AgencyTours: React.FC = () => {
     fetchAgencyTours();
     fetchAllDestinations();
     fetchCategories();
-  }, [user]);
+  }, [user?.id]);
 
   // Restaurar borrador al cargar
   useEffect(() => {

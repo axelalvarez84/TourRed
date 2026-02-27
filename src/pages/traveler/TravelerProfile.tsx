@@ -63,7 +63,7 @@ const TravelerProfile: React.FC = () => {
     if (user?.id) {
       fetchProfile();
     }
-  }, [user]);
+  }, [user?.id]);
 
   const fetchProfile = async () => {
     if (!user?.id) return;

@@ -54,7 +54,7 @@ const AdminProfile: React.FC = () => {
     };
 
     fetchProfile();
-  }, [user]);
+  }, [user?.id]);
 
   const handleSave = async () => {
     if (!user?.id) return;

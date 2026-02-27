@@ -44,7 +44,7 @@ export default function AgencyDiscountCodes() {
 
   useEffect(() => {
     fetchAgencyData();
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     if (agencyId) {

@@ -17,7 +17,7 @@ const TravelerReferralsPage: React.FC = () => {
 
   useEffect(() => {
     loadReferralData();
-  }, [user]);
+  }, [user?.id]);
 
   const loadReferralData = async () => {
     if (!user) return;
