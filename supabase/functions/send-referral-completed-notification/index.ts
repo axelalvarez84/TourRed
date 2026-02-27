@@ -33,7 +33,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const appUrl = 'https://toursred.com';
+    const logoUrl = `${supabaseUrl}/storage/v1/object/public/images/email-logo.png`;
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -50,7 +52,7 @@ Deno.serve(async (req: Request) => {
         <table role="presentation" style="width: 100%; max-width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <tr>
             <td style="padding: 40px 40px 30px 40px; text-align: center; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 8px 8px 0 0;">
-              <img src="${appUrl}/LogoFinal.jpg" alt="ToursRed" style="height: 48px; margin-bottom: 16px; border-radius: 8px;">
+              <img src="${logoUrl}" alt="ToursRed" style="max-width: 160px; height: auto; margin-bottom: 16px; background: white; padding: 8px 16px; border-radius: 8px;">
               <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: bold;">¡Referido Completado!</h1>
             </td>
           </tr>
@@ -108,16 +110,18 @@ Deno.serve(async (req: Request) => {
 </html>`;
 
     const emailPayload = {
-      api_key: emailSettings.smtp_api_key,
-      to: [referrerEmail],
       sender: emailSettings.contact_email,
+      to: [referrerEmail],
       subject: `¡Has ganado ${Number(pointsAwarded).toLocaleString('es-MX')} puntos ToursRed por tu referido!`,
       html_body: htmlContent,
     };
 
     const response = await fetch('https://api.smtp2go.com/v3/email/send', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Smtp2go-Api-Key': emailSettings.smtp_api_key,
+      },
       body: JSON.stringify(emailPayload),
     });
 
