@@ -1935,17 +1935,19 @@ export const processPartialCancellation = async (
 
     if (insertError) throw insertError;
 
-    // Descontar puntos proporcionales ganados por los viajeros cancelados
+    // Descontar puntos correspondientes al anticipo de los viajeros cancelados
+    // La tasa de puntos es 1 peso pagado = 1 punto ganado (FLOOR del monto)
+    // originalPartialAmount ya refleja el precio exacto de esos viajeros × ratio de anticipo
     const pointsEarned = Number(booking.points_earned) || 0;
     if (pointsEarned > 0) {
-      const totalPrice = Number(booking.total_price) || 0;
-      const depositAmount = Number(booking.deposit_amount) || totalPrice;
-      const cancelledDeposit = policy.originalPartialAmount;
-      const depositProportion = depositAmount > 0 ? cancelledDeposit / depositAmount : 0;
-      const pointsToDeduct = Math.round(pointsEarned * depositProportion);
+      // Puntos a restar = anticipo pagado por los viajeros cancelados (1:1 con pesos)
+      // Limitado a los puntos realmente disponibles en la reserva para no pasarse
+      const pointsToDeduct = Math.min(
+        Math.floor(policy.originalPartialAmount),
+        pointsEarned
+      );
 
       if (pointsToDeduct > 0) {
-        console.log(`🔴 Descontando ${pointsToDeduct} puntos por cancelación parcial`);
         const { error: deductError } = await supabase.rpc('deduct_points_for_partial_cancellation', {
           p_booking_id: bookingId,
           p_partial_cancellation_id: partialCancellation.id,
@@ -1955,7 +1957,6 @@ export const processPartialCancellation = async (
         if (deductError) {
           console.error('⚠️ Error descontando puntos (no crítico):', deductError);
         } else {
-          // Actualizar points_earned en la reserva para reflejar los puntos restantes
           await supabase
             .from('bookings')
             .update({ points_earned: pointsEarned - pointsToDeduct })
