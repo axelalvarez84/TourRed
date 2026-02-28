@@ -12,7 +12,18 @@ export default function GiftCardSuccessPage() {
     const isFree = searchParams.get('free');
     const giftCardId = searchParams.get('gift_card_id');
 
+    const provider = searchParams.get('provider');
+
     if (isFree === 'true' && giftCardId) {
+      supabase.functions.invoke('send-gift-card-email', {
+        body: { giftCardId }
+      }).then(() => {
+        setIsProcessing(false);
+      }).catch((error) => {
+        console.error('Error sending gift card email:', error);
+        setIsProcessing(false);
+      });
+    } else if (giftCardId && (provider === 'mercadopago' || provider === 'paypal')) {
       supabase.functions.invoke('send-gift-card-email', {
         body: { giftCardId }
       }).then(() => {

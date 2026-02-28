@@ -79,6 +79,50 @@ Deno.serve(async (req: Request) => {
     }
 
     if (bookingId && payment.status === "approved") {
+      const { data: giftCardCheck } = await supabase
+        .from("gift_cards")
+        .select("id")
+        .eq("id", bookingId)
+        .maybeSingle();
+
+      if (giftCardCheck) {
+        await supabase
+          .from("gift_cards")
+          .update({
+            status: "active",
+            payment_status: "paid",
+          })
+          .eq("id", bookingId);
+
+        try {
+          await fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-gift-card-email`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+              },
+              body: JSON.stringify({ giftCardId: bookingId }),
+            }
+          );
+          console.log("Gift card email sent for:", bookingId);
+        } catch (emailErr) {
+          console.error("Error sending gift card email:", emailErr);
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            status: payment.status,
+            status_detail: payment.status_detail,
+            payment_id: payment.id,
+            external_reference: payment.external_reference,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       const { error: updateError } = await supabase
         .from("bookings")
         .update({
