@@ -31,12 +31,22 @@ Deno.serve(async (req) => {
       pointsUsed = 0
     } = await req.json();
 
-    if (!amount || !bookingId) {
+    if (amount == null || !bookingId) {
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Missing required parameters: amount and bookingId are required" 
+        JSON.stringify({
+          success: false,
+          error: "Missing required parameters: amount and bookingId are required"
         }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
+    }
+
+    if (amount <= 0) {
+      return new Response(
+        JSON.stringify({ success: false, error: "El monto a cobrar es cero; no se requiere pago con tarjeta." }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 400,

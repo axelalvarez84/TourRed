@@ -424,7 +424,7 @@ const TravelersInfoPage: React.FC = () => {
       const pointsUsed = booking?.points_used || 0;
       const pointsDiscountAmount = pointsUsed / 100; // convertir puntos a pesos
       const toursRedCashUsed = booking?.toursred_cash_used || 0;
-      const amountToCharge = (booking?.user_payment || 0) - pointsDiscountAmount - toursRedCashUsed;
+      const amountToCharge = Math.max(0, Math.round(((booking?.user_payment || 0) - pointsDiscountAmount - toursRedCashUsed) * 100) / 100);
 
       console.log('💵 Cálculo de pago:', {
         user_payment: booking?.user_payment,
