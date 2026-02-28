@@ -855,6 +855,86 @@ Deno.serve(async (req: Request) => {
       console.log("Reset confirmation_email_sent to false due to email failures for booking:", booking_id);
     }
 
+    // Check and send referral bonus emails
+    try {
+      const { data: travelerUser } = await supabase
+        .from("users")
+        .select("referred_by_user_id")
+        .eq("id", booking.traveler.id)
+        .maybeSingle();
+
+      if (travelerUser?.referred_by_user_id) {
+        const { data: relationship } = await supabase
+          .from("referral_relationships")
+          .select("id, referrer_user_id, referred_user_id, status")
+          .eq("referred_user_id", booking.traveler.id)
+          .eq("status", "completed")
+          .eq("first_booking_id", booking_id)
+          .maybeSingle();
+
+        if (relationship) {
+          const { data: referrer } = await supabase
+            .from("users")
+            .select("email, first_name, last_name")
+            .eq("id", relationship.referrer_user_id)
+            .maybeSingle();
+
+          const { data: referred } = await supabase
+            .from("users")
+            .select("email, first_name, last_name")
+            .eq("id", relationship.referred_user_id)
+            .maybeSingle();
+
+          const { data: platformSettingsForBonus } = await supabase
+            .from("platform_settings")
+            .select("referral_bonus_points")
+            .maybeSingle();
+
+          const bonusPoints = platformSettingsForBonus?.referral_bonus_points || 5000;
+
+          if (referrer && referred) {
+            const referrerName = [referrer.first_name, referrer.last_name].filter(Boolean).join(" ") || referrer.email;
+            const referredName = [referred.first_name, referred.last_name].filter(Boolean).join(" ") || referred.email;
+
+            await Promise.allSettled([
+              fetch(`${supabaseUrl}/functions/v1/send-referral-completed-notification`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${supabaseServiceKey}`,
+                },
+                body: JSON.stringify({
+                  referrerEmail: referrer.email,
+                  referrerName,
+                  referredName,
+                  pointsAwarded: bonusPoints,
+                  bookingCode: booking.booking_code,
+                }),
+              }),
+              fetch(`${supabaseUrl}/functions/v1/send-referral-completed-notification`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${supabaseServiceKey}`,
+                },
+                body: JSON.stringify({
+                  referrerEmail: referred.email,
+                  referrerName: referredName,
+                  referredName,
+                  pointsAwarded: bonusPoints,
+                  bookingCode: booking.booking_code,
+                  isReferredUser: true,
+                }),
+              }),
+            ]);
+            console.log("Referral bonus emails sent for booking:", booking_id);
+          }
+        }
+      }
+    } catch (referralEmailErr) {
+      console.error("Error sending referral bonus emails:", referralEmailErr);
+    }
+
     return new Response(
       JSON.stringify({
         success: allSuccess,

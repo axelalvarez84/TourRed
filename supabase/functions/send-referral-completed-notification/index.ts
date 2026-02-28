@@ -18,7 +18,7 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const { referrerEmail, referrerName, referredName, pointsAwarded, bookingCode } = await req.json();
+    const { referrerEmail, referrerName, referredName, pointsAwarded, bookingCode, isReferredUser } = await req.json();
 
     const { data: emailSettings, error: settingsError } = await supabase
       .from('email_settings')
@@ -53,7 +53,7 @@ Deno.serve(async (req: Request) => {
           <tr>
             <td style="padding: 40px 40px 30px 40px; text-align: center; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 8px 8px 0 0;">
               <img src="${logoUrl}" alt="ToursRed" style="max-width: 160px; height: auto; margin-bottom: 16px; background: white; padding: 8px 16px; border-radius: 8px;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: bold;">¡Referido Completado!</h1>
+              <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: bold;">${isReferredUser ? '¡Bono de Bienvenida!' : '¡Referido Completado!'}</h1>
             </td>
           </tr>
           <tr>
@@ -62,8 +62,10 @@ Deno.serve(async (req: Request) => {
                 Hola <strong>${referrerName}</strong>,
               </p>
               <p style="margin: 0 0 20px 0; color: #374151; font-size: 16px; line-height: 24px;">
-                ¡Excelentes noticias! <strong>${referredName}</strong> ha completado su primera reserva
-                ${bookingCode ? `(${bookingCode})` : ''} en ToursRed gracias a tu recomendación.
+                ${isReferredUser
+                  ? `¡Bienvenido a ToursRed! Has completado tu primera reserva${bookingCode ? ` (${bookingCode})` : ''} y has recibido un bono de puntos por registrarte con un código de referido.`
+                  : `¡Excelentes noticias! <strong>${referredName}</strong> ha completado su primera reserva${bookingCode ? ` (${bookingCode})` : ''} en ToursRed gracias a tu recomendación.`
+                }
               </p>
               <div style="background-color: #d1fae5; border-left: 4px solid #10b981; padding: 24px; margin: 24px 0; border-radius: 6px; text-align: center;">
                 <p style="margin: 0 0 8px 0; color: #065f46; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
@@ -112,7 +114,9 @@ Deno.serve(async (req: Request) => {
     const emailPayload = {
       sender: emailSettings.contact_email,
       to: [referrerEmail],
-      subject: `¡Has ganado ${Number(pointsAwarded).toLocaleString('es-MX')} puntos ToursRed por tu referido!`,
+      subject: isReferredUser
+        ? `¡Bono de bienvenida! Has ganado ${Number(pointsAwarded).toLocaleString('es-MX')} puntos ToursRed`
+        : `¡Has ganado ${Number(pointsAwarded).toLocaleString('es-MX')} puntos ToursRed por tu referido!`,
       html_body: htmlContent,
     };
 
