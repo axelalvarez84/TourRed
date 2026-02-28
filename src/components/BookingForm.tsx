@@ -1846,7 +1846,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           </div>
         )}
 
-        {totalTravelers > 0 && user && isTraveler && (
+        {totalTravelers > 0 && user && isTraveler && totalToPayNow > 0 && (
           <PaymentProviderSelector
             context={addMembershipToBooking ? 'booking_with_membership' : 'booking'}
             value={paymentProvider}
@@ -1902,6 +1902,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
             <>
               <Settings className="w-5 h-5 mr-2" />
               Enviar Solicitud de Reserva
+            </>
+          ) : totalToPayNow <= 0 ? (
+            <>
+              <Check className="w-5 h-5 mr-2" />
+              Reservar Ahora
             </>
           ) : (
             <>
