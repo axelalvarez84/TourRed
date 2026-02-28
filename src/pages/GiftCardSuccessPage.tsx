@@ -24,14 +24,7 @@ export default function GiftCardSuccessPage() {
         setIsProcessing(false);
       });
     } else if (giftCardId && (provider === 'mercadopago' || provider === 'paypal')) {
-      supabase.functions.invoke('send-gift-card-email', {
-        body: { giftCardId }
-      }).then(() => {
-        setIsProcessing(false);
-      }).catch((error) => {
-        console.error('Error sending gift card email:', error);
-        setIsProcessing(false);
-      });
+      setIsProcessing(false);
     } else if (sessionId) {
       setTimeout(() => {
         setIsProcessing(false);
