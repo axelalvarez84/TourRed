@@ -339,7 +339,6 @@ Válida hasta: ${expiryDate}
   `;
 
   const emailPayload = {
-    api_key: apiKey,
     to: [recipientEmail],
     sender: "ToursRed <noreply@toursred.com>",
     subject: subject,
@@ -351,6 +350,7 @@ Válida hasta: ${expiryDate}
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "X-Smtp2go-Api-Key": apiKey,
     },
     body: JSON.stringify(emailPayload),
   });

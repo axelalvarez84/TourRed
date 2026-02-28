@@ -209,7 +209,7 @@ Deno.serve(async (req: Request) => {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
               },
-              body: JSON.stringify({ gift_card_id: externalReference }),
+              body: JSON.stringify({ giftCardId: externalReference }),
             }
           );
         } catch (emailErr) {
