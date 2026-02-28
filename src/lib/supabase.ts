@@ -1781,10 +1781,20 @@ export const calculatePartialCancellationPolicy = async (
   const millisecondsPerDay = 1000 * 60 * 60 * 24;
   const daysBeforeTour = Math.ceil((tourStartDate.getTime() - today.getTime()) / millisecondsPerDay);
 
-  const originalPartialAmount = travelersToCancel.reduce(
+  // Calcular el monto total de los viajeros a cancelar (precio completo)
+  const fullPriceOfCancelledTravelers = travelersToCancel.reduce(
     (sum, t) => sum + Number(t.precio_aplicado),
     0
   );
+
+  // El reembolso máximo posible es solo lo que el viajero realmente pagó (anticipo)
+  // Si se pagó solo el anticipo, la proporción es deposit_amount / total_price
+  const totalPrice = Number(booking.total_price) || 0;
+  const depositAmount = Number(booking.deposit_amount) || totalPrice;
+  const depositRatio = totalPrice > 0 ? depositAmount / totalPrice : 1;
+
+  // originalPartialAmount = parte del anticipo correspondiente a estos viajeros
+  const originalPartialAmount = Math.round(fullPriceOfCancelledTravelers * depositRatio * 100) / 100;
 
   const { data: platformSettings } = await supabase
     .from('platform_settings')
