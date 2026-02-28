@@ -424,13 +424,16 @@ const TravelersInfoPage: React.FC = () => {
       const pointsUsed = booking?.points_used || 0;
       const pointsDiscountAmount = pointsUsed / 100; // convertir puntos a pesos
       const toursRedCashUsed = booking?.toursred_cash_used || 0;
-      const amountToCharge = Math.max(0, Math.round(((booking?.user_payment || 0) - pointsDiscountAmount - toursRedCashUsed) * 100) / 100);
+      const rawAmountToCharge = Math.max(0, Math.round(((booking?.user_payment || 0) - pointsDiscountAmount - toursRedCashUsed) * 100) / 100);
+      // Si el residuo es menor a $10 (mínimo de los procesadores de pago), se absorbe como pago completo
+      const amountToCharge = rawAmountToCharge < 10 ? 0 : rawAmountToCharge;
 
       console.log('💵 Cálculo de pago:', {
         user_payment: booking?.user_payment,
         pointsUsed,
         pointsDiscountAmount,
         toursRedCashUsed,
+        rawAmountToCharge,
         amountToCharge
       });
 
