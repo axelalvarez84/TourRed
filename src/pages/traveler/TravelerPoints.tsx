@@ -224,7 +224,7 @@ const TravelerPointsPage: React.FC = () => {
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
           </div>
-        ) : !hasMembership ? (
+        ) : !hasMembership && !wallet ? (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
             <Award className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No tienes una billetera de puntos</h3>
@@ -282,7 +282,32 @@ const TravelerPointsPage: React.FC = () => {
               </div>
             </div>
 
-            {wallet && !wallet.is_active && (
+            {!hasMembership && wallet && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-6">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                    <Crown className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-semibold text-amber-900 mb-1">
+                      Tus puntos están acumulados pero bloqueados
+                    </h4>
+                    <p className="text-sm text-amber-800 mb-3">
+                      Tienes <strong>{(wallet.balance || 0).toLocaleString()} puntos</strong> acumulados (equivalente a <strong>${((wallet.balance || 0) / 100).toFixed(2)} MXN</strong>), pero necesitas una membresía ToursRed+ activa para poder usarlos en tus reservas.
+                    </p>
+                    <Link
+                      to="/traveler/membership"
+                      className="inline-flex items-center px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-semibold transition-colors"
+                    >
+                      <Crown className="h-4 w-4 mr-2" />
+                      Activar membresía y desbloquear puntos
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {wallet && !wallet.is_active && hasMembership && (
               <div className="bg-orange-50 border-l-4 border-orange-500 p-4 mb-6 rounded-md">
                 <div className="flex items-start">
                   <AlertCircle className="h-5 w-5 text-orange-600 mr-2 flex-shrink-0 mt-0.5" />
@@ -301,7 +326,7 @@ const TravelerPointsPage: React.FC = () => {
               </div>
             )}
 
-            {wallet && wallet.is_active && (
+            {wallet && wallet.is_active && hasMembership && (
               <div className="bg-gradient-to-r from-emerald-50 to-green-50 border-l-4 border-emerald-500 p-4 mb-6 rounded-md">
                 <div className="flex items-start">
                   <Award className="h-5 w-5 text-emerald-600 mr-2 flex-shrink-0 mt-0.5" />
