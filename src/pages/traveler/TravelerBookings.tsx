@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X, Edit, UserCheck, XCircle, CalendarX, Check, Wallet, Lock } from 'lucide-react';
+import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X, Edit, UserCheck, XCircle, CalendarX, Check, Wallet, Lock, UserMinus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { getUserBookings, parseDateFromDB, supabase, calculateCancellationPolicy, processCancellation } from '../../lib/supabase';
+import { getUserBookings, parseDateFromDB, supabase, calculateCancellationPolicy, processCancellation, calculatePartialCancellationPolicy, processPartialCancellation, PartialCancellationTraveler } from '../../lib/supabase';
 import { Booking, PendingReschedule } from '../../types';
 import { format } from 'date-fns';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -51,6 +51,34 @@ const TravelerBookings: React.FC = () => {
     error: '',
     success: false,
   });
+  const [partialCancellationModal, setPartialCancellationModal] = useState<{
+    open: boolean;
+    booking: Booking | null;
+    travelers: PartialCancellationTraveler[];
+    selectedIds: Set<string>;
+    policy: any;
+    isCalculating: boolean;
+    isCancelling: boolean;
+    cancellationReason: string;
+    acceptPolicy: boolean;
+    error: string;
+    success: boolean;
+    refundAmount: number;
+  }>({
+    open: false,
+    booking: null,
+    travelers: [],
+    selectedIds: new Set(),
+    policy: null,
+    isCalculating: false,
+    isCancelling: false,
+    cancellationReason: '',
+    acceptPolicy: false,
+    error: '',
+    success: false,
+    refundAmount: 0,
+  });
+
   const [paymentModal, setPaymentModal] = useState<{
     open: boolean;
     booking: Booking | null;
@@ -321,7 +349,7 @@ const TravelerBookings: React.FC = () => {
     try {
       const { data: travelers, error } = await supabase
         .from('booking_travelers')
-        .select('*')
+        .select('*, is_cancelled, cancelled_at')
         .eq('booking_id', booking.id)
         .order('created_at', { ascending: true });
 
@@ -484,6 +512,191 @@ const TravelerBookings: React.FC = () => {
     if (tourStartDate < today) return false;
 
     return true;
+  };
+
+  const canPartialCancelBooking = (booking: Booking) => {
+    if (!booking.tours) return false;
+    if (booking.status === 'cancelled') return false;
+    if ((booking as any).is_no_show) return false;
+    if ((booking as any).approval_status === 'rejected') return false;
+    if (!['confirmed'].includes(booking.status)) return false;
+    if (booking.payment_status !== 'succeeded') return false;
+
+    const activeTravelersCount = (booking as any).active_travelers_count ?? booking.travelers_count;
+    if (!activeTravelersCount || activeTravelersCount < 2) return false;
+
+    const tourStartDate = parseDateFromDB((booking.tours as any).start_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (tourStartDate < today) return false;
+
+    return true;
+  };
+
+  const handleOpenPartialCancellationModal = async (booking: Booking) => {
+    setPartialCancellationModal({
+      open: true,
+      booking,
+      travelers: [],
+      selectedIds: new Set(),
+      policy: null,
+      isCalculating: true,
+      isCancelling: false,
+      cancellationReason: '',
+      acceptPolicy: false,
+      error: '',
+      success: false,
+      refundAmount: 0,
+    });
+
+    try {
+      const { data: travelersData, error } = await supabase
+        .from('booking_travelers')
+        .select('id, nombre, categoria_viajero, precio_aplicado')
+        .eq('booking_id', booking.id)
+        .eq('is_cancelled', false)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      setPartialCancellationModal(prev => ({
+        ...prev,
+        travelers: (travelersData || []).map((t: any) => ({
+          id: t.id,
+          nombre: t.nombre,
+          categoria_viajero: t.categoria_viajero,
+          precio_aplicado: Number(t.precio_aplicado),
+        })),
+        isCalculating: false,
+      }));
+    } catch (err: any) {
+      setPartialCancellationModal(prev => ({
+        ...prev,
+        error: err.message || 'Error al cargar los viajeros',
+        isCalculating: false,
+      }));
+    }
+  };
+
+  const handleClosePartialCancellationModal = () => {
+    setPartialCancellationModal({
+      open: false,
+      booking: null,
+      travelers: [],
+      selectedIds: new Set(),
+      policy: null,
+      isCalculating: false,
+      isCancelling: false,
+      cancellationReason: '',
+      acceptPolicy: false,
+      error: '',
+      success: false,
+      refundAmount: 0,
+    });
+  };
+
+  const handleTogglePartialTraveler = async (travelerId: string) => {
+    const newSelected = new Set(partialCancellationModal.selectedIds);
+    if (newSelected.has(travelerId)) {
+      newSelected.delete(travelerId);
+    } else {
+      newSelected.add(travelerId);
+    }
+
+    const selectedTravelers = partialCancellationModal.travelers.filter(t => newSelected.has(t.id));
+
+    if (selectedTravelers.length === 0) {
+      setPartialCancellationModal(prev => ({
+        ...prev,
+        selectedIds: newSelected,
+        policy: null,
+        refundAmount: 0,
+      }));
+      return;
+    }
+
+    setPartialCancellationModal(prev => ({ ...prev, selectedIds: newSelected, isCalculating: true }));
+
+    try {
+      const { data: fullBooking } = await supabase
+        .from('bookings')
+        .select('*, tours:tour_id(id, name, start_date, cancellation_not_allowed)')
+        .eq('id', partialCancellationModal.booking!.id)
+        .single();
+
+      if (!fullBooking) throw new Error('No se pudo cargar la reserva');
+
+      const policy = await calculatePartialCancellationPolicy(fullBooking, selectedTravelers);
+
+      setPartialCancellationModal(prev => ({
+        ...prev,
+        policy,
+        refundAmount: policy.refundAmountToTraveler,
+        isCalculating: false,
+      }));
+    } catch (err: any) {
+      setPartialCancellationModal(prev => ({
+        ...prev,
+        policy: null,
+        refundAmount: 0,
+        isCalculating: false,
+        error: err.message || 'Error al calcular la política',
+      }));
+    }
+  };
+
+  const handleProcessPartialCancellation = async () => {
+    if (!partialCancellationModal.booking || !user?.id) return;
+    if (!partialCancellationModal.acceptPolicy) {
+      setPartialCancellationModal(prev => ({
+        ...prev,
+        error: 'Debes aceptar la política de cancelación para continuar',
+      }));
+      return;
+    }
+
+    const selectedTravelers = partialCancellationModal.travelers.filter(
+      t => partialCancellationModal.selectedIds.has(t.id)
+    );
+
+    if (selectedTravelers.length === 0) {
+      setPartialCancellationModal(prev => ({ ...prev, error: 'Selecciona al menos un viajero para cancelar' }));
+      return;
+    }
+
+    if (selectedTravelers.length >= partialCancellationModal.travelers.length) {
+      setPartialCancellationModal(prev => ({
+        ...prev,
+        error: 'No puedes cancelar todos los viajeros. Usa la cancelación total de la reserva.',
+      }));
+      return;
+    }
+
+    setPartialCancellationModal(prev => ({ ...prev, isCancelling: true, error: '' }));
+
+    try {
+      const result = await processPartialCancellation(
+        partialCancellationModal.booking.id,
+        user.id,
+        selectedTravelers,
+        partialCancellationModal.cancellationReason || undefined
+      );
+
+      if (result.error) throw new Error(result.error);
+
+      setPartialCancellationModal(prev => ({ ...prev, isCancelling: false, success: true }));
+      await fetchBookings();
+
+      setTimeout(() => {
+        handleClosePartialCancellationModal();
+      }, 3000);
+    } catch (err: any) {
+      setPartialCancellationModal(prev => ({
+        ...prev,
+        isCancelling: false,
+        error: err.message || 'Error al procesar la cancelación parcial',
+      }));
+    }
   };
 
   const handleEditTravelers = (bookingId: string) => {
@@ -975,12 +1188,23 @@ const TravelerBookings: React.FC = () => {
                     </div>
                   </div>
 
+                  {(booking as any).has_partial_cancellations && (
+                    <div className="mb-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-800 text-xs font-medium">
+                      <UserMinus className="h-3 w-3" />
+                      Cancelación parcial aplicada &mdash; {(booking as any).active_travelers_count ?? booking.travelers_count} de {booking.travelers_count} viajeros activos
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                     <div className="flex items-center">
                       <Users className="h-4 w-4 text-gray-400 mr-2" />
                       <div>
                         <div className="text-sm text-gray-500">Viajeros</div>
-                        <div className="font-medium">{booking.travelers_count}</div>
+                        <div className="font-medium">
+                          {(booking as any).has_partial_cancellations
+                            ? `${(booking as any).active_travelers_count ?? booking.travelers_count} activos`
+                            : booking.travelers_count}
+                        </div>
                       </div>
                     </div>
 
@@ -1131,6 +1355,16 @@ const TravelerBookings: React.FC = () => {
                       >
                         <XCircle className="h-4 w-4 mr-2" />
                         Cancelar Reserva
+                      </button>
+                    )}
+
+                    {canPartialCancelBooking(booking) && (
+                      <button
+                        onClick={() => handleOpenPartialCancellationModal(booking)}
+                        className="btn btn-outline border-orange-300 text-orange-700 hover:bg-orange-50 flex items-center justify-center"
+                      >
+                        <UserMinus className="h-4 w-4 mr-2" />
+                        Cancelar Viajeros
                       </button>
                     )}
 
@@ -1346,12 +1580,17 @@ const TravelerBookings: React.FC = () => {
               ) : (
                 <div className="space-y-4">
                   {travelersModal.travelers.map((traveler, index) => (
-                    <div key={traveler.id} className="border border-gray-200 rounded-lg p-4 hover:border-primary-300 transition-colors">
+                    <div key={traveler.id} className={`border rounded-lg p-4 transition-colors ${(traveler as any).is_cancelled ? 'border-red-200 bg-red-50 opacity-75' : 'border-gray-200 hover:border-primary-300'}`}>
                       <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-semibold text-lg">
-                          {getCategoryLabel(traveler.categoria_viajero)} {index + 1}
-                        </h3>
-                        <span className="text-sm text-gray-500 font-medium">
+                        <div className="flex items-center gap-2">
+                          <h3 className={`font-semibold text-lg ${(traveler as any).is_cancelled ? 'line-through text-gray-400' : ''}`}>
+                            {getCategoryLabel(traveler.categoria_viajero)} {index + 1}
+                          </h3>
+                          {(traveler as any).is_cancelled && (
+                            <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">Cancelado</span>
+                          )}
+                        </div>
+                        <span className={`text-sm font-medium ${(traveler as any).is_cancelled ? 'text-gray-400 line-through' : 'text-gray-500'}`}>
                           ${traveler.precio_aplicado.toLocaleString()}
                         </span>
                       </div>
@@ -1674,6 +1913,239 @@ const TravelerBookings: React.FC = () => {
                   {cancellationModal.policy?.refundAmountToTraveler > 0 && (
                     <p className="text-sm text-gray-600">
                       El reembolso de ${cancellationModal.policy.refundAmountToTraveler.toFixed(2)} ha sido depositado en tu ToursRed Cash.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Partial Cancellation Modal */}
+      {partialCancellationModal.open && partialCancellationModal.booking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {!partialCancellationModal.success ? (
+                <>
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h2 className="text-xl font-bold text-orange-700 flex items-center gap-2">
+                        <UserMinus className="h-5 w-5" />
+                        Cancelar Viajeros
+                      </h2>
+                      <p className="text-gray-600 text-sm mt-1">{partialCancellationModal.booking.tours?.name}</p>
+                    </div>
+                    <button
+                      onClick={handleClosePartialCancellationModal}
+                      className="text-gray-400 hover:text-gray-600"
+                      disabled={partialCancellationModal.isCancelling}
+                    >
+                      <X className="h-6 w-6" />
+                    </button>
+                  </div>
+
+                  <p className="text-sm text-gray-600 mb-4">
+                    Selecciona los viajeros que deseas cancelar. La reserva continuará activa para los viajeros restantes.
+                  </p>
+
+                  {partialCancellationModal.isCalculating && partialCancellationModal.travelers.length === 0 ? (
+                    <div className="flex justify-center py-8">
+                      <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-orange-500"></div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2 mb-5">
+                        {partialCancellationModal.travelers.map((traveler) => {
+                          const isSelected = partialCancellationModal.selectedIds.has(traveler.id);
+                          const categoryLabels: Record<string, string> = {
+                            adulto: 'Adulto', nino: 'Niño', infante: 'Infante', adulto_mayor: 'Adulto Mayor'
+                          };
+                          return (
+                            <button
+                              key={traveler.id}
+                              onClick={() => handleTogglePartialTraveler(traveler.id)}
+                              disabled={partialCancellationModal.isCancelling || partialCancellationModal.isCalculating}
+                              className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all text-left ${
+                                isSelected
+                                  ? 'border-orange-400 bg-orange-50'
+                                  : 'border-gray-200 bg-white hover:border-gray-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                                  isSelected ? 'bg-orange-500 border-orange-500' : 'border-gray-300'
+                                }`}>
+                                  {isSelected && (
+                                    <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+                                      <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="font-medium text-gray-900 text-sm">{traveler.nombre}</div>
+                                  <div className="text-xs text-gray-500">{categoryLabels[traveler.categoria_viajero] || traveler.categoria_viajero}</div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-semibold text-sm text-gray-800">${Number(traveler.precio_aplicado).toFixed(2)}</div>
+                                <div className="text-xs text-gray-500">anticipo</div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {partialCancellationModal.selectedIds.size === partialCancellationModal.travelers.length && partialCancellationModal.travelers.length > 0 && (
+                        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                          <p className="text-sm text-red-800 font-medium">
+                            Has seleccionado todos los viajeros. Para cancelar toda la reserva, usa el botón "Cancelar Reserva".
+                          </p>
+                        </div>
+                      )}
+
+                      {partialCancellationModal.isCalculating && partialCancellationModal.selectedIds.size > 0 && (
+                        <div className="mb-4 flex items-center gap-2 text-sm text-gray-500">
+                          <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-orange-500"></div>
+                          Calculando política...
+                        </div>
+                      )}
+
+                      {partialCancellationModal.policy && partialCancellationModal.selectedIds.size > 0 && !partialCancellationModal.isCalculating && (
+                        <div className={`p-4 rounded-lg mb-4 border-2 ${
+                          partialCancellationModal.policy.policyType === '100_percent'
+                            ? 'bg-green-50 border-green-200'
+                            : partialCancellationModal.policy.policyType === '50_percent'
+                            ? 'bg-yellow-50 border-yellow-200'
+                            : 'bg-red-50 border-red-200'
+                        }`}>
+                          <div className="flex justify-between items-start mb-2">
+                            <h3 className={`font-semibold text-sm ${
+                              partialCancellationModal.policy.policyType === '100_percent' ? 'text-green-800' :
+                              partialCancellationModal.policy.policyType === '50_percent' ? 'text-yellow-800' : 'text-red-800'
+                            }`}>
+                              {partialCancellationModal.policy.policyType === '100_percent' && 'Reembolso del 100%'}
+                              {partialCancellationModal.policy.policyType === '50_percent' && 'Reembolso del 50%'}
+                              {partialCancellationModal.policy.policyType === 'no_refund' && 'Sin Reembolso'}
+                            </h3>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                              partialCancellationModal.policy.daysBeforeTour >= 15 ? 'bg-green-100 text-green-800' :
+                              partialCancellationModal.policy.daysBeforeTour >= 7 ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {partialCancellationModal.policy.daysBeforeTour} día(s) antes
+                            </span>
+                          </div>
+                          <div className="space-y-1 text-sm mb-2">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Anticipo de viajeros cancelados:</span>
+                              <span className="font-medium">${Number(partialCancellationModal.policy.originalPartialAmount).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Reembolso a ToursRed Cash:</span>
+                              <span className={`font-bold ${partialCancellationModal.policy.refundAmountToTraveler > 0 ? 'text-green-700' : 'text-red-600'}`}>
+                                ${Number(partialCancellationModal.policy.refundAmountToTraveler).toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                          <p className={`text-xs mt-1 ${
+                            partialCancellationModal.policy.policyType === '100_percent' ? 'text-green-700' :
+                            partialCancellationModal.policy.policyType === '50_percent' ? 'text-yellow-700' : 'text-red-700'
+                          }`}>
+                            {partialCancellationModal.policy.refundMessage}
+                          </p>
+                        </div>
+                      )}
+
+                      {partialCancellationModal.selectedIds.size > 0 && (
+                        <>
+                          <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Motivo de cancelación (opcional)
+                            </label>
+                            <textarea
+                              value={partialCancellationModal.cancellationReason}
+                              onChange={(e) => setPartialCancellationModal(prev => ({ ...prev, cancellationReason: e.target.value }))}
+                              rows={2}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                              placeholder="¿Por qué cancelas estos viajeros?"
+                              disabled={partialCancellationModal.isCancelling}
+                            />
+                          </div>
+
+                          <div className="mb-4">
+                            <label className="flex items-start gap-2">
+                              <input
+                                type="checkbox"
+                                checked={partialCancellationModal.acceptPolicy}
+                                onChange={(e) => setPartialCancellationModal(prev => ({ ...prev, acceptPolicy: e.target.checked, error: '' }))}
+                                className="mt-1 h-4 w-4 text-orange-500 focus:ring-orange-400 border-gray-300 rounded"
+                                disabled={partialCancellationModal.isCancelling}
+                              />
+                              <span className="text-sm text-gray-700">
+                                He leído y acepto la política de cancelación. Entiendo que los viajeros seleccionados serán removidos permanentemente de la reserva y el reembolso se acreditará en mi ToursRed Cash.
+                              </span>
+                            </label>
+                          </div>
+                        </>
+                      )}
+
+                      {partialCancellationModal.error && (
+                        <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3 flex items-start gap-2">
+                          <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm text-red-800">{partialCancellationModal.error}</p>
+                        </div>
+                      )}
+
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <button
+                          onClick={handleClosePartialCancellationModal}
+                          className="btn btn-outline flex-1"
+                          disabled={partialCancellationModal.isCancelling}
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={handleProcessPartialCancellation}
+                          disabled={
+                            partialCancellationModal.selectedIds.size === 0 ||
+                            partialCancellationModal.selectedIds.size === partialCancellationModal.travelers.length ||
+                            !partialCancellationModal.acceptPolicy ||
+                            partialCancellationModal.isCancelling ||
+                            partialCancellationModal.isCalculating ||
+                            !partialCancellationModal.policy
+                          }
+                          className="btn bg-orange-600 hover:bg-orange-700 text-white flex-1 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                        >
+                          {partialCancellationModal.isCancelling ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                              Procesando...
+                            </>
+                          ) : (
+                            <>
+                              <UserMinus className="h-4 w-4 mr-2" />
+                              Cancelar {partialCancellationModal.selectedIds.size > 0 ? `${partialCancellationModal.selectedIds.size} viajero(s)` : 'Viajeros'}
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="mb-4 inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100">
+                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-green-600 mb-2">Cancelación Parcial Exitosa</h3>
+                  <p className="text-gray-600 mb-2">Los viajeros han sido removidos de tu reserva.</p>
+                  {partialCancellationModal.policy?.refundAmountToTraveler > 0 && (
+                    <p className="text-sm text-gray-600">
+                      El reembolso de ${Number(partialCancellationModal.policy.refundAmountToTraveler).toFixed(2)} ha sido acreditado en tu ToursRed Cash.
                     </p>
                   )}
                 </div>

@@ -582,7 +582,7 @@ const AgencyBookings: React.FC = () => {
     try {
       const { data: travelers, error } = await supabase
         .from('booking_travelers')
-        .select('*')
+        .select('*, is_cancelled, cancelled_at')
         .eq('booking_id', booking.id)
         .order('created_at', { ascending: true });
 
@@ -1024,12 +1024,23 @@ const AgencyBookings: React.FC = () => {
                     </div>
                   </div>
 
+                  {(booking as any).has_partial_cancellations && (
+                    <div className="mb-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-800 text-xs font-medium">
+                      <UserX className="h-3 w-3" />
+                      Cancelación parcial &mdash; {(booking as any).active_travelers_count ?? booking.travelers_count} de {booking.travelers_count} viajeros activos
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
                     <div className="flex items-center">
                       <Users className="h-4 w-4 text-gray-400 mr-2" />
                       <div>
                         <div className="text-sm text-gray-500">Viajeros</div>
-                        <div className="font-medium">{booking.travelers_count}</div>
+                        <div className="font-medium">
+                          {(booking as any).has_partial_cancellations
+                            ? `${(booking as any).active_travelers_count ?? booking.travelers_count} activos`
+                            : booking.travelers_count}
+                        </div>
                       </div>
                     </div>
 
@@ -1691,12 +1702,17 @@ const AgencyBookings: React.FC = () => {
               ) : (
                 <div className="space-y-4">
                   {travelersModal.travelers.map((traveler, index) => (
-                    <div key={traveler.id} className="border border-gray-200 rounded-lg p-4 hover:border-primary-300 transition-colors">
+                    <div key={traveler.id} className={`border rounded-lg p-4 transition-colors ${(traveler as any).is_cancelled ? 'border-red-200 bg-red-50 opacity-75' : 'border-gray-200 hover:border-primary-300'}`}>
                       <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-semibold text-lg">
-                          {getCategoryLabel(traveler.categoria_viajero)} {index + 1}
-                        </h3>
-                        <span className="text-sm text-gray-500 font-medium">
+                        <div className="flex items-center gap-2">
+                          <h3 className={`font-semibold text-lg ${(traveler as any).is_cancelled ? 'line-through text-gray-400' : ''}`}>
+                            {getCategoryLabel(traveler.categoria_viajero)} {index + 1}
+                          </h3>
+                          {(traveler as any).is_cancelled && (
+                            <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">Cancelado</span>
+                          )}
+                        </div>
+                        <span className={`text-sm font-medium ${(traveler as any).is_cancelled ? 'text-gray-400 line-through' : 'text-gray-500'}`}>
                           ${traveler.precio_aplicado.toLocaleString()}
                         </span>
                       </div>

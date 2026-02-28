@@ -1747,3 +1747,304 @@ export const processCancellation = async (
     };
   }
 };
+
+// ─── PARTIAL CANCELLATION SYSTEM ────────────────────────────────────────────
+
+export interface PartialCancellationTraveler {
+  id: string;
+  nombre: string;
+  categoria_viajero: string;
+  precio_aplicado: number;
+}
+
+export interface PartialCancellationPolicy {
+  policyType: '100_percent' | '50_percent' | 'no_refund';
+  daysBeforeTour: number;
+  originalPartialAmount: number;
+  refundAmountToTraveler: number;
+  amountToAgency: number;
+  amountToPlatform: number;
+  canCancel: boolean;
+  warningMessage?: string;
+  refundMessage: string;
+}
+
+export const calculatePartialCancellationPolicy = async (
+  booking: any,
+  travelersToCancel: PartialCancellationTraveler[]
+): Promise<PartialCancellationPolicy> => {
+  const tour = booking.tours;
+  const tourStartDate = parseDateFromDB(tour.start_date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const millisecondsPerDay = 1000 * 60 * 60 * 24;
+  const daysBeforeTour = Math.ceil((tourStartDate.getTime() - today.getTime()) / millisecondsPerDay);
+
+  const originalPartialAmount = travelersToCancel.reduce(
+    (sum, t) => sum + Number(t.precio_aplicado),
+    0
+  );
+
+  const { data: platformSettings } = await supabase
+    .from('platform_settings')
+    .select('agency_commission_percentage')
+    .single();
+
+  const commissionRate = (platformSettings?.agency_commission_percentage || 15) / 100;
+
+  const travelerNames = travelersToCancel.map(t => t.nombre).join(', ');
+
+  if (daysBeforeTour >= 15) {
+    return {
+      policyType: '100_percent',
+      daysBeforeTour,
+      originalPartialAmount,
+      refundAmountToTraveler: originalPartialAmount,
+      amountToAgency: 0,
+      amountToPlatform: 0,
+      canCancel: true,
+      refundMessage: `Se reembolsará el 100% del anticipo parcial ($${originalPartialAmount.toFixed(2)}) a tu ToursRed Cash.`
+    };
+  }
+
+  if (daysBeforeTour >= 7 && daysBeforeTour < 15) {
+    const refundAmount = originalPartialAmount * 0.5;
+    const penaltyAmount = originalPartialAmount * 0.5;
+    return {
+      policyType: '50_percent',
+      daysBeforeTour,
+      originalPartialAmount,
+      refundAmountToTraveler: refundAmount,
+      amountToAgency: penaltyAmount * 0.7,
+      amountToPlatform: penaltyAmount * 0.3,
+      canCancel: true,
+      refundMessage: `Se reembolsará el 50% del anticipo parcial ($${refundAmount.toFixed(2)}) a tu ToursRed Cash.`
+    };
+  }
+
+  const agencyAmount = originalPartialAmount * (1 - commissionRate);
+  const platformAmount = originalPartialAmount * commissionRate;
+
+  return {
+    policyType: 'no_refund',
+    daysBeforeTour,
+    originalPartialAmount,
+    refundAmountToTraveler: 0,
+    amountToAgency: agencyAmount,
+    amountToPlatform: platformAmount,
+    canCancel: true,
+    warningMessage: tour.cancellation_not_allowed
+      ? 'Este tour NO permite cancelaciones con reembolso.'
+      : daysBeforeTour < 1
+        ? 'Cancelar en este momento no genera reembolso.'
+        : undefined,
+    refundMessage: `No habrá reembolso por estos viajeros. La cancelación se procesa para evitar penalización de No Show.`
+  };
+};
+
+export const processPartialCancellation = async (
+  bookingId: string,
+  userId: string,
+  travelersToCancel: PartialCancellationTraveler[],
+  cancellationReason?: string
+): Promise<{ data: { partialCancellation: any; policy: PartialCancellationPolicy } | null; error: string | null }> => {
+  try {
+    console.log('🚫 Procesando cancelación parcial:', bookingId, travelersToCancel.length, 'viajeros');
+
+    const { data: booking, error: bookingError } = await supabase
+      .from('bookings')
+      .select(`
+        *,
+        tours (id, name, start_date, cancellation_not_allowed),
+        agencies (id, user_id)
+      `)
+      .eq('id', bookingId)
+      .single();
+
+    if (bookingError || !booking) {
+      throw new Error('Reserva no encontrada');
+    }
+
+    if (!['confirmed', 'pending'].includes(booking.status)) {
+      throw new Error('La reserva no está en un estado que permita cancelaciones parciales');
+    }
+
+    const { data: activeTravelers, error: travelersError } = await supabase
+      .from('booking_travelers')
+      .select('id')
+      .eq('booking_id', bookingId)
+      .eq('is_cancelled', false);
+
+    if (travelersError) throw travelersError;
+
+    const currentActiveCount = activeTravelers?.length || 0;
+    if (travelersToCancel.length >= currentActiveCount) {
+      throw new Error('No puedes cancelar todos los viajeros con cancelación parcial. Usa la cancelación total de la reserva.');
+    }
+
+    const policy = await calculatePartialCancellationPolicy(booking, travelersToCancel);
+
+    let transactionId: string | null = null;
+
+    if (policy.refundAmountToTraveler > 0) {
+      const tourName = (booking.tours as any).name;
+      const { data: refundData, error: refundError } = await supabase.rpc('update_wallet_balance', {
+        p_user_id: userId,
+        p_amount: policy.refundAmountToTraveler,
+        p_type: 'refund',
+        p_description: `Reembolso por cancelación parcial de ${tourName}`,
+        p_reference_id: bookingId,
+        p_reference_type: 'booking_partial_cancellation'
+      });
+
+      if (refundError) throw new Error(`Error al procesar reembolso: ${refundError.message}`);
+      transactionId = refundData?.transaction_id || null;
+      console.log('💰 Reembolso parcial procesado:', transactionId);
+    }
+
+    const { data: partialCancellation, error: insertError } = await supabase
+      .from('booking_partial_cancellations')
+      .insert({
+        booking_id: bookingId,
+        cancelled_by_user_id: userId,
+        tour_start_date: (booking.tours as any).start_date,
+        days_before_tour: policy.daysBeforeTour,
+        cancellation_policy_type: policy.policyType,
+        travelers_cancelled: travelersToCancel,
+        original_partial_amount: policy.originalPartialAmount,
+        refund_amount_to_traveler: policy.refundAmountToTraveler,
+        amount_to_agency: policy.amountToAgency,
+        amount_to_platform: policy.amountToPlatform,
+        toursred_cash_transaction_id: transactionId,
+        refund_processed: policy.refundAmountToTraveler > 0,
+        cancellation_reason: cancellationReason || null
+      })
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+
+    const travelerIds = travelersToCancel.map(t => t.id);
+    const { error: updateTravelersError } = await supabase
+      .from('booking_travelers')
+      .update({
+        is_cancelled: true,
+        cancelled_at: new Date().toISOString(),
+        partial_cancellation_id: partialCancellation.id
+      })
+      .in('id', travelerIds);
+
+    if (updateTravelersError) throw updateTravelersError;
+
+    const newActiveCount = currentActiveCount - travelersToCancel.length;
+    const { error: updateBookingError } = await supabase
+      .from('bookings')
+      .update({
+        has_partial_cancellations: true,
+        active_travelers_count: newActiveCount
+      })
+      .eq('id', bookingId);
+
+    if (updateBookingError) throw updateBookingError;
+
+    if (policy.amountToAgency > 0) {
+      const { data: existingCommission } = await supabase
+        .from('commission_records')
+        .select('id, agency_amount, platform_amount')
+        .eq('booking_id', bookingId)
+        .maybeSingle();
+
+      if (existingCommission) {
+        await supabase
+          .from('commission_records')
+          .update({
+            agency_amount: Number(existingCommission.agency_amount || 0) + policy.amountToAgency,
+            platform_amount: Number(existingCommission.platform_amount || 0) + policy.amountToPlatform,
+            status: 'pending'
+          })
+          .eq('id', existingCommission.id);
+      } else {
+        await supabase
+          .from('commission_records')
+          .insert({
+            booking_id: bookingId,
+            agency_id: booking.agency_id,
+            agency_amount: policy.amountToAgency,
+            platform_amount: policy.amountToPlatform,
+            status: 'pending'
+          });
+      }
+    }
+
+    try {
+      const agencyUserId = (booking.agencies as any)?.user_id;
+      if (agencyUserId) {
+        await supabase.rpc('create_user_notification', {
+          p_user_id: agencyUserId,
+          p_type: 'booking_cancelled',
+          p_title: 'Cancelación Parcial de Viajeros',
+          p_message: `Se cancelaron ${travelersToCancel.length} viajero(s) de la reserva del tour "${(booking.tours as any).name}".`,
+          p_data: {
+            booking_id: bookingId,
+            partial_cancellation_id: partialCancellation.id,
+            travelers_count: travelersToCancel.length,
+            refund_amount: policy.refundAmountToTraveler,
+            policy_type: policy.policyType
+          }
+        });
+
+        await supabase
+          .from('booking_partial_cancellations')
+          .update({ notification_sent: true })
+          .eq('id', partialCancellation.id);
+      }
+    } catch (notifError) {
+      console.error('⚠️ Error enviando notificación en tiempo real (no crítico):', notifError);
+    }
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const responses = await Promise.all([
+        fetch(`${supabaseUrl}/functions/v1/send-partial-cancellation-notification-traveler`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseAnonKey}` },
+          body: JSON.stringify({ booking_id: bookingId, partial_cancellation_id: partialCancellation.id })
+        }),
+        fetch(`${supabaseUrl}/functions/v1/send-partial-cancellation-notification-agency`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseAnonKey}` },
+          body: JSON.stringify({ booking_id: bookingId, partial_cancellation_id: partialCancellation.id })
+        }),
+        fetch(`${supabaseUrl}/functions/v1/send-partial-cancellation-notification-admin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseAnonKey}` },
+          body: JSON.stringify({ booking_id: bookingId, partial_cancellation_id: partialCancellation.id })
+        })
+      ]);
+
+      const allSent = responses.every(r => r.ok);
+      await supabase
+        .from('booking_partial_cancellations')
+        .update({ emails_sent: allSent })
+        .eq('id', partialCancellation.id);
+    } catch (emailError) {
+      console.error('⚠️ Error enviando emails de cancelación parcial (no crítico):', emailError);
+    }
+
+    console.log('✅ Cancelación parcial completada exitosamente');
+
+    return {
+      data: { partialCancellation, policy },
+      error: null
+    };
+  } catch (error: any) {
+    console.error('❌ Error en processPartialCancellation:', error);
+    return {
+      data: null,
+      error: error.message || 'Error al procesar la cancelación parcial'
+    };
+  }
+};
