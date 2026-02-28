@@ -16,7 +16,7 @@ interface PointsTransaction {
   id: string;
   amount: number;
   balance_after: number;
-  type: 'earned' | 'redeemed' | 'expired' | 'refund' | 'adjustment';
+  type: 'earned' | 'redeemed' | 'expired' | 'refund' | 'adjustment' | 'partial_cancellation';
   description: string;
   expires_at: string | null;
   created_at: string;
@@ -140,7 +140,9 @@ const TravelerPointsPage: React.FC = () => {
       case 'refund':
         return <ArrowUp className="h-5 w-5 text-amber-600" />;
       case 'adjustment':
-        return <AlertCircle className="h-5 w-5 text-purple-600" />;
+        return <AlertCircle className="h-5 w-5 text-gray-600" />;
+      case 'partial_cancellation':
+        return <ArrowDown className="h-5 w-5 text-orange-600" />;
       default:
         return <AlertCircle className="h-5 w-5 text-gray-600" />;
     }
@@ -157,7 +159,9 @@ const TravelerPointsPage: React.FC = () => {
       case 'refund':
         return 'text-amber-600';
       case 'adjustment':
-        return 'text-purple-600';
+        return 'text-gray-600';
+      case 'partial_cancellation':
+        return 'text-orange-600';
       default:
         return 'text-gray-600';
     }
