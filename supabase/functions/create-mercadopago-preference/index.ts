@@ -118,6 +118,9 @@ Deno.serve(async (req: Request) => {
       notification_url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/mercadopago-webhook`,
       statement_descriptor: "TOURSRED",
       binary_mode: false,
+      payment_methods: {
+        excluded_payment_types: [{ id: "ticket" }],
+      },
     };
 
     const mpResponse = await fetch("https://api.mercadopago.com/checkout/preferences", {
