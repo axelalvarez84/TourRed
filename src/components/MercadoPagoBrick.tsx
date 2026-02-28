@@ -120,7 +120,6 @@ export default function MercadoPagoBrick({
             paymentMethods: {
               creditCard: 'all',
               debitCard: 'all',
-              ticket: 0,
               mercadoPago: 'all',
             },
             visual: {
