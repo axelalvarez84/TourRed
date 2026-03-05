@@ -29,7 +29,7 @@ interface TourPromotionsManagerProps {
 
 const defaultForm = {
   promotion_type: '2x1' as '2x1' | '3x2' | 'grupo_precio_fijo' | 'nxprecio',
-  min_travelers: 4,
+  min_travelers: '',
   fixed_group_price: '',
   group_discount_percentage: '',
   valid_from: '',
@@ -378,13 +378,17 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Min. viajeros para activar
                     </label>
-                    <input
-                      type="number"
-                      min={4}
-                      value={formData.min_travelers}
-                      onChange={e => setFormData(prev => ({ ...prev, min_travelers: parseInt(e.target.value) || 4 }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
-                    />
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={4}
+                        value={formData.min_travelers}
+                        onChange={e => setFormData(prev => ({ ...prev, min_travelers: e.target.value }))}
+                        placeholder="Ej: 4"
+                        className="w-full px-3 py-2 pr-16 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+                      />
+                      <span className="absolute right-2.5 top-2 text-xs text-gray-400 pointer-events-none">viajeros</span>
+                    </div>
                     <p className="text-xs text-gray-400 mt-1">Mínimo permitido: 4 viajeros</p>
                   </div>
                   <div>
@@ -431,14 +435,18 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Viajeros por grupo
                     </label>
-                    <input
-                      type="number"
-                      min={2}
-                      value={formData.min_travelers}
-                      onChange={e => setFormData(prev => ({ ...prev, min_travelers: parseInt(e.target.value) || 2 }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
-                    />
-                    <p className="text-xs text-gray-400 mt-1">Precio normal: ${(tourPrice * (formData.min_travelers || 2)).toLocaleString()}</p>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={2}
+                        value={formData.min_travelers}
+                        onChange={e => setFormData(prev => ({ ...prev, min_travelers: e.target.value }))}
+                        placeholder="Ej: 4"
+                        className="w-full px-3 py-2 pr-16 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+                      />
+                      <span className="absolute right-2.5 top-2 text-xs text-gray-400 pointer-events-none">viajeros</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">Precio normal: ${(tourPrice * (parseInt(formData.min_travelers) || 2)).toLocaleString()}</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
