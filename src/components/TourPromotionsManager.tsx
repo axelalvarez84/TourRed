@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Tag, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, AlertCircle, Check, X, Calendar, Users, DollarSign, Loader2, Info } from 'lucide-react';
+import { Tag, Plus, CreditCard as Edit2, Trash2, ToggleLeft, ToggleRight, AlertCircle, Check, X, Calendar, Users, DollarSign, Loader2, Info } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface TourPromotion {
