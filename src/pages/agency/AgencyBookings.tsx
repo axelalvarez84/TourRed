@@ -1712,9 +1712,22 @@ const AgencyBookings: React.FC = () => {
                             <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">Cancelado</span>
                           )}
                         </div>
-                        <span className={`text-sm font-medium ${(traveler as any).is_cancelled ? 'text-gray-400 line-through' : 'text-gray-500'}`}>
-                          ${traveler.precio_aplicado.toLocaleString()}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {Number((traveler as any).promo_discount_per_traveler) > 0 ? (
+                            <span className="flex items-center gap-1.5">
+                              <span className="text-sm text-gray-400 line-through">
+                                ${(Number(traveler.precio_aplicado) + Number((traveler as any).promo_discount_per_traveler)).toLocaleString()}
+                              </span>
+                              <span className={`text-sm font-bold ${(traveler as any).is_cancelled ? 'text-gray-400 line-through' : 'text-emerald-600'}`}>
+                                ${Number(traveler.precio_aplicado).toLocaleString()}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className={`text-sm font-medium ${(traveler as any).is_cancelled ? 'text-gray-400 line-through' : 'text-gray-500'}`}>
+                              ${Number(traveler.precio_aplicado).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                         <div>

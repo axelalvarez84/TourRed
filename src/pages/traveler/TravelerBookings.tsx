@@ -552,7 +552,7 @@ const TravelerBookings: React.FC = () => {
     try {
       const { data: travelersData, error } = await supabase
         .from('booking_travelers')
-        .select('id, nombre, categoria_viajero, precio_aplicado')
+        .select('id, nombre, categoria_viajero, precio_aplicado, promo_discount_per_traveler')
         .eq('booking_id', booking.id)
         .eq('is_cancelled', false)
         .order('created_at', { ascending: true });
@@ -566,6 +566,7 @@ const TravelerBookings: React.FC = () => {
           nombre: t.nombre,
           categoria_viajero: t.categoria_viajero,
           precio_aplicado: Number(t.precio_aplicado),
+          promo_discount_per_traveler: Number(t.promo_discount_per_traveler) || 0,
         })),
         isCalculating: false,
       }));
@@ -1590,9 +1591,22 @@ const TravelerBookings: React.FC = () => {
                             <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">Cancelado</span>
                           )}
                         </div>
-                        <span className={`text-sm font-medium ${(traveler as any).is_cancelled ? 'text-gray-400 line-through' : 'text-gray-500'}`}>
-                          ${traveler.precio_aplicado.toLocaleString()}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {Number((traveler as any).promo_discount_per_traveler) > 0 ? (
+                            <span className="flex items-center gap-1.5">
+                              <span className="text-sm text-gray-400 line-through">
+                                ${(Number(traveler.precio_aplicado) + Number((traveler as any).promo_discount_per_traveler)).toLocaleString()}
+                              </span>
+                              <span className={`text-sm font-bold ${(traveler as any).is_cancelled ? 'text-gray-400 line-through' : 'text-emerald-600'}`}>
+                                ${Number(traveler.precio_aplicado).toLocaleString()}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className={`text-sm font-medium ${(traveler as any).is_cancelled ? 'text-gray-400 line-through' : 'text-gray-500'}`}>
+                              ${Number(traveler.precio_aplicado).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                         <div>
@@ -1989,8 +2003,20 @@ const TravelerBookings: React.FC = () => {
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className="font-semibold text-sm text-gray-800">${Number(traveler.precio_aplicado).toFixed(2)}</div>
-                                <div className="text-xs text-gray-500">anticipo</div>
+                                {Number((traveler as any).promo_discount_per_traveler) > 0 ? (
+                                  <>
+                                    <div className="flex items-center gap-1.5 justify-end">
+                                      <span className="text-xs text-gray-400 line-through">${(Number(traveler.precio_aplicado) + Number((traveler as any).promo_discount_per_traveler)).toFixed(2)}</span>
+                                      <span className="font-semibold text-sm text-emerald-600">${Number(traveler.precio_aplicado).toFixed(2)}</span>
+                                    </div>
+                                    <div className="text-xs text-gray-500">precio pagado</div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="font-semibold text-sm text-gray-800">${Number(traveler.precio_aplicado).toFixed(2)}</div>
+                                    <div className="text-xs text-gray-500">precio pagado</div>
+                                  </>
+                                )}
                               </div>
                             </button>
                           );
