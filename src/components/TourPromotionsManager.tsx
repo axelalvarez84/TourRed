@@ -6,7 +6,7 @@ interface TourPromotion {
   id: string;
   tour_id: string;
   agency_id: string;
-  promotion_type: '2x1' | '3x2' | 'grupo_precio_fijo';
+  promotion_type: '2x1' | '3x2' | 'grupo_precio_fijo' | 'nxprecio';
   min_travelers: number;
   group_size: number;
   pay_count: number;
@@ -27,7 +27,7 @@ interface TourPromotionsManagerProps {
 }
 
 const defaultForm = {
-  promotion_type: '2x1' as '2x1' | '3x2' | 'grupo_precio_fijo',
+  promotion_type: '2x1' as '2x1' | '3x2' | 'grupo_precio_fijo' | 'nxprecio',
   min_travelers: 2,
   fixed_group_price: '',
   valid_from: '',
@@ -65,7 +65,7 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
     setIsLoading(false);
   };
 
-  const getGroupConfig = (type: '2x1' | '3x2' | 'grupo_precio_fijo') => {
+  const getGroupConfig = (type: '2x1' | '3x2' | 'grupo_precio_fijo' | 'nxprecio') => {
     if (type === '2x1') return { group_size: 2, pay_count: 1, min_travelers: 2 };
     if (type === '3x2') return { group_size: 3, pay_count: 2, min_travelers: 3 };
     return { group_size: 2, pay_count: 2, min_travelers: 2 };
@@ -118,9 +118,14 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
       return;
     }
 
-    if (formData.promotion_type === 'grupo_precio_fijo') {
+    if (formData.promotion_type === 'grupo_precio_fijo' || formData.promotion_type === 'nxprecio') {
       if (!formData.fixed_group_price || parseFloat(formData.fixed_group_price) <= 0) {
-        setError('Debes ingresar un precio fijo de grupo válido.');
+        setError('Debes ingresar un precio especial de grupo válido.');
+        setIsSubmitting(false);
+        return;
+      }
+      if (!formData.min_travelers || formData.min_travelers < 2) {
+        setError('El número de viajeros del grupo debe ser al menos 2.');
         setIsSubmitting(false);
         return;
       }
@@ -133,7 +138,8 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
     }
 
     const groupConfig = getGroupConfig(formData.promotion_type);
-    const minTravelers = formData.promotion_type === 'grupo_precio_fijo'
+    const isCustomPriceType = formData.promotion_type === 'grupo_precio_fijo' || formData.promotion_type === 'nxprecio';
+    const minTravelers = isCustomPriceType
       ? parseInt(formData.min_travelers.toString())
       : groupConfig.min_travelers;
 
@@ -144,9 +150,9 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
       agency_id: agencyId,
       promotion_type: formData.promotion_type,
       min_travelers: minTravelers,
-      group_size: formData.promotion_type === 'grupo_precio_fijo' ? minTravelers : groupConfig.group_size,
-      pay_count: formData.promotion_type === 'grupo_precio_fijo' ? minTravelers : groupConfig.pay_count,
-      fixed_group_price: formData.promotion_type === 'grupo_precio_fijo' ? parseFloat(formData.fixed_group_price) : null,
+      group_size: isCustomPriceType ? minTravelers : groupConfig.group_size,
+      pay_count: isCustomPriceType ? minTravelers : groupConfig.pay_count,
+      fixed_group_price: isCustomPriceType ? parseFloat(formData.fixed_group_price) : null,
       valid_from: new Date(formData.valid_from + 'T00:00:00').toISOString(),
       valid_until: new Date(formData.valid_until + 'T23:59:59').toISOString(),
       max_uses: formData.max_uses ? parseInt(formData.max_uses) : null,
@@ -223,6 +229,7 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
   const getPromotionLabel = (promo: TourPromotion) => {
     if (promo.promotion_type === '2x1') return '2x1 — Viajan 2, paga 1';
     if (promo.promotion_type === '3x2') return '3x2 — Viajan 3, pagan 2';
+    if (promo.promotion_type === 'nxprecio') return `${promo.min_travelers} por $${promo.fixed_group_price?.toLocaleString()} — Precio especial para grupos de ${promo.min_travelers}`;
     return `Precio especial grupal — $${promo.fixed_group_price?.toLocaleString()} para ${promo.min_travelers}+ viajeros`;
   };
 
@@ -291,11 +298,12 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Promoción</label>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {([
                   { value: '2x1', label: '2x1', desc: 'Viajan 2, paga 1' },
                   { value: '3x2', label: '3x2', desc: 'Viajan 3, pagan 2' },
                   { value: 'grupo_precio_fijo', label: 'Precio Fijo', desc: 'Precio especial grupal' },
+                  { value: 'nxprecio', label: 'N x Precio', desc: 'Ej: 2 por $3,500' },
                 ] as const).map(opt => (
                   <label
                     key={opt.value}
@@ -319,7 +327,7 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
               </div>
             </div>
 
-            {formData.promotion_type !== 'grupo_precio_fijo' && (
+            {(formData.promotion_type === '2x1' || formData.promotion_type === '3x2') && (
               <div className="bg-white border border-rose-200 rounded-md p-3">
                 <div className="flex items-start gap-2">
                   <Info className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
@@ -356,6 +364,55 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
                     placeholder={`Precio normal: $${(tourPrice * (formData.min_travelers || 2)).toLocaleString()}`}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
                   />
+                </div>
+              </div>
+            )}
+
+            {formData.promotion_type === 'nxprecio' && (
+              <div className="space-y-3">
+                <div className="bg-white border border-rose-200 rounded-md p-3">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-gray-600">
+                      Define cuantas personas forman el grupo y el precio especial total para ese grupo.
+                      Ej: 2 personas por $3,500 (en lugar de $4,000 precio normal).
+                      Si viajan 4 y quedan usos disponibles, la promo aplica dos veces.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Viajeros por grupo
+                    </label>
+                    <input
+                      type="number"
+                      min={2}
+                      value={formData.min_travelers}
+                      onChange={e => setFormData(prev => ({ ...prev, min_travelers: parseInt(e.target.value) || 2 }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Precio normal: ${(tourPrice * (formData.min_travelers || 2)).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Precio especial por grupo ($)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={formData.fixed_group_price}
+                      onChange={e => setFormData(prev => ({ ...prev, fixed_group_price: e.target.value }))}
+                      placeholder={`Ej: ${Math.round(tourPrice * (formData.min_travelers || 2) * 0.85).toLocaleString()}`}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+                    />
+                    {formData.fixed_group_price && parseFloat(formData.fixed_group_price) > 0 && (
+                      <p className="text-xs text-emerald-600 mt-1 font-medium">
+                        ${Math.round(parseFloat(formData.fixed_group_price) / (formData.min_travelers || 2)).toLocaleString()} por persona
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -430,7 +487,7 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
         <div className="text-center py-8 text-gray-500">
           <Tag className="w-10 h-10 mx-auto mb-2 text-gray-300" />
           <p className="text-sm">No hay promociones configuradas para este tour.</p>
-          <p className="text-xs text-gray-400 mt-1">Crea una promoción 2x1, 3x2 o precio especial grupal.</p>
+          <p className="text-xs text-gray-400 mt-1">Crea una promoción 2x1, 3x2, precio especial grupal o N x precio.</p>
         </div>
       ) : (
         <div className="space-y-2">

@@ -19,19 +19,25 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
   const { user } = useAuth();
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [activePromoType, setActivePromoType] = useState<string | null>(null);
+  const [activePromo, setActivePromo] = useState<{
+    promotion_type: string;
+    min_travelers: number;
+    fixed_group_price: number | null;
+    max_uses: number | null;
+    times_used: number;
+  } | null>(null);
 
   useEffect(() => {
     const loadPromo = async () => {
       try {
         const { data } = await supabase.rpc('get_active_promotion_for_tour', { p_tour_id: tour.id });
         if (data && data.length > 0) {
-          setActivePromoType(data[0].promotion_type);
+          setActivePromo(data[0]);
         } else {
-          setActivePromoType(null);
+          setActivePromo(null);
         }
       } catch {
-        setActivePromoType(null);
+        setActivePromo(null);
       }
     };
     loadPromo();
@@ -142,14 +148,19 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
             Destacado
           </div>
         )}
-        {activePromoType && (
+        {activePromo && (
           <div className={`absolute ${tour.is_featured ? 'top-10 left-2' : 'top-2 left-2'} flex items-center gap-1 text-white text-xs font-bold px-2 py-1 rounded shadow-md ${
-            activePromoType === '2x1' ? 'bg-rose-600' :
-            activePromoType === '3x2' ? 'bg-orange-500' :
+            activePromo.promotion_type === '2x1' ? 'bg-rose-600' :
+            activePromo.promotion_type === '3x2' ? 'bg-orange-500' :
+            activePromo.promotion_type === 'nxprecio' ? 'bg-teal-600' :
             'bg-emerald-600'
           }`}>
             <Tag className="w-3 h-3" />
-            {activePromoType === '2x1' ? '2x1' : activePromoType === '3x2' ? '3x2' : 'Oferta'}
+            {activePromo.promotion_type === '2x1' ? '2x1' :
+             activePromo.promotion_type === '3x2' ? '3x2' :
+             activePromo.promotion_type === 'nxprecio' && activePromo.fixed_group_price !== null
+               ? `${activePromo.min_travelers} x $${activePromo.fixed_group_price.toLocaleString()}`
+               : 'Oferta'}
           </div>
         )}
         {user && (

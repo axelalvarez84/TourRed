@@ -6,7 +6,7 @@ interface TourPromotion {
   id: string;
   tour_id: string;
   agency_id: string;
-  promotion_type: '2x1' | '3x2' | 'grupo_precio_fijo';
+  promotion_type: '2x1' | '3x2' | 'grupo_precio_fijo' | 'nxprecio';
   min_travelers: number;
   group_size: number;
   pay_count: number;
@@ -23,7 +23,7 @@ interface TourPromotion {
 }
 
 type StatusFilter = 'all' | 'active' | 'inactive' | 'expired' | 'scheduled';
-type TypeFilter = 'all' | '2x1' | '3x2' | 'grupo_precio_fijo';
+type TypeFilter = 'all' | '2x1' | '3x2' | 'grupo_precio_fijo' | 'nxprecio';
 
 const AdminPromotions: React.FC = () => {
   const [promotions, setPromotions] = useState<TourPromotion[]>([]);
@@ -130,12 +130,14 @@ const AdminPromotions: React.FC = () => {
   const getPromoLabel = (type: string) => {
     if (type === '2x1') return '2x1';
     if (type === '3x2') return '3x2';
+    if (type === 'nxprecio') return 'N x Precio';
     return 'Precio Fijo';
   };
 
   const getTypeBadgeClass = (type: string) => {
     if (type === '2x1') return 'bg-rose-100 text-rose-700 border-rose-200';
     if (type === '3x2') return 'bg-orange-100 text-orange-700 border-orange-200';
+    if (type === 'nxprecio') return 'bg-teal-100 text-teal-700 border-teal-200';
     return 'bg-emerald-100 text-emerald-700 border-emerald-200';
   };
 
@@ -169,7 +171,7 @@ const AdminPromotions: React.FC = () => {
           <Tag className="w-7 h-7 text-rose-600" />
           Promociones Grupales
         </h1>
-        <p className="text-gray-500 text-sm mt-1">Supervisa y gestiona las promociones 2x1, 3x2 y precio especial de todas las agencias.</p>
+        <p className="text-gray-500 text-sm mt-1">Supervisa y gestiona las promociones 2x1, 3x2, precio especial y N x precio de todas las agencias.</p>
       </div>
 
       {actionMessage && (
@@ -228,6 +230,7 @@ const AdminPromotions: React.FC = () => {
               <option value="2x1">2x1</option>
               <option value="3x2">3x2</option>
               <option value="grupo_precio_fijo">Precio Fijo</option>
+              <option value="nxprecio">N x Precio</option>
             </select>
           </div>
         </div>
@@ -278,6 +281,11 @@ const AdminPromotions: React.FC = () => {
                       {promo.promotion_type === 'grupo_precio_fijo' && promo.fixed_group_price && (
                         <div className="text-xs text-gray-500 mt-0.5">
                           ${promo.fixed_group_price.toLocaleString()} / {promo.min_travelers}+ viaj.
+                        </div>
+                      )}
+                      {promo.promotion_type === 'nxprecio' && promo.fixed_group_price && (
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {promo.min_travelers} por ${promo.fixed_group_price.toLocaleString()}
                         </div>
                       )}
                     </td>

@@ -71,6 +71,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     pay_count: number;
     fixed_group_price: number | null;
     valid_until: string;
+    max_uses: number | null;
+    times_used: number;
   } | null>(null);
   const [isLoadingOptionalServices, setIsLoadingOptionalServices] = useState(true);
 
@@ -509,11 +511,58 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const grossTourPrice = precioAdultos + precioNinos + precioInfantes + precioAdultosMayores + precioMascotas;
 
   // Calcular descuento por promoción grupal
-  const calculatePromoDiscount = (): { discount: number; isActive: boolean; label: string; nearMissMessage: string | null } => {
-    if (!activePromotion) return { discount: 0, isActive: false, label: '', nearMissMessage: null };
+  const calculatePromoDiscount = (): { discount: number; isActive: boolean; label: string; nearMissMessage: string | null; availabilityNote: string | null } => {
+    if (!activePromotion) return { discount: 0, isActive: false, label: '', nearMissMessage: null, availabilityNote: null };
 
-    const { promotion_type, min_travelers, group_size, pay_count, fixed_group_price } = activePromotion;
+    const { promotion_type, min_travelers, group_size, pay_count, fixed_group_price, max_uses, times_used } = activePromotion;
     const totalHuman = totalTravelers; // no mascotas
+
+    if (promotion_type === 'nxprecio') {
+      if (totalHuman < min_travelers) {
+        const needed = min_travelers - totalHuman;
+        if (needed <= 2) {
+          return { discount: 0, isActive: false, label: '', nearMissMessage: `Agrega ${needed} viajero${needed > 1 ? 's' : ''} más para activar el precio especial grupal.`, availabilityNote: null };
+        }
+        return { discount: 0, isActive: false, label: '', nearMissMessage: null, availabilityNote: null };
+      }
+
+      if (fixed_group_price === null) return { discount: 0, isActive: false, label: '', nearMissMessage: null, availabilityNote: null };
+
+      const totalGroups = Math.floor(totalHuman / min_travelers);
+      const remainingTravelers = totalHuman % min_travelers;
+
+      const usosRestantes = max_uses !== null ? Math.max(0, max_uses - times_used) : Infinity;
+      const gruposConPromo = Math.min(totalGroups, usosRestantes === Infinity ? totalGroups : usosRestantes);
+      const gruposSinPromo = totalGroups - gruposConPromo;
+
+      const pricePerPerson = getPrecioPorCategoria('adulto');
+      const normalPricePerGroup = min_travelers * pricePerPerson;
+
+      const discountPerGroup = Math.max(0, normalPricePerGroup - fixed_group_price);
+      const totalDiscount = gruposConPromo * discountPerGroup;
+
+      if (totalDiscount <= 0) return { discount: 0, isActive: false, label: '', nearMissMessage: null, availabilityNote: null };
+
+      const usosUsadosEnEstaReserva = gruposConPromo;
+      const usosDisponibles = max_uses !== null ? Math.max(0, max_uses - times_used - usosUsadosEnEstaReserva) : null;
+
+      let label = `${min_travelers} x $${fixed_group_price.toLocaleString()} — ${gruposConPromo} grupo${gruposConPromo > 1 ? 's' : ''} con precio especial`;
+      if (gruposSinPromo > 0) {
+        label += ` (${gruposSinPromo * min_travelers} viajero${gruposSinPromo * min_travelers > 1 ? 's' : ''} a precio normal)`;
+      }
+      if (remainingTravelers > 0) {
+        label += ` + ${remainingTravelers} viajero${remainingTravelers > 1 ? 's' : ''} a precio normal`;
+      }
+
+      let availabilityNote: string | null = null;
+      if (max_uses !== null) {
+        availabilityNote = usosDisponibles !== null && usosDisponibles > 0
+          ? `Sujeto a disponibilidad — quedan ${usosDisponibles} uso${usosDisponibles > 1 ? 's' : ''} tras esta reserva`
+          : `Sujeto a disponibilidad — esta reserva agota los usos disponibles`;
+      }
+
+      return { discount: totalDiscount, isActive: true, label, nearMissMessage: null, availabilityNote };
+    }
 
     if (promotion_type === 'grupo_precio_fijo') {
       if (totalHuman >= min_travelers && fixed_group_price !== null) {
@@ -524,22 +573,23 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           isActive: discount > 0,
           label: `Precio especial grupal (${min_travelers}+ viajeros)`,
           nearMissMessage: null,
+          availabilityNote: null,
         };
       }
       const needed = min_travelers - totalHuman;
       if (needed > 0 && needed <= 2) {
-        return { discount: 0, isActive: false, label: '', nearMissMessage: `Agrega ${needed} viajero${needed > 1 ? 's' : ''} más y activa el precio especial grupal.` };
+        return { discount: 0, isActive: false, label: '', nearMissMessage: `Agrega ${needed} viajero${needed > 1 ? 's' : ''} más y activa el precio especial grupal.`, availabilityNote: null };
       }
-      return { discount: 0, isActive: false, label: '', nearMissMessage: null };
+      return { discount: 0, isActive: false, label: '', nearMissMessage: null, availabilityNote: null };
     }
 
     if (promotion_type === '2x1' || promotion_type === '3x2') {
       if (totalHuman < min_travelers) {
         const needed = min_travelers - totalHuman;
         if (needed <= 2) {
-          return { discount: 0, isActive: false, label: '', nearMissMessage: `Agrega ${needed} viajero${needed > 1 ? 's' : ''} más y activa el ${promotion_type}.` };
+          return { discount: 0, isActive: false, label: '', nearMissMessage: `Agrega ${needed} viajero${needed > 1 ? 's' : ''} más y activa el ${promotion_type}.`, availabilityNote: null };
         }
-        return { discount: 0, isActive: false, label: '', nearMissMessage: null };
+        return { discount: 0, isActive: false, label: '', nearMissMessage: null, availabilityNote: null };
       }
 
       const pricePerAdulto = getPrecioPorCategoria('adulto');
@@ -553,10 +603,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         isActive: discount > 0,
         label: `Promoción ${promotion_type} — ${freeCount} viajero${freeCount > 1 ? 's' : ''} gratis`,
         nearMissMessage: null,
+        availabilityNote: null,
       };
     }
 
-    return { discount: 0, isActive: false, label: '', nearMissMessage: null };
+    return { discount: 0, isActive: false, label: '', nearMissMessage: null, availabilityNote: null };
   };
 
   const promoResult = calculatePromoDiscount();
@@ -1105,6 +1156,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                   Promoción Aplicada
                 </h4>
                 <p className="text-xs text-rose-700 mt-0.5">{promoResult.label}</p>
+                {promoResult.availabilityNote && (
+                  <p className="text-xs text-amber-700 mt-1 flex items-center gap-1">
+                    <Info className="h-3 w-3 flex-shrink-0" />
+                    {promoResult.availabilityNote}
+                  </p>
+                )}
               </div>
               <span className="text-sm font-bold text-rose-700 flex-shrink-0">
                 -${promoDiscountAmount.toLocaleString()}
