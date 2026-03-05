@@ -14,6 +14,7 @@ interface TravelerFormData {
   telefono: string;
   fecha_nacimiento: string;
   precio_aplicado: number;
+  promo_discount_per_traveler: number;
   saveAsFrequentCompanion: boolean;
   selectedCompanionId?: string;
 }
@@ -112,6 +113,7 @@ const TravelersInfoPage: React.FC = () => {
       telefono: t.telefono || '',
       fecha_nacimiento: t.fecha_nacimiento,
       precio_aplicado: t.precio_aplicado,
+      promo_discount_per_traveler: Number(t.promo_discount_per_traveler) || 0,
       saveAsFrequentCompanion: false,
       selectedCompanionId: t.frequent_companion_id,
     }));
@@ -133,9 +135,29 @@ const TravelersInfoPage: React.FC = () => {
       .eq('id', user?.id)
       .maybeSingle();
 
-    console.log('User data loaded:', userData);
+    let promoDiscountPct = 0;
+    if ((bookingData as any).promotion_id && Number((bookingData as any).promo_discount_amount) > 0) {
+      const { data: promoData } = await supabase
+        .from('tour_promotions')
+        .select('promotion_type, group_discount_percentage')
+        .eq('id', (bookingData as any).promotion_id)
+        .maybeSingle();
+      if (promoData?.promotion_type === 'grupo_precio_fijo' && promoData.group_discount_percentage) {
+        promoDiscountPct = Number(promoData.group_discount_percentage) / 100;
+      }
+    }
+
+    const calcDiscountForCategory = (basePrice: number): number =>
+      promoDiscountPct > 0 ? Math.round(basePrice * promoDiscountPct * 100) / 100 : 0;
+
+    const precioAdulto = tourData.precio_adulto || tourData.price;
+    const precioNino = tourData.precio_nino || tourData.price;
+    const precioInfante = tourData.precio_infante || tourData.price;
+    const precioAdultoMayor = tourData.precio_adulto_mayor || tourData.price;
+    const precioMascota = tourData.precio_mascota || 0;
 
     for (let i = 0; i < countAdultos; i++) {
+      const discount = calcDiscountForCategory(precioAdulto);
       if (i === 0 && userData) {
         travelersList.push({
           categoria_viajero: 'adulto',
@@ -143,34 +165,38 @@ const TravelersInfoPage: React.FC = () => {
           email: userData.email || user?.email || '',
           telefono: userData.phone_number || '',
           fecha_nacimiento: userData.date_of_birth || '',
-          precio_aplicado: tourData.precio_adulto || tourData.price,
+          precio_aplicado: precioAdulto - discount,
+          promo_discount_per_traveler: discount,
           saveAsFrequentCompanion: false,
         });
       } else {
-        travelersList.push(createEmptyTraveler('adulto', tourData.precio_adulto || tourData.price));
+        travelersList.push(createEmptyTraveler('adulto', precioAdulto - calcDiscountForCategory(precioAdulto), calcDiscountForCategory(precioAdulto)));
       }
     }
 
     for (let i = 0; i < countNinos; i++) {
-      travelersList.push(createEmptyTraveler('nino', tourData.precio_nino || tourData.price));
+      const discount = calcDiscountForCategory(precioNino);
+      travelersList.push(createEmptyTraveler('nino', precioNino - discount, discount));
     }
 
     for (let i = 0; i < countInfantes; i++) {
-      travelersList.push(createEmptyTraveler('infante', tourData.precio_infante || tourData.price));
+      const discount = calcDiscountForCategory(precioInfante);
+      travelersList.push(createEmptyTraveler('infante', precioInfante - discount, discount));
     }
 
     for (let i = 0; i < countAdultosMayores; i++) {
-      travelersList.push(createEmptyTraveler('adulto_mayor', tourData.precio_adulto_mayor || tourData.price));
+      const discount = calcDiscountForCategory(precioAdultoMayor);
+      travelersList.push(createEmptyTraveler('adulto_mayor', precioAdultoMayor - discount, discount));
     }
 
     for (let i = 0; i < countMascotas; i++) {
-      travelersList.push(createEmptyTraveler('mascota', tourData.precio_mascota || 0));
+      travelersList.push(createEmptyTraveler('mascota', precioMascota, 0));
     }
 
     setTravelers(travelersList);
   };
 
-  const createEmptyTraveler = (categoria: 'adulto' | 'nino' | 'infante' | 'adulto_mayor' | 'mascota', precio: number): TravelerFormData => {
+  const createEmptyTraveler = (categoria: 'adulto' | 'nino' | 'infante' | 'adulto_mayor' | 'mascota', precio: number, promoDiscount = 0): TravelerFormData => {
     return {
       categoria_viajero: categoria,
       nombre: '',
@@ -178,6 +204,7 @@ const TravelersInfoPage: React.FC = () => {
       telefono: '',
       fecha_nacimiento: '',
       precio_aplicado: precio,
+      promo_discount_per_traveler: promoDiscount,
       saveAsFrequentCompanion: false,
     };
   };
@@ -301,6 +328,7 @@ const TravelersInfoPage: React.FC = () => {
         telefono: traveler.telefono || null,
         fecha_nacimiento: traveler.fecha_nacimiento || null,
         precio_aplicado: traveler.precio_aplicado,
+        promo_discount_per_traveler: traveler.promo_discount_per_traveler || 0,
         frequent_companion_id: traveler.selectedCompanionId || null,
       }));
 
@@ -953,11 +981,25 @@ const TravelersInfoPage: React.FC = () => {
             {travelers.map((traveler, index) => (
               <div key={index} className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-lg">
+                  <h3 className="font-semibold text-lg flex items-center gap-2 flex-wrap">
                     {getCategoryLabel(traveler.categoria_viajero)} {index + 1}
-                    <span className="text-sm text-gray-500 ml-2">
-                      (${traveler.precio_aplicado.toLocaleString()})
-                    </span>
+                    {traveler.promo_discount_per_traveler > 0 ? (
+                      <span className="flex items-center gap-1.5">
+                        <span className="text-sm text-gray-400 line-through">
+                          ${(traveler.precio_aplicado + traveler.promo_discount_per_traveler).toLocaleString()}
+                        </span>
+                        <span className="text-sm font-bold text-emerald-600">
+                          ${traveler.precio_aplicado.toLocaleString()}
+                        </span>
+                        <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">
+                          -{traveler.promo_discount_per_traveler.toLocaleString()} desc. grupal
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-sm text-gray-500">
+                        (${traveler.precio_aplicado.toLocaleString()})
+                      </span>
+                    )}
                   </h3>
 
                   {frequentCompanions.length > 0 && traveler.categoria_viajero !== 'mascota' && (

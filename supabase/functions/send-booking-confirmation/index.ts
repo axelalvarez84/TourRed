@@ -145,6 +145,7 @@ Deno.serve(async (req: Request) => {
     const emailSettings = emailSettingsResult.data;
     const platformSettings = platformSettingsResult.data;
 
+    const promoDiscountAmount = Number(booking.promo_discount_amount) || 0;
     const totalPrice = booking.total_price;
     const depositAmount = booking.deposit_amount;
     const depositPercentage = booking.tour.deposit_percentage;
@@ -275,6 +276,12 @@ Deno.serve(async (req: Request) => {
         <div class="info-row">
           <span class="info-label">${booking.pets_count} ${booking.pets_count === 1 ? 'Mascota' : 'Mascotas'} × ${formatCurrency(booking.pet_price || 0)}:</span>
           <span class="info-value">${formatCurrency((booking.pet_price || 0) * (booking.pets_count || 0))}</span>
+        </div>
+        ` : ''}
+        ${promoDiscountAmount > 0 ? `
+        <div class="info-row" style="background-color: #dcfce7; margin: 5px -5px; padding: 8px 5px;">
+          <span class="info-label" style="font-weight: 600;">🏷️ Descuento Grupal:</span>
+          <span class="info-value" style="color: #059669;">-${formatCurrency(promoDiscountAmount)}</span>
         </div>
         ` : ''}
         <div class="info-row" style="border-top: 2px solid #e5e7eb; padding-top: 10px; margin-top: 10px;">
@@ -629,6 +636,12 @@ Deno.serve(async (req: Request) => {
         <div class="info-row">
           <span class="info-label">${booking.pets_count} ${booking.pets_count === 1 ? 'Mascota' : 'Mascotas'} × ${formatCurrency(booking.pet_price || 0)}:</span>
           <span class="info-value">${formatCurrency((booking.pet_price || 0) * (booking.pets_count || 0))}</span>
+        </div>
+        ` : ''}
+        ${promoDiscountAmount > 0 ? `
+        <div class="info-row" style="background-color: #dcfce7; margin: 5px -5px; padding: 8px 5px;">
+          <span class="info-label" style="font-weight: 600;">🏷️ Descuento Grupal:</span>
+          <span class="info-value" style="color: #059669;">-${formatCurrency(promoDiscountAmount)}</span>
         </div>
         ` : ''}
         <div class="info-row" style="border-top: 2px solid #e5e7eb; padding-top: 10px; margin-top: 10px;">

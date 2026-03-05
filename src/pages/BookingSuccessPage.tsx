@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { CheckCircle, Calendar, MapPin, Users, DollarSign, ArrowRight, CreditCard, Mail, Wallet, Award, Ticket } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, Users, DollarSign, ArrowRight, CreditCard, Mail, Wallet, Award, Ticket, Tag } from 'lucide-react';
 import { supabase, parseDateFromDB } from '../lib/supabase';
 import { Booking, Tour } from '../types';
 import { format } from 'date-fns';
@@ -266,6 +266,16 @@ const BookingSuccessPage: React.FC = () => {
                     <div className="flex justify-between">
                       <span className="text-gray-600">{booking.pets_count} {booking.pets_count === 1 ? 'Mascota' : 'Mascotas'} × ${booking.pet_price?.toLocaleString()}:</span>
                       <span className="font-medium">${((booking.pet_price || 0) * (booking.pets_count || 0)).toLocaleString()}</span>
+                    </div>
+                  )}
+
+                  {Number((booking as any).promo_discount_amount) > 0 && (
+                    <div className="flex justify-between bg-emerald-50 border border-emerald-200 rounded px-2 py-1.5 -mx-1">
+                      <span className="text-emerald-700 font-medium flex items-center">
+                        <Tag className="h-4 w-4 mr-1" />
+                        Descuento Grupal:
+                      </span>
+                      <span className="font-bold text-emerald-600">-${Number((booking as any).promo_discount_amount).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                   )}
 
