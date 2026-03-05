@@ -29,7 +29,7 @@ interface TourPromotionsManagerProps {
 
 const defaultForm = {
   promotion_type: '2x1' as '2x1' | '3x2' | 'grupo_precio_fijo' | 'nxprecio',
-  min_travelers: 2,
+  min_travelers: 4,
   fixed_group_price: '',
   group_discount_percentage: '',
   valid_from: '',
