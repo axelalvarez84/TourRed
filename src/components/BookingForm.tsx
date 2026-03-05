@@ -70,6 +70,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     group_size: number;
     pay_count: number;
     fixed_group_price: number | null;
+    group_discount_percentage: number | null;
     valid_until: string;
     max_uses: number | null;
     times_used: number;
@@ -514,7 +515,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const calculatePromoDiscount = (): { discount: number; isActive: boolean; label: string; nearMissMessage: string | null; availabilityNote: string | null } => {
     if (!activePromotion) return { discount: 0, isActive: false, label: '', nearMissMessage: null, availabilityNote: null };
 
-    const { promotion_type, min_travelers, group_size, pay_count, fixed_group_price, max_uses, times_used } = activePromotion;
+    const { promotion_type, min_travelers, group_size, pay_count, fixed_group_price, group_discount_percentage, max_uses, times_used } = activePromotion;
     const totalHuman = totalTravelers; // no mascotas
 
     if (promotion_type === 'nxprecio') {
@@ -565,20 +566,24 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     }
 
     if (promotion_type === 'grupo_precio_fijo') {
-      if (totalHuman >= min_travelers && fixed_group_price !== null) {
-        const originalPrice = grossTourPrice;
-        const discount = Math.max(0, originalPrice - fixed_group_price);
+      if (totalHuman >= min_travelers && group_discount_percentage !== null && group_discount_percentage > 0) {
+        const pct = group_discount_percentage / 100;
+        const discountAdultos = getPrecioPorCategoria('adulto') * travelerCounts.adultos * pct;
+        const discountNinos = getPrecioPorCategoria('nino') * travelerCounts.ninos * pct;
+        const discountInfantes = getPrecioPorCategoria('infante') * travelerCounts.infantes * pct;
+        const discountAdultosMayores = getPrecioPorCategoria('adulto_mayor') * travelerCounts.adultos_mayores * pct;
+        const discount = Math.round((discountAdultos + discountNinos + discountInfantes + discountAdultosMayores) * 100) / 100;
         return {
           discount,
           isActive: discount > 0,
-          label: `Precio especial grupal (${min_travelers}+ viajeros)`,
+          label: `Precio Grupal ${group_discount_percentage}% desc. por persona (${min_travelers}+ viajeros)`,
           nearMissMessage: null,
           availabilityNote: null,
         };
       }
       const needed = min_travelers - totalHuman;
-      if (needed > 0 && needed <= 2) {
-        return { discount: 0, isActive: false, label: '', nearMissMessage: `Agrega ${needed} viajero${needed > 1 ? 's' : ''} más y activa el precio especial grupal.`, availabilityNote: null };
+      if (needed > 0 && needed <= 3) {
+        return { discount: 0, isActive: false, label: '', nearMissMessage: `Agrega ${needed} viajero${needed > 1 ? 's' : ''} más y activa el descuento grupal de ${group_discount_percentage}%.`, availabilityNote: null };
       }
       return { discount: 0, isActive: false, label: '', nearMissMessage: null, availabilityNote: null };
     }

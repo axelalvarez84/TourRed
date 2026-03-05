@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Tag, Plus, CreditCard as Edit2, Trash2, ToggleLeft, ToggleRight, AlertCircle, Check, X, Calendar, Users, DollarSign, Loader2, Info } from 'lucide-react';
+import { Tag, Plus, CreditCard as Edit2, Trash2, ToggleLeft, ToggleRight, AlertCircle, Check, X, Calendar, Users, Loader2, Info, Percent } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface TourPromotion {
@@ -11,6 +11,7 @@ interface TourPromotion {
   group_size: number;
   pay_count: number;
   fixed_group_price: number | null;
+  group_discount_percentage: number | null;
   valid_from: string;
   valid_until: string;
   max_uses: number | null;
@@ -30,6 +31,7 @@ const defaultForm = {
   promotion_type: '2x1' as '2x1' | '3x2' | 'grupo_precio_fijo' | 'nxprecio',
   min_travelers: 2,
   fixed_group_price: '',
+  group_discount_percentage: '',
   valid_from: '',
   valid_until: '',
   max_uses: '',
@@ -85,6 +87,7 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
       promotion_type: promo.promotion_type,
       min_travelers: promo.min_travelers,
       fixed_group_price: promo.fixed_group_price?.toString() || '',
+      group_discount_percentage: promo.group_discount_percentage?.toString() || '',
       valid_from: promo.valid_from.split('T')[0],
       valid_until: promo.valid_until.split('T')[0],
       max_uses: promo.max_uses?.toString() || '',
@@ -118,7 +121,20 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
       return;
     }
 
-    if (formData.promotion_type === 'grupo_precio_fijo' || formData.promotion_type === 'nxprecio') {
+    if (formData.promotion_type === 'grupo_precio_fijo') {
+      if (!formData.group_discount_percentage || parseFloat(formData.group_discount_percentage) <= 0 || parseFloat(formData.group_discount_percentage) >= 100) {
+        setError('El porcentaje de descuento debe ser entre 1 y 99.');
+        setIsSubmitting(false);
+        return;
+      }
+      if (!formData.min_travelers || formData.min_travelers < 4) {
+        setError('El mínimo de viajeros para precio grupal debe ser al menos 4.');
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    if (formData.promotion_type === 'nxprecio') {
       if (!formData.fixed_group_price || parseFloat(formData.fixed_group_price) <= 0) {
         setError('Debes ingresar un precio especial de grupo válido.');
         setIsSubmitting(false);
@@ -138,8 +154,10 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
     }
 
     const groupConfig = getGroupConfig(formData.promotion_type);
-    const isCustomPriceType = formData.promotion_type === 'grupo_precio_fijo' || formData.promotion_type === 'nxprecio';
-    const minTravelers = isCustomPriceType
+    const isGrupoType = formData.promotion_type === 'grupo_precio_fijo';
+    const isNxPrecioType = formData.promotion_type === 'nxprecio';
+    const isCustomType = isGrupoType || isNxPrecioType;
+    const minTravelers = isCustomType
       ? parseInt(formData.min_travelers.toString())
       : groupConfig.min_travelers;
 
@@ -150,9 +168,10 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
       agency_id: agencyId,
       promotion_type: formData.promotion_type,
       min_travelers: minTravelers,
-      group_size: isCustomPriceType ? minTravelers : groupConfig.group_size,
-      pay_count: isCustomPriceType ? minTravelers : groupConfig.pay_count,
-      fixed_group_price: isCustomPriceType ? parseFloat(formData.fixed_group_price) : null,
+      group_size: isCustomType ? minTravelers : groupConfig.group_size,
+      pay_count: isCustomType ? minTravelers : groupConfig.pay_count,
+      fixed_group_price: isNxPrecioType ? parseFloat(formData.fixed_group_price) : null,
+      group_discount_percentage: isGrupoType ? parseFloat(formData.group_discount_percentage) : null,
       valid_from: new Date(formData.valid_from + 'T00:00:00').toISOString(),
       valid_until: new Date(formData.valid_until + 'T23:59:59').toISOString(),
       max_uses: formData.max_uses ? parseInt(formData.max_uses) : null,
@@ -230,7 +249,7 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
     if (promo.promotion_type === '2x1') return '2x1 — Viajan 2, paga 1';
     if (promo.promotion_type === '3x2') return '3x2 — Viajan 3, pagan 2';
     if (promo.promotion_type === 'nxprecio') return `${promo.min_travelers} por $${promo.fixed_group_price?.toLocaleString()} — Precio especial para grupos de ${promo.min_travelers}`;
-    return `Precio especial grupal — $${promo.fixed_group_price?.toLocaleString()} para ${promo.min_travelers}+ viajeros`;
+    return `Precio grupal — ${promo.group_discount_percentage}% desc. por persona a partir de ${promo.min_travelers} viajeros`;
   };
 
   const getStatusBadge = (promo: TourPromotion) => {
@@ -256,6 +275,9 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
   };
+
+  const discountPct = parseFloat(formData.group_discount_percentage) || 0;
+  const exampleDiscount = discountPct > 0 ? Math.round(tourPrice * discountPct / 100) : 0;
 
   return (
     <div className="space-y-4">
@@ -302,7 +324,7 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
                 {([
                   { value: '2x1', label: '2x1', desc: 'Viajan 2, paga 1' },
                   { value: '3x2', label: '3x2', desc: 'Viajan 3, pagan 2' },
-                  { value: 'grupo_precio_fijo', label: 'Precio Fijo', desc: 'Precio especial grupal' },
+                  { value: 'grupo_precio_fijo', label: 'Precio Grupal', desc: 'Descuento % por persona' },
                   { value: 'nxprecio', label: 'N x Precio', desc: 'Ej: 2 por $3,500' },
                 ] as const).map(opt => (
                   <label
@@ -342,28 +364,52 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
             )}
 
             {formData.promotion_type === 'grupo_precio_fijo' && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Min. Viajeros para activar</label>
-                  <input
-                    type="number"
-                    min={2}
-                    value={formData.min_travelers}
-                    onChange={e => setFormData(prev => ({ ...prev, min_travelers: parseInt(e.target.value) || 2 }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
-                  />
+              <div className="space-y-3">
+                <div className="bg-white border border-rose-200 rounded-md p-3">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-gray-600">
+                      El descuento aplica a <strong>cada viajero según su tarifa individual</strong>. Si hay adultos, niños y adultos mayores, cada uno recibe el mismo porcentaje sobre su precio. Las mascotas no entran en el conteo ni reciben descuento.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Precio Fijo de Grupo ($)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={formData.fixed_group_price}
-                    onChange={e => setFormData(prev => ({ ...prev, fixed_group_price: e.target.value }))}
-                    placeholder={`Precio normal: $${(tourPrice * (formData.min_travelers || 2)).toLocaleString()}`}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Min. viajeros para activar
+                    </label>
+                    <input
+                      type="number"
+                      min={4}
+                      value={formData.min_travelers}
+                      onChange={e => setFormData(prev => ({ ...prev, min_travelers: parseInt(e.target.value) || 4 }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Mínimo permitido: 4 viajeros</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Descuento por persona (%)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={1}
+                        max={99}
+                        step="0.5"
+                        value={formData.group_discount_percentage}
+                        onChange={e => setFormData(prev => ({ ...prev, group_discount_percentage: e.target.value }))}
+                        placeholder="Ej: 10"
+                        className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+                      />
+                      <Percent className="absolute right-2.5 top-2.5 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                    </div>
+                    {exampleDiscount > 0 && (
+                      <p className="text-xs text-emerald-600 mt-1 font-medium">
+                        Ej: adulto a ${tourPrice.toLocaleString()} → ahorra ${exampleDiscount.toLocaleString()}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -487,7 +533,7 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
         <div className="text-center py-8 text-gray-500">
           <Tag className="w-10 h-10 mx-auto mb-2 text-gray-300" />
           <p className="text-sm">No hay promociones configuradas para este tour.</p>
-          <p className="text-xs text-gray-400 mt-1">Crea una promoción 2x1, 3x2, precio especial grupal o N x precio.</p>
+          <p className="text-xs text-gray-400 mt-1">Crea una promoción 2x1, 3x2, precio grupal o N x precio.</p>
         </div>
       ) : (
         <div className="space-y-2">

@@ -11,6 +11,7 @@ interface TourPromotion {
   group_size: number;
   pay_count: number;
   fixed_group_price: number | null;
+  group_discount_percentage: number | null;
   valid_from: string;
   valid_until: string;
   max_uses: number | null;
@@ -131,7 +132,7 @@ const AdminPromotions: React.FC = () => {
     if (type === '2x1') return '2x1';
     if (type === '3x2') return '3x2';
     if (type === 'nxprecio') return 'N x Precio';
-    return 'Precio Fijo';
+    return 'Precio Grupal';
   };
 
   const getTypeBadgeClass = (type: string) => {
@@ -229,7 +230,7 @@ const AdminPromotions: React.FC = () => {
               <option value="all">Todos los tipos</option>
               <option value="2x1">2x1</option>
               <option value="3x2">3x2</option>
-              <option value="grupo_precio_fijo">Precio Fijo</option>
+              <option value="grupo_precio_fijo">Precio Grupal</option>
               <option value="nxprecio">N x Precio</option>
             </select>
           </div>
@@ -278,9 +279,9 @@ const AdminPromotions: React.FC = () => {
                         <Tag className="w-3 h-3" />
                         {getPromoLabel(promo.promotion_type)}
                       </span>
-                      {promo.promotion_type === 'grupo_precio_fijo' && promo.fixed_group_price && (
+                      {promo.promotion_type === 'grupo_precio_fijo' && promo.group_discount_percentage && (
                         <div className="text-xs text-gray-500 mt-0.5">
-                          ${promo.fixed_group_price.toLocaleString()} / {promo.min_travelers}+ viaj.
+                          {promo.group_discount_percentage}% desc. / {promo.min_travelers}+ viaj.
                         </div>
                       )}
                       {promo.promotion_type === 'nxprecio' && promo.fixed_group_price && (

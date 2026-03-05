@@ -23,6 +23,7 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
     promotion_type: string;
     min_travelers: number;
     fixed_group_price: number | null;
+    group_discount_percentage: number | null;
     max_uses: number | null;
     times_used: number;
   } | null>(null);
@@ -160,6 +161,8 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
              activePromo.promotion_type === '3x2' ? '3x2' :
              activePromo.promotion_type === 'nxprecio' && activePromo.fixed_group_price !== null
                ? `${activePromo.min_travelers} x $${activePromo.fixed_group_price.toLocaleString()}`
+             : activePromo.promotion_type === 'grupo_precio_fijo' && activePromo.group_discount_percentage !== null
+               ? `-${activePromo.group_discount_percentage}% Grupal`
                : 'Oferta'}
           </div>
         )}
