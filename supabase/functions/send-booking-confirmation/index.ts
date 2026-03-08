@@ -179,6 +179,39 @@ Deno.serve(async (req: Request) => {
 
     console.log("Sending booking confirmation emails for booking:", booking_id);
 
+    let qrImageUrl = "";
+    let checkinPageUrl = "";
+    try {
+      const qrResponse = await fetch(`${supabaseUrl}/functions/v1/generate-booking-qr-token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${supabaseServiceKey}`,
+        },
+        body: JSON.stringify({ booking_id }),
+      });
+      const qrData = await qrResponse.json();
+      if (qrData?.qr_url) {
+        checkinPageUrl = qrData.qr_url;
+        qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qrData.qr_url)}&size=200x200&margin=10`;
+      }
+    } catch (qrErr) {
+      console.error("Error generating QR token:", qrErr);
+    }
+
+    const qrSection = qrImageUrl ? `
+      <div class="section" style="text-align: center;">
+        <div class="section-title" style="text-align: left;">Código QR de Check-in</div>
+        <p style="color: #6b7280; font-size: 14px; margin-bottom: 16px;">
+          Presenta este código a la agencia el día del tour para confirmar tu asistencia.
+        </p>
+        <div style="background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 24px; display: inline-block;">
+          <img src="${qrImageUrl}" alt="Código QR de Check-in" style="width: 200px; height: 200px; display: block; margin: 0 auto;" />
+          <div style="font-size: 11px; color: #94a3b8; margin-top: 10px;">Válido hasta 24h después del inicio del tour</div>
+        </div>
+      </div>
+    ` : '';
+
     const travelerEmailHtml = `
 <!DOCTYPE html>
 <html>
@@ -371,6 +404,8 @@ Deno.serve(async (req: Request) => {
           <span class="info-value" style="color: #dc2626;">${formatCurrency(remainingAmount)}</span>
         </div>
       </div>
+
+      ${qrSection}
 
       <div class="section">
         <div class="section-title">🏢 Información de Contacto de la Agencia</div>

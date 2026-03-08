@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter, Star, X, User, MessageSquare, UserCheck, UserX, FileSpreadsheet, FileText, Download } from 'lucide-react';
+import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter, Star, X, User, MessageSquare, UserCheck, UserX, FileSpreadsheet, FileText, Download, QrCode } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getAgencyBookings, getTourBookingReport, supabase, parseDateFromDB } from '../../lib/supabase';
 import { Booking } from '../../types';
@@ -937,6 +937,18 @@ const AgencyBookings: React.FC = () => {
                           No Show
                         </span>
                       )}
+                      {(booking as any).checkin_status === 'full' && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <QrCode className="h-3 w-3 mr-1" />
+                          Check-in Completo
+                        </span>
+                      )}
+                      {(booking as any).checkin_status === 'partial' && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                          <QrCode className="h-3 w-3 mr-1" />
+                          Check-in Parcial
+                        </span>
+                      )}
                       {booking.reschedule_response === 'accepted' && (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                           <CheckCircle className="h-3 w-3 mr-1" />
@@ -1190,14 +1202,24 @@ const AgencyBookings: React.FC = () => {
                             Marcar Completada
                           </button>
                         )}
-                        {canMarkAsNoShow(booking) && (
+                        {canMarkAsNoShow(booking) && !(booking as any).checkin_status && (
                           <button
                             onClick={() => handleMarkNoShow(booking.id)}
                             className="btn bg-orange-600 text-white hover:bg-orange-700 flex items-center justify-center"
+                            title="No disponible: esta reserva ya fue procesada vía QR de check-in"
                           >
                             <UserX className="h-4 w-4 mr-2" />
                             No Show
                           </button>
+                        )}
+                        {canMarkAsNoShow(booking) && (booking as any).checkin_status && (
+                          <div
+                            className="btn bg-gray-200 text-gray-400 cursor-not-allowed flex items-center justify-center"
+                            title="Esta reserva ya fue procesada vía QR de check-in"
+                          >
+                            <UserX className="h-4 w-4 mr-2" />
+                            No Show
+                          </div>
                         )}
                       </>
                     )}
@@ -1366,6 +1388,16 @@ const AgencyBookings: React.FC = () => {
                     <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
                       <p className="text-sm text-blue-800">
                         <strong>Tour completado exitosamente:</strong> Ahora puedes calificar al viajero para ayudar a otras agencias.
+                        {(booking as any).checkin_status === 'full' && (
+                          <span className="block mt-1 flex items-center gap-1">
+                            <QrCode className="h-3.5 w-3.5 inline" /> Check-in confirmado vía código QR.
+                          </span>
+                        )}
+                        {(booking as any).checkin_status === 'partial' && (
+                          <span className="block mt-1 flex items-center gap-1 text-amber-700">
+                            <QrCode className="h-3.5 w-3.5 inline" /> Check-in parcial vía QR: algunos acompañantes no se presentaron.
+                          </span>
+                        )}
                       </p>
                     </div>
                   )}
