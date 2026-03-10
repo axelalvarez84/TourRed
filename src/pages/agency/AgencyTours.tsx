@@ -1147,6 +1147,7 @@ const AgencyTours: React.FC = () => {
       };
 
       let tourId: string;
+      let createdTour: any = null;
 
       if (editingTour) {
         // Actualizar tour existente
@@ -1159,6 +1160,7 @@ const AgencyTours: React.FC = () => {
         const { data: newTour, error } = await createTour(tourData, processedDestinations, user.id);
         if (error) throw error;
         tourId = newTour.id;
+        createdTour = newTour;
         console.log('✅ Tour creado correctamente');
       }
 
@@ -1325,7 +1327,16 @@ const AgencyTours: React.FC = () => {
 
       // Recargar tours después de crear/actualizar
       await fetchAgencyTours();
-      handleCancel();
+
+      if (createdTour) {
+        // Después de crear, pasar a modo edición para configurar promociones grupales
+        localStorage.removeItem(DRAFT_KEY);
+        setIsCreating(false);
+        const { data: freshTour } = await supabase.from('tours').select('*').eq('id', createdTour.id).single();
+        setEditingTour(freshTour || createdTour);
+      } else {
+        handleCancel();
+      }
 
     } catch (err: any) {
       setError(err.message);
@@ -2302,28 +2313,35 @@ const AgencyTours: React.FC = () => {
               </div>
             </div>
 
-            {/* SECCIÓN 7 — Promociones Grupales (solo cuando se edita un tour existente) */}
-            {editingTour && (
-              <div className="bg-white rounded-xl shadow-sm border border-rose-100 overflow-hidden">
-                <div className="bg-rose-600 px-5 py-3 flex items-center gap-2">
-                  <div className="bg-white/20 rounded-lg p-1.5">
-                    <Percent className="w-4 h-4 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-white font-semibold text-sm">Paso 7 — Promociones Grupales</h3>
-                    <p className="text-rose-100 text-xs">Configura 2x1, 3x2 o precio especial para grupos</p>
-                  </div>
-                  <span className="ml-auto bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">Opcional</span>
+            {/* SECCIÓN 7 — Promociones Grupales */}
+            <div className="bg-white rounded-xl shadow-sm border border-rose-100 overflow-hidden">
+              <div className="bg-rose-600 px-5 py-3 flex items-center gap-2">
+                <div className="bg-white/20 rounded-lg p-1.5">
+                  <Percent className="w-4 h-4 text-white" />
                 </div>
-                <div className="p-5">
+                <div>
+                  <h3 className="text-white font-semibold text-sm">Paso 7 — Promociones Grupales</h3>
+                  <p className="text-rose-100 text-xs">Configura 2x1, 3x2 o precio especial para grupos</p>
+                </div>
+                <span className="ml-auto bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">Opcional</span>
+              </div>
+              <div className="p-5">
+                {editingTour ? (
                   <TourPromotionsManager
                     tourId={editingTour.id}
                     agencyId={editingTour.agency_id}
                     tourPrice={parseFloat(formData.price) || editingTour.price}
                   />
-                </div>
+                ) : (
+                  <div className="flex items-start gap-3 bg-rose-50 border border-rose-200 rounded-xl p-4 text-sm text-rose-700">
+                    <Percent className="w-4 h-4 mt-0.5 flex-shrink-0 text-rose-500" />
+                    <p>
+                      Las promociones grupales se configuran después de crear el tour. Al hacer clic en <strong>"Crear Tour"</strong>, el formulario cambiará automáticamente a modo edición donde podrás agregar promociones de inmediato.
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
 
             <div className="flex justify-end space-x-4">
               <button
