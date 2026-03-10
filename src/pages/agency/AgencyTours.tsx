@@ -1965,78 +1965,6 @@ const AgencyTours: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="border-t border-gray-100 pt-4">
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">Política de cancelación</label>
-                      <p className="text-xs text-gray-500 mb-3">Define las franjas horarias y porcentajes de reembolso para este tour. La zona sin reembolso se aplica automáticamente cuando faltan menos horas que el umbral moderado.</p>
-
-                      <div className="space-y-3">
-                        <div className="bg-green-50 border border-green-200 rounded-xl p-3">
-                          <p className="text-xs font-semibold text-green-700 mb-2">Zona flexible — reembolso total</p>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-xs text-gray-600 mb-1">Horas mínimas antes del tour</label>
-                              <input
-                                type="number" min="1" value={receptivoData.flexible_hours}
-                                onChange={e => setReceptivoData(prev => ({ ...prev, flexible_hours: e.target.value }))}
-                                className="input" />
-                            </div>
-                            <div>
-                              <label className="block text-xs text-gray-600 mb-1">% de reembolso</label>
-                              <input
-                                type="number" min="0" max="100" value={receptivoData.flexible_refund_percentage}
-                                onChange={e => setReceptivoData(prev => ({ ...prev, flexible_refund_percentage: e.target.value }))}
-                                className="input" />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
-                          <p className="text-xs font-semibold text-yellow-700 mb-2">Zona moderada — reembolso parcial</p>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-xs text-gray-600 mb-1">Horas mínimas antes del tour</label>
-                              <input
-                                type="number" min="1" value={receptivoData.moderate_hours}
-                                onChange={e => setReceptivoData(prev => ({ ...prev, moderate_hours: e.target.value }))}
-                                className="input" />
-                              {parseInt(receptivoData.moderate_hours) >= parseInt(receptivoData.flexible_hours) && (
-                                <p className="text-[10px] text-red-500 mt-1">Debe ser menor que las horas flexibles ({receptivoData.flexible_hours} hrs)</p>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-xs text-gray-600 mb-1">% de reembolso</label>
-                              <input
-                                type="number" min="0" max="100" value={receptivoData.moderate_refund_percentage}
-                                onChange={e => setReceptivoData(prev => ({ ...prev, moderate_refund_percentage: e.target.value }))}
-                                className="input" />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-                          <p className="text-xs font-semibold text-red-700 mb-1">Zona sin reembolso — calculada automáticamente</p>
-                          <p className="text-xs text-red-600">Menos de {receptivoData.moderate_hours || '—'} horas antes del tour: 0% de reembolso</p>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 bg-gray-50 border border-gray-200 rounded-xl p-3">
-                        <p className="text-xs font-semibold text-gray-600 mb-2">Resumen de política</p>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-xs text-gray-700">
-                            <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
-                            <span>{receptivoData.flexible_hours}+ horas antes: reembolso del {receptivoData.flexible_refund_percentage}%</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-gray-700">
-                            <span className="w-2 h-2 rounded-full bg-yellow-500 flex-shrink-0" />
-                            <span>{receptivoData.moderate_hours} a {receptivoData.flexible_hours} horas antes: reembolso del {receptivoData.moderate_refund_percentage}%</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-gray-700">
-                            <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
-                            <span>Menos de {receptivoData.moderate_hours} horas antes: sin reembolso (0%)</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 )}
 
@@ -2507,26 +2435,98 @@ const AgencyTours: React.FC = () => {
                 <div className="space-y-3">
                   <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                     <Ban className="w-4 h-4 text-rose-500" />
-                    Restricciones del Tour
+                    {tourType === 'receptivo' ? 'Política de cancelación' : 'Restricciones del Tour'}
                   </h4>
-                  <div className={`rounded-xl border-2 p-4 transition-all ${formData.cancellation_not_allowed ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50'}`}>
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.cancellation_not_allowed}
-                        onChange={(e) => setFormData({...formData, cancellation_not_allowed: e.target.checked})}
-                        className="w-5 h-5 mt-0.5 text-red-600 border-gray-300 rounded focus:ring-red-500 flex-shrink-0"
-                      />
-                      <div>
-                        <span className={`text-sm font-semibold ${formData.cancellation_not_allowed ? 'text-red-800' : 'text-gray-700'}`}>
-                          Este tour NO permite cancelaciones con reembolso
-                        </span>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Los viajeros solo podrán cancelar para evitar la penalización de No Show. Esta restricción será visible en la página del tour.
-                        </p>
+
+                  {tourType === 'receptivo' ? (
+                    <div className="space-y-3">
+                      <p className="text-xs text-gray-500">Define las franjas horarias y porcentajes de reembolso. La zona sin reembolso se aplica automáticamente cuando faltan menos horas que el umbral moderado.</p>
+                      <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                        <p className="text-xs font-semibold text-green-700 mb-2">Zona flexible — reembolso total</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Horas mínimas antes del tour</label>
+                            <input
+                              type="number" min="1" value={receptivoData.flexible_hours}
+                              onChange={e => setReceptivoData(prev => ({ ...prev, flexible_hours: e.target.value }))}
+                              className="input" />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">% de reembolso</label>
+                            <input
+                              type="number" min="0" max="100" value={receptivoData.flexible_refund_percentage}
+                              onChange={e => setReceptivoData(prev => ({ ...prev, flexible_refund_percentage: e.target.value }))}
+                              className="input" />
+                          </div>
+                        </div>
                       </div>
-                    </label>
-                  </div>
+
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+                        <p className="text-xs font-semibold text-yellow-700 mb-2">Zona moderada — reembolso parcial</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Horas mínimas antes del tour</label>
+                            <input
+                              type="number" min="1" value={receptivoData.moderate_hours}
+                              onChange={e => setReceptivoData(prev => ({ ...prev, moderate_hours: e.target.value }))}
+                              className="input" />
+                            {parseInt(receptivoData.moderate_hours) >= parseInt(receptivoData.flexible_hours) && (
+                              <p className="text-[10px] text-red-500 mt-1">Debe ser menor que las horas flexibles ({receptivoData.flexible_hours} hrs)</p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">% de reembolso</label>
+                            <input
+                              type="number" min="0" max="100" value={receptivoData.moderate_refund_percentage}
+                              onChange={e => setReceptivoData(prev => ({ ...prev, moderate_refund_percentage: e.target.value }))}
+                              className="input" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                        <p className="text-xs font-semibold text-red-700 mb-1">Zona sin reembolso — calculada automáticamente</p>
+                        <p className="text-xs text-red-600">Menos de {receptivoData.moderate_hours || '—'} horas antes del tour: 0% de reembolso</p>
+                      </div>
+
+                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                        <p className="text-xs font-semibold text-gray-600 mb-2">Resumen de política</p>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-xs text-gray-700">
+                            <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                            <span>{receptivoData.flexible_hours}+ horas antes: reembolso del {receptivoData.flexible_refund_percentage}%</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-700">
+                            <span className="w-2 h-2 rounded-full bg-yellow-500 flex-shrink-0" />
+                            <span>{receptivoData.moderate_hours} a {receptivoData.flexible_hours} horas antes: reembolso del {receptivoData.moderate_refund_percentage}%</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-700">
+                            <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                            <span>Menos de {receptivoData.moderate_hours} horas antes: sin reembolso (0%)</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={`rounded-xl border-2 p-4 transition-all ${formData.cancellation_not_allowed ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50'}`}>
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.cancellation_not_allowed}
+                          onChange={(e) => setFormData({...formData, cancellation_not_allowed: e.target.checked})}
+                          className="w-5 h-5 mt-0.5 text-red-600 border-gray-300 rounded focus:ring-red-500 flex-shrink-0"
+                        />
+                        <div>
+                          <span className={`text-sm font-semibold ${formData.cancellation_not_allowed ? 'text-red-800' : 'text-gray-700'}`}>
+                            Este tour NO permite cancelaciones con reembolso
+                          </span>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Los viajeros solo podrán cancelar para evitar la penalización de No Show. Esta restricción será visible en la página del tour.
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                  )}
                   <div className={`rounded-xl border-2 p-4 transition-all ${formData.name_changes_not_allowed ? 'border-orange-300 bg-orange-50' : 'border-gray-200 bg-gray-50'}`}>
                     <label className="flex items-start gap-3 cursor-pointer">
                       <input
