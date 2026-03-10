@@ -3,8 +3,6 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { CheckCircle, XCircle, Clock, AlertTriangle, Users, MapPin, Calendar, DollarSign, QrCode, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import NavBar from '../components/NavBar';
-import Footer from '../components/Footer';
 
 interface Traveler {
   id: string;
@@ -168,67 +166,53 @@ export default function BookingCheckinPage() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <NavBar />
-        <div className="flex-1 flex items-center justify-center px-4">
-          <div className="text-center max-w-md">
-            <QrCode className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">Código QR inválido</h1>
-            <p className="text-gray-500 mb-6">El enlace de check-in no contiene un token válido.</p>
-            <Link to="/" className="btn-primary">Ir al inicio</Link>
-          </div>
+      <div className="flex items-center justify-center px-4 py-20">
+        <div className="text-center max-w-md">
+          <QrCode className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Código QR inválido</h1>
+          <p className="text-gray-500 mb-6">El enlace de check-in no contiene un token válido.</p>
+          <Link to="/" className="btn-primary">Ir al inicio</Link>
         </div>
-        <Footer />
       </div>
     );
   }
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <NavBar />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
-        </div>
-        <Footer />
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <NavBar />
-        <div className="flex-1 flex items-center justify-center px-4 py-16">
-          <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <QrCode className="w-8 h-8 text-blue-600" />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Check-in de Reserva</h1>
-            <p className="text-gray-500 mb-6">
-              Escaneo exitoso. Inicia sesión para ver los detalles de tu reserva y confirmar el check-in.
-            </p>
-            <button
-              onClick={() => navigate(`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`)}
-              className="w-full bg-blue-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
-            >
-              Iniciar Sesión
-            </button>
-            <p className="text-sm text-gray-400 mt-4">
-              ¿No tienes cuenta?{' '}
-              <Link to="/signup" className="text-blue-600 hover:underline">Regístrate aquí</Link>
-            </p>
+      <div className="flex items-center justify-center px-4 py-16">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <QrCode className="w-8 h-8 text-blue-600" />
           </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Check-in de Reserva</h1>
+          <p className="text-gray-500 mb-6">
+            Escaneo exitoso. Inicia sesión para ver los detalles de tu reserva y confirmar el check-in.
+          </p>
+          <button
+            onClick={() => navigate(`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`)}
+            className="w-full bg-blue-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+          >
+            Iniciar Sesión
+          </button>
+          <p className="text-sm text-gray-400 mt-4">
+            ¿No tienes cuenta?{' '}
+            <Link to="/signup" className="text-blue-600 hover:underline">Regístrate aquí</Link>
+          </p>
         </div>
-        <Footer />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <NavBar />
-      <div className="flex-1 py-10 px-4">
+    <div className="py-10 px-4">
         <div className="max-w-2xl mx-auto">
 
           {loading && (
@@ -414,7 +398,6 @@ export default function BookingCheckinPage() {
             </>
           )}
         </div>
-      </div>
 
       {showPartialModal && details && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -466,7 +449,6 @@ export default function BookingCheckinPage() {
         </div>
       )}
 
-      <Footer />
     </div>
   );
 }
