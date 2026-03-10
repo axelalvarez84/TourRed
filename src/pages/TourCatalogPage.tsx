@@ -31,6 +31,7 @@ const TourCatalogPage: React.FC = () => {
     lng: searchParams.get('lng') || '',
     radius: searchParams.get('radius') || '',
     locationName: searchParams.get('locationName') || '',
+    tourType: (searchParams.get('tourType') as 'excursion' | 'receptivo' | undefined) || undefined,
   }), [searchParams]);
 
   const hasGeoSearch = !!(initialFilters.lat && initialFilters.lng);
@@ -280,8 +281,13 @@ const TourCatalogPage: React.FC = () => {
     fetchPopularDeparturePoints();
   }, []);
 
-  // No client-side filtering needed - database already handles all filters correctly
-  const filteredTours = tours;
+  const filteredTours = useMemo(() => {
+    if (!initialFilters.tourType) return tours;
+    return tours.filter(t => {
+      const type = (t as any).tour_type || 'excursion';
+      return type === initialFilters.tourType;
+    });
+  }, [tours, initialFilters.tourType]);
 
   return (
     <div className="bg-blue-50 min-h-screen py-8">
@@ -476,6 +482,8 @@ const TourCatalogPage: React.FC = () => {
                     {initialFilters.tourName && ` con nombre "${initialFilters.tourName}"`}
                     {initialFilters.destination && ` para "${initialFilters.destination}"`}
                     {initialFilters.category && ` en ${initialFilters.category}`}
+                    {initialFilters.tourType === 'receptivo' && ` (solo receptivos)`}
+                    {initialFilters.tourType === 'excursion' && ` (solo excursiones)`}
                   </p>
                   <div className="flex items-center">
                     <span className="text-sm text-gray-600 mr-2">Ordenar por:</span>

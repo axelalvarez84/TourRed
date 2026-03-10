@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Tag, Calendar, Building2, DollarSign, Dog, X, MapPin, FileSearch } from 'lucide-react';
+import { Search, Tag, Calendar, Building2, DollarSign, Dog, X, MapPin, FileSearch, RefreshCw } from 'lucide-react';
 import { SearchFilters } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -22,6 +22,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
   const [minPrice, setMinPrice] = useState(initialFilters.minPrice || '');
   const [maxPrice, setMaxPrice] = useState(initialFilters.maxPrice || '');
   const [petFriendly, setPetFriendly] = useState(initialFilters.petFriendly || '');
+  const [tourType, setTourType] = useState(initialFilters.tourType || '');
   const [locationName, setLocationName] = useState(initialFilters.locationName || '');
   const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | null>(
     initialFilters.lat && initialFilters.lng
@@ -205,6 +206,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
     if (minPrice) queryParams.set('minPrice', minPrice);
     if (maxPrice) queryParams.set('maxPrice', maxPrice);
     if (petFriendly) queryParams.set('petFriendly', petFriendly);
+    if (tourType) queryParams.set('tourType', tourType);
 
     if (locationCoords) {
       queryParams.set('lat', locationCoords.lat.toString());
@@ -463,6 +465,27 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
                 <option value="">Todos los Tours</option>
                 <option value="true">Solo Pet Friendly</option>
                 <option value="false">Sin Mascotas</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="tourType" className="block text-sm font-medium text-gray-700 mb-1">
+              Tipo de Tour
+            </label>
+            <div className="relative rounded-md shadow-sm">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <RefreshCw className="h-5 w-5 text-gray-400" />
+              </div>
+              <select
+                id="tourType"
+                value={tourType}
+                onChange={(e) => setTourType(e.target.value)}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
+              >
+                <option value="">Todos los Tipos</option>
+                <option value="excursion">Excursiones (fecha fija)</option>
+                <option value="receptivo">Receptivos (bajo demanda)</option>
               </select>
             </div>
           </div>

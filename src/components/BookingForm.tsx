@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet, Award, Ticket, X, Check, Loader2, ShoppingBag, Info, Tag } from 'lucide-react';
+import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet, Award, Ticket, X, Check, Loader2, ShoppingBag, Info, Tag, RefreshCw, Clock } from 'lucide-react';
 import PaymentProviderSelector, { PaymentProvider } from './PaymentProviderSelector';
+import SlotCalendarPicker from './receptivo/SlotCalendarPicker';
+import SlotTimePicker from './receptivo/SlotTimePicker';
+import MinTravelersAlert from './receptivo/MinTravelersAlert';
+import { TourSlot } from '../types';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface TourOptionalService {
   id: string;
@@ -76,6 +82,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     times_used: number;
   } | null>(null);
   const [isLoadingOptionalServices, setIsLoadingOptionalServices] = useState(true);
+
+  const isReceptivo = tour.tour_type === 'receptivo';
+  const [selectedSlotDate, setSelectedSlotDate] = useState<Date | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<TourSlot | null>(null);
 
   const [discountCodeInput, setDiscountCodeInput] = useState('');
   const [isValidatingCode, setIsValidatingCode] = useState(false);
@@ -352,6 +362,17 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
   React.useEffect(() => {
     const fetchAvailability = async () => {
+      if (isReceptivo) {
+        if (selectedSlot) {
+          const available = Math.max(0, selectedSlot.capacity - selectedSlot.booked_count);
+          setAvailableSpots(available);
+        } else {
+          setAvailableSpots(null);
+        }
+        setIsLoadingAvailability(false);
+        return;
+      }
+
       try {
         setIsLoadingAvailability(true);
 
@@ -366,7 +387,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
         if (data && data.length > 0) {
           const availability = data[0];
-          console.log(`📊 Disponibilidad del tour: ${availability.available_spots} de ${availability.max_capacity} lugares disponibles (${availability.total_booked} reservados)`);
           setAvailableSpots(availability.available_spots);
         }
 
@@ -399,7 +419,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [tour.id]);
+  }, [tour.id, isReceptivo, selectedSlot]);
 
   const formatDate = (dateString: string) => {
     try {
@@ -416,6 +436,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   };
 
   const isBookingDeadlinePassed = () => {
+    if (isReceptivo) return false;
     if (!tour.booking_deadline) return false;
 
     try {
@@ -773,6 +794,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
       return;
     }
 
+    if (isReceptivo && !selectedSlot) {
+      setError('Debes seleccionar una fecha y horario para el tour receptivo.');
+      return;
+    }
+
     if (totalTravelers === 0) {
       setError('Debes seleccionar al menos un viajero.');
       return;
@@ -802,7 +828,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         service_charge: serviceCharge,
         user_payment: userPayment,
         platform_revenue: platformRevenue,
-        booking_date: tour.start_date,
+        booking_date: isReceptivo && selectedSlot ? selectedSlot.slot_date : tour.start_date,
+        slot_id: isReceptivo && selectedSlot ? selectedSlot.id : null,
+        selected_date: isReceptivo && selectedSlot ? selectedSlot.slot_date : null,
+        selected_time: isReceptivo && selectedSlot ? selectedSlot.departure_time : null,
         status: initialStatus,
         payment_status: initialPaymentStatus,
         approval_status: initialApprovalStatus,
@@ -953,15 +982,64 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         </div>
       )}
 
-      <div className="mb-4 bg-gray-50 p-3 rounded-md">
-        <div className="text-sm font-medium mb-2">Fechas del Tour</div>
-        <div className="flex items-center text-gray-700">
-          <Calendar className="w-4 h-4 mr-2 text-primary-600" />
-          <span>
-            {formatDate(tour.start_date)} - {formatDate(tour.end_date)}
-          </span>
+      {isReceptivo ? (
+        <div className="mb-4 space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <RefreshCw className="w-4 h-4 text-teal-600" />
+            <span className="text-sm font-semibold text-gray-700">Selecciona fecha y horario</span>
+          </div>
+          <SlotCalendarPicker
+            tour={tour}
+            selectedDate={selectedSlotDate}
+            onDateSelect={(date) => {
+              setSelectedSlotDate(date);
+              setSelectedSlot(null);
+            }}
+          />
+          {selectedSlotDate && (
+            <SlotTimePicker
+              tourId={tour.id}
+              selectedDate={selectedSlotDate}
+              selectedSlotId={selectedSlot?.id || null}
+              onSlotSelect={(slot) => setSelectedSlot(slot)}
+            />
+          )}
+          {selectedSlot && tour.min_travelers_required && tour.min_travelers_required > 1 && (
+            <MinTravelersAlert
+              minTravelersRequired={tour.min_travelers_required}
+              confirmationHours={tour.min_travelers_confirmation_hours || 24}
+              currentSlotBooked={selectedSlot.booked_count}
+            />
+          )}
+          {selectedSlot && (
+            <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 flex items-center gap-2.5">
+              <Clock className="w-4 h-4 text-teal-600 flex-shrink-0" />
+              <div className="text-sm">
+                <span className="font-semibold text-teal-800">
+                  {format(new Date(selectedSlot.slot_date + 'T12:00:00'), "EEEE d 'de' MMMM", { locale: es })}
+                </span>
+                <span className="text-teal-600 ml-2">
+                  a las {(() => {
+                    const [h, m] = selectedSlot.departure_time.split(':');
+                    const hour = parseInt(h);
+                    return `${hour % 12 || 12}:${m} ${hour >= 12 ? 'PM' : 'AM'}`;
+                  })()}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      ) : (
+        <div className="mb-4 bg-gray-50 p-3 rounded-md">
+          <div className="text-sm font-medium mb-2">Fechas del Tour</div>
+          <div className="flex items-center text-gray-700">
+            <Calendar className="w-4 h-4 mr-2 text-primary-600" />
+            <span>
+              {formatDate(tour.start_date)} - {formatDate(tour.end_date)}
+            </span>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit}>
         <div className="mb-4">

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Users, Building, Star, Clock, Globe, MessageCircle, ChevronLeft, ChevronRight, Edit, Heart, ExternalLink, Share2 } from 'lucide-react';
+import { MapPin, Calendar, Users, Building, Star, Clock, Globe, MessageCircle, ChevronLeft, ChevronRight, Edit, Heart, ExternalLink, Share2, RefreshCw, Lock } from 'lucide-react';
 import BookingForm from '../components/BookingForm';
 import AgencyReviews from '../components/AgencyReviews';
 import ShareTourModal from '../components/ShareTourModal';
@@ -804,12 +804,30 @@ const TourDetailPage: React.FC = () => {
                 <div className="flex items-start">
                   <Calendar className="h-5 w-5 text-primary-600 mr-3 mt-0.5" />
                   <div>
-                    <h4 className="font-medium">Fechas</h4>
-                    <p className="text-gray-600">
-                      {formatDate(tour.start_date)} - {formatDate(tour.end_date)}
-                    </p>
+                    <h4 className="font-medium">
+                      {tour.tour_type === 'receptivo' ? 'Disponibilidad' : 'Fechas'}
+                    </h4>
+                    {tour.tour_type === 'receptivo' ? (
+                      <p className="text-gray-600">Disponible según calendario</p>
+                    ) : (
+                      <p className="text-gray-600">
+                        {formatDate(tour.start_date)} - {formatDate(tour.end_date)}
+                      </p>
+                    )}
                   </div>
                 </div>
+
+                {tour.tour_type === 'receptivo' && (
+                  <div className="flex items-start">
+                    <RefreshCw className="h-5 w-5 text-teal-600 mr-3 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium">Modalidad</h4>
+                      <p className="text-gray-600 capitalize">
+                        {tour.receptivo_modality === 'compartido' ? 'Tour Compartido' : 'Tour Privado'}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-start">
                   <Users className="h-5 w-5 text-primary-600 mr-3 mt-0.5" />

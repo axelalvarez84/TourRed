@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Star, Users, Building, Heart, Tag } from 'lucide-react';
+import { MapPin, Calendar, Star, Users, Building, Heart, Tag, RefreshCw } from 'lucide-react';
 import { Tour } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -149,8 +149,17 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
             Destacado
           </div>
         )}
+        {tour.tour_type === 'receptivo' && (
+          <div className={`absolute ${tour.is_featured ? 'top-9' : 'top-2'} left-2 flex items-center gap-1 bg-teal-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm`}>
+            <RefreshCw className="w-2.5 h-2.5" />
+            {tour.receptivo_modality === 'privado' ? 'Privado' : 'Receptivo'}
+          </div>
+        )}
         {activePromo && (
-          <div className={`absolute ${tour.is_featured ? 'top-10 left-2' : 'top-2 left-2'} flex items-center gap-1 text-white text-xs font-bold px-2 py-1 rounded shadow-md ${
+          <div className={`absolute left-2 flex items-center gap-1 text-white text-xs font-bold px-2 py-1 rounded shadow-md ${
+            tour.is_featured && tour.tour_type === 'receptivo' ? 'top-16' :
+            tour.is_featured || tour.tour_type === 'receptivo' ? 'top-9' : 'top-2'
+          } ${
             activePromo.promotion_type === '2x1' ? 'bg-rose-600' :
             activePromo.promotion_type === '3x2' ? 'bg-orange-500' :
             activePromo.promotion_type === 'nxprecio' ? 'bg-teal-600' :
@@ -231,10 +240,17 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
           </div>
         )}
 
-        <div className="flex items-center text-gray-500 text-sm mb-3">
-          <Calendar className="w-4 h-4 mr-1" />
-          <span>{formatDate(tour.start_date)} - {formatDate(tour.end_date)}</span>
-        </div>
+        {tour.tour_type === 'receptivo' ? (
+          <div className="flex items-center text-gray-500 text-sm mb-3">
+            <RefreshCw className="w-4 h-4 mr-1 text-teal-600" />
+            <span className="text-teal-700">Disponible según calendario</span>
+          </div>
+        ) : (
+          <div className="flex items-center text-gray-500 text-sm mb-3">
+            <Calendar className="w-4 h-4 mr-1" />
+            <span>{formatDate(tour.start_date)} - {formatDate(tour.end_date)}</span>
+          </div>
+        )}
         
         {tour.max_travelers && (
           <div className="flex items-center text-gray-500 text-sm mb-3">

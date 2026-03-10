@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination, getTourCategories } from '../../lib/supabase';
-import { Plus, Search, X, CreditCard as Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban, ShoppingBag, Info, Percent } from 'lucide-react';
+import { Plus, Search, X, CreditCard as Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban, ShoppingBag, Info, Percent, Route, RefreshCw, Layers } from 'lucide-react';
 import TourPromotionsManager from '../../components/TourPromotionsManager';
+import AgencyScheduleManager from '../../components/receptivo/AgencyScheduleManager';
+import AgencyBlackoutManager from '../../components/receptivo/AgencyBlackoutManager';
+import AgencySlotCalendar from '../../components/receptivo/AgencySlotCalendar';
+import { TourType, ReceptivoModality, CancellationPolicy } from '../../types';
 
 interface OptionalService {
   id?: string;
@@ -99,6 +103,23 @@ const AgencyTours: React.FC = () => {
 
   const [cancelFormData, setCancelFormData] = useState({
     cancellation_reason: '',
+  });
+
+  const [tourType, setTourType] = useState<TourType>('excursion');
+  const [receptivoModality, setReceptivoModality] = useState<ReceptivoModality>('compartido');
+  const [receptivoTab, setReceptivoTab] = useState<'info' | 'horarios' | 'bloqueos' | 'calendario'>('info');
+  const [receptivoData, setReceptivoData] = useState({
+    operating_days: [] as number[],
+    operating_months: [] as number[],
+    min_advance_booking_hours: '24',
+    max_advance_booking_days: '90',
+    slot_duration_days: '1',
+    default_slot_capacity: '',
+    cancellation_policy: 'moderada' as CancellationPolicy,
+    cancellation_hours_limit: '48',
+    cancellation_refund_percentage: '80',
+    min_travelers_required: '1',
+    min_travelers_confirmation_hours: '24',
   });
 
   const [formData, setFormData] = useState({
@@ -334,6 +355,22 @@ const AgencyTours: React.FC = () => {
   };
 
   const resetForm = () => {
+    setTourType('excursion');
+    setReceptivoModality('compartido');
+    setReceptivoTab('info');
+    setReceptivoData({
+      operating_days: [],
+      operating_months: [],
+      min_advance_booking_hours: '24',
+      max_advance_booking_days: '90',
+      slot_duration_days: '1',
+      default_slot_capacity: '',
+      cancellation_policy: 'moderada',
+      cancellation_hours_limit: '48',
+      cancellation_refund_percentage: '80',
+      min_travelers_required: '1',
+      min_travelers_confirmation_hours: '24',
+    });
     setFormData({
       name: '',
       category: categories.length > 0 ? [categories[0].slug] : [],
@@ -426,6 +463,24 @@ const AgencyTours: React.FC = () => {
     // Asegurar que category sea un array
     const categoryArray = Array.isArray(tour.category) ? tour.category : [tour.category];
 
+    setTourType(tour.tour_type || 'excursion');
+    setReceptivoModality(tour.receptivo_modality || 'compartido');
+    setReceptivoTab('info');
+    if (tour.tour_type === 'receptivo') {
+      setReceptivoData({
+        operating_days: tour.operating_days || [],
+        operating_months: tour.operating_months || [],
+        min_advance_booking_hours: tour.min_advance_booking_hours?.toString() || '24',
+        max_advance_booking_days: tour.max_advance_booking_days?.toString() || '90',
+        slot_duration_days: tour.slot_duration_days?.toString() || '1',
+        default_slot_capacity: tour.default_slot_capacity?.toString() || '',
+        cancellation_policy: tour.cancellation_policy || 'moderada',
+        cancellation_hours_limit: tour.cancellation_hours_limit?.toString() || '48',
+        cancellation_refund_percentage: tour.cancellation_refund_percentage?.toString() || '80',
+        min_travelers_required: tour.min_travelers_required?.toString() || '1',
+        min_travelers_confirmation_hours: tour.min_travelers_confirmation_hours?.toString() || '24',
+      });
+    }
     setFormData({
       name: tour.name,
       category: categoryArray,
@@ -1106,13 +1161,21 @@ const AgencyTours: React.FC = () => {
         throw new Error('No puedes seleccionar más de 4 puntos de salida para el tour');
       }
 
-      // Calcular fecha límite por defecto si no se especifica
+      if (tourType === 'excursion' && !formData.start_date) {
+        throw new Error('La fecha de inicio es requerida para excursiones');
+      }
+      if (tourType === 'excursion' && !formData.end_date) {
+        throw new Error('La fecha de fin es requerida para excursiones');
+      }
+
       let bookingDeadline = formData.booking_deadline;
-      if (!bookingDeadline && formData.start_date) {
+      if (!bookingDeadline && formData.start_date && tourType === 'excursion') {
         const deadline = new Date(formData.start_date);
-        deadline.setDate(deadline.getDate() - 14); // 14 días antes por defecto
+        deadline.setDate(deadline.getDate() - 14);
         bookingDeadline = deadline.toISOString().split('T')[0];
       }
+
+      const isReceptivo = tourType === 'receptivo';
 
       const tourData = {
         name: formData.name,
@@ -1122,15 +1185,15 @@ const AgencyTours: React.FC = () => {
         price: parseFloat(formData.price),
         deposit_percentage: parseInt(formData.deposit_percentage),
         image_url: tourImageData ? tourImageData.base64 : formData.image_url,
-        start_date: formData.start_date,
-        end_date: formData.end_date,
+        start_date: isReceptivo ? null : formData.start_date,
+        end_date: isReceptivo ? null : formData.end_date,
         max_travelers: formData.max_travelers ? parseInt(formData.max_travelers) : null,
-        available_spots: formData.available_spots ? parseInt(formData.available_spots) : null,
+        available_spots: isReceptivo ? null : (formData.available_spots ? parseInt(formData.available_spots) : null),
         destination: selectedDestinations.length > 0 ? selectedDestinations[0].name : '',
         includes: filteredIncludes.length > 0 ? filteredIncludes : null,
         excludes: filteredExcludes.length > 0 ? filteredExcludes : null,
         departure_points: filteredDeparturePoints,
-        booking_deadline: bookingDeadline,
+        booking_deadline: isReceptivo ? null : bookingDeadline,
         booking_approval_type: formData.booking_approval_type,
         cancellation_not_allowed: formData.cancellation_not_allowed,
         name_changes_not_allowed: formData.name_changes_not_allowed,
@@ -1144,6 +1207,19 @@ const AgencyTours: React.FC = () => {
         admite_ninos: formData.admite_ninos,
         admite_adultos: formData.admite_adultos,
         admite_adultos_mayores: formData.admite_adultos_mayores,
+        tour_type: tourType,
+        receptivo_modality: isReceptivo ? receptivoModality : null,
+        operating_days: isReceptivo && receptivoData.operating_days.length > 0 ? receptivoData.operating_days : null,
+        operating_months: isReceptivo && receptivoData.operating_months.length > 0 ? receptivoData.operating_months : null,
+        min_advance_booking_hours: isReceptivo ? parseInt(receptivoData.min_advance_booking_hours) : null,
+        max_advance_booking_days: isReceptivo ? parseInt(receptivoData.max_advance_booking_days) : null,
+        slot_duration_days: isReceptivo ? parseInt(receptivoData.slot_duration_days) : null,
+        default_slot_capacity: isReceptivo && receptivoData.default_slot_capacity ? parseInt(receptivoData.default_slot_capacity) : null,
+        cancellation_policy: isReceptivo ? receptivoData.cancellation_policy : null,
+        cancellation_hours_limit: isReceptivo ? parseInt(receptivoData.cancellation_hours_limit) : null,
+        cancellation_refund_percentage: isReceptivo ? parseInt(receptivoData.cancellation_refund_percentage) : null,
+        min_travelers_required: isReceptivo ? parseInt(receptivoData.min_travelers_required) : null,
+        min_travelers_confirmation_hours: isReceptivo ? parseInt(receptivoData.min_travelers_confirmation_hours) : null,
       };
 
       let tourId: string;
@@ -1551,6 +1627,95 @@ const AgencyTours: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-5">
 
+            {/* SELECTOR TIPO DE TOUR */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Tipo de Tour</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setTourType('excursion')}
+                  className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                    tourType === 'excursion'
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                    tourType === 'excursion' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className={`font-semibold text-sm ${tourType === 'excursion' ? 'text-red-700' : 'text-gray-800'}`}>
+                      Excursión
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Fecha fija de inicio y fin. Una sola salida programada.
+                    </p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTourType('receptivo')}
+                  className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                    tourType === 'receptivo'
+                      ? 'border-teal-500 bg-teal-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                    tourType === 'receptivo' ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    <RefreshCw className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className={`font-semibold text-sm ${tourType === 'receptivo' ? 'text-teal-700' : 'text-gray-800'}`}>
+                      Receptivo
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Opera con horarios recurrentes. Disponibilidad por calendario.
+                    </p>
+                  </div>
+                </button>
+              </div>
+              {tourType === 'receptivo' && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="text-xs font-medium text-gray-600 mb-2">Modalidad del tour receptivo</p>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setReceptivoModality('compartido')}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
+                        receptivoModality === 'compartido'
+                          ? 'border-teal-500 bg-teal-50 text-teal-700'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      Compartido
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReceptivoModality('privado')}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
+                        receptivoModality === 'privado'
+                          ? 'border-teal-500 bg-teal-50 text-teal-700'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                      Privado
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    {receptivoModality === 'compartido'
+                      ? 'Los viajeros comparten la salida con otros grupos. Informativo para el viajero.'
+                      : 'El tour es exclusivo para un grupo. Informativo para el viajero.'}
+                  </p>
+                </div>
+              )}
+            </div>
+
             {/* SECCIÓN 1 — Información General */}
             <div className="bg-white rounded-xl shadow-sm border border-blue-100 overflow-hidden">
               <div className="bg-blue-600 px-5 py-3 flex items-center gap-2">
@@ -1638,39 +1803,201 @@ const AgencyTours: React.FC = () => {
                   <Calendar className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-white font-semibold text-sm">Paso 2 — Fechas y Destinos</h3>
-                  <p className="text-teal-100 text-xs">¿Cuándo sale y a dónde va el tour?</p>
+                  <h3 className="text-white font-semibold text-sm">
+                    Paso 2 — {tourType === 'receptivo' ? 'Destinos y Operación' : 'Fechas y Destinos'}
+                  </h3>
+                  <p className="text-teal-100 text-xs">
+                    {tourType === 'receptivo' ? '¿A dónde va y cómo opera el tour?' : '¿Cuándo sale y a dónde va el tour?'}
+                  </p>
                 </div>
                 <span className="ml-auto bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">Requerido</span>
               </div>
               <div className="p-5 space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      Fecha de Inicio <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.start_date}
-                      onChange={(e) => setFormData({...formData, start_date: e.target.value})}
-                      className="input"
-                      required
-                    />
+                {tourType === 'excursion' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Fecha de Inicio <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.start_date}
+                        onChange={(e) => setFormData({...formData, start_date: e.target.value})}
+                        className="input"
+                        required={tourType === 'excursion'}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Fecha de Fin <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.end_date}
+                        onChange={(e) => setFormData({...formData, end_date: e.target.value})}
+                        className="input"
+                        min={formData.start_date}
+                        required={tourType === 'excursion'}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      Fecha de Fin <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.end_date}
-                      onChange={(e) => setFormData({...formData, end_date: e.target.value})}
-                      className="input"
-                      min={formData.start_date}
-                      required
-                    />
+                )}
+
+                {tourType === 'receptivo' && (
+                  <div className="space-y-4">
+                    <div className="bg-teal-50 border border-teal-100 rounded-xl p-4">
+                      <p className="text-teal-700 text-xs font-medium">
+                        Los tours receptivos no tienen fechas fijas. La disponibilidad se gestiona mediante horarios recurrentes una vez creado el tour.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Días de operación
+                        <span className="ml-2 text-xs font-normal text-gray-400">Vacío = todos los días</span>
+                      </label>
+                      <div className="flex gap-1.5">
+                        {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((d, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setReceptivoData(prev => ({
+                              ...prev,
+                              operating_days: prev.operating_days.includes(i)
+                                ? prev.operating_days.filter(x => x !== i)
+                                : [...prev.operating_days, i].sort()
+                            }))}
+                            className={`w-10 h-10 rounded-lg text-xs font-medium transition-colors ${
+                              receptivoData.operating_days.includes(i)
+                                ? 'bg-teal-600 text-white'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            {d}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Meses de operación
+                        <span className="ml-2 text-xs font-normal text-gray-400">Vacío = todo el año</span>
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'].map((m, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => {
+                              const month = i + 1;
+                              setReceptivoData(prev => ({
+                                ...prev,
+                                operating_months: prev.operating_months.includes(month)
+                                  ? prev.operating_months.filter(x => x !== month)
+                                  : [...prev.operating_months, month].sort((a, b) => a - b)
+                              }));
+                            }}
+                            className={`px-2.5 h-8 rounded-lg text-xs font-medium transition-colors ${
+                              receptivoData.operating_months.includes(i + 1)
+                                ? 'bg-teal-600 text-white'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Duración (días)</label>
+                        <input type="number" min="1" value={receptivoData.slot_duration_days}
+                          onChange={e => setReceptivoData(prev => ({ ...prev, slot_duration_days: e.target.value }))}
+                          className="input" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Cupos por defecto</label>
+                        <input type="number" min="1" value={receptivoData.default_slot_capacity}
+                          placeholder="= máx. viajeros"
+                          onChange={e => setReceptivoData(prev => ({ ...prev, default_slot_capacity: e.target.value }))}
+                          className="input" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Anticip. mín. (hrs)</label>
+                        <input type="number" min="1" value={receptivoData.min_advance_booking_hours}
+                          onChange={e => setReceptivoData(prev => ({ ...prev, min_advance_booking_hours: e.target.value }))}
+                          className="input" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Ventana máx. (días)</label>
+                        <input type="number" min="1" value={receptivoData.max_advance_booking_days}
+                          onChange={e => setReceptivoData(prev => ({ ...prev, max_advance_booking_days: e.target.value }))}
+                          className="input" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Mín. viajeros para confirmar</label>
+                        <input type="number" min="1" value={receptivoData.min_travelers_required}
+                          onChange={e => setReceptivoData(prev => ({ ...prev, min_travelers_required: e.target.value }))}
+                          className="input" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Hrs. confirmación mín.</label>
+                        <input type="number" min="1" value={receptivoData.min_travelers_confirmation_hours}
+                          onChange={e => setReceptivoData(prev => ({ ...prev, min_travelers_confirmation_hours: e.target.value }))}
+                          className="input" />
+                      </div>
+                    </div>
+
+                    <div className="border-t border-gray-100 pt-4">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Política de cancelación</label>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {([
+                          { value: 'flexible', label: 'Flexible', desc: 'Cancel. sin penalización' },
+                          { value: 'moderada', label: 'Moderada', desc: 'Reembolso parcial' },
+                          { value: 'estricta', label: 'Estricta', desc: 'Reembolso limitado' },
+                          { value: 'no_reembolsable', label: 'No reembolsable', desc: 'Sin reembolso' },
+                        ] as const).map(p => (
+                          <button
+                            key={p.value}
+                            type="button"
+                            onClick={() => setReceptivoData(prev => ({ ...prev, cancellation_policy: p.value }))}
+                            className={`p-3 rounded-xl border-2 text-left transition-all ${
+                              receptivoData.cancellation_policy === p.value
+                                ? 'border-teal-500 bg-teal-50'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <p className={`text-xs font-semibold ${receptivoData.cancellation_policy === p.value ? 'text-teal-700' : 'text-gray-700'}`}>
+                              {p.label}
+                            </p>
+                            <p className="text-[10px] text-gray-400 mt-0.5">{p.desc}</p>
+                          </button>
+                        ))}
+                      </div>
+                      {receptivoData.cancellation_policy !== 'no_reembolsable' && (
+                        <div className="grid grid-cols-2 gap-3 mt-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">Hrs. límite cancelación</label>
+                            <input type="number" min="1" value={receptivoData.cancellation_hours_limit}
+                              onChange={e => setReceptivoData(prev => ({ ...prev, cancellation_hours_limit: e.target.value }))}
+                              className="input" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">% de reembolso</label>
+                            <input type="number" min="0" max="100" value={receptivoData.cancellation_refund_percentage}
+                              onChange={e => setReceptivoData(prev => ({ ...prev, cancellation_refund_percentage: e.target.value }))}
+                              className="input" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
@@ -2343,6 +2670,90 @@ const AgencyTours: React.FC = () => {
               </div>
             </div>
 
+            {tourType === 'receptivo' && editingTour && (
+              <div className="bg-white rounded-xl shadow-sm border border-teal-100 overflow-hidden">
+                <div className="bg-teal-600 px-5 py-3 flex items-center gap-2">
+                  <div className="bg-white/20 rounded-lg p-1.5">
+                    <Layers className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-semibold text-sm">Disponibilidad — Horarios y Calendario</h3>
+                    <p className="text-teal-100 text-xs">Configura horarios recurrentes, bloqueos y genera slots</p>
+                  </div>
+                  <span className="ml-auto bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">Receptivo</span>
+                </div>
+                <div>
+                  <div className="flex border-b border-gray-100">
+                    {(['info', 'horarios', 'bloqueos', 'calendario'] as const).map(tab => {
+                      const labels: Record<string, string> = {
+                        info: 'Resumen',
+                        horarios: 'Horarios',
+                        bloqueos: 'Bloqueos',
+                        calendario: 'Calendario',
+                      };
+                      return (
+                        <button
+                          key={tab}
+                          type="button"
+                          onClick={() => setReceptivoTab(tab)}
+                          className={`flex-1 py-3 text-xs font-medium transition-colors ${
+                            receptivoTab === tab
+                              ? 'text-teal-700 border-b-2 border-teal-600 bg-teal-50'
+                              : 'text-gray-500 hover:text-gray-700'
+                          }`}
+                        >
+                          {labels[tab]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="p-5">
+                    {receptivoTab === 'info' && (
+                      <div className="space-y-3 text-sm text-gray-600">
+                        <p>Para activar este tour receptivo, sigue estos pasos:</p>
+                        <ol className="list-decimal list-inside space-y-2 text-gray-700">
+                          <li>Ve a <strong>Horarios</strong> y agrega al menos un horario de salida.</li>
+                          <li>Opcionalmente bloquea fechas en <strong>Bloqueos</strong>.</li>
+                          <li>En <strong>Calendario</strong>, usa <em>Generar Slots</em> para crear las salidas disponibles.</li>
+                        </ol>
+                        <p className="text-xs text-gray-400 mt-2">
+                          Los viajeros podrán reservar seleccionando una fecha y horario disponible.
+                        </p>
+                      </div>
+                    )}
+                    {receptivoTab === 'horarios' && (
+                      <AgencyScheduleManager
+                        tourId={editingTour.id}
+                        agencyId={editingTour.agency_id}
+                      />
+                    )}
+                    {receptivoTab === 'bloqueos' && (
+                      <AgencyBlackoutManager
+                        tourId={editingTour.id}
+                        agencyId={editingTour.agency_id}
+                        userId={editingTour.agency_id}
+                      />
+                    )}
+                    {receptivoTab === 'calendario' && (
+                      <AgencySlotCalendar
+                        tourId={editingTour.id}
+                        agencyId={editingTour.agency_id}
+                        onGenerateSlots={async (start, end) => {
+                          const { data, error } = await supabase.rpc('auto_generate_slots_for_range', {
+                            p_tour_id: editingTour.id,
+                            p_start_date: start,
+                            p_end_date: end,
+                          });
+                          if (error) throw error;
+                          alert(`Se generaron ${data} slots correctamente.`);
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end space-x-4">
               <button
                 type="button"
@@ -2357,14 +2768,14 @@ const AgencyTours: React.FC = () => {
                 type="submit"
                 disabled={isSubmitting || selectedDestinations.length === 0}
                 className={`btn btn-primary ${
-                  selectedDestinations.length === 0 
-                    ? 'opacity-50 cursor-not-allowed' 
+                  selectedDestinations.length === 0
+                    ? 'opacity-50 cursor-not-allowed'
                     : ''
                 }`}
               >
                 <Save className="h-4 w-4 mr-2" />
-                {isSubmitting 
-                  ? (editingTour ? 'Actualizando...' : 'Creando...') 
+                {isSubmitting
+                  ? (editingTour ? 'Actualizando...' : 'Creando...')
                   : (editingTour ? 'Actualizar Tour' : 'Crear Tour')
                 }
               </button>

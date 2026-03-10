@@ -90,6 +90,11 @@ export interface TourDeparturePoint {
   departure_points?: DeparturePoint;
 }
 
+export type TourType = 'excursion' | 'receptivo';
+export type ReceptivoModality = 'compartido' | 'privado';
+export type CancellationPolicy = 'flexible' | 'moderada' | 'estricta' | 'no_reembolsable';
+export type SlotStatus = 'activo' | 'lleno' | 'bloqueado' | 'cancelado' | 'completado';
+
 export interface Tour {
   id: string;
   agency_id: string;
@@ -126,6 +131,74 @@ export interface Tour {
   admite_ninos?: boolean;
   admite_adultos?: boolean;
   admite_adultos_mayores?: boolean;
+  tour_type?: TourType;
+  receptivo_modality?: ReceptivoModality;
+  operating_days?: number[];
+  operating_months?: number[];
+  min_advance_booking_hours?: number;
+  max_advance_booking_days?: number;
+  slot_duration_days?: number;
+  max_daily_slots?: number;
+  default_slot_capacity?: number;
+  cancellation_policy?: CancellationPolicy;
+  cancellation_hours_limit?: number;
+  cancellation_refund_percentage?: number;
+  min_travelers_required?: number;
+  min_travelers_confirmation_hours?: number;
+}
+
+export interface TourSchedule {
+  id: string;
+  tour_id: string;
+  agency_id: string;
+  departure_point_id?: string;
+  departure_time: string;
+  label?: string;
+  slot_capacity?: number;
+  valid_from: string;
+  valid_until?: string;
+  days_of_week?: number[];
+  is_active: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+  departure_points?: DeparturePoint;
+}
+
+export interface TourSlot {
+  id: string;
+  tour_id: string;
+  agency_id: string;
+  schedule_id?: string;
+  slot_date: string;
+  departure_time: string;
+  end_date?: string;
+  capacity: number;
+  booked_count: number;
+  available_count?: number;
+  status: SlotStatus;
+  is_auto_generated: boolean;
+  min_travelers_reached: boolean;
+  confirmed_at?: string;
+  cancellation_reason?: string;
+  cancelled_at?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  tour_schedules?: TourSchedule;
+}
+
+export interface TourSlotBlackout {
+  id: string;
+  tour_id: string;
+  agency_id: string;
+  blackout_start: string;
+  blackout_end: string;
+  reason?: string;
+  is_partial_day: boolean;
+  blocked_schedule_ids?: string[];
+  created_by?: string;
+  created_at: string;
 }
 
 export interface Booking {
@@ -170,6 +243,10 @@ export interface Booking {
   discount_amount?: number;
   service_charge_discount?: number;
   discount_codes?: DiscountCode;
+  slot_id?: string;
+  selected_date?: string;
+  selected_time?: string;
+  tour_slots?: TourSlot;
 }
 
 export interface BookingTraveler {
@@ -275,6 +352,8 @@ export interface SearchFilters {
   lng?: string;
   radius?: string;
   locationName?: string;
+  tourType?: TourType | 'all';
+  travelDate?: string;
 }
 
 export interface ImageUploadData {
