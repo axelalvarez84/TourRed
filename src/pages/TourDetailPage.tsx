@@ -948,8 +948,8 @@ const TourDetailPage: React.FC = () => {
               </div>
             )}
 
-            {/* Warning for no cancellation tours */}
-            {!isOwner && tour.cancellation_not_allowed && tour.agencies?.is_active !== false && (
+            {/* Warning for no cancellation tours (excursion only) */}
+            {!isOwner && tour.tour_type !== 'receptivo' && tour.cancellation_not_allowed && tour.agencies?.is_active !== false && (
               <div className="bg-orange-50 border-l-4 border-orange-500 rounded-lg p-6 mb-6">
                 <div className="flex items-start">
                   <div className="flex-shrink-0">
@@ -966,6 +966,48 @@ const TourDetailPage: React.FC = () => {
                     </p>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Cancellation policy for receptivo tours */}
+            {!isOwner && tour.tour_type === 'receptivo' && tour.agencies?.is_active !== false && (
+              <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6 shadow-sm">
+                <h3 className="text-base font-bold text-gray-800 mb-3 flex items-center gap-2">
+                  <svg className="h-5 w-5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                  Política de cancelación
+                </h3>
+                <div className="space-y-2">
+                  <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
+                    <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0 mt-1" />
+                    <div>
+                      <p className="text-sm font-semibold text-green-800">
+                        {tour.flexible_hours ?? 48}+ horas antes: reembolso del {tour.flexible_refund_percentage ?? 100}%
+                      </p>
+                      <p className="text-xs text-green-700 mt-0.5">Cancelando con suficiente anticipación recibes el mayor reembolso posible.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-100">
+                    <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 flex-shrink-0 mt-1" />
+                    <div>
+                      <p className="text-sm font-semibold text-yellow-800">
+                        {tour.moderate_hours ?? 24} a {tour.flexible_hours ?? 48} horas antes: reembolso del {tour.moderate_refund_percentage ?? 50}%
+                      </p>
+                      <p className="text-xs text-yellow-700 mt-0.5">Reembolso parcial si cancelas con menos anticipación.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 bg-red-50 rounded-lg border border-red-100">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0 mt-1" />
+                    <div>
+                      <p className="text-sm font-semibold text-red-800">
+                        Menos de {tour.moderate_hours ?? 24} horas antes: sin reembolso
+                      </p>
+                      <p className="text-xs text-red-700 mt-0.5">Aun así puedes cancelar para evitar una penalización de No Show en tu perfil.</p>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400 mt-3">El cargo por servicio de plataforma no es reembolsable en ningún caso.</p>
               </div>
             )}
 

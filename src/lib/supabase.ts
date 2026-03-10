@@ -1378,12 +1378,7 @@ export const validateCancellationEligibility = async (bookingId: string) => {
 
 export const calculateCancellationPolicy = async (booking: any): Promise<CancellationPolicy> => {
   const tour = booking.tours;
-  const tourStartDate = parseDateFromDB(tour.start_date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const millisecondsPerDay = 1000 * 60 * 60 * 24;
-  const daysBeforeTour = Math.ceil((tourStartDate.getTime() - today.getTime()) / millisecondsPerDay);
+  const isReceptivo = tour.tour_type === 'receptivo';
 
   const originalDepositAmount = Number(booking.deposit_amount || 0);
   const originalServiceCharge = Number(booking.service_charge || 0);
@@ -1420,7 +1415,7 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
   if (isPending) {
     return {
       policyType: 'pending_approval',
-      daysBeforeTour,
+      daysBeforeTour: 0,
       originalDepositAmount: 0,
       originalServiceCharge: 0,
       refundAmountToTraveler: 0,
@@ -1432,6 +1427,107 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
       refundMessage: 'Esta reserva está pendiente de aprobación y no ha sido pagada. Puedes cancelarla sin ninguna penalización.'
     };
   }
+
+  if (isReceptivo) {
+    const selectedDate = booking.selected_date;
+    const selectedTime = booking.selected_time || '00:00:00';
+    const now = new Date();
+
+    let departureDateTime: Date;
+    if (selectedDate) {
+      departureDateTime = new Date(`${selectedDate}T${selectedTime}`);
+    } else {
+      const tourStartDate = parseDateFromDB(tour.start_date);
+      departureDateTime = tourStartDate;
+    }
+
+    const millisecondsPerHour = 1000 * 60 * 60;
+    const hoursBeforeTour = (departureDateTime.getTime() - now.getTime()) / millisecondsPerHour;
+
+    const flexibleHours = Number(tour.flexible_hours ?? 48);
+    const flexibleRefundPct = Number(tour.flexible_refund_percentage ?? 100) / 100;
+    const moderateHours = Number(tour.moderate_hours ?? 24);
+    const moderateRefundPct = Number(tour.moderate_refund_percentage ?? 50) / 100;
+
+    if (hoursBeforeTour >= flexibleHours) {
+      const refundAmount = originalDepositAmount * flexibleRefundPct;
+      const penaltyAmount = originalDepositAmount * (1 - flexibleRefundPct);
+      const totalRefund = refundAmount + optionalServicesRefundable;
+      return {
+        policyType: flexibleRefundPct >= 1 ? '100_percent' : '50_percent',
+        daysBeforeTour: Math.ceil(hoursBeforeTour / 24),
+        originalDepositAmount,
+        originalServiceCharge,
+        refundAmountToTraveler: totalRefund,
+        amountToAgency: penaltyAmount * 0.7,
+        amountToPlatform: penaltyAmount * 0.3,
+        canCancel: true,
+        optionalServicesRefundable,
+        optionalServicesNonRefundable,
+        refundMessage: `Se reembolsará el ${Math.round(flexibleRefundPct * 100)}% del anticipo ($${refundAmount.toFixed(2)})${optionalServicesRefundable > 0 ? ` más los servicios opcionales reembolsables ($${optionalServicesRefundable.toFixed(2)})` : ''} a tu ToursRed Cash. El cargo por servicio ($${originalServiceCharge.toFixed(2)}) no es reembolsable.${optionalServicesNonRefundable > 0 ? ` Los servicios no reembolsables ($${optionalServicesNonRefundable.toFixed(2)}) no se devuelven.` : ''}`
+      };
+    }
+
+    if (hoursBeforeTour >= moderateHours) {
+      const refundAmount = originalDepositAmount * moderateRefundPct;
+      const penaltyAmount = originalDepositAmount * (1 - moderateRefundPct);
+      const totalRefund = refundAmount + optionalServicesRefundable;
+      return {
+        policyType: moderateRefundPct > 0 ? '50_percent' : 'no_refund',
+        daysBeforeTour: Math.ceil(hoursBeforeTour / 24),
+        originalDepositAmount,
+        originalServiceCharge,
+        refundAmountToTraveler: totalRefund,
+        amountToAgency: penaltyAmount * 0.7,
+        amountToPlatform: penaltyAmount * 0.3,
+        canCancel: true,
+        optionalServicesRefundable,
+        optionalServicesNonRefundable,
+        refundMessage: `Se reembolsará el ${Math.round(moderateRefundPct * 100)}% del anticipo ($${refundAmount.toFixed(2)})${optionalServicesRefundable > 0 ? ` más los servicios opcionales reembolsables ($${optionalServicesRefundable.toFixed(2)})` : ''} a tu ToursRed Cash. El cargo por servicio ($${originalServiceCharge.toFixed(2)}) no es reembolsable.${optionalServicesNonRefundable > 0 ? ` Los servicios no reembolsables ($${optionalServicesNonRefundable.toFixed(2)}) no se devuelven.` : ''}`
+      };
+    }
+
+    if (hoursBeforeTour > 0) {
+      const agencyAmount = originalDepositAmount * (1 - commissionRate);
+      const platformCommission = originalDepositAmount * commissionRate;
+      return {
+        policyType: 'no_refund',
+        daysBeforeTour: Math.ceil(hoursBeforeTour / 24),
+        originalDepositAmount,
+        originalServiceCharge,
+        refundAmountToTraveler: optionalServicesRefundable,
+        amountToAgency: agencyAmount,
+        amountToPlatform: platformCommission,
+        canCancel: true,
+        optionalServicesRefundable,
+        optionalServicesNonRefundable,
+        refundMessage: `No se reembolsará el anticipo del tour (menos de ${moderateHours} horas antes).${optionalServicesRefundable > 0 ? ` Los servicios opcionales reembolsables ($${optionalServicesRefundable.toFixed(2)}) sí se devuelven.` : ''} Cancelar evita una penalización de No Show en tu perfil.`
+      };
+    }
+
+    return {
+      policyType: 'no_show',
+      daysBeforeTour: 0,
+      originalDepositAmount,
+      originalServiceCharge,
+      refundAmountToTraveler: optionalServicesRefundable,
+      amountToAgency: originalDepositAmount * (1 - commissionRate),
+      amountToPlatform: originalDepositAmount * commissionRate,
+      canCancel: true,
+      optionalServicesRefundable,
+      optionalServicesNonRefundable,
+      warningMessage: 'ADVERTENCIA: Cancelar con la hora de salida ya pasada resultará en una marca de No Show en tu perfil.',
+      refundMessage: 'No hay reembolso del anticipo y se te marcará como No Show. Esto puede afectar tu capacidad de hacer reservas futuras.'
+    };
+  }
+
+  // Excursion: fixed days-based policy (unchanged)
+  const tourStartDate = parseDateFromDB(tour.start_date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const millisecondsPerDay = 1000 * 60 * 60 * 24;
+  const daysBeforeTour = Math.ceil((tourStartDate.getTime() - today.getTime()) / millisecondsPerDay);
 
   if (daysBeforeTour >= 15) {
     const totalRefund = originalDepositAmount + optionalServicesRefundable;

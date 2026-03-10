@@ -407,7 +407,7 @@ const TravelerBookings: React.FC = () => {
         .from('bookings')
         .select(`
           *,
-          tours:tour_id(id, name, start_date, cancellation_not_allowed)
+          tours:tour_id(id, name, start_date, cancellation_not_allowed, tour_type, flexible_hours, flexible_refund_percentage, moderate_hours, moderate_refund_percentage)
         `)
         .eq('id', booking.id)
         .single();

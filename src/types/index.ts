@@ -143,6 +143,10 @@ export interface Tour {
   cancellation_policy?: CancellationPolicy;
   cancellation_hours_limit?: number;
   cancellation_refund_percentage?: number;
+  flexible_hours?: number;
+  flexible_refund_percentage?: number;
+  moderate_hours?: number;
+  moderate_refund_percentage?: number;
   min_travelers_required?: number;
   min_travelers_confirmation_hours?: number;
 }
