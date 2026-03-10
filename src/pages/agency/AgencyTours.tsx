@@ -2435,10 +2435,29 @@ const AgencyTours: React.FC = () => {
                 <div className="space-y-3">
                   <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                     <Ban className="w-4 h-4 text-rose-500" />
-                    {tourType === 'receptivo' ? 'Política de cancelación' : 'Restricciones del Tour'}
+                    Restricciones del Tour
                   </h4>
 
-                  {tourType === 'receptivo' ? (
+                  <div className={`rounded-xl border-2 p-4 transition-all ${formData.cancellation_not_allowed ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50'}`}>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.cancellation_not_allowed}
+                        onChange={(e) => setFormData({...formData, cancellation_not_allowed: e.target.checked})}
+                        className="w-5 h-5 mt-0.5 text-red-600 border-gray-300 rounded focus:ring-red-500 flex-shrink-0"
+                      />
+                      <div>
+                        <span className={`text-sm font-semibold ${formData.cancellation_not_allowed ? 'text-red-800' : 'text-gray-700'}`}>
+                          Este tour NO permite cancelaciones con reembolso
+                        </span>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Los viajeros solo podrán cancelar para evitar la penalización de No Show. Esta restricción será visible en la página del tour.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+
+                  {tourType === 'receptivo' && !formData.cancellation_not_allowed && (
                     <div className="space-y-3">
                       <p className="text-xs text-gray-500">Define las franjas horarias y porcentajes de reembolso. La zona sin reembolso se aplica automáticamente cuando faltan menos horas que el umbral moderado.</p>
                       <div className="bg-green-50 border border-green-200 rounded-xl p-3">
@@ -2506,25 +2525,6 @@ const AgencyTours: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className={`rounded-xl border-2 p-4 transition-all ${formData.cancellation_not_allowed ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50'}`}>
-                      <label className="flex items-start gap-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.cancellation_not_allowed}
-                          onChange={(e) => setFormData({...formData, cancellation_not_allowed: e.target.checked})}
-                          className="w-5 h-5 mt-0.5 text-red-600 border-gray-300 rounded focus:ring-red-500 flex-shrink-0"
-                        />
-                        <div>
-                          <span className={`text-sm font-semibold ${formData.cancellation_not_allowed ? 'text-red-800' : 'text-gray-700'}`}>
-                            Este tour NO permite cancelaciones con reembolso
-                          </span>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Los viajeros solo podrán cancelar para evitar la penalización de No Show. Esta restricción será visible en la página del tour.
-                          </p>
-                        </div>
-                      </label>
                     </div>
                   )}
                   <div className={`rounded-xl border-2 p-4 transition-all ${formData.name_changes_not_allowed ? 'border-orange-300 bg-orange-50' : 'border-gray-200 bg-gray-50'}`}>
