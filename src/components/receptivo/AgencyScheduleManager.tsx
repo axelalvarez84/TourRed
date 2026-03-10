@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Clock, Save, X, Loader2, AlertCircle, Check } from 'lucide-react';
+import { Plus, CreditCard as Edit2, Trash2, Clock, Save, X, Loader2, AlertCircle, Check } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { TourSchedule, DeparturePoint } from '../../types';
 

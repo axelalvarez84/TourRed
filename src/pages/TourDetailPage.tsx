@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Users, Building, Star, Clock, Globe, MessageCircle, ChevronLeft, ChevronRight, Edit, Heart, ExternalLink, Share2, RefreshCw, Lock } from 'lucide-react';
+import { MapPin, Calendar, Users, Building, Star, Clock, Globe, MessageCircle, ChevronLeft, ChevronRight, CreditCard as Edit, Heart, ExternalLink, Share2, RefreshCw, Lock } from 'lucide-react';
 import BookingForm from '../components/BookingForm';
 import AgencyReviews from '../components/AgencyReviews';
 import ShareTourModal from '../components/ShareTourModal';
