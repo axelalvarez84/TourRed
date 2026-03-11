@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Users, Building, Star, Clock, Globe, MessageCircle, ChevronLeft, ChevronRight, CreditCard as Edit, Heart, ExternalLink, Share2, RefreshCw, Lock } from 'lucide-react';
+import { MapPin, Calendar, Users, Building, Star, Clock, Globe, MessageCircle, ChevronLeft, ChevronRight, CreditCard as Edit, Heart, ExternalLink, Share2, RefreshCw, Lock, Car, AlertTriangle } from 'lucide-react';
 import BookingForm from '../components/BookingForm';
 import AgencyReviews from '../components/AgencyReviews';
 import ShareTourModal from '../components/ShareTourModal';
@@ -673,7 +673,7 @@ const TourDetailPage: React.FC = () => {
                       <>
                         <h3 className="text-lg font-semibold mt-6 mb-3 flex items-center">
                           <MapPin className="h-5 w-5 mr-2 text-primary-600" />
-                          Puntos de Salida
+                          {tour.tour_type === 'receptivo' ? 'Puntos de Encuentro' : 'Puntos de Salida'}
                         </h3>
                         <div className="space-y-3">
                           {departurePointsInfo.map((point) => (
@@ -691,7 +691,7 @@ const TourDetailPage: React.FC = () => {
                                 )}
                                 {point.special_instructions && (
                                   <p className="text-sm text-gray-700 mt-1 italic">
-                                    📍 {point.special_instructions}
+                                    {point.special_instructions}
                                   </p>
                                 )}
                                 {point.google_maps_url && (
@@ -709,8 +709,109 @@ const TourDetailPage: React.FC = () => {
                           ))}
                         </div>
                         <p className="text-sm text-gray-600 mt-3 italic">
-                          El tour sale desde {departurePointsInfo.length === 1 ? 'este punto' : 'estos puntos'}. Asegúrate de llegar con tiempo suficiente.
+                          {tour.tour_type === 'receptivo'
+                            ? `El tour opera desde ${departurePointsInfo.length === 1 ? 'este punto de encuentro' : 'estos puntos de encuentro'}. Preséntate a tiempo.`
+                            : `El tour sale desde ${departurePointsInfo.length === 1 ? 'este punto' : 'estos puntos'}. Asegúrate de llegar con tiempo suficiente.`
+                          }
                         </p>
+                      </>
+                    )}
+
+                    {/* Pick Up — solo receptivo */}
+                    {tour.tour_type === 'receptivo' && tour.pickup_available && (
+                      <>
+                        <h3 className="text-lg font-semibold mt-6 mb-3 flex items-center gap-2">
+                          <Car className="h-5 w-5 text-teal-600" />
+                          Recogida en Hotel (Pick Up)
+                        </h3>
+                        <div className="space-y-3">
+                          {tour.pickup_free_zone && (
+                            <div className="flex items-start gap-3 p-4 bg-teal-50 border border-teal-200 rounded-lg">
+                              <div className="flex-shrink-0 w-6 h-6 bg-teal-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                                ✓
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-teal-800">Sin costo adicional</p>
+                                <p className="text-sm text-teal-700">{tour.pickup_free_zone}</p>
+                              </div>
+                            </div>
+                          )}
+                          {Array.isArray(tour.pickup_zones) && tour.pickup_zones.length > 0 && (
+                            <div className="space-y-2">
+                              <p className="text-sm font-medium text-gray-700">Zonas con costo adicional:</p>
+                              {tour.pickup_zones.map((zone: any, idx: number) => (
+                                <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                                  <span className="text-sm text-gray-800">{zone.name}</span>
+                                  <span className="text-sm font-semibold text-gray-900">
+                                    +${zone.extra_cost?.toLocaleString('es-MX', { minimumFractionDigits: 0 })} MXN
+                                    <span className="text-xs font-normal text-gray-500 ml-1">
+                                      {zone.cost_type === 'por_persona' ? '/ persona' : '/ reserva'}
+                                    </span>
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Idiomas disponibles — solo receptivo */}
+                    {tour.tour_type === 'receptivo' && Array.isArray(tour.tour_languages) && tour.tour_languages.length > 0 && (
+                      <>
+                        <h3 className="text-lg font-semibold mt-6 mb-3 flex items-center gap-2">
+                          <Globe className="h-5 w-5 text-blue-600" />
+                          Idiomas Disponibles
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                          {tour.tour_languages.map((lang: any, idx: number) => (
+                            <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                              <span className="text-sm font-medium text-blue-800">{lang.language}</span>
+                              {lang.extra_cost > 0 && (
+                                <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
+                                  +${lang.extra_cost?.toLocaleString('es-MX', { minimumFractionDigits: 0 })} {lang.cost_type === 'por_persona' ? '/ persona' : 'fijo'}
+                                </span>
+                              )}
+                              {(!lang.extra_cost || lang.extra_cost === 0) && (
+                                <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full">Sin costo extra</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Restricciones físicas — solo receptivo */}
+                    {tour.tour_type === 'receptivo' && (tour.restriction_pregnant || tour.restriction_disability || tour.restriction_physical) && (
+                      <>
+                        <h3 className="text-lg font-semibold mt-6 mb-3 flex items-center gap-2">
+                          <AlertTriangle className="h-5 w-5 text-amber-500" />
+                          Restricciones Importantes
+                        </h3>
+                        <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 space-y-2">
+                          <p className="text-sm font-semibold text-amber-800 mb-3">Este tour tiene las siguientes restricciones de aptitud:</p>
+                          {tour.restriction_pregnant && (
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">!</span>
+                              <span className="text-sm text-amber-800">No apto para mujeres embarazadas</span>
+                            </div>
+                          )}
+                          {tour.restriction_disability && (
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">!</span>
+                              <span className="text-sm text-amber-800">No apto para personas con alguna discapacidad</span>
+                            </div>
+                          )}
+                          {tour.restriction_physical && (
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">!</span>
+                              <span className="text-sm text-amber-800">No apto para personas con mala condición física</span>
+                            </div>
+                          )}
+                          <p className="text-xs text-amber-700 mt-3 pt-2 border-t border-amber-200">
+                            Al hacer una reserva, deberás aceptar estas restricciones. Ni tú ni tus acompañantes deben pertenecer a estos grupos.
+                          </p>
+                        </div>
                       </>
                     )}
 

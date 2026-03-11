@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet, Award, Ticket, X, Check, Loader2, ShoppingBag, Info, Tag, RefreshCw, Clock } from 'lucide-react';
+import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet, Award, Ticket, X, Check, Loader2, ShoppingBag, Info, Tag, RefreshCw, Clock, Car, Globe, AlertTriangle, MapPin } from 'lucide-react';
 import PaymentProviderSelector, { PaymentProvider } from './PaymentProviderSelector';
 import SlotCalendarPicker from './receptivo/SlotCalendarPicker';
 import SlotTimePicker from './receptivo/SlotTimePicker';
@@ -86,6 +86,19 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const isReceptivo = tour.tour_type === 'receptivo';
   const [selectedSlotDate, setSelectedSlotDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TourSlot | null>(null);
+
+  const [pickupType, setPickupType] = useState<'meeting_point' | 'pickup'>('meeting_point');
+  const [pickupHotelAddress, setPickupHotelAddress] = useState('');
+  const [selectedPickupZone, setSelectedPickupZone] = useState<string>('free');
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('');
+  const [restrictionsAccepted, setRestrictionsAccepted] = useState(false);
+
+  const hasRestrictions = isReceptivo && (tour.restriction_pregnant || tour.restriction_disability || tour.restriction_physical);
+  const pickupZones: any[] = Array.isArray(tour.pickup_zones) ? tour.pickup_zones : [];
+  const tourLanguages: any[] = Array.isArray(tour.tour_languages) ? tour.tour_languages : [];
+
+  const selectedLanguageData = tourLanguages.find((l: any) => l.language === selectedLanguage);
+  const selectedZoneData = selectedPickupZone !== 'free' ? pickupZones.find((z: any) => z.name === selectedPickupZone) : null;
 
   const [discountCodeInput, setDiscountCodeInput] = useState('');
   const [isValidatingCode, setIsValidatingCode] = useState(false);
@@ -529,6 +542,20 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     return sum + qty * svc.price_per_person;
   }, 0);
 
+  const pickupExtraCost = (() => {
+    if (!isReceptivo || pickupType !== 'pickup' || !selectedZoneData) return 0;
+    if (selectedZoneData.cost_type === 'por_persona') return selectedZoneData.extra_cost * totalTravelers;
+    return selectedZoneData.extra_cost;
+  })();
+
+  const languageExtraCost = (() => {
+    if (!isReceptivo || !selectedLanguageData || !selectedLanguageData.extra_cost) return 0;
+    if (selectedLanguageData.cost_type === 'por_persona') return selectedLanguageData.extra_cost * totalTravelers;
+    return selectedLanguageData.extra_cost;
+  })();
+
+  const receptivoExtrasSubtotal = pickupExtraCost + languageExtraCost;
+
   // Precio total del tour (sin descuento, sin opcionales)
   const grossTourPrice = precioAdultos + precioNinos + precioInfantes + precioAdultosMayores + precioMascotas;
 
@@ -640,7 +667,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const promoDiscountAmount = promoResult.discount;
 
   // Precio total del tour (sin descuento de código, pero con promo)
-  const grossTotalPrice = grossTourPrice - promoDiscountAmount + optionalServicesSubtotal;
+  const grossTotalPrice = grossTourPrice - promoDiscountAmount + optionalServicesSubtotal + receptivoExtrasSubtotal;
 
   // Si el usuario es de alto riesgo (más de 3 no shows), debe pagar el 100%
   const effectiveDepositPercentage = isHighRisk ? 100 : tour.deposit_percentage;
@@ -799,6 +826,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
       return;
     }
 
+    if (hasRestrictions && !restrictionsAccepted) {
+      setError('Debes aceptar las restricciones del tour para continuar.');
+      return;
+    }
+
+    if (isReceptivo && tour.pickup_available && pickupType === 'pickup' && !pickupHotelAddress.trim()) {
+      setError('Debes ingresar tu dirección o nombre de hotel para la recogida.');
+      return;
+    }
+
     if (totalTravelers === 0) {
       setError('Debes seleccionar al menos un viajero.');
       return;
@@ -848,6 +885,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         payment_provider: addMembershipToBooking ? 'stripe' : paymentProvider,
         promotion_id: promoResult.isActive && activePromotion ? activePromotion.id : null,
         promo_discount_amount: promoResult.isActive ? promoDiscountAmount : 0,
+        pickup_type: isReceptivo && tour.pickup_available ? pickupType : null,
+        pickup_zone_name: isReceptivo && pickupType === 'pickup' && selectedZoneData ? selectedZoneData.name : (isReceptivo && pickupType === 'pickup' ? (pickupHotelAddress || null) : null),
+        pickup_zone_extra_cost: isReceptivo && pickupType === 'pickup' ? (selectedZoneData?.extra_cost || 0) : 0,
+        pickup_cost_type: isReceptivo && pickupType === 'pickup' && selectedZoneData ? selectedZoneData.cost_type : null,
+        selected_language: isReceptivo && selectedLanguage ? selectedLanguage : null,
+        language_extra_cost: isReceptivo && selectedLanguageData ? (selectedLanguageData.extra_cost || 0) : 0,
+        language_cost_type: isReceptivo && selectedLanguageData ? selectedLanguageData.cost_type : null,
+        restrictions_accepted: hasRestrictions ? restrictionsAccepted : false,
       };
 
       console.log('📝 Creando reserva con datos:', bookingData);
@@ -1037,6 +1082,154 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
             <span>
               {formatDate(tour.start_date)} - {formatDate(tour.end_date)}
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* Pickup selector — solo receptivo */}
+      {isReceptivo && tour.pickup_available && (
+        <div className="mb-4 space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Car className="w-4 h-4 text-teal-600" />
+            <span className="text-sm font-semibold text-gray-700">Tipo de traslado</span>
+          </div>
+          <div className="space-y-2">
+            <label className="flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all hover:border-teal-300 hover:bg-teal-50"
+              style={{ borderColor: pickupType === 'meeting_point' ? '#0d9488' : '#e5e7eb', background: pickupType === 'meeting_point' ? '#f0fdfa' : undefined }}>
+              <input
+                type="radio"
+                name="pickup_type"
+                value="meeting_point"
+                checked={pickupType === 'meeting_point'}
+                onChange={() => setPickupType('meeting_point')}
+                className="mt-0.5 text-teal-600"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-800">Me presento en el punto de encuentro</span>
+                <p className="text-xs text-gray-500 mt-0.5">Llego por mi cuenta al punto indicado</p>
+              </div>
+            </label>
+            <label className="flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all hover:border-teal-300 hover:bg-teal-50"
+              style={{ borderColor: pickupType === 'pickup' ? '#0d9488' : '#e5e7eb', background: pickupType === 'pickup' ? '#f0fdfa' : undefined }}>
+              <input
+                type="radio"
+                name="pickup_type"
+                value="pickup"
+                checked={pickupType === 'pickup'}
+                onChange={() => setPickupType('pickup')}
+                className="mt-0.5 text-teal-600"
+              />
+              <div className="flex-1">
+                <span className="text-sm font-medium text-gray-800">Solicitar recogida en mi hotel</span>
+                <p className="text-xs text-gray-500 mt-0.5">La agencia pasará por mí</p>
+              </div>
+            </label>
+          </div>
+
+          {pickupType === 'pickup' && (
+            <div className="pl-4 space-y-3">
+              {tour.pickup_free_zone && (
+                <div className="text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+                  <span className="font-semibold">Zona sin costo:</span> {tour.pickup_free_zone}
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  Nombre de tu hotel o dirección <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={pickupHotelAddress}
+                  onChange={e => setPickupHotelAddress(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  placeholder="Ej: Hotel Barceló, Zona Hotelera"
+                />
+              </div>
+              {pickupZones.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    Zona de recogida
+                  </label>
+                  <select
+                    value={selectedPickupZone}
+                    onChange={e => setSelectedPickupZone(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  >
+                    <option value="free">{tour.pickup_free_zone ? `Sin costo (${tour.pickup_free_zone})` : 'Sin costo adicional'}</option>
+                    {pickupZones.map((zone: any, idx: number) => (
+                      <option key={idx} value={zone.name}>
+                        {zone.name} — +${zone.extra_cost?.toLocaleString('es-MX', { minimumFractionDigits: 0 })} MXN {zone.cost_type === 'por_persona' ? '/ persona' : '/ reserva'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Selector de idioma — solo receptivo */}
+      {isReceptivo && tourLanguages.length > 0 && (
+        <div className="mb-4 space-y-2">
+          <div className="flex items-center gap-2 mb-1">
+            <Globe className="w-4 h-4 text-blue-600" />
+            <span className="text-sm font-semibold text-gray-700">Idioma del tour</span>
+          </div>
+          <select
+            value={selectedLanguage}
+            onChange={e => setSelectedLanguage(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Idioma por defecto (sin costo extra)</option>
+            {tourLanguages.map((lang: any, idx: number) => (
+              <option key={idx} value={lang.language}>
+                {lang.language}{lang.extra_cost > 0 ? ` — +$${lang.extra_cost?.toLocaleString('es-MX', { minimumFractionDigits: 0 })} MXN ${lang.cost_type === 'por_persona' ? '/ persona' : 'fijo'}` : ' (sin costo extra)'}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Restricciones del tour — solo receptivo */}
+      {hasRestrictions && (
+        <div className="mb-4">
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+              <span className="text-sm font-semibold text-amber-800">Restricciones del Tour</span>
+            </div>
+            <div className="space-y-1.5">
+              {tour.restriction_pregnant && (
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded-full bg-amber-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">!</span>
+                  <span className="text-xs text-amber-800">No apto para mujeres embarazadas</span>
+                </div>
+              )}
+              {tour.restriction_disability && (
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded-full bg-amber-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">!</span>
+                  <span className="text-xs text-amber-800">No apto para personas con alguna discapacidad</span>
+                </div>
+              )}
+              {tour.restriction_physical && (
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded-full bg-amber-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">!</span>
+                  <span className="text-xs text-amber-800">No apto para personas con mala condición física</span>
+                </div>
+              )}
+            </div>
+            <label className={`flex items-start gap-3 cursor-pointer p-3 rounded-lg border-2 transition-all ${restrictionsAccepted ? 'border-green-400 bg-green-50' : 'border-amber-300 bg-white'}`}>
+              <input
+                type="checkbox"
+                checked={restrictionsAccepted}
+                onChange={e => setRestrictionsAccepted(e.target.checked)}
+                className="w-4 h-4 mt-0.5 text-green-600 border-gray-300 rounded focus:ring-green-500 flex-shrink-0"
+              />
+              <span className={`text-xs font-medium ${restrictionsAccepted ? 'text-green-800' : 'text-gray-700'}`}>
+                He leído y acepto las restricciones. Ni yo ni mis acompañantes pertenecemos a ninguno de estos grupos.
+              </span>
+            </label>
           </div>
         </div>
       )}
@@ -1788,6 +1981,30 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     );
                   })
                 }
+              </div>
+            )}
+
+            {receptivoExtrasSubtotal > 0 && (
+              <div className="border-t pt-2 mt-1 space-y-1">
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Extras Receptivo</div>
+                {pickupExtraCost > 0 && selectedZoneData && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 flex items-center gap-1">
+                      <Car className="w-3 h-3" />
+                      Pick Up — {selectedZoneData.name} ({selectedZoneData.cost_type === 'por_persona' ? 'por persona' : 'por reserva'}):
+                    </span>
+                    <span className="font-medium">${pickupExtraCost.toLocaleString()}</span>
+                  </div>
+                )}
+                {languageExtraCost > 0 && selectedLanguageData && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 flex items-center gap-1">
+                      <Globe className="w-3 h-3" />
+                      Idioma — {selectedLanguageData.language} ({selectedLanguageData.cost_type === 'por_persona' ? 'por persona' : 'fijo'}):
+                    </span>
+                    <span className="font-medium">${languageExtraCost.toLocaleString()}</span>
+                  </div>
+                )}
               </div>
             )}
 

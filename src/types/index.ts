@@ -149,6 +149,15 @@ export interface Tour {
   moderate_refund_percentage?: number;
   min_travelers_required?: number;
   min_travelers_confirmation_hours?: number;
+  pickup_available?: boolean;
+  pickup_free_zone?: string;
+  pickup_zones?: any[];
+  tour_languages?: any[];
+  restriction_pregnant?: boolean;
+  restriction_disability?: boolean;
+  restriction_physical?: boolean;
+  name_changes_not_allowed?: boolean;
+  cancellation_not_allowed?: boolean;
 }
 
 export interface TourSchedule {

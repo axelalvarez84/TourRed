@@ -23,6 +23,7 @@ interface DeparturePointSelectorProps {
   onCreateNew?: () => void;
   maxPoints?: number;
   minPoints?: number;
+  label?: string;
 }
 
 const DeparturePointSelector: React.FC<DeparturePointSelectorProps> = ({
@@ -31,6 +32,7 @@ const DeparturePointSelector: React.FC<DeparturePointSelectorProps> = ({
   onCreateNew,
   maxPoints = 4,
   minPoints = 1,
+  label = 'Puntos de Salida',
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<DeparturePoint[]>([]);
@@ -168,7 +170,7 @@ const DeparturePointSelector: React.FC<DeparturePointSelectorProps> = ({
     <div className="space-y-4">
       <div ref={wrapperRef} className="relative">
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Puntos de Salida *
+          {label} *
           <span className="text-xs text-gray-500 ml-2">
             (Mínimo {minPoints}, Máximo {maxPoints})
           </span>
@@ -186,7 +188,7 @@ const DeparturePointSelector: React.FC<DeparturePointSelectorProps> = ({
                 setShowSuggestions(true);
               }
             }}
-            placeholder="Buscar punto de salida..."
+            placeholder={`Buscar ${label.toLowerCase()}...`}
             className="input pl-10 pr-10"
             disabled={selectedPoints.length >= maxPoints}
           />
@@ -357,7 +359,7 @@ const DeparturePointSelector: React.FC<DeparturePointSelectorProps> = ({
       {selectedPoints.length < minPoints && (
         <p className="text-sm text-error-600 flex items-center gap-2">
           <AlertCircle className="w-4 h-4" />
-          Debes seleccionar al menos {minPoints} punto{minPoints !== 1 ? 's' : ''} de salida
+          Debes seleccionar al menos {minPoints} {label.toLowerCase().replace(/s$/, '')}{minPoints !== 1 ? 's' : ''}
         </p>
       )}
 
@@ -368,11 +370,11 @@ const DeparturePointSelector: React.FC<DeparturePointSelectorProps> = ({
         disabled={selectedPoints.length >= maxPoints}
       >
         <Plus className="w-4 h-4" />
-        Crear nuevo punto de salida
+        Crear nuevo {label.toLowerCase().replace(/s$/, '').replace(/puntos? de/i, 'punto de')}
       </button>
 
       <p className="text-xs text-gray-500">
-        💡 Busca por nombre del lugar, ciudad o municipio. Si no encuentras el punto que necesitas, créalo y estará disponible para todos tus tours futuros.
+        Busca por nombre del lugar, ciudad o municipio. Si no encuentras el punto que necesitas, créalo y estará disponible para todos tus tours futuros.
       </p>
     </div>
   );
