@@ -18,6 +18,15 @@ interface OptionalService {
   is_active: boolean;
 }
 
+interface ScheduleDraft {
+  id?: string;
+  departure_time: string;
+  label: string;
+  slot_capacity: string;
+  days_of_week: number[];
+  is_active: boolean;
+}
+
 interface PickupZone {
   name: string;
   extra_cost: string;
@@ -174,6 +183,13 @@ const AgencyTours: React.FC = () => {
   const [tourImageData, setTourImageData] = useState<{base64: string, type: string, size: number} | null>(null);
   const [hasDraft, setHasDraft] = useState(false);
   const [optionalServices, setOptionalServices] = useState<OptionalService[]>([]);
+
+  const [schedulesDraft, setSchedulesDraft] = useState<ScheduleDraft[]>([]);
+  const [scheduleForm, setScheduleForm] = useState<ScheduleDraft>({
+    departure_time: '', label: '', slot_capacity: '', days_of_week: [], is_active: true,
+  });
+  const [showScheduleForm, setShowScheduleForm] = useState(false);
+  const [editingScheduleIdx, setEditingScheduleIdx] = useState<number | null>(null);
 
   const [pickupAvailable, setPickupAvailable] = useState(false);
   const [pickupFreeZone, setPickupFreeZone] = useState('');
@@ -432,6 +448,10 @@ const AgencyTours: React.FC = () => {
     setSelectedDeparturePoints([]);
     setTourImageData(null);
     setOptionalServices([]);
+    setSchedulesDraft([]);
+    setScheduleForm({ departure_time: '', label: '', slot_capacity: '', days_of_week: [], is_active: true });
+    setShowScheduleForm(false);
+    setEditingScheduleIdx(null);
     setPickupAvailable(false);
     setPickupFreeZone('');
     setPickupZones([]);
@@ -640,6 +660,36 @@ const AgencyTours: React.FC = () => {
     } catch (err) {
       console.error('Error loading optional services:', err);
       setOptionalServices([]);
+    }
+
+    // Load schedules for receptivo tours
+    if (tour.tour_type === 'receptivo') {
+      try {
+        const { data: schedulesData } = await supabase
+          .from('tour_schedules')
+          .select('*')
+          .eq('tour_id', tour.id)
+          .order('display_order', { ascending: true })
+          .order('departure_time', { ascending: true });
+
+        if (schedulesData) {
+          setSchedulesDraft(schedulesData.map(s => ({
+            id: s.id,
+            departure_time: s.departure_time,
+            label: s.label || '',
+            slot_capacity: s.slot_capacity?.toString() || '',
+            days_of_week: s.days_of_week || [],
+            is_active: s.is_active,
+          })));
+        } else {
+          setSchedulesDraft([]);
+        }
+      } catch (err) {
+        console.error('Error loading schedules:', err);
+        setSchedulesDraft([]);
+      }
+    } else {
+      setSchedulesDraft([]);
     }
 
     setEditingTour(tour);
@@ -1487,6 +1537,68 @@ const AgencyTours: React.FC = () => {
         await supabase.from('tour_optional_services').insert(toInsert);
       }
 
+      // Save schedules for receptivo tours
+      if (tourType === 'receptivo' && schedulesDraft.length > 0) {
+        const agencyIdForSchedules = editingTour ? editingTour.agency_id : createdTour?.agency_id;
+
+        if (agencyIdForSchedules) {
+          if (editingTour) {
+            // Sync: update existing, insert new ones that have no id yet
+            for (const s of schedulesDraft) {
+              if (s.id) {
+                await supabase.from('tour_schedules').update({
+                  departure_time: s.departure_time,
+                  label: s.label || null,
+                  slot_capacity: s.slot_capacity ? parseInt(s.slot_capacity) : null,
+                  days_of_week: s.days_of_week.length > 0 ? s.days_of_week : null,
+                  is_active: s.is_active,
+                  updated_at: new Date().toISOString(),
+                }).eq('id', s.id);
+              } else {
+                await supabase.from('tour_schedules').insert({
+                  tour_id: tourId,
+                  agency_id: agencyIdForSchedules,
+                  departure_time: s.departure_time,
+                  label: s.label || null,
+                  slot_capacity: s.slot_capacity ? parseInt(s.slot_capacity) : null,
+                  days_of_week: s.days_of_week.length > 0 ? s.days_of_week : null,
+                  is_active: s.is_active,
+                  valid_from: new Date().toISOString().split('T')[0],
+                  display_order: schedulesDraft.indexOf(s),
+                });
+              }
+            }
+          } else {
+            // New tour: bulk insert all draft schedules
+            const schedulesToInsert = schedulesDraft.map((s, i) => ({
+              tour_id: tourId,
+              agency_id: agencyIdForSchedules,
+              departure_time: s.departure_time,
+              label: s.label || null,
+              slot_capacity: s.slot_capacity ? parseInt(s.slot_capacity) : null,
+              days_of_week: s.days_of_week.length > 0 ? s.days_of_week : null,
+              is_active: s.is_active,
+              valid_from: new Date().toISOString().split('T')[0],
+              display_order: i + 1,
+            }));
+            await supabase.from('tour_schedules').insert(schedulesToInsert);
+
+            // Auto-generate slots for the next 90 days
+            const startDate = new Date().toISOString().split('T')[0];
+            const endDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            try {
+              await supabase.rpc('auto_generate_slots_for_range', {
+                p_tour_id: tourId,
+                p_start_date: startDate,
+                p_end_date: endDate,
+              });
+            } catch (slotErr) {
+              console.warn('Could not auto-generate slots:', slotErr);
+            }
+          }
+        }
+      }
+
       // Recargar destinos disponibles después de crear nuevos
       await fetchAllDestinations();
 
@@ -1499,6 +1611,9 @@ const AgencyTours: React.FC = () => {
         setIsCreating(false);
         const { data: freshTour } = await supabase.from('tours').select('*').eq('id', createdTour.id).single();
         setEditingTour(freshTour || createdTour);
+        if (tourType === 'receptivo') {
+          setReceptivoTab('horarios');
+        }
       } else {
         handleCancel();
       }
@@ -1936,7 +2051,7 @@ const AgencyTours: React.FC = () => {
                   <div className="space-y-4">
                     <div className="bg-teal-50 border border-teal-100 rounded-xl p-4">
                       <p className="text-teal-700 text-xs font-medium">
-                        Los tours receptivos no tienen fechas fijas. La disponibilidad se gestiona mediante horarios recurrentes una vez creado el tour.
+                        Los tours receptivos no tienen fechas fijas. Configura los horarios de salida abajo y se generarán slots de disponibilidad automáticamente al guardar.
                       </p>
                     </div>
 
@@ -2145,6 +2260,201 @@ const AgencyTours: React.FC = () => {
                               </div>
                             </div>
                           </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Horarios de Salida */}
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="bg-gray-50 px-4 py-3 flex items-center gap-2 border-b border-gray-200">
+                        <Clock className="w-4 h-4 text-gray-500" />
+                        <span className="text-sm font-semibold text-gray-700">Horarios de Salida</span>
+                        <span className="ml-2 text-xs text-gray-400 font-normal">Configura las horas en que sale este tour</span>
+                      </div>
+                      <div className="p-4 space-y-3">
+                        {schedulesDraft.length === 0 && !showScheduleForm && (
+                          <p className="text-xs text-gray-400 italic text-center py-2">
+                            Sin horarios configurados. Agrega al menos uno para que los viajeros puedan reservar.
+                          </p>
+                        )}
+
+                        {schedulesDraft.length > 0 && (
+                          <div className="space-y-2">
+                            {schedulesDraft.map((s, idx) => (
+                              <div key={idx} className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${s.is_active ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-100'}`}>
+                                <div className="flex items-center gap-2.5">
+                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${s.is_active ? 'bg-teal-50 text-teal-600' : 'bg-gray-100 text-gray-400'}`}>
+                                    <Clock className="w-4 h-4" />
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-semibold text-sm text-gray-800">
+                                        {(() => { const [h, m] = s.departure_time.split(':'); const hr = parseInt(h); return `${hr % 12 || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`; })()}
+                                      </span>
+                                      {s.label && <span className="text-xs text-gray-500">— {s.label}</span>}
+                                      {!s.is_active && <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Inactivo</span>}
+                                    </div>
+                                    {(s.slot_capacity || s.days_of_week.length > 0) && (
+                                      <div className="flex items-center gap-2 mt-0.5">
+                                        {s.slot_capacity && <span className="text-xs text-gray-500">{s.slot_capacity} cupos</span>}
+                                        {s.days_of_week.length > 0 && <span className="text-xs text-gray-500">{s.days_of_week.map(d => ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][d]).join(', ')}</span>}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setScheduleForm({ ...s });
+                                      setEditingScheduleIdx(idx);
+                                      setShowScheduleForm(true);
+                                    }}
+                                    className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                  >
+                                    <Edit className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (!s.id || confirm('¿Eliminar este horario?')) {
+                                        if (s.id) {
+                                          supabase.from('tour_schedules').delete().eq('id', s.id);
+                                        }
+                                        setSchedulesDraft(prev => prev.filter((_, i) => i !== idx));
+                                      }
+                                    }}
+                                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {showScheduleForm && (
+                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-sm font-semibold text-gray-700">
+                                {editingScheduleIdx !== null ? 'Editar Horario' : 'Nuevo Horario'}
+                              </h4>
+                              <button type="button" onClick={() => { setShowScheduleForm(false); setEditingScheduleIdx(null); setScheduleForm({ departure_time: '', label: '', slot_capacity: '', days_of_week: [], is_active: true }); }}
+                                className="p-1 text-gray-400 hover:text-gray-600">
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">Hora de salida *</label>
+                                <input
+                                  type="time"
+                                  value={scheduleForm.departure_time}
+                                  onChange={e => setScheduleForm(prev => ({ ...prev, departure_time: e.target.value }))}
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">Etiqueta (opcional)</label>
+                                <input
+                                  type="text"
+                                  value={scheduleForm.label}
+                                  placeholder="Ej: Salida matutina"
+                                  onChange={e => setScheduleForm(prev => ({ ...prev, label: e.target.value }))}
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Cupos propios (opcional — deja vacío para usar el default del tour)</label>
+                              <input
+                                type="number"
+                                min="1"
+                                value={scheduleForm.slot_capacity}
+                                placeholder="Usa cupos por defecto del tour"
+                                onChange={e => setScheduleForm(prev => ({ ...prev, slot_capacity: e.target.value }))}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-2">Días específicos (vacío = todos los días del tour)</label>
+                              <div className="flex gap-1.5">
+                                {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map((d, i) => (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    onClick={() => setScheduleForm(prev => ({
+                                      ...prev,
+                                      days_of_week: prev.days_of_week.includes(i)
+                                        ? prev.days_of_week.filter(x => x !== i)
+                                        : [...prev.days_of_week, i].sort(),
+                                    }))}
+                                    className={`w-9 h-9 rounded-lg text-xs font-medium transition-colors ${
+                                      scheduleForm.days_of_week.includes(i)
+                                        ? 'bg-teal-600 text-white'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
+                                  >
+                                    {d}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <input type="checkbox" id="sdraft-active" checked={scheduleForm.is_active}
+                                onChange={e => setScheduleForm(prev => ({ ...prev, is_active: e.target.checked }))}
+                                className="w-4 h-4 text-teal-600 rounded" />
+                              <label htmlFor="sdraft-active" className="text-xs text-gray-700">Horario activo</label>
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                type="button"
+                                disabled={!scheduleForm.departure_time}
+                                onClick={async () => {
+                                  if (!scheduleForm.departure_time) return;
+                                  if (editingScheduleIdx !== null) {
+                                    const existing = schedulesDraft[editingScheduleIdx];
+                                    if (existing.id && editingTour) {
+                                      await supabase.from('tour_schedules').update({
+                                        departure_time: scheduleForm.departure_time,
+                                        label: scheduleForm.label || null,
+                                        slot_capacity: scheduleForm.slot_capacity ? parseInt(scheduleForm.slot_capacity) : null,
+                                        days_of_week: scheduleForm.days_of_week.length > 0 ? scheduleForm.days_of_week : null,
+                                        is_active: scheduleForm.is_active,
+                                        updated_at: new Date().toISOString(),
+                                      }).eq('id', existing.id);
+                                    }
+                                    setSchedulesDraft(prev => prev.map((s, i) => i === editingScheduleIdx ? { ...scheduleForm } : s));
+                                  } else {
+                                    setSchedulesDraft(prev => [...prev, { ...scheduleForm }]);
+                                  }
+                                  setShowScheduleForm(false);
+                                  setEditingScheduleIdx(null);
+                                  setScheduleForm({ departure_time: '', label: '', slot_capacity: '', days_of_week: [], is_active: true });
+                                }}
+                                className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-40"
+                              >
+                                <Save className="w-3.5 h-3.5" />
+                                Guardar
+                              </button>
+                              <button type="button" onClick={() => { setShowScheduleForm(false); setEditingScheduleIdx(null); setScheduleForm({ departure_time: '', label: '', slot_capacity: '', days_of_week: [], is_active: true }); }}
+                                className="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {!showScheduleForm && (
+                          <button
+                            type="button"
+                            onClick={() => { setScheduleForm({ departure_time: '', label: '', slot_capacity: '', days_of_week: [], is_active: true }); setEditingScheduleIdx(null); setShowScheduleForm(true); }}
+                            className="flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-800 font-medium"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Agregar horario de salida
+                          </button>
                         )}
                       </div>
                     </div>
@@ -3081,11 +3391,11 @@ const AgencyTours: React.FC = () => {
                   <div className="p-5">
                     {receptivoTab === 'info' && (
                       <div className="space-y-3 text-sm text-gray-600">
-                        <p>Para activar este tour receptivo, sigue estos pasos:</p>
+                        <p>Para que los viajeros puedan reservar este tour, asegúrate de:</p>
                         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-                          <li>Ve a <strong>Horarios</strong> y agrega al menos un horario de salida.</li>
-                          <li>Opcionalmente bloquea fechas en <strong>Bloqueos</strong>.</li>
-                          <li>En <strong>Calendario</strong>, usa <em>Generar Slots</em> para crear las salidas disponibles.</li>
+                          <li>Tener al menos un <strong>Horario</strong> activo (puedes agregar o editar en la pestaña Horarios).</li>
+                          <li>Opcionalmente bloquear fechas no disponibles en <strong>Bloqueos</strong>.</li>
+                          <li>En <strong>Calendario</strong>, usar <em>Generar Slots</em> para crear o actualizar las salidas disponibles.</li>
                         </ol>
                         <p className="text-xs text-gray-400 mt-2">
                           Los viajeros podrán reservar seleccionando una fecha y horario disponible.
