@@ -118,9 +118,9 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
     }
   };
   // Helper function to format dates consistently
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return '';
     try {
-      // Parse the date string in YYYY-MM-DD format
       const [year, month, day] = dateString.split('-').map(Number);
       // Create date at midnight UTC
       const date = new Date(Date.UTC(year, month - 1, day));

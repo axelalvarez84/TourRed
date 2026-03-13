@@ -364,9 +364,9 @@ const TourDetailPage: React.FC = () => {
   };
 
   // Helper function to format dates consistently
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return '';
     try {
-      // Parse the date string in YYYY-MM-DD format
       const [year, month, day] = dateString.split('-').map(Number);
       // Create date at midnight UTC
       const date = new Date(Date.UTC(year, month - 1, day));
@@ -404,7 +404,7 @@ const TourDetailPage: React.FC = () => {
     if (tour.booking_deadline) {
       return formatDate(tour.booking_deadline);
     }
-    // Calcular 14 días antes del inicio como fecha límite por defecto
+    if (!tour.start_date) return '';
     try {
       const startDate = parseDateFromDB(tour.start_date);
       const deadline = new Date(startDate);
@@ -412,10 +412,7 @@ const TourDetailPage: React.FC = () => {
       return format(deadline, 'MMM d, yyyy');
     } catch (error) {
       console.error('Error calculating booking deadline:', error);
-      // Fallback calculation
-      const deadline = new Date(tour.start_date);
-      deadline.setDate(deadline.getDate() - 14);
-      return format(deadline, 'MMM d, yyyy');
+      return '';
     }
   };
 
