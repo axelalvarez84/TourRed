@@ -134,6 +134,7 @@ const TourMassMessageModal: React.FC<TourMassMessageModalProps> = ({
   const handleNextFromCompose = () => {
     if (!subject.trim() || !messageBody.trim()) return;
     setStep('confirm');
+    loadRecipientCount();
   };
 
   const handleSend = async () => {
@@ -451,7 +452,9 @@ const TourMassMessageModal: React.FC<TourMassMessageModalProps> = ({
                     )}
                     <div className="flex justify-between">
                       <span className="text-gray-500">Destinatarios:</span>
-                      <span className="font-bold text-blue-700">{recipientCount} personas</span>
+                      <span className="font-bold text-blue-700">
+                        {loadingCount ? '...' : `${recipientCount ?? 0} ${(recipientCount ?? 0) === 1 ? 'persona' : 'personas'}`}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Asunto:</span>
