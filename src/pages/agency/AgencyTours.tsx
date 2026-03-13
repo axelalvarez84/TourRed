@@ -1683,7 +1683,8 @@ const AgencyTours: React.FC = () => {
     setSelectedDestinations(selectedDestinations.filter(d => d.id !== destinationId));
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return 'N/A';
     try {
       if (dateString.includes(' ') || dateString.includes('T')) {
         const date = new Date(dateString);
@@ -3937,7 +3938,10 @@ const AgencyTours: React.FC = () => {
                   
                   <div className="flex items-center text-sm text-gray-600">
                     <Calendar className="h-4 w-4 mr-2" />
-                    <span>{formatDate(tour.start_date)} - {formatDate(tour.end_date)}</span>
+                    {tour.tour_type === 'receptivo'
+                      ? <span>Disponible según calendario</span>
+                      : <span>{formatDate(tour.start_date)} - {formatDate(tour.end_date)}</span>
+                    }
                   </div>
                   
                   <div className="flex items-center justify-between text-sm text-gray-600">
