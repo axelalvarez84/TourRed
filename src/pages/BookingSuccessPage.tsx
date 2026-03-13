@@ -104,7 +104,8 @@ const BookingSuccessPage: React.FC = () => {
   };
 
   // Helper function to format dates consistently
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return '-';
     try {
       const date = parseDateFromDB(dateString);
       return format(date, 'EEEE, d \'de\' MMMM \'de\' yyyy', { locale: es });
@@ -115,7 +116,8 @@ const BookingSuccessPage: React.FC = () => {
     }
   };
 
-  const formatShortDate = (dateString: string) => {
+  const formatShortDate = (dateString: string | null | undefined) => {
+    if (!dateString) return '-';
     try {
       const date = parseDateFromDB(dateString);
       return format(date, 'd \'de\' MMMM', { locale: es });
@@ -203,7 +205,9 @@ const BookingSuccessPage: React.FC = () => {
                     <div>
                       <div className="text-sm text-gray-500">Duración del Tour</div>
                       <div className="font-medium">
-                        {formatShortDate(tour.start_date)} - {formatShortDate(tour.end_date)}
+                        {tour.start_date && tour.end_date
+                          ? `${formatShortDate(tour.start_date)} - ${formatShortDate(tour.end_date)}`
+                          : 'Tour disponible bajo solicitud'}
                       </div>
                     </div>
                   </div>
