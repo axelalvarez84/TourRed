@@ -1205,8 +1205,7 @@ const AgencyTours: React.FC = () => {
     setFormData({ ...formData, image_url: base64 });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setIsSubmitting(true);
     setError('');
 
@@ -1834,7 +1833,7 @@ const AgencyTours: React.FC = () => {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-5">
 
             {/* SELECTOR TIPO DE TOUR */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
@@ -3455,7 +3454,8 @@ const AgencyTours: React.FC = () => {
                 Cancelar
               </button>
               <button
-                type="submit"
+                type="button"
+                onClick={handleSubmit}
                 disabled={isSubmitting || selectedDestinations.length === 0}
                 className={`btn btn-primary ${
                   selectedDestinations.length === 0
@@ -3470,7 +3470,7 @@ const AgencyTours: React.FC = () => {
                 }
               </button>
             </div>
-          </form>
+          </div>
         </div>
       )}
 
