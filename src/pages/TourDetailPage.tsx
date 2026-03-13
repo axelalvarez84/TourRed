@@ -383,6 +383,7 @@ const TourDetailPage: React.FC = () => {
 
   const calculateDuration = () => {
     try {
+      if (!tour.start_date || !tour.end_date) return 1;
       // Parse dates in UTC
       const [startYear, startMonth, startDay] = tour.start_date.split('-').map(Number);
       const [endYear, endMonth, endDay] = tour.end_date.split('-').map(Number);

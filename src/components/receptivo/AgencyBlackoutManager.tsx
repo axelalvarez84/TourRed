@@ -45,8 +45,7 @@ const AgencyBlackoutManager: React.FC<AgencyBlackoutManagerProps> = ({ tourId, a
 
   useEffect(() => { fetchBlackouts(); }, [tourId]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     if (!form.blackout_start || !form.blackout_end) {
       setError('Las fechas de inicio y fin son requeridas.');
       return;
@@ -115,7 +114,7 @@ const AgencyBlackoutManager: React.FC<AgencyBlackoutManagerProps> = ({ tourId, a
       )}
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-4 space-y-4">
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-4 space-y-4">
           <div className="flex items-center justify-between">
             <h4 className="font-medium text-gray-800 text-sm">Nuevo Bloqueo</h4>
             <button type="button" onClick={() => setShowForm(false)} className="p-1 text-gray-400 hover:text-gray-600">
@@ -129,14 +128,14 @@ const AgencyBlackoutManager: React.FC<AgencyBlackoutManagerProps> = ({ tourId, a
               <input type="date" value={form.blackout_start}
                 onChange={e => setForm(prev => ({ ...prev, blackout_start: e.target.value }))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-                required />
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Fecha fin *</label>
               <input type="date" value={form.blackout_end} min={form.blackout_start}
                 onChange={e => setForm(prev => ({ ...prev, blackout_end: e.target.value }))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-                required />
+              />
             </div>
           </div>
 
@@ -148,7 +147,7 @@ const AgencyBlackoutManager: React.FC<AgencyBlackoutManagerProps> = ({ tourId, a
           </div>
 
           <div className="flex gap-2 pt-2">
-            <button type="submit" disabled={isSubmitting}
+            <button type="button" onClick={handleSubmit} disabled={isSubmitting}
               className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50">
               {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               {isSubmitting ? 'Guardando...' : 'Guardar Bloqueo'}
@@ -158,7 +157,7 @@ const AgencyBlackoutManager: React.FC<AgencyBlackoutManagerProps> = ({ tourId, a
               Cancelar
             </button>
           </div>
-        </form>
+        </div>
       )}
 
       {isLoading ? (
