@@ -93,7 +93,6 @@ const TourMassMessageModal: React.FC<TourMassMessageModalProps> = ({
         .from('tour_slots')
         .select('id, slot_date, departure_time, booked_count')
         .eq('tour_id', selectedTourId)
-        .in('status', ['active', 'confirmed'])
         .order('slot_date', { ascending: true });
 
       if (!error && data) {
