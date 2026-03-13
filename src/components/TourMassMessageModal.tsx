@@ -96,7 +96,7 @@ const TourMassMessageModal: React.FC<TourMassMessageModalProps> = ({
         .order('slot_date', { ascending: true });
 
       if (!error && data) {
-        setSlots(data);
+        setSlots(data.filter(s => (s.booked_count ?? 0) > 0));
       }
     } catch (err) {
       console.error('Error loading slots:', err);
