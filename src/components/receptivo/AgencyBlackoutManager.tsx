@@ -64,7 +64,6 @@ const AgencyBlackoutManager: React.FC<AgencyBlackoutManagerProps> = ({ tourId, a
         blackout_end: form.blackout_end,
         reason: form.reason || null,
         is_partial_day: form.is_partial_day,
-        created_by: userId,
       });
       if (err) throw err;
       await fetchBlackouts();
