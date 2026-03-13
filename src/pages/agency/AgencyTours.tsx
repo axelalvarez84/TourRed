@@ -2875,36 +2875,40 @@ const AgencyTours: React.FC = () => {
                     </div>
                     <p className="text-xs text-gray-500 mt-1">Capacidad total del tour</p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      Lugares Disponibles para Reserva
-                    </label>
-                    <div className="relative">
-                      <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="number"
-                        value={formData.available_spots}
-                        onChange={(e) => setFormData({...formData, available_spots: e.target.value})}
-                        className="input pl-9"
-                        min="0"
-                        max={formData.max_travelers || undefined}
-                        placeholder="Deja vacío para usar el máximo"
-                      />
+                  {tourType === 'excursion' && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Lugares Disponibles para Reserva
+                      </label>
+                      <div className="relative">
+                        <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="number"
+                          value={formData.available_spots}
+                          onChange={(e) => setFormData({...formData, available_spots: e.target.value})}
+                          className="input pl-9"
+                          min="0"
+                          max={formData.max_travelers || undefined}
+                          placeholder="Deja vacío para usar el máximo"
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Útil si ya tienes reservas previas o cupos comprometidos</p>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Útil si ya tienes reservas previas o cupos comprometidos</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      Fecha Límite de Reserva
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.booking_deadline}
-                      onChange={(e) => setFormData({...formData, booking_deadline: e.target.value})}
-                      className="input"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Por defecto: 14 días antes del inicio</p>
-                  </div>
+                  )}
+                  {tourType === 'excursion' && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Fecha Límite de Reserva
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.booking_deadline}
+                        onChange={(e) => setFormData({...formData, booking_deadline: e.target.value})}
+                        className="input"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Por defecto: 14 días antes del inicio</p>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                       Tipo de Reserva <span className="text-red-500">*</span>
