@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter, Star, X, User, MessageSquare, UserCheck, UserX, FileSpreadsheet, FileText, Download, QrCode, Car, Globe } from 'lucide-react';
+import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter, Star, X, User, MessageSquare, UserCheck, UserX, FileSpreadsheet, FileText, Download, QrCode, Car, Globe, Send } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getAgencyBookings, getTourBookingReport, supabase, parseDateFromDB } from '../../lib/supabase';
 import { Booking } from '../../types';
@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { Link, useNavigate } from 'react-router-dom';
 import ReviewForm from '../../components/ReviewForm';
 import { exportTourReportToExcel, exportTourReportToPDF } from '../../utils/reportExports';
+import TourMassMessageModal from '../../components/TourMassMessageModal';
 
 const AgencyBookings: React.FC = () => {
   const { user } = useAuth();
@@ -37,7 +38,14 @@ const AgencyBookings: React.FC = () => {
     isSubmitting: boolean;
     reason: string;
   }>({ open: false, booking: null, isSubmitting: false, reason: '' });
-  const [activeTab, setActiveTab] = useState<'bookings' | 'reports'>('bookings');
+  const [activeTab, setActiveTab] = useState<'bookings' | 'reports' | 'messages'>('bookings');
+  const [massMessageModal, setMassMessageModal] = useState<{
+    open: boolean;
+    preselectedTourId?: string | null;
+    preselectedSlotId?: string | null;
+  }>({ open: false });
+  const [sentMessages, setSentMessages] = useState<any[]>([]);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [bookingOptionalServices, setBookingOptionalServices] = useState<Record<string, any[]>>({});
   const [availableTours, setAvailableTours] = useState<any[]>([]);
   const [selectedTourForReport, setSelectedTourForReport] = useState<string>('');
@@ -115,7 +123,7 @@ const AgencyBookings: React.FC = () => {
       // OPTIMIZED: Limit tours and only count IDs
       const { data: toursData, error: toursError } = await supabase
         .from('tours')
-        .select('id, name, destination, start_date')
+        .select('id, name, destination, start_date, end_date, tour_type')
         .eq('agency_id', agencyData.id)
         .order('start_date', { ascending: false })
         .limit(50);
@@ -743,6 +751,35 @@ const AgencyBookings: React.FC = () => {
     exportTourReportToPDF(reportData, agencyName);
   };
 
+  const fetchSentMessages = async () => {
+    if (!agencyId) return;
+    setIsLoadingMessages(true);
+    try {
+      const { data, error } = await supabase
+        .from('agency_tour_messages')
+        .select(`
+          id, subject, message_body, recipients_count, success_count, error_count, status, created_at, slot_id,
+          tours(name, destination),
+          tour_slots(slot_date, departure_time)
+        `)
+        .eq('agency_id', agencyId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (!error) setSentMessages(data || []);
+    } catch (err) {
+      console.error('Error loading sent messages:', err);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'messages' && agencyId) {
+      fetchSentMessages();
+    }
+  }, [activeTab, agencyId]);
+
   // Filtrar reservas
   const filteredBookings = bookings.filter(booking => {
     const matchesSearch = 
@@ -791,6 +828,13 @@ const AgencyBookings: React.FC = () => {
             }
           </p>
         </div>
+        <button
+          onClick={() => setMassMessageModal({ open: true })}
+          className="btn btn-primary flex items-center gap-2"
+        >
+          <Send className="h-4 w-4" />
+          Mensaje a Asistentes
+        </button>
       </div>
 
       {/* Tabs */}
@@ -817,6 +861,17 @@ const AgencyBookings: React.FC = () => {
           >
             <FileText className="inline-block h-5 w-5 mr-2" />
             Reportes por Tour
+          </button>
+          <button
+            onClick={() => setActiveTab('messages')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'messages'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <Send className="inline-block h-5 w-5 mr-2" />
+            Mensajes Enviados
           </button>
         </nav>
       </div>
@@ -1471,6 +1526,87 @@ const AgencyBookings: React.FC = () => {
         </>
       )}
 
+      {activeTab === 'messages' && (
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold">Mensajes Enviados a Asistentes</h2>
+              <p className="text-gray-600 mt-1">Historial de todos los mensajes masivos enviados a los asistentes de tus tours.</p>
+            </div>
+            <button
+              onClick={() => setMassMessageModal({ open: true })}
+              className="btn btn-primary flex items-center gap-2"
+            >
+              <Send className="h-4 w-4" />
+              Nuevo Mensaje
+            </button>
+          </div>
+
+          {isLoadingMessages ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-600"></div>
+            </div>
+          ) : sentMessages.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+              <p className="text-lg font-medium mb-1">Sin mensajes enviados</p>
+              <p className="text-sm">Usa el botón "Mensaje a Asistentes" para comunicarte con los participantes de tus tours.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {sentMessages.map((msg: any) => {
+                const statusColors: Record<string, string> = {
+                  completed: 'bg-green-100 text-green-700',
+                  sending: 'bg-blue-100 text-blue-700',
+                  failed: 'bg-red-100 text-red-700',
+                  pending: 'bg-yellow-100 text-yellow-700',
+                };
+                const statusLabels: Record<string, string> = {
+                  completed: 'Enviado',
+                  sending: 'Enviando',
+                  failed: 'Error',
+                  pending: 'Pendiente',
+                };
+                const slotDate = msg.tour_slots?.slot_date
+                  ? new Date(msg.tour_slots.slot_date + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
+                  : null;
+
+                return (
+                  <div key={msg.id} className="border border-gray-200 rounded-xl p-5 hover:border-gray-300 transition-colors">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[msg.status] || 'bg-gray-100 text-gray-700'}`}>
+                            {statusLabels[msg.status] || msg.status}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            {new Date(msg.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className="font-semibold text-gray-900 truncate">{msg.subject}</p>
+                        <p className="text-sm text-gray-500 mt-0.5">
+                          {msg.tours?.name}
+                          {slotDate && <span className="ml-1 text-gray-400">· {slotDate}{msg.tour_slots?.departure_time ? ` ${msg.tour_slots.departure_time}` : ''}</span>}
+                          {!msg.slot_id && <span className="ml-1 text-gray-400">· Todos los asistentes</span>}
+                        </p>
+                        <p className="text-sm text-gray-600 mt-2 line-clamp-2">{msg.message_body}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-2xl font-bold text-primary-600">{msg.success_count}</div>
+                        <div className="text-xs text-gray-500">enviados</div>
+                        {msg.error_count > 0 && (
+                          <div className="text-xs text-red-500 mt-0.5">{msg.error_count} errores</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {activeTab === 'reports' && (
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-2xl font-bold mb-4">Reportes de Asistentes por Tour</h2>
@@ -2032,6 +2168,24 @@ const AgencyBookings: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {massMessageModal.open && agencyId && (
+        <TourMassMessageModal
+          open={massMessageModal.open}
+          onClose={() => setMassMessageModal({ open: false })}
+          agencyId={agencyId}
+          tours={availableTours.map(t => ({
+            id: t.id,
+            name: t.name,
+            destination: t.destination,
+            start_date: t.start_date ?? null,
+            end_date: t.end_date ?? null,
+            tour_type: t.tour_type ?? null,
+          }))}
+          preselectedTourId={massMessageModal.preselectedTourId}
+          preselectedSlotId={massMessageModal.preselectedSlotId}
+        />
       )}
     </div>
   );

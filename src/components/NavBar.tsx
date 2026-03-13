@@ -143,6 +143,7 @@ const NavBar: React.FC = () => {
       menuItems.push({ to: '/admin/payouts', label: 'Gestión de Pagos' });
       menuItems.push({ to: '/admin/referrals', label: 'Referidos' });
       menuItems.push({ to: '/admin/promotions', label: 'Promociones' });
+      menuItems.push({ to: '/admin/tour-messages', label: 'Mensajes de Agencias' });
 
       return menuItems;
     }
