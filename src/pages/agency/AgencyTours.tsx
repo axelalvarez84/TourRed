@@ -1717,6 +1717,10 @@ const AgencyTours: React.FC = () => {
   };
 
   const getStatusBadge = (tour: Tour) => {
+    if (tour.tour_type === 'receptivo') {
+      return <span className="px-2 py-1 text-xs font-medium bg-teal-100 text-teal-800 rounded-full">Receptivo</span>;
+    }
+
     const today = new Date();
     const startDate = new Date(tour.start_date);
     const endDate = new Date(tour.end_date);
