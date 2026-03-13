@@ -215,7 +215,7 @@ const TourDetailPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!tour) return;
+    if (!tour || tour.tour_type === 'receptivo') return;
 
     const fetchAvailability = async () => {
       try {
@@ -981,8 +981,8 @@ const TourDetailPage: React.FC = () => {
           </div>
           
           <div className="w-full lg:w-1/3">
-            {/* Availability Info - Visible para todos los usuarios excepto el propietario */}
-            {!isOwner && availableSpots !== null && (
+            {/* Availability Info - Solo para tours NO receptivos (los receptivos muestran disponibilidad por slot en el formulario) */}
+            {!isOwner && availableSpots !== null && tour.tour_type !== 'receptivo' && (
               <div className={`rounded-lg p-4 mb-6 ${
                 availableSpots === 0
                   ? 'bg-red-50 border-2 border-red-200'
