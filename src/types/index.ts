@@ -260,6 +260,15 @@ export interface Booking {
   selected_date?: string;
   selected_time?: string;
   tour_slots?: TourSlot;
+  pickup_type?: 'meeting_point' | 'pickup';
+  pickup_zone_name?: string;
+  pickup_zone_extra_cost?: number;
+  pickup_cost_type?: 'por_persona' | 'por_reserva';
+  pickup_hotel_address?: string;
+  selected_language?: string;
+  language_extra_cost?: number;
+  language_cost_type?: 'por_persona' | 'fijo';
+  restrictions_accepted?: boolean;
 }
 
 export interface BookingTraveler {

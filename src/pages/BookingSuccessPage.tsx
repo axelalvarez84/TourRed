@@ -235,6 +235,35 @@ const BookingSuccessPage: React.FC = () => {
                     </div>
                   </div>
 
+                  {booking.pickup_type && (
+                    <div className="flex items-start">
+                      <MapPin className="h-5 w-5 text-gray-400 mr-3 mt-1" />
+                      <div>
+                        <div className="text-sm text-gray-500">Traslado</div>
+                        {booking.pickup_type === 'meeting_point' ? (
+                          <div className="font-medium">Me presento en el punto de encuentro</div>
+                        ) : (
+                          <>
+                            <div className="font-medium">Recogida en hotel / dirección</div>
+                            {booking.pickup_zone_name && (
+                              <div className="text-sm text-gray-600 mt-0.5">{booking.pickup_zone_name}</div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {booking.selected_language && (
+                    <div className="flex items-start">
+                      <CreditCard className="h-5 w-5 text-gray-400 mr-3 mt-1" />
+                      <div>
+                        <div className="text-sm text-gray-500">Idioma del Tour</div>
+                        <div className="font-medium">{booking.selected_language}</div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-start">
                     <DollarSign className="h-5 w-5 text-gray-400 mr-3 mt-1" />
                     <div>
@@ -285,6 +314,24 @@ const BookingSuccessPage: React.FC = () => {
                     <div className="flex justify-between">
                       <span className="text-gray-600">{booking.pets_count} {booking.pets_count === 1 ? 'Mascota' : 'Mascotas'} × ${booking.pet_price?.toLocaleString()}:</span>
                       <span className="font-medium">${((booking.pet_price || 0) * (booking.pets_count || 0)).toLocaleString()}</span>
+                    </div>
+                  )}
+
+                  {(booking.pickup_zone_extra_cost ?? 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">
+                        Pick Up — {booking.pickup_zone_name} ({booking.pickup_cost_type === 'por_persona' ? 'por persona' : 'por reserva'}):
+                      </span>
+                      <span className="font-medium">${(booking.pickup_zone_extra_cost ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+
+                  {(booking.language_extra_cost ?? 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">
+                        Idioma — {booking.selected_language} ({booking.language_cost_type === 'por_persona' ? 'por persona' : 'fijo'}):
+                      </span>
+                      <span className="font-medium">${(booking.language_extra_cost ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
                     </div>
                   )}
 

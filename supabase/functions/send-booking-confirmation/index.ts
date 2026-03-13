@@ -164,6 +164,9 @@ Deno.serve(async (req: Request) => {
     const agencyCommission = totalPrice * (agencyCommissionPercentage / 100);
     const agencyReceives = depositAmount - agencyCommission;
 
+    const pickupExtraCost = Number(booking.pickup_zone_extra_cost) || 0;
+    const languageExtraCost = Number(booking.language_extra_cost) || 0;
+
     const formatDate = (dateString: string | null | undefined) => {
       if (!dateString) return 'No disponible';
       const date = new Date(dateString);
@@ -292,6 +295,18 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">Número de viajeros:</span>
           <span class="info-value">${booking.travelers_count}</span>
         </div>
+        ${booking.pickup_type ? `
+        <div class="info-row">
+          <span class="info-label">Traslado:</span>
+          <span class="info-value">${booking.pickup_type === 'meeting_point' ? 'Me presento en el punto de encuentro' : `Recogida en hotel — ${booking.pickup_zone_name || ''}`}</span>
+        </div>
+        ` : ''}
+        ${booking.selected_language ? `
+        <div class="info-row">
+          <span class="info-label">Idioma del tour:</span>
+          <span class="info-value">${booking.selected_language}</span>
+        </div>
+        ` : ''}
       </div>
 
       <div class="section">
@@ -330,6 +345,18 @@ Deno.serve(async (req: Request) => {
         <div class="info-row" style="background-color: #dcfce7; margin: 5px -5px; padding: 8px 5px;">
           <span class="info-label" style="font-weight: 600;">🏷️ Descuento Grupal:</span>
           <span class="info-value" style="color: #059669;">-${formatCurrency(promoDiscountAmount)}</span>
+        </div>
+        ` : ''}
+        ${pickupExtraCost > 0 ? `
+        <div class="info-row">
+          <span class="info-label">🚗 Pick Up — ${booking.pickup_zone_name} (${booking.pickup_cost_type === 'por_persona' ? 'por persona' : 'por reserva'}):</span>
+          <span class="info-value">${formatCurrency(pickupExtraCost)}</span>
+        </div>
+        ` : ''}
+        ${languageExtraCost > 0 ? `
+        <div class="info-row">
+          <span class="info-label">🌐 Idioma — ${booking.selected_language} (${booking.language_cost_type === 'por_persona' ? 'por persona' : 'fijo'}):</span>
+          <span class="info-value">${formatCurrency(languageExtraCost)}</span>
         </div>
         ` : ''}
         <div class="info-row" style="border-top: 2px solid #e5e7eb; padding-top: 10px; margin-top: 10px;">
@@ -527,6 +554,18 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">Número de viajeros:</span>
           <span class="info-value">${booking.travelers_count}</span>
         </div>
+        ${booking.pickup_type ? `
+        <div class="info-row">
+          <span class="info-label">Traslado:</span>
+          <span class="info-value">${booking.pickup_type === 'meeting_point' ? 'Me presento en el punto de encuentro' : `Recogida en hotel — ${booking.pickup_zone_name || ''}`}</span>
+        </div>
+        ` : ''}
+        ${booking.selected_language ? `
+        <div class="info-row">
+          <span class="info-label">Idioma del tour:</span>
+          <span class="info-value">${booking.selected_language}</span>
+        </div>
+        ` : ''}
       </div>
 
       <div class="section">
@@ -661,6 +700,18 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">Número de viajeros:</span>
           <span class="info-value">${booking.travelers_count}</span>
         </div>
+        ${booking.pickup_type ? `
+        <div class="info-row">
+          <span class="info-label">Traslado solicitado:</span>
+          <span class="info-value">${booking.pickup_type === 'meeting_point' ? 'Se presenta en el punto de encuentro' : `Recogida en hotel — ${booking.pickup_zone_name || ''}`}</span>
+        </div>
+        ` : ''}
+        ${booking.selected_language ? `
+        <div class="info-row">
+          <span class="info-label">Idioma solicitado:</span>
+          <span class="info-value">${booking.selected_language}</span>
+        </div>
+        ` : ''}
       </div>
 
       <div class="section">
@@ -693,6 +744,18 @@ Deno.serve(async (req: Request) => {
         <div class="info-row">
           <span class="info-label">${booking.pets_count} ${booking.pets_count === 1 ? 'Mascota' : 'Mascotas'} × ${formatCurrency(booking.pet_price || 0)}:</span>
           <span class="info-value">${formatCurrency((booking.pet_price || 0) * (booking.pets_count || 0))}</span>
+        </div>
+        ` : ''}
+        ${pickupExtraCost > 0 ? `
+        <div class="info-row">
+          <span class="info-label">🚗 Pick Up — ${booking.pickup_zone_name} (${booking.pickup_cost_type === 'por_persona' ? 'por persona' : 'por reserva'}):</span>
+          <span class="info-value">${formatCurrency(pickupExtraCost)}</span>
+        </div>
+        ` : ''}
+        ${languageExtraCost > 0 ? `
+        <div class="info-row">
+          <span class="info-label">🌐 Idioma — ${booking.selected_language} (${booking.language_cost_type === 'por_persona' ? 'por persona' : 'fijo'}):</span>
+          <span class="info-value">${formatCurrency(languageExtraCost)}</span>
         </div>
         ` : ''}
         ${promoDiscountAmount > 0 ? `
