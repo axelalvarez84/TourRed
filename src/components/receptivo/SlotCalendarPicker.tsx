@@ -88,7 +88,7 @@ const SlotCalendarPicker: React.FC<SlotCalendarPickerProps> = ({ tour, selectedD
     const dateKey = format(date, 'yyyy-MM-dd');
     const avail = availability.get(dateKey);
     if (!avail) return true;
-    if (avail.isFull) return false;
+    if (avail.isFull) return true;
     return false;
   };
 
