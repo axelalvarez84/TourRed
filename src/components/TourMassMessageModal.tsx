@@ -79,7 +79,7 @@ const TourMassMessageModal: React.FC<TourMassMessageModalProps> = ({
 
   useEffect(() => {
     if (selectedTourId) {
-      loadRecipientCount();
+      loadRecipientCount(selectedTourId, scopeType, selectedSlotId);
     } else {
       setRecipientCount(null);
     }
@@ -105,13 +105,13 @@ const TourMassMessageModal: React.FC<TourMassMessageModalProps> = ({
     }
   };
 
-  const loadRecipientCount = async () => {
-    if (!selectedTourId) return;
+  const loadRecipientCount = async (tourId: string, scope: 'all' | 'slot', slotId: string) => {
+    if (!tourId) return;
     setLoadingCount(true);
     try {
-      const resolvedSlotId = scopeType === 'slot' && selectedSlotId ? selectedSlotId : null;
+      const resolvedSlotId = scope === 'slot' && slotId ? slotId : null;
       const { data, error } = await supabase.rpc('get_tour_confirmed_attendees', {
-        p_tour_id: selectedTourId,
+        p_tour_id: tourId,
         p_slot_id: resolvedSlotId,
       });
 
@@ -134,7 +134,7 @@ const TourMassMessageModal: React.FC<TourMassMessageModalProps> = ({
   const handleNextFromCompose = () => {
     if (!subject.trim() || !messageBody.trim()) return;
     setStep('confirm');
-    loadRecipientCount();
+    loadRecipientCount(selectedTourId, scopeType, selectedSlotId);
   };
 
   const handleSend = async () => {
