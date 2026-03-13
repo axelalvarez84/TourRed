@@ -435,7 +435,7 @@ export const getTours = async (filters: any = {}) => {
 
       if (filters.includeExpired !== true) {
         const today = formatDateForDB(new Date());
-        query = query.gte('end_date', today);
+        query = query.or(`end_date.gte.${today},end_date.is.null`);
       }
 
       if (filters.tourName) {
@@ -507,7 +507,7 @@ export const getTours = async (filters: any = {}) => {
 
     if (filters.includeExpired !== true) {
       const today = formatDateForDB(new Date());
-      query = query.gte('end_date', today);
+      query = query.or(`end_date.gte.${today},end_date.is.null`);
     }
 
     if (filters.tourName) {
