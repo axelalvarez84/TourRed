@@ -200,17 +200,32 @@ const BookingSuccessPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-start">
-                    <Calendar className="h-5 w-5 text-gray-400 mr-3 mt-1" />
-                    <div>
-                      <div className="text-sm text-gray-500">Duración del Tour</div>
-                      <div className="font-medium">
-                        {tour.start_date && tour.end_date
-                          ? `${formatShortDate(tour.start_date)} - ${formatShortDate(tour.end_date)}`
-                          : 'Tour disponible bajo solicitud'}
+                  {(tour.start_date && tour.end_date) ? (
+                    <div className="flex items-start">
+                      <Calendar className="h-5 w-5 text-gray-400 mr-3 mt-1" />
+                      <div>
+                        <div className="text-sm text-gray-500">Duración del Tour</div>
+                        <div className="font-medium">
+                          {formatShortDate(tour.start_date)} - {formatShortDate(tour.end_date)}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (booking.selected_date || booking.booking_date) ? (
+                    <div className="flex items-start">
+                      <Calendar className="h-5 w-5 text-gray-400 mr-3 mt-1" />
+                      <div>
+                        <div className="text-sm text-gray-500">Fecha de tu Reserva</div>
+                        <div className="font-medium">
+                          {formatDate(booking.selected_date || booking.booking_date)}
+                        </div>
+                        {booking.selected_time && (
+                          <div className="text-sm text-blue-600 font-medium mt-1">
+                            Horario: {booking.selected_time}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
                   
                   <div className="flex items-center">
                     <Users className="h-5 w-5 text-gray-400 mr-3" />

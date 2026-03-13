@@ -164,7 +164,8 @@ Deno.serve(async (req: Request) => {
     const agencyCommission = totalPrice * (agencyCommissionPercentage / 100);
     const agencyReceives = depositAmount - agencyCommission;
 
-    const formatDate = (dateString: string) => {
+    const formatDate = (dateString: string | null | undefined) => {
+      if (!dateString) return 'No disponible';
       const date = new Date(dateString);
       return date.toLocaleDateString('es-MX', {
         year: 'numeric',
@@ -172,6 +173,13 @@ Deno.serve(async (req: Request) => {
         day: 'numeric'
       });
     };
+
+    const isReceptivo = !booking.tour.start_date && !booking.tour.end_date;
+    const fechaReservaDisplay = isReceptivo
+      ? (booking.selected_date
+          ? `${formatDate(booking.selected_date)}${booking.selected_time ? ' - ' + booking.selected_time : ''}`
+          : formatDate(booking.booking_date))
+      : null;
 
     const formatCurrency = (amount: number) => {
       return `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -265,6 +273,12 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">Destino:</span>
           <span class="info-value">${booking.tour.destination}</span>
         </div>
+        ${isReceptivo ? `
+        <div class="info-row">
+          <span class="info-label">Fecha y horario reservado:</span>
+          <span class="info-value">${fechaReservaDisplay}</span>
+        </div>
+        ` : `
         <div class="info-row">
           <span class="info-label">Fecha de inicio:</span>
           <span class="info-value">${formatDate(booking.tour.start_date)}</span>
@@ -273,6 +287,7 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">Fecha de finalización:</span>
           <span class="info-value">${formatDate(booking.tour.end_date)}</span>
         </div>
+        `}
         <div class="info-row">
           <span class="info-label">Número de viajeros:</span>
           <span class="info-value">${booking.travelers_count}</span>
@@ -493,6 +508,12 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">Destino:</span>
           <span class="info-value">${booking.tour.destination}</span>
         </div>
+        ${isReceptivo ? `
+        <div class="info-row">
+          <span class="info-label">Fecha y horario reservado:</span>
+          <span class="info-value">${fechaReservaDisplay}</span>
+        </div>
+        ` : `
         <div class="info-row">
           <span class="info-label">Fecha de inicio:</span>
           <span class="info-value">${formatDate(booking.tour.start_date)}</span>
@@ -501,6 +522,7 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">Fecha de finalización:</span>
           <span class="info-value">${formatDate(booking.tour.end_date)}</span>
         </div>
+        `}
         <div class="info-row">
           <span class="info-label">Número de viajeros:</span>
           <span class="info-value">${booking.travelers_count}</span>
