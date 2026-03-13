@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter, Star, X, User, MessageSquare, UserCheck, UserX, FileSpreadsheet, FileText, Download, QrCode } from 'lucide-react';
+import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter, Star, X, User, MessageSquare, UserCheck, UserX, FileSpreadsheet, FileText, Download, QrCode, Car, Globe } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getAgencyBookings, getTourBookingReport, supabase, parseDateFromDB } from '../../lib/supabase';
 import { Booking } from '../../types';
@@ -1096,6 +1096,59 @@ const AgencyBookings: React.FC = () => {
                       <div className="flex-1">
                         <div className="text-xs text-blue-600 font-medium">ID de Transacción PayPal</div>
                         <div className="font-mono text-sm tracking-wide text-blue-900">{(booking as any).paypal_transaction_id}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pickup & Language Info - Receptivo tours */}
+                  {((booking as any).pickup_type || (booking as any).selected_language) && (
+                    <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 mb-4">
+                      <h4 className="text-sm font-semibold text-teal-800 mb-3 flex items-center gap-2">
+                        <Car className="h-4 w-4" />
+                        Detalles de Traslado e Idioma
+                      </h4>
+                      <div className="space-y-2">
+                        {(booking as any).pickup_type && (
+                          <div className="flex items-start gap-2">
+                            <MapPin className="h-4 w-4 text-teal-600 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <span className="text-xs text-teal-700 font-medium">Tipo de traslado: </span>
+                              <span className="text-sm text-gray-800">
+                                {(booking as any).pickup_type === 'meeting_point'
+                                  ? 'Se presenta en el punto de encuentro'
+                                  : 'Solicita recogida en hotel'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {(booking as any).pickup_type === 'pickup' && (booking as any).pickup_zone_name && (
+                          <div className="flex items-start gap-2">
+                            <Car className="h-4 w-4 text-teal-600 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <span className="text-xs text-teal-700 font-medium">Zona / Hotel: </span>
+                              <span className="text-sm text-gray-800">{(booking as any).pickup_zone_name}</span>
+                              {(booking as any).pickup_zone_extra_cost > 0 && (
+                                <span className="ml-2 text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded">
+                                  +${(booking as any).pickup_zone_extra_cost} {(booking as any).pickup_cost_type === 'por_persona' ? '/persona' : '/reserva'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {(booking as any).selected_language && (
+                          <div className="flex items-start gap-2">
+                            <Globe className="h-4 w-4 text-teal-600 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <span className="text-xs text-teal-700 font-medium">Idioma seleccionado: </span>
+                              <span className="text-sm text-gray-800 capitalize">{(booking as any).selected_language}</span>
+                              {(booking as any).language_extra_cost > 0 && (
+                                <span className="ml-2 text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded">
+                                  +${(booking as any).language_extra_cost} {(booking as any).language_cost_type === 'fijo' ? 'fijo' : '/persona'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
