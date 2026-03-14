@@ -1,18 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, X, Check, CheckCheck, Clock } from 'lucide-react';
+import { Bell, X, Check, CheckCheck, Clock, MessageSquare, Building2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase, getUserNotifications, getUnreadNotificationCount, markNotificationAsRead, markAllNotificationsAsRead } from '../lib/supabase';
 import { Notification } from '../types';
 import { format } from 'date-fns';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const NotificationBell: React.FC = () => {
   const { user, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [detailNotification, setDetailNotification] = useState<Notification | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -161,7 +163,9 @@ const NotificationBell: React.FC = () => {
       case 'booking_confirmed':
         return <CheckCheck className="h-5 w-5 text-green-500" />;
       case 'message_received':
-        return <div className="h-5 w-5 flex items-center justify-center text-blue-500">💬</div>;
+        return <MessageSquare className="h-5 w-5 text-blue-500" />;
+      case 'tour_announcement':
+        return <Building2 className="h-5 w-5 text-blue-600" />;
       default:
         return <Bell className="h-5 w-5 text-gray-500" />;
     }
@@ -182,9 +186,25 @@ const NotificationBell: React.FC = () => {
         return `/messages${data.conversation_id ? `?conversation=${data.conversation_id}` : ''}`;
       case 'tour_updated':
         return `/tours/${data.tour_id}`;
+      case 'tour_announcement':
+        return null;
       default:
         return '#';
     }
+  };
+
+  const handleNotificationClick = (notification: Notification) => {
+    if (!notification.is_read) markAsRead(notification.id);
+
+    if (notification.type === 'tour_announcement') {
+      setIsOpen(false);
+      setDetailNotification(notification);
+      return;
+    }
+
+    const link = getNotificationLink(notification);
+    setIsOpen(false);
+    if (link && link !== '#') navigate(link);
   };
 
   if (!user) {
@@ -246,42 +266,32 @@ const NotificationBell: React.FC = () => {
                 notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`px-4 py-3 hover:bg-blue-100 ${
+                    className={`px-4 py-3 cursor-pointer hover:bg-blue-100 transition-colors ${
                       !notification.is_read ? 'bg-blue-100' : ''
                     }`}
+                    onClick={() => handleNotificationClick(notification)}
                   >
-                    <Link
-                      to={getNotificationLink(notification)}
-                      onClick={() => {
-                        if (!notification.is_read) {
-                          markAsRead(notification.id);
-                        }
-                        setIsOpen(false);
-                      }}
-                      className="block"
-                    >
-                      <div className="flex">
-                        <div className="flex-shrink-0 mr-3 mt-1">
-                          {getNotificationIcon(notification.type)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium ${!notification.is_read ? 'text-gray-900' : 'text-gray-600'}`}>
-                            {notification.title}
-                          </p>
-                          <p className="text-sm text-gray-500 line-clamp-2">
-                            {notification.message}
-                          </p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            {formatTimeAgo(notification.created_at)}
-                          </p>
-                        </div>
-                        {!notification.is_read && (
-                          <div className="ml-2 flex-shrink-0">
-                            <span className="inline-block w-2 h-2 rounded-full bg-primary-600"></span>
-                          </div>
-                        )}
+                    <div className="flex">
+                      <div className="flex-shrink-0 mr-3 mt-1">
+                        {getNotificationIcon(notification.type)}
                       </div>
-                    </Link>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium ${!notification.is_read ? 'text-gray-900' : 'text-gray-600'}`}>
+                          {notification.title}
+                        </p>
+                        <p className="text-sm text-gray-500 line-clamp-2">
+                          {notification.message}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {formatTimeAgo(notification.created_at)}
+                        </p>
+                      </div>
+                      {!notification.is_read && (
+                        <div className="ml-2 flex-shrink-0">
+                          <span className="inline-block w-2 h-2 rounded-full bg-primary-600"></span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))
               )}
@@ -295,6 +305,64 @@ const NotificationBell: React.FC = () => {
               >
                 Ver todas las notificaciones
               </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {detailNotification && (
+        <div className="fixed inset-0 z-[100] overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 py-8">
+            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setDetailNotification(null)} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-auto">
+              <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                    <Building2 className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-gray-900 leading-tight">{detailNotification.title}</h2>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {(detailNotification.data?.agency_name as string) || 'Agencia'} · {formatTimeAgo(detailNotification.created_at)}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setDetailNotification(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+
+              {(detailNotification.data?.tour_name || detailNotification.data?.booking_code) && (
+                <div className="mx-6 mt-5 bg-blue-50 rounded-xl px-4 py-3 space-y-0.5">
+                  {detailNotification.data?.tour_name && (
+                    <p className="text-sm font-semibold text-blue-800">{detailNotification.data.tour_name as string}</p>
+                  )}
+                  {detailNotification.data?.booking_code && (
+                    <p className="text-xs text-blue-600">Reserva #{detailNotification.data.booking_code as string}</p>
+                  )}
+                </div>
+              )}
+
+              <div className="px-6 py-5">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Mensaje</p>
+                <div className="bg-gray-50 rounded-xl border-l-4 border-blue-400 px-5 py-4">
+                  <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                    {detailNotification.message}
+                  </p>
+                </div>
+              </div>
+
+              <div className="px-6 pb-5 flex justify-end">
+                <button
+                  onClick={() => setDetailNotification(null)}
+                  className="btn btn-primary"
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -286,11 +286,17 @@ const NotificationsPage: React.FC = () => {
         ) : (
           <div className="space-y-4">
             {filteredNotifications.map((notification) => (
-              <div 
-                key={notification.id} 
+              <div
+                key={notification.id}
                 className={`bg-blue-100 rounded-lg shadow-md overflow-hidden transition-all ${
                   !notification.is_read ? 'border-l-4 border-primary-500' : ''
-                }`}
+                } ${notification.type === 'tour_announcement' ? 'cursor-pointer' : ''}`}
+                onClick={() => {
+                  if (notification.type === 'tour_announcement') {
+                    if (!notification.is_read) markAsRead(notification.id);
+                    setDetailNotification(notification);
+                  }
+                }}
               >
                 <div className="p-4">
                   <div className="flex items-start">
