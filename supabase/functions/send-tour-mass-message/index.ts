@@ -7,12 +7,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+type SendChannel = "email" | "notification" | "both";
+
 interface MassMessageRequest {
   agency_id: string;
   tour_id: string;
   slot_id?: string | null;
   subject: string;
   message_body: string;
+  send_channel?: SendChannel;
 }
 
 interface Attendee {
@@ -58,11 +61,21 @@ Deno.serve(async (req: Request) => {
     }
 
     const body: MassMessageRequest = await req.json();
-    const { agency_id, tour_id, slot_id, subject, message_body } = body;
+    const { agency_id, tour_id, slot_id, subject, message_body, send_channel = "both" } = body;
 
-    if (!agency_id || !tour_id || !subject || !message_body) {
+    const needsEmail = send_channel === "email" || send_channel === "both";
+    const needsNotification = send_channel === "notification" || send_channel === "both";
+
+    if (!agency_id || !tour_id || !message_body) {
       return new Response(
         JSON.stringify({ error: "Faltan campos requeridos" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (needsEmail && !subject) {
+      return new Response(
+        JSON.stringify({ error: "El asunto es requerido para envío por email" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -105,16 +118,20 @@ Deno.serve(async (req: Request) => {
       slotInfo = slot;
     }
 
-    const { data: emailSettings, error: emailError } = await supabase
-      .from("email_settings")
-      .select("*")
-      .maybeSingle();
+    let emailSettings: { smtp_api_key: string; from_email: string; from_name: string } | null = null;
+    if (needsEmail) {
+      const { data, error: emailError } = await supabase
+        .from("email_settings")
+        .select("*")
+        .maybeSingle();
 
-    if (emailError || !emailSettings?.smtp_api_key) {
-      return new Response(
-        JSON.stringify({ error: "Configuración de email no disponible" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (emailError || !data?.smtp_api_key) {
+        return new Response(
+          JSON.stringify({ error: "Configuración de email no disponible" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      emailSettings = data;
     }
 
     const { data: attendees, error: attendeesError } = await supabase.rpc(
@@ -138,7 +155,7 @@ Deno.serve(async (req: Request) => {
         agency_id,
         tour_id,
         slot_id: slot_id ?? null,
-        subject,
+        subject: subject || "",
         message_body,
         sent_by: user.id,
         recipients_count: attendeeList.length,
@@ -175,9 +192,9 @@ Deno.serve(async (req: Request) => {
       : `${formatDate(tour.start_date)}${tour.end_date && tour.end_date !== tour.start_date ? " – " + formatDate(tour.end_date) : ""}`;
 
     const logoUrl = "https://huzsedewwzjywcpbkjkm.supabase.co/storage/v1/object/public/images/email-logo.png";
-    const fromEmail = emailSettings.from_email || "noreply@toursred.com";
-    const fromName = emailSettings.from_name || "ToursRed";
-    const smtp2goApiKey = emailSettings.smtp_api_key;
+    const fromEmail = emailSettings?.from_email || "noreply@toursred.com";
+    const fromName = emailSettings?.from_name || "ToursRed";
+    const smtp2goApiKey = emailSettings?.smtp_api_key || "";
 
     let successCount = 0;
     let errorCount = 0;
@@ -191,10 +208,21 @@ Deno.serve(async (req: Request) => {
       error_message: string | null;
     }> = [];
 
-    for (const attendee of attendeeList) {
-      const messageBodyFormatted = message_body.replace(/\n/g, "<br>");
+    const notificationInserts: Array<{
+      user_id: string;
+      type: string;
+      title: string;
+      message: string;
+      data: Record<string, unknown>;
+    }> = [];
 
-      const emailHtml = `
+    for (const attendee of attendeeList) {
+      let emailDelivered = true;
+
+      if (needsEmail) {
+        const messageBodyFormatted = message_body.replace(/\n/g, "<br>");
+
+        const emailHtml = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -245,56 +273,94 @@ Deno.serve(async (req: Request) => {
   </div>
 </body>
 </html>
-      `.trim();
+        `.trim();
 
-      try {
-        const emailResponse = await fetch("https://api.smtp2go.com/v3/email/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            api_key: smtp2goApiKey,
-            to: [`${attendee.first_name} ${attendee.last_name} <${attendee.email}>`],
-            sender: `${fromName} <${fromEmail}>`,
-            subject,
-            html_body: emailHtml,
-          }),
-        });
+        try {
+          const emailResponse = await fetch("https://api.smtp2go.com/v3/email/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              api_key: smtp2goApiKey,
+              to: [`${attendee.first_name} ${attendee.last_name} <${attendee.email}>`],
+              sender: `${fromName} <${fromEmail}>`,
+              subject,
+              html_body: emailHtml,
+            }),
+          });
 
-        const emailResult = await emailResponse.json();
-        const delivered = emailResult?.data?.succeeded === 1;
+          const emailResult = await emailResponse.json();
+          emailDelivered = emailResult?.data?.succeeded === 1;
 
-        recipientRecords.push({
-          message_id: messageId,
-          user_id: attendee.user_id,
-          booking_id: attendee.booking_id,
-          email: attendee.email,
-          delivered,
-          delivered_at: delivered ? new Date().toISOString() : null,
-          error_message: !delivered ? JSON.stringify(emailResult?.data?.failures || "Send failed") : null,
-        });
-
-        if (delivered) {
-          successCount++;
-        } else {
-          errorCount++;
+          recipientRecords.push({
+            message_id: messageId,
+            user_id: attendee.user_id,
+            booking_id: attendee.booking_id,
+            email: attendee.email,
+            delivered: emailDelivered,
+            delivered_at: emailDelivered ? new Date().toISOString() : null,
+            error_message: !emailDelivered ? JSON.stringify(emailResult?.data?.failures || "Send failed") : null,
+          });
+        } catch (sendErr) {
+          console.error(`Error sending email to ${attendee.email}:`, sendErr);
+          emailDelivered = false;
+          recipientRecords.push({
+            message_id: messageId,
+            user_id: attendee.user_id,
+            booking_id: attendee.booking_id,
+            email: attendee.email,
+            delivered: false,
+            delivered_at: null,
+            error_message: String(sendErr),
+          });
         }
-      } catch (sendErr) {
-        console.error(`Error sending to ${attendee.email}:`, sendErr);
+      } else {
         recipientRecords.push({
           message_id: messageId,
           user_id: attendee.user_id,
           booking_id: attendee.booking_id,
           email: attendee.email,
-          delivered: false,
-          delivered_at: null,
-          error_message: String(sendErr),
+          delivered: true,
+          delivered_at: new Date().toISOString(),
+          error_message: null,
         });
+      }
+
+      if (needsNotification) {
+        const notifTitle = subject || `Mensaje de ${agency.name}`;
+        const truncatedMsg = message_body.length > 200 ? message_body.slice(0, 197) + "..." : message_body;
+        notificationInserts.push({
+          user_id: attendee.user_id,
+          type: "tour_announcement",
+          title: notifTitle,
+          message: truncatedMsg,
+          data: {
+            tour_id,
+            tour_name: tour.name,
+            agency_name: agency.name,
+            booking_id: attendee.booking_id,
+            booking_code: attendee.booking_code,
+            message_id: messageId,
+          },
+        });
+      }
+
+      const counted = needsEmail ? emailDelivered : true;
+      if (counted) {
+        successCount++;
+      } else {
         errorCount++;
       }
     }
 
     if (recipientRecords.length > 0) {
       await supabase.from("agency_tour_message_recipients").insert(recipientRecords);
+    }
+
+    if (notificationInserts.length > 0) {
+      const { error: notifError } = await supabase.from("notifications").insert(notificationInserts);
+      if (notifError) {
+        console.error("Error inserting notifications:", notifError);
+      }
     }
 
     await supabase

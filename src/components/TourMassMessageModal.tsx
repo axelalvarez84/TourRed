@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Send, Users, Calendar, ChevronDown, AlertCircle, CheckCircle, MessageSquare, Info } from 'lucide-react';
+import { X, Send, Users, Calendar, ChevronDown, AlertCircle, CheckCircle, MessageSquare, Info, Mail, Bell, Layers } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface TourOption {
@@ -28,6 +28,28 @@ interface TourMassMessageModalProps {
 }
 
 type Step = 'scope' | 'compose' | 'confirm';
+type SendChannel = 'email' | 'notification' | 'both';
+
+const CHANNEL_OPTIONS: { value: SendChannel; label: string; description: string; icon: React.ReactNode }[] = [
+  {
+    value: 'email',
+    label: 'Solo email',
+    description: 'Envía un correo al viajero',
+    icon: <Mail className="h-5 w-5" />,
+  },
+  {
+    value: 'notification',
+    label: 'Notificación en app',
+    description: 'Aparece en la campanita',
+    icon: <Bell className="h-5 w-5" />,
+  },
+  {
+    value: 'both',
+    label: 'Email y notificación',
+    description: 'Ambos canales a la vez',
+    icon: <Layers className="h-5 w-5" />,
+  },
+];
 
 const TourMassMessageModal: React.FC<TourMassMessageModalProps> = ({
   open,
@@ -45,6 +67,7 @@ const TourMassMessageModal: React.FC<TourMassMessageModalProps> = ({
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [recipientCount, setRecipientCount] = useState<number | null>(null);
   const [loadingCount, setLoadingCount] = useState(false);
+  const [sendChannel, setSendChannel] = useState<SendChannel>('both');
   const [subject, setSubject] = useState('');
   const [messageBody, setMessageBody] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -61,6 +84,7 @@ const TourMassMessageModal: React.FC<TourMassMessageModalProps> = ({
       setSelectedSlotId(preselectedSlotId || '');
       setSlots([]);
       setRecipientCount(null);
+      setSendChannel('both');
       setSubject('');
       setMessageBody('');
       setIsSending(false);
@@ -132,7 +156,8 @@ const TourMassMessageModal: React.FC<TourMassMessageModalProps> = ({
   };
 
   const handleNextFromCompose = () => {
-    if (!subject.trim() || !messageBody.trim()) return;
+    if (!messageBody.trim()) return;
+    if ((sendChannel === 'email' || sendChannel === 'both') && !subject.trim()) return;
     setStep('confirm');
     loadRecipientCount(selectedTourId, scopeType, selectedSlotId);
   };
@@ -157,6 +182,7 @@ const TourMassMessageModal: React.FC<TourMassMessageModalProps> = ({
             slot_id: scopeType === 'slot' && selectedSlotId ? selectedSlotId : null,
             subject: subject.trim(),
             message_body: messageBody.trim(),
+            send_channel: sendChannel,
           }),
         }
       );
@@ -186,6 +212,8 @@ const TourMassMessageModal: React.FC<TourMassMessageModalProps> = ({
   };
 
   const selectedSlot = slots.find(s => s.id === selectedSlotId) || null;
+  const needsSubject = sendChannel === 'email' || sendChannel === 'both';
+  const composeValid = messageBody.trim() && (!needsSubject || subject.trim());
 
   if (!open) return null;
 
@@ -374,27 +402,58 @@ const TourMassMessageModal: React.FC<TourMassMessageModalProps> = ({
             {/* STEP 2: COMPOSE */}
             {!sendResult && step === 'compose' && (
               <div className="space-y-5">
+                {/* Channel selector */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Canal de envío</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {CHANNEL_OPTIONS.map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setSendChannel(opt.value)}
+                        className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-center ${
+                          sendChannel === opt.value
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <span className={sendChannel === opt.value ? 'text-blue-600' : 'text-gray-400'}>
+                          {opt.icon}
+                        </span>
+                        <span className={`text-xs font-semibold leading-tight ${sendChannel === opt.value ? 'text-blue-700' : 'text-gray-600'}`}>
+                          {opt.label}
+                        </span>
+                        <span className="text-[10px] text-gray-400 leading-tight">{opt.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="bg-blue-50 rounded-xl p-3 flex items-start gap-2">
                   <Info className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-blue-700">
-                    Puedes incluir el enlace de tu grupo de WhatsApp, instrucciones de punto de encuentro, o cualquier informacion relevante para los asistentes.
+                    {sendChannel === 'email' && 'Se enviará un correo electrónico a cada asistente.'}
+                    {sendChannel === 'notification' && 'Aparecerá una notificación en la campanita dentro de la app.'}
+                    {sendChannel === 'both' && 'Los asistentes recibirán tanto un email como una notificación en la app.'}
                   </p>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    Asunto del email <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={subject}
-                    onChange={e => setSubject(e.target.value)}
-                    placeholder="Ej: Informacion importante sobre tu tour"
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                    maxLength={120}
-                  />
-                  <p className="text-xs text-gray-400 mt-1 text-right">{subject.length}/120</p>
-                </div>
+                {needsSubject && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Asunto del email <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={subject}
+                      onChange={e => setSubject(e.target.value)}
+                      placeholder="Ej: Informacion importante sobre tu tour"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      maxLength={120}
+                    />
+                    <p className="text-xs text-gray-400 mt-1 text-right">{subject.length}/120</p>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
@@ -404,7 +463,7 @@ const TourMassMessageModal: React.FC<TourMassMessageModalProps> = ({
                     value={messageBody}
                     onChange={e => setMessageBody(e.target.value)}
                     placeholder="Escribe aqui tu mensaje para los asistentes...&#10;&#10;Puedes incluir:&#10;- Enlace al grupo de WhatsApp&#10;- Punto de encuentro&#10;- Que llevar / vestimenta&#10;- Cualquier cambio de ultima hora"
-                    rows={8}
+                    rows={7}
                     className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
                     maxLength={2000}
                   />
@@ -417,7 +476,7 @@ const TourMassMessageModal: React.FC<TourMassMessageModalProps> = ({
                   </button>
                   <button
                     onClick={handleNextFromCompose}
-                    disabled={!subject.trim() || !messageBody.trim()}
+                    disabled={!composeValid}
                     className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Revisar y enviar
@@ -451,15 +510,25 @@ const TourMassMessageModal: React.FC<TourMassMessageModalProps> = ({
                       </div>
                     )}
                     <div className="flex justify-between">
+                      <span className="text-gray-500">Canal:</span>
+                      <span className="font-semibold text-gray-800">
+                        {sendChannel === 'email' && 'Solo email'}
+                        {sendChannel === 'notification' && 'Notificación en app'}
+                        {sendChannel === 'both' && 'Email y notificación'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
                       <span className="text-gray-500">Destinatarios:</span>
                       <span className="font-bold text-blue-700">
                         {loadingCount ? '...' : `${recipientCount ?? 0} ${(recipientCount ?? 0) === 1 ? 'persona' : 'personas'}`}
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Asunto:</span>
-                      <span className="font-semibold text-gray-800 text-right max-w-[60%] truncate">{subject}</span>
-                    </div>
+                    {needsSubject && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Asunto:</span>
+                        <span className="font-semibold text-gray-800 text-right max-w-[60%] truncate">{subject}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="bg-white border border-gray-200 rounded-xl p-4">
