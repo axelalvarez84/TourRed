@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { DollarSign, TrendingUp, Calendar, Download, FileText, CheckCircle, Clock, Eye, CreditCard, FileSpreadsheet } from 'lucide-react';
+import { formatCurrencyMXN } from '../../utils/formatCurrency';
 import { format } from 'date-fns';
 import type { FinancialSummary, TourFinancialSummary, CommissionRecord } from '../../types';
 import { jsPDF } from 'jspdf';
@@ -239,12 +240,7 @@ const AgencyFinancials: React.FC = () => {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: 'MXN',
-    }).format(amount);
-  };
+  const formatCurrency = (amount: number) => formatCurrencyMXN(amount);
 
   const getStatusBadge = (status: string) => {
     const styles = {

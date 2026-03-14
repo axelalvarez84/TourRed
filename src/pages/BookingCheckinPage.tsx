@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { CheckCircle, XCircle, Clock, AlertTriangle, Users, MapPin, Calendar, DollarSign, QrCode, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { formatCurrencyMXN } from '../utils/formatCurrency';
 
 interface Traveler {
   id: string;
@@ -60,8 +61,7 @@ const formatDateTime = (dateString: string) =>
     year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
   });
 
-const formatCurrency = (amount: number) =>
-  `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatCurrency = (amount: number) => formatCurrencyMXN(amount);
 
 export default function BookingCheckinPage() {
   const [searchParams] = useSearchParams();

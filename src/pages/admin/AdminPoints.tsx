@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Award, Search, Filter, TrendingUp, TrendingDown, Clock, Users, Plus, Minus, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 interface PointsWallet {
   id: string;
@@ -183,7 +184,7 @@ const AdminPoints: React.FC = () => {
               {stats.totalPointsInCirculation.toLocaleString()}
             </div>
             <div className="text-sm text-gray-500">
-              ${(stats.totalPointsInCirculation / 100).toFixed(2)} MXN
+              ${formatCurrency(stats.totalPointsInCirculation / 100)} MXN
             </div>
           </div>
 
@@ -296,7 +297,7 @@ const AdminPoints: React.FC = () => {
                         {wallet.balance.toLocaleString()}
                       </div>
                       <div className="text-xs text-gray-500">
-                        ${(wallet.balance / 100).toFixed(2)}
+                        ${formatCurrency(wallet.balance / 100)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -408,7 +409,7 @@ const AdminPoints: React.FC = () => {
                 />
                 {adjustmentAmount && (
                   <div className="mt-2 text-sm text-gray-600">
-                    Equivalente a: ${(parseInt(adjustmentAmount) / 100).toFixed(2)} MXN
+                    Equivalente a: ${formatCurrency(parseInt(adjustmentAmount) / 100)} MXN
                   </div>
                 )}
               </div>

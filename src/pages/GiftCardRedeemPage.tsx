@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Gift, Check, AlertCircle, Wallet } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { formatCurrencyMXN } from '../utils/formatCurrency';
 
 export default function GiftCardRedeemPage() {
   const [searchParams] = useSearchParams();
@@ -132,13 +133,13 @@ export default function GiftCardRedeemPage() {
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-gray-700 font-medium">Monto Agregado:</span>
                   <span className="text-3xl font-bold text-amber-600">
-                    ${redemptionData.amount.toLocaleString('es-MX')} MXN
+                    {formatCurrencyMXN(redemptionData.amount)} MXN
                   </span>
                 </div>
                 <div className="flex items-center justify-between pt-4 border-t border-amber-200">
                   <span className="text-gray-700 font-medium">Nuevo Saldo:</span>
                   <span className="text-2xl font-bold text-gray-900">
-                    ${redemptionData.newBalance.toLocaleString('es-MX')} MXN
+                    {formatCurrencyMXN(redemptionData.newBalance)} MXN
                   </span>
                 </div>
               </div>
@@ -247,7 +248,7 @@ export default function GiftCardRedeemPage() {
                     <div className="flex justify-between">
                       <span className="text-gray-700">Monto:</span>
                       <span className="font-bold text-2xl text-green-700">
-                        ${validationResult.amount.toLocaleString('es-MX')} {validationResult.currency}
+                        {formatCurrencyMXN(validationResult.amount)} {validationResult.currency}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">

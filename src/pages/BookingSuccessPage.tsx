@@ -6,6 +6,7 @@ import { Booking, Tour } from '../types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAuth } from '../context/AuthContext';
+import { formatCurrencyMXN } from '../utils/formatCurrency';
 
 const BookingSuccessPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -322,7 +323,7 @@ const BookingSuccessPage: React.FC = () => {
                       <span className="text-gray-600">
                         Pick Up — {booking.pickup_zone_name} ({booking.pickup_cost_type === 'por_persona' ? 'por persona' : 'por reserva'}):
                       </span>
-                      <span className="font-medium">${(booking.pickup_zone_extra_cost ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                      <span className="font-medium">{formatCurrencyMXN(booking.pickup_zone_extra_cost ?? 0)}</span>
                     </div>
                   )}
 
@@ -331,7 +332,7 @@ const BookingSuccessPage: React.FC = () => {
                       <span className="text-gray-600">
                         Idioma — {booking.selected_language} ({booking.language_cost_type === 'por_persona' ? 'por persona' : 'fijo'}):
                       </span>
-                      <span className="font-medium">${(booking.language_extra_cost ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                      <span className="font-medium">{formatCurrencyMXN(booking.language_extra_cost ?? 0)}</span>
                     </div>
                   )}
 
@@ -341,7 +342,7 @@ const BookingSuccessPage: React.FC = () => {
                         <Tag className="h-4 w-4 mr-1" />
                         Descuento Grupal:
                       </span>
-                      <span className="font-bold text-emerald-600">-${Number((booking as any).promo_discount_amount).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-bold text-emerald-600">-{formatCurrencyMXN(Number((booking as any).promo_discount_amount))}</span>
                     </div>
                   )}
 
@@ -362,7 +363,7 @@ const BookingSuccessPage: React.FC = () => {
                           <div className="flex justify-between">
                             <span className="text-gray-600">Cargo por Servicio (5%):</span>
                             <span className="font-medium text-gray-400 line-through">
-                              ${((booking.service_charge || 0) + Number(booking.service_charge_discount || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {formatCurrencyMXN((booking.service_charge || 0) + Number(booking.service_charge_discount || 0))}
                             </span>
                           </div>
                           <div className="flex justify-between bg-green-50 border border-green-200 rounded px-2 py-1.5 -mx-1">
@@ -370,19 +371,19 @@ const BookingSuccessPage: React.FC = () => {
                               <Ticket className="h-4 w-4 mr-1" />
                               Desc. Cargo por Servicio:
                             </span>
-                            <span className="font-bold text-green-600">-${Number(booking.service_charge_discount).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="font-bold text-green-600">-{formatCurrencyMXN(Number(booking.service_charge_discount))}</span>
                           </div>
                           {booking.service_charge > 0 && (
                             <div className="flex justify-between">
                               <span className="text-gray-600">Cargo por Servicio (a pagar):</span>
-                              <span className="font-medium">${booking.service_charge.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              <span className="font-medium">{formatCurrencyMXN(booking.service_charge)}</span>
                             </div>
                           )}
                         </>
                       ) : booking.service_charge > 0 ? (
                         <div className="flex justify-between">
                           <span className="text-gray-600">Cargo por Servicio (5%):</span>
-                          <span className="font-medium">${booking.service_charge.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <span className="font-medium">{formatCurrencyMXN(booking.service_charge)}</span>
                         </div>
                       ) : (
                         <div className="flex justify-between">
@@ -399,7 +400,7 @@ const BookingSuccessPage: React.FC = () => {
                         <Ticket className="h-4 w-4 mr-1" />
                         Código de Descuento:
                       </span>
-                      <span className="font-bold text-green-600">-${Number(booking.discount_amount).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-bold text-green-600">-{formatCurrencyMXN(Number(booking.discount_amount))}</span>
                     </div>
                   )}
 
@@ -409,7 +410,7 @@ const BookingSuccessPage: React.FC = () => {
                         <Award className="h-4 w-4 mr-1" />
                         Puntos ToursRed Usados:
                       </span>
-                      <span className="font-bold text-amber-600">-{booking.points_used.toLocaleString()} puntos (${(booking.points_used / 100).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
+                      <span className="font-bold text-amber-600">-{booking.points_used.toLocaleString()} puntos ({formatCurrencyMXN(booking.points_used / 100)})</span>
                     </div>
                   )}
 
@@ -419,28 +420,28 @@ const BookingSuccessPage: React.FC = () => {
                         <Wallet className="h-4 w-4 mr-1" />
                         ToursRed Cash Aplicado:
                       </span>
-                      <span className="font-bold text-amber-600">-${Number(booking.toursred_cash_used).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-bold text-amber-600">-{formatCurrencyMXN(Number(booking.toursred_cash_used))}</span>
                     </div>
                   )}
 
                   <div className="border-t border-gray-200 pt-2 mt-2">
                     <div className="flex justify-between text-lg font-bold">
                       <span className="text-green-600">Total Pagado:</span>
-                      <span className="text-green-600">${booking.user_payment?.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="text-green-600">{formatCurrencyMXN(booking.user_payment ?? 0)}</span>
                     </div>
                     {((Number(booking.points_used) > 0) || (Number(booking.toursred_cash_used) > 0)) && (
                       <div className="text-xs text-gray-500 mt-1 text-right">
                         {Number(booking.points_used) > 0 && Number(booking.toursred_cash_used) > 0 ? (
                           <>
-                            ({booking.points_used.toLocaleString()} puntos + ${Number(booking.toursred_cash_used).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ToursRed Cash + ${Math.max(0, (booking.user_payment || 0) - ((booking.points_used || 0) / 100) - Number(booking.toursred_cash_used || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Stripe)
+                            ({booking.points_used.toLocaleString()} puntos + {formatCurrencyMXN(Number(booking.toursred_cash_used))} ToursRed Cash + {formatCurrencyMXN(Math.max(0, (booking.user_payment || 0) - ((booking.points_used || 0) / 100) - Number(booking.toursred_cash_used || 0)))} Stripe)
                           </>
                         ) : Number(booking.points_used) > 0 ? (
                           <>
-                            ({booking.points_used.toLocaleString()} puntos + ${Math.max(0, (booking.user_payment || 0) - (booking.points_used / 100)).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Stripe)
+                            ({booking.points_used.toLocaleString()} puntos + {formatCurrencyMXN(Math.max(0, (booking.user_payment || 0) - (booking.points_used / 100)))} Stripe)
                           </>
                         ) : (
                           <>
-                            (${Number(booking.toursred_cash_used || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ToursRed Cash + ${Math.max(0, (booking.user_payment || 0) - Number(booking.toursred_cash_used || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Stripe)
+                            ({formatCurrencyMXN(Number(booking.toursred_cash_used || 0))} ToursRed Cash + {formatCurrencyMXN(Math.max(0, (booking.user_payment || 0) - Number(booking.toursred_cash_used || 0)))} Stripe)
                           </>
                         )}
                       </div>

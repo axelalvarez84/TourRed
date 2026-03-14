@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Building, Users, Eye, EyeOff, Mail, Phone, Globe, Calendar, Search, Filter, MoreVertical, CheckCircle, XCircle, Edit, Save, X, Percent, DollarSign, AlertTriangle, User, MapPin, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Building, Users, Eye, EyeOff, Mail, Phone, Globe, Calendar, Search, Filter, MoreVertical, CheckCircle, XCircle, CreditCard as Edit, Save, X, Percent, DollarSign, AlertTriangle, User, MapPin, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { getAllAgencies, updateAgencyStatus, supabase } from '../../lib/supabase';
+import { formatCurrencyMXN } from '../../utils/formatCurrency';
 
 interface Agency {
   id: string;
@@ -779,7 +780,7 @@ const AdminAgencies: React.FC = () => {
                             {((parseFloat(agency.commission_rate) || 0.10) * 100).toFixed(1)}%
                           </div>
                           <div className="text-xs text-gray-500">
-                            ${(agency.platform_commission || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} generado
+                            {formatCurrencyMXN(agency.platform_commission || 0)} generado
                           </div>
                         </div>
                       </div>
@@ -793,7 +794,7 @@ const AdminAgencies: React.FC = () => {
                           {agency.booking_count || 0} reservas
                         </div>
                         <div className="text-sm text-gray-500">
-                          ${(agency.total_revenue || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ingresos
+                          {formatCurrencyMXN(agency.total_revenue || 0)} ingresos
                         </div>
                         {agency.rating && (
                           <div className="text-sm text-gray-500">

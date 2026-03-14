@@ -8,6 +8,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import ReviewForm from '../../components/ReviewForm';
 import { useFormPersistence } from '../../hooks/useFormPersistence';
 import { usePreventUnload } from '../../hooks/usePreventUnload';
+import { formatCurrency, formatCurrencyMXN } from '../../utils/formatCurrency';
 import { validateAllTravelers } from '../../utils/birthDateValidation';
 import PaymentProviderSelector from '../../components/PaymentProviderSelector';
 import MercadoPagoBrick from '../../components/MercadoPagoBrick';
@@ -1862,7 +1863,7 @@ const TravelerBookings: React.FC = () => {
                         {cancellationModal.policy.originalServiceCharge > 0 && (
                           <div className="bg-orange-50 border-l-4 border-orange-400 p-4 mb-4">
                             <p className="text-sm text-orange-800">
-                              <strong>Nota importante:</strong> El cargo por servicio de ${cancellationModal.policy.originalServiceCharge.toFixed(2)} no es reembolsable. Si utilizaste beneficios de ToursRed+, estos tampoco son recuperables ya que fueron cobrados por Stripe.
+                              <strong>Nota importante:</strong> El cargo por servicio de ${formatCurrencyMXN(cancellationModal.policy.originalServiceCharge)} no es reembolsable. Si utilizaste beneficios de ToursRed+, estos tampoco son recuperables ya que fueron cobrados por Stripe.
                             </p>
                           </div>
                         )}
@@ -1871,11 +1872,11 @@ const TravelerBookings: React.FC = () => {
                           <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
                             <p className="text-sm text-red-800 font-semibold mb-1">Servicios opcionales NO reembolsables:</p>
                             <p className="text-sm text-red-700">
-                              Tienes ${((cancellationModal.policy as any).optionalServicesNonRefundable as number).toFixed(2)} en servicios adicionales marcados como no reembolsables. Al cancelar, este monto <strong>no se devolverá</strong>, ya que fue contratado con esa condición.
+                              Tienes ${formatCurrencyMXN((cancellationModal.policy as any).optionalServicesNonRefundable as number)} en servicios adicionales marcados como no reembolsables. Al cancelar, este monto <strong>no se devolverá</strong>, ya que fue contratado con esa condición.
                             </p>
                             {(cancellationModal.policy as any).optionalServicesRefundable > 0 && (
                               <p className="text-sm text-red-600 mt-1">
-                                Los servicios reembolsables (${ ((cancellationModal.policy as any).optionalServicesRefundable as number).toFixed(2)}) sí se devuelven.
+                                Los servicios reembolsables (${formatCurrencyMXN((cancellationModal.policy as any).optionalServicesRefundable as number)}) sí se devuelven.
                               </p>
                             )}
                           </div>
@@ -1979,7 +1980,7 @@ const TravelerBookings: React.FC = () => {
                   </p>
                   {cancellationModal.policy?.refundAmountToTraveler > 0 && (
                     <p className="text-sm text-gray-600">
-                      El reembolso de ${cancellationModal.policy.refundAmountToTraveler.toFixed(2)} ha sido depositado en tu ToursRed Cash.
+                      El reembolso de ${formatCurrencyMXN(cancellationModal.policy.refundAmountToTraveler)} ha sido depositado en tu ToursRed Cash.
                     </p>
                   )}
                 </div>
@@ -2059,14 +2060,14 @@ const TravelerBookings: React.FC = () => {
                                 {Number((traveler as any).promo_discount_per_traveler) > 0 ? (
                                   <>
                                     <div className="flex items-center gap-1.5 justify-end">
-                                      <span className="text-xs text-gray-400 line-through">${(Number(traveler.precio_aplicado) + Number((traveler as any).promo_discount_per_traveler)).toFixed(2)}</span>
-                                      <span className="font-semibold text-sm text-emerald-600">${Number(traveler.precio_aplicado).toFixed(2)}</span>
+                                      <span className="text-xs text-gray-400 line-through">${formatCurrencyMXN(Number(traveler.precio_aplicado) + Number((traveler as any).promo_discount_per_traveler))}</span>
+                                      <span className="font-semibold text-sm text-emerald-600">${formatCurrencyMXN(Number(traveler.precio_aplicado))}</span>
                                     </div>
                                     <div className="text-xs text-gray-500">precio pagado</div>
                                   </>
                                 ) : (
                                   <>
-                                    <div className="font-semibold text-sm text-gray-800">${Number(traveler.precio_aplicado).toFixed(2)}</div>
+                                    <div className="font-semibold text-sm text-gray-800">${formatCurrencyMXN(Number(traveler.precio_aplicado))}</div>
                                     <div className="text-xs text-gray-500">precio pagado</div>
                                   </>
                                 )}
@@ -2119,12 +2120,12 @@ const TravelerBookings: React.FC = () => {
                           <div className="space-y-1 text-sm mb-2">
                             <div className="flex justify-between">
                               <span className="text-gray-600">Anticipo de viajeros cancelados:</span>
-                              <span className="font-medium">${Number(partialCancellationModal.policy.originalPartialAmount).toFixed(2)}</span>
+                              <span className="font-medium">${formatCurrencyMXN(Number(partialCancellationModal.policy.originalPartialAmount))}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-gray-600">Reembolso a ToursRed Cash:</span>
                               <span className={`font-bold ${partialCancellationModal.policy.refundAmountToTraveler > 0 ? 'text-green-700' : 'text-red-600'}`}>
-                                ${Number(partialCancellationModal.policy.refundAmountToTraveler).toFixed(2)}
+                                ${formatCurrencyMXN(Number(partialCancellationModal.policy.refundAmountToTraveler))}
                               </span>
                             </div>
                           </div>
@@ -2224,7 +2225,7 @@ const TravelerBookings: React.FC = () => {
                   <p className="text-gray-600 mb-2">Los viajeros han sido removidos de tu reserva.</p>
                   {partialCancellationModal.policy?.refundAmountToTraveler > 0 && (
                     <p className="text-sm text-gray-600">
-                      El reembolso de ${Number(partialCancellationModal.policy.refundAmountToTraveler).toFixed(2)} ha sido acreditado en tu ToursRed Cash.
+                      El reembolso de ${formatCurrencyMXN(Number(partialCancellationModal.policy.refundAmountToTraveler))} ha sido acreditado en tu ToursRed Cash.
                     </p>
                   )}
                 </div>
@@ -2318,7 +2319,7 @@ const TravelerBookings: React.FC = () => {
                     <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
                       <div className="flex justify-between text-sm">
                         <span className="text-amber-800">ToursRed Points Aplicados:</span>
-                        <span className="font-semibold text-amber-800">-${((paymentModal.booking?.points_used || 0) / 100).toFixed(2)}</span>
+                        <span className="font-semibold text-amber-800">-${formatCurrencyMXN((paymentModal.booking?.points_used || 0) / 100)}</span>
                       </div>
                       <p className="text-xs text-amber-700 mt-1">
                         {(paymentModal.booking?.points_used || 0).toLocaleString()} puntos ya descontados

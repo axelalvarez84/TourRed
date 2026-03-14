@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Crown, Calendar, DollarSign, AlertCircle, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 interface Membership {
   id: string;
@@ -289,7 +290,7 @@ export default function AdminMemberships() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                         <div className="flex items-center gap-1">
                           <DollarSign className="h-4 w-4" />
-                          ${membership.service_fee_exemption_used.toFixed(2)} / $500.00
+                          ${formatCurrency(membership.service_fee_exemption_used)} / $500.00
                         </div>
                         <div className="mt-1 w-full bg-gray-200 rounded-full h-1.5">
                           <div

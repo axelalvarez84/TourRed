@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useFormPersistence } from '../hooks/useFormPersistence';
 import { usePreventUnload } from '../hooks/usePreventUnload';
 import { useAuth } from '../context/AuthContext';
+import { formatCurrencyMXN } from '../utils/formatCurrency';
 import PaymentProviderSelector, { PaymentProvider } from '../components/PaymentProviderSelector';
 import MercadoPagoBrick from '../components/MercadoPagoBrick';
 
@@ -513,14 +514,14 @@ export default function GiftCardsPage() {
                 <div className="flex justify-between items-center text-lg">
                   <span className="text-gray-700">Monto de Tarjeta:</span>
                   <span className="text-2xl font-bold text-gray-900">
-                    ${selectedAmount.toLocaleString('es-MX')} MXN
+                    {formatCurrencyMXN(selectedAmount)} MXN
                   </span>
                 </div>
                 {appliedDiscount && (
                   <div className="flex justify-between items-center text-lg text-green-600">
                     <span>Descuento:</span>
                     <span className="text-xl font-semibold">
-                      -${appliedDiscount.discountAmount.toLocaleString('es-MX')} MXN
+                      -{formatCurrencyMXN(appliedDiscount.discountAmount)} MXN
                     </span>
                   </div>
                 )}
@@ -528,7 +529,7 @@ export default function GiftCardsPage() {
                   <div className="flex justify-between items-center text-lg">
                     <span className="text-gray-700 font-semibold">Total a Pagar:</span>
                     <span className="text-3xl font-bold text-amber-600">
-                      ${calculateFinalAmount().toLocaleString('es-MX')} MXN
+                      {formatCurrencyMXN(calculateFinalAmount())} MXN
                     </span>
                   </div>
                 </div>
@@ -591,7 +592,7 @@ export default function GiftCardsPage() {
                       <div>
                         <p className="font-semibold text-green-900">Código aplicado: {appliedDiscount.code}</p>
                         <p className="text-sm text-green-700">
-                          Descuento de ${appliedDiscount.discountAmount.toLocaleString('es-MX')} MXN
+                          Descuento de {formatCurrencyMXN(appliedDiscount.discountAmount)} MXN
                         </p>
                       </div>
                     </div>

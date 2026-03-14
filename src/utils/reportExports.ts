@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
+import { formatCurrencyMXN } from './formatCurrency';
 
 interface TravelerData {
   id: string;
@@ -66,9 +67,7 @@ const getCategoryLabel = (categoria: string): string => {
   return labels[categoria] || categoria;
 };
 
-const formatCurrency = (amount: number): string => {
-  return `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
+const formatCurrency = (amount: number): string => formatCurrencyMXN(amount);
 
 const formatDate = (dateString: string): string => {
   try {

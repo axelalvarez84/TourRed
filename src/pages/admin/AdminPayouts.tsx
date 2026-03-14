@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { DollarSign, Calendar, Clock, CheckCircle, AlertCircle, Download, Plus, RefreshCw, Upload } from 'lucide-react';
+import { formatCurrencyMXN } from '../../utils/formatCurrency';
 import { format, isAfter } from 'date-fns';
 import type { CommissionRecord, Agency, Tour, AgencyPayout } from '../../types';
 
@@ -173,12 +174,7 @@ const AdminPayouts: React.FC = () => {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: 'MXN',
-    }).format(amount);
-  };
+  const formatCurrency = (amount: number) => formatCurrencyMXN(amount);
 
   const getFrequencyBadge = (frequency: string) => {
     const labels = {
@@ -641,12 +637,6 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: 'MXN',
-    }).format(amount);
-  };
 
   if (!isOpen) return null;
 

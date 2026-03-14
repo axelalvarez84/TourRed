@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, MapPin, Heart, Clock, CheckCircle, Crown, Sparkles, Wallet, Award, Gift, Copy, ExternalLink } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { formatCurrency, formatCurrencyMXN } from '../../utils/formatCurrency';
 import { supabase } from '../../lib/supabase';
 import { Link } from 'react-router-dom';
 
@@ -486,7 +487,7 @@ const TravelerDashboard: React.FC = () => {
           </div>
           <div className="text-right">
             <p className="text-4xl font-bold">
-              ${walletBalance.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatCurrencyMXN(walletBalance)}
             </p>
             <p className="text-accent-100 text-sm mt-1">MXN</p>
           </div>
@@ -528,7 +529,7 @@ const TravelerDashboard: React.FC = () => {
                 {pointsBalance.toLocaleString()}
               </p>
               <p className="text-amber-100 text-sm mt-1">
-                ${(pointsBalance / 100).toFixed(2)} MXN
+                ${formatCurrency(pointsBalance / 100)} MXN
               </p>
             </div>
           </div>

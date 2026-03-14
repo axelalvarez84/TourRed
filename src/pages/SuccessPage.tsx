@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle, ArrowRight, Home, CreditCard } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { formatCurrencyMXN } from '../utils/formatCurrency';
 
 const SuccessPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -80,7 +81,7 @@ const SuccessPage: React.FC = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Total Pagado:</span>
-                  <span className="font-medium">${bookingDetails.user_payment?.toFixed(2) || '0.00'} MXN</span>
+                  <span className="font-medium">{formatCurrencyMXN(bookingDetails.user_payment ?? 0)} MXN</span>
                 </div>
               </div>
             </div>

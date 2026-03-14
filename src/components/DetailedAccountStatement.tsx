@@ -2,6 +2,7 @@ import React from 'react';
 import { ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import type { CommissionRecord } from '../types';
+import { formatCurrencyMXN } from '../utils/formatCurrency';
 
 interface DetailedAccountStatementProps {
   records: CommissionRecord[];
@@ -20,12 +21,7 @@ const DetailedAccountStatement: React.FC<DetailedAccountStatementProps> = ({ rec
     setExpandedRows(newExpanded);
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: 'MXN',
-    }).format(amount);
-  };
+  const formatCurrency = (amount: number) => formatCurrencyMXN(amount);
 
   const getStatusBadge = (status: string) => {
     const styles = {

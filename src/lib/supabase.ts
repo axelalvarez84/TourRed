@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { format, parse } from 'date-fns';
 import { Tour, Booking, Destination, DestinationImage, ImageUploadData } from '../types';
+import { formatCurrency } from '../utils/formatCurrency';
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -1464,7 +1465,7 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
         canCancel: true,
         optionalServicesRefundable,
         optionalServicesNonRefundable,
-        refundMessage: `Se reembolsará el ${Math.round(flexibleRefundPct * 100)}% del anticipo ($${refundAmount.toFixed(2)})${optionalServicesRefundable > 0 ? ` más los servicios opcionales reembolsables ($${optionalServicesRefundable.toFixed(2)})` : ''} a tu ToursRed Cash. El cargo por servicio ($${originalServiceCharge.toFixed(2)}) no es reembolsable.${optionalServicesNonRefundable > 0 ? ` Los servicios no reembolsables ($${optionalServicesNonRefundable.toFixed(2)}) no se devuelven.` : ''}`
+        refundMessage: `Se reembolsará el ${Math.round(flexibleRefundPct * 100)}% del anticipo ($${formatCurrency(refundAmount)})${optionalServicesRefundable > 0 ? ` más los servicios opcionales reembolsables ($${formatCurrency(optionalServicesRefundable)})` : ''} a tu ToursRed Cash. El cargo por servicio ($${formatCurrency(originalServiceCharge)}) no es reembolsable.${optionalServicesNonRefundable > 0 ? ` Los servicios no reembolsables ($${formatCurrency(optionalServicesNonRefundable)}) no se devuelven.` : ''}`
       };
     }
 
@@ -1483,7 +1484,7 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
         canCancel: true,
         optionalServicesRefundable,
         optionalServicesNonRefundable,
-        refundMessage: `Se reembolsará el ${Math.round(moderateRefundPct * 100)}% del anticipo ($${refundAmount.toFixed(2)})${optionalServicesRefundable > 0 ? ` más los servicios opcionales reembolsables ($${optionalServicesRefundable.toFixed(2)})` : ''} a tu ToursRed Cash. El cargo por servicio ($${originalServiceCharge.toFixed(2)}) no es reembolsable.${optionalServicesNonRefundable > 0 ? ` Los servicios no reembolsables ($${optionalServicesNonRefundable.toFixed(2)}) no se devuelven.` : ''}`
+        refundMessage: `Se reembolsará el ${Math.round(moderateRefundPct * 100)}% del anticipo ($${formatCurrency(refundAmount)})${optionalServicesRefundable > 0 ? ` más los servicios opcionales reembolsables ($${formatCurrency(optionalServicesRefundable)})` : ''} a tu ToursRed Cash. El cargo por servicio ($${formatCurrency(originalServiceCharge)}) no es reembolsable.${optionalServicesNonRefundable > 0 ? ` Los servicios no reembolsables ($${formatCurrency(optionalServicesNonRefundable)}) no se devuelven.` : ''}`
       };
     }
 
@@ -1501,7 +1502,7 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
         canCancel: true,
         optionalServicesRefundable,
         optionalServicesNonRefundable,
-        refundMessage: `No se reembolsará el anticipo del tour (menos de ${moderateHours} horas antes).${optionalServicesRefundable > 0 ? ` Los servicios opcionales reembolsables ($${optionalServicesRefundable.toFixed(2)}) sí se devuelven.` : ''} Cancelar evita una penalización de No Show en tu perfil.`
+        refundMessage: `No se reembolsará el anticipo del tour (menos de ${moderateHours} horas antes).${optionalServicesRefundable > 0 ? ` Los servicios opcionales reembolsables ($${formatCurrency(optionalServicesRefundable)}) sí se devuelven.` : ''} Cancelar evita una penalización de No Show en tu perfil.`
       };
     }
 
@@ -1542,7 +1543,7 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
       canCancel: true,
       optionalServicesRefundable,
       optionalServicesNonRefundable,
-      refundMessage: `Se reembolsará el 100% del anticipo ($${originalDepositAmount.toFixed(2)})${optionalServicesRefundable > 0 ? ` más los servicios opcionales reembolsables ($${optionalServicesRefundable.toFixed(2)})` : ''} a tu ToursRed Cash. El cargo por servicio ($${originalServiceCharge.toFixed(2)}) no es reembolsable.${optionalServicesNonRefundable > 0 ? ` Los servicios no reembolsables ($${optionalServicesNonRefundable.toFixed(2)}) no se devuelven.` : ''}`
+      refundMessage: `Se reembolsará el 100% del anticipo ($${formatCurrency(originalDepositAmount)})${optionalServicesRefundable > 0 ? ` más los servicios opcionales reembolsables ($${formatCurrency(optionalServicesRefundable)})` : ''} a tu ToursRed Cash. El cargo por servicio ($${formatCurrency(originalServiceCharge)}) no es reembolsable.${optionalServicesNonRefundable > 0 ? ` Los servicios no reembolsables ($${formatCurrency(optionalServicesNonRefundable)}) no se devuelven.` : ''}`
     };
   }
 
@@ -1564,7 +1565,7 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
       canCancel: true,
       optionalServicesRefundable,
       optionalServicesNonRefundable,
-      refundMessage: `Se reembolsará el 50% del anticipo ($${refundAmount.toFixed(2)})${optionalServicesRefundable > 0 ? ` más los servicios opcionales reembolsables ($${optionalServicesRefundable.toFixed(2)})` : ''} a tu ToursRed Cash. El cargo por servicio ($${originalServiceCharge.toFixed(2)}) no es reembolsable.${optionalServicesNonRefundable > 0 ? ` Los servicios no reembolsables ($${optionalServicesNonRefundable.toFixed(2)}) no se devuelven.` : ''}`
+      refundMessage: `Se reembolsará el 50% del anticipo ($${formatCurrency(refundAmount)})${optionalServicesRefundable > 0 ? ` más los servicios opcionales reembolsables ($${formatCurrency(optionalServicesRefundable)})` : ''} a tu ToursRed Cash. El cargo por servicio ($${formatCurrency(originalServiceCharge)}) no es reembolsable.${optionalServicesNonRefundable > 0 ? ` Los servicios no reembolsables ($${formatCurrency(optionalServicesNonRefundable)}) no se devuelven.` : ''}`
     };
   }
 
@@ -1586,7 +1587,7 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
       warningMessage: tour.cancellation_not_allowed
         ? 'Este tour NO permite cancelaciones con reembolso. Solo puedes cancelar para evitar la penalización de No Show.'
         : undefined,
-      refundMessage: `No se reembolsará el anticipo del tour.${optionalServicesRefundable > 0 ? ` Los servicios opcionales reembolsables ($${optionalServicesRefundable.toFixed(2)}) sí se devuelven.` : ''}${optionalServicesNonRefundable > 0 ? ` Los servicios no reembolsables ($${optionalServicesNonRefundable.toFixed(2)}) no se devuelven.` : ''} Cancelar evita una penalización de No Show en tu perfil.`
+      refundMessage: `No se reembolsará el anticipo del tour.${optionalServicesRefundable > 0 ? ` Los servicios opcionales reembolsables ($${formatCurrency(optionalServicesRefundable)}) sí se devuelven.` : ''}${optionalServicesNonRefundable > 0 ? ` Los servicios no reembolsables ($${formatCurrency(optionalServicesNonRefundable)}) no se devuelven.` : ''} Cancelar evita una penalización de No Show en tu perfil.`
     };
   }
 
@@ -1910,7 +1911,7 @@ export const calculatePartialCancellationPolicy = async (
       amountToAgency: 0,
       amountToPlatform: 0,
       canCancel: true,
-      refundMessage: `Se reembolsará el 100% del anticipo parcial ($${originalPartialAmount.toFixed(2)}) a tu ToursRed Cash.`
+      refundMessage: `Se reembolsará el 100% del anticipo parcial ($${formatCurrency(originalPartialAmount)}) a tu ToursRed Cash.`
     };
   }
 
@@ -1925,7 +1926,7 @@ export const calculatePartialCancellationPolicy = async (
       amountToAgency: penaltyAmount * 0.7,
       amountToPlatform: penaltyAmount * 0.3,
       canCancel: true,
-      refundMessage: `Se reembolsará el 50% del anticipo parcial ($${refundAmount.toFixed(2)}) a tu ToursRed Cash.`
+      refundMessage: `Se reembolsará el 50% del anticipo parcial ($${formatCurrency(refundAmount)}) a tu ToursRed Cash.`
     };
   }
 

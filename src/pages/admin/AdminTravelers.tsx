@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { User, Mail, Phone, Calendar, MapPin, Shield, ShieldOff, Edit2, Star, ShoppingBag, X, DollarSign, CreditCard, Crown, TrendingUp, Users, ArrowUpDown, ArrowUp, ArrowDown, Wallet } from 'lucide-react';
+import { User, Mail, Phone, Calendar, MapPin, Shield, ShieldOff, CreditCard as Edit2, Star, ShoppingBag, X, DollarSign, CreditCard, Crown, TrendingUp, Users, ArrowUpDown, ArrowUp, ArrowDown, Wallet } from 'lucide-react';
+import { formatCurrencyMXN } from '../../utils/formatCurrency';
 
 interface Traveler {
   id: string;
@@ -262,12 +263,7 @@ export default function AdminTravelers() {
       return 0;
     });
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: 'MXN',
-    }).format(amount);
-  };
+  const formatCurrency = (amount: number) => formatCurrencyMXN(amount);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';

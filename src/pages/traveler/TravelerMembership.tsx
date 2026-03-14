@@ -4,6 +4,7 @@ import { Crown, Check, X, Zap, Shield, Sparkles, AlertCircle, ArrowLeft, Calenda
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { useMembershipPrices } from '../../hooks/useMembershipPrices';
+import { formatCurrencyMXN, formatCurrency } from '../../utils/formatCurrency';
 
 interface Membership {
   id: string;
@@ -232,7 +233,7 @@ export default function TravelerMembership() {
               <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-yellow-100 text-sm">Exención de cargo por servicio disponible este mes</p>
-                  <p className="text-2xl font-bold">${remainingExemption.toFixed(2)} MXN</p>
+                  <p className="text-2xl font-bold">{formatCurrencyMXN(remainingExemption)} MXN</p>
                 </div>
                 <div className="w-full bg-white/20 rounded-full h-2">
                   <div
@@ -320,7 +321,7 @@ export default function TravelerMembership() {
                           <div className="text-right ml-4">
                             <p className="text-xs text-gray-500 mb-1">Ahorro en cargo por servicio</p>
                             <p className="text-lg font-bold text-green-600">
-                              ${(booking.membership_service_fee_saved || 0).toFixed(2)}
+                              {formatCurrencyMXN(booking.membership_service_fee_saved || 0)}
                             </p>
                             <p className="text-xs text-gray-500">¡Beneficio aplicado!</p>
                           </div>
@@ -330,7 +331,7 @@ export default function TravelerMembership() {
                   </div>
                   <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
                     <p className="text-sm text-green-800 font-medium">
-                      Total ahorrado este mes: ${((membership?.service_fee_exemption_used || 0)).toFixed(2)} MXN
+                      Total ahorrado este mes: {formatCurrencyMXN(membership?.service_fee_exemption_used || 0)} MXN
                     </p>
                   </div>
                 </>
@@ -341,7 +342,7 @@ export default function TravelerMembership() {
                   </div>
                   <p className="text-gray-600 mb-2">Aún no has usado tu beneficio este mes</p>
                   <p className="text-sm text-gray-500">
-                    Tienes ${remainingExemption.toFixed(2)} MXN disponibles para ahorrar en cargos por servicio
+                    Tienes {formatCurrencyMXN(remainingExemption)} MXN disponibles para ahorrar en cargos por servicio
                   </p>
                 </div>
               )}

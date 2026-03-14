@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { formatCurrency } from '../utils/formatCurrency';
 
 interface MembershipPrices {
   monthlyPrice: number;
@@ -50,7 +51,7 @@ export function useMembershipPrices() {
         monthlyPriceFormatted: `$${monthlyPrice.toFixed(0)}`,
         annualPriceFormatted: `$${annualPrice.toFixed(0)}`,
         annualMonthlyEquivalent,
-        annualMonthlyEquivalentFormatted: `$${annualMonthlyEquivalent.toFixed(2)}`,
+        annualMonthlyEquivalentFormatted: `$${formatCurrency(annualMonthlyEquivalent)}`,
         annualSavings,
         annualSavingsFormatted: `$${annualSavings.toFixed(0)}`,
         savingsPercentage: Math.round(savingsPercentage)

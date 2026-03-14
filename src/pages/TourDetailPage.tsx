@@ -7,6 +7,7 @@ import ShareTourModal from '../components/ShareTourModal';
 import { Tour } from '../types';
 import { getTourById, supabase, parseDateFromDB } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { formatCurrencyMXN } from '../utils/formatCurrency';
 import { format } from 'date-fns';
 
 interface DeparturePointInfo {
@@ -741,7 +742,7 @@ const TourDetailPage: React.FC = () => {
                                 <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg">
                                   <span className="text-sm text-gray-800">{zone.name}</span>
                                   <span className="text-sm font-semibold text-gray-900">
-                                    +${zone.extra_cost?.toLocaleString('es-MX', { minimumFractionDigits: 0 })} MXN
+                                    +{formatCurrencyMXN(zone.extra_cost ?? 0)} MXN
                                     <span className="text-xs font-normal text-gray-500 ml-1">
                                       {zone.cost_type === 'por_persona' ? '/ persona' : '/ reserva'}
                                     </span>
@@ -767,7 +768,7 @@ const TourDetailPage: React.FC = () => {
                               <span className="text-sm font-medium text-blue-800">{lang.language}</span>
                               {lang.extra_cost > 0 && (
                                 <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
-                                  +${lang.extra_cost?.toLocaleString('es-MX', { minimumFractionDigits: 0 })} {lang.cost_type === 'por_persona' ? '/ persona' : 'fijo'}
+                                  +{formatCurrencyMXN(lang.extra_cost ?? 0)} {lang.cost_type === 'por_persona' ? '/ persona' : 'fijo'}
                                 </span>
                               )}
                               {(!lang.extra_cost || lang.extra_cost === 0) && (

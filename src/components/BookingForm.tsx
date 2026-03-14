@@ -23,6 +23,7 @@ interface TourOptionalService {
 import { Tour } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { createBooking, formatDateForDB, supabase } from '../lib/supabase';
+import { formatCurrency, formatCurrencyMXN } from '../utils/formatCurrency';
 import { useMembershipPrices } from '../hooks/useMembershipPrices';
 
 interface BookingFormProps {
@@ -1158,7 +1159,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <option value="free">{tour.pickup_free_zone ? `Sin costo (${tour.pickup_free_zone})` : 'Sin costo adicional'}</option>
                     {pickupZones.map((zone: any, idx: number) => (
                       <option key={idx} value={zone.name}>
-                        {zone.name} — +${zone.extra_cost?.toLocaleString('es-MX', { minimumFractionDigits: 0 })} MXN {zone.cost_type === 'por_persona' ? '/ persona' : '/ reserva'}
+                        {zone.name} — +{formatCurrencyMXN(zone.extra_cost ?? 0)} MXN {zone.cost_type === 'por_persona' ? '/ persona' : '/ reserva'}
                       </option>
                     ))}
                   </select>
@@ -1184,7 +1185,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
             <option value="">Idioma por defecto (sin costo extra)</option>
             {tourLanguages.map((lang: any, idx: number) => (
               <option key={idx} value={lang.language}>
-                {lang.language}{lang.extra_cost > 0 ? ` — +$${lang.extra_cost?.toLocaleString('es-MX', { minimumFractionDigits: 0 })} MXN ${lang.cost_type === 'por_persona' ? '/ persona' : 'fijo'}` : ' (sin costo extra)'}
+                {lang.language}{lang.extra_cost > 0 ? ` — +${formatCurrencyMXN(lang.extra_cost ?? 0)} MXN ${lang.cost_type === 'por_persona' ? '/ persona' : 'fijo'}` : ' (sin costo extra)'}
               </option>
             ))}
           </select>
@@ -1642,7 +1643,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                       Límite Mensual de Descuento Alcanzado
                     </h4>
                     <p className="text-xs text-gray-700 mb-2">
-                      Has usado ${(500 - remainingExemption).toFixed(2)} MXN de tus $500 MXN de descuento este mes. Esta reserva aplicará un cargo por servicio de ${serviceCharge.toFixed(2)} MXN.
+                      Has usado {formatCurrencyMXN(500 - remainingExemption)} MXN de tus $500 MXN de descuento este mes. Esta reserva aplicará un cargo por servicio de {formatCurrencyMXN(serviceCharge)} MXN.
                     </p>
                     <div className="bg-white rounded-md p-2 border border-orange-200">
                       <p className="text-xs text-gray-600">
@@ -1681,7 +1682,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                   ToursRed Points Disponibles
                 </h4>
                 <p className="text-xs text-gray-700">
-                  Tienes {pointsBalance.toLocaleString()} puntos (${(pointsBalance / 100).toFixed(2)} MXN). Usa hasta el 50% del total con puntos.
+                  Tienes {pointsBalance.toLocaleString()} puntos ({formatCurrencyMXN(pointsBalance / 100)} MXN). Usa hasta el 50% del total con puntos.
                 </p>
               </div>
             </div>
@@ -1733,13 +1734,13 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-700">Descuento con puntos:</span>
                     <span className="font-bold text-amber-600">
-                      -${pointsDiscountAmount.toFixed(2)} MXN
+                      -{formatCurrencyMXN(pointsDiscountAmount)} MXN
                     </span>
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
                     <span>Máximo permitido (50%):</span>
                     <span className="font-medium">
-                      {maxPointsAllowed.toLocaleString()} puntos (${(maxPointsAllowed / 100).toFixed(2)})
+                      {maxPointsAllowed.toLocaleString()} puntos ({formatCurrencyMXN(maxPointsAllowed / 100)})
                     </span>
                   </div>
                   <div className="flex justify-between text-xs text-gray-600">
@@ -2045,14 +2046,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <>
                       <div className="flex justify-between text-sm text-gray-600 mt-1">
                         <span>Cargo por Servicio ({serviceChargePercentage}%):</span>
-                        <span className="font-medium line-through text-gray-400">${fullServiceCharge.toFixed(2)}</span>
+                        <span className="font-medium line-through text-gray-400">{formatCurrencyMXN(fullServiceCharge)}</span>
                       </div>
                       <div className="flex justify-between text-sm text-green-600">
                         <span className="flex items-center">
                           <Ticket className="h-3 w-3 mr-1" />
                           Descuento ({appliedDiscount!.code}):
                         </span>
-                        <span className="font-medium">-${serviceChargeDiscountAmount.toFixed(2)}</span>
+                        <span className="font-medium">-{formatCurrencyMXN(serviceChargeDiscountAmount)}</span>
                       </div>
                     </>
                   );
@@ -2063,14 +2064,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <>
                       <div className="flex justify-between text-sm text-gray-600 mt-1">
                         <span>Cargo por Servicio ({serviceChargePercentage}%):</span>
-                        <span className="font-medium">${fullServiceCharge.toFixed(2)}</span>
+                        <span className="font-medium">{formatCurrencyMXN(fullServiceCharge)}</span>
                       </div>
                       <div className="flex justify-between text-sm text-green-600">
                         <span className="flex items-center">
                           <Ticket className="h-3 w-3 mr-1" />
                           Descuento ({appliedDiscount!.code}):
                         </span>
-                        <span className="font-medium">-${serviceChargeDiscountAmount.toFixed(2)}</span>
+                        <span className="font-medium">-{formatCurrencyMXN(serviceChargeDiscountAmount)}</span>
                       </div>
                       {shouldWaiveServiceCharge && exemptionUsed > 0 && (
                         <div className="flex justify-between text-sm text-green-600">
@@ -2078,13 +2079,13 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                             <Crown className="h-3 w-3 mr-1" />
                             Descuento ToursRed+:
                           </span>
-                          <span className="font-medium">-${exemptionUsed.toFixed(2)}</span>
+                          <span className="font-medium">-{formatCurrencyMXN(exemptionUsed)}</span>
                         </div>
                       )}
                       {serviceCharge > 0 ? (
                         <div className="flex justify-between text-sm text-orange-600">
                           <span>Cargo por Servicio (a pagar):</span>
-                          <span className="font-medium">+${serviceCharge.toFixed(2)}</span>
+                          <span className="font-medium">+{formatCurrencyMXN(serviceCharge)}</span>
                         </div>
                       ) : (
                         <div className="flex justify-between text-sm text-green-600">
@@ -2113,7 +2114,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <>
                       <div className="flex justify-between text-sm text-gray-600 mt-1">
                         <span>Cargo por Servicio ({serviceChargePercentage}%):</span>
-                        <span className="font-medium">${fullServiceCharge.toFixed(2)}</span>
+                        <span className="font-medium">{formatCurrencyMXN(fullServiceCharge)}</span>
                       </div>
                       {exemptionUsed > 0 && (
                         <div className="flex justify-between text-sm text-green-600">
@@ -2121,12 +2122,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                             <Crown className="h-3 w-3 mr-1" />
                             Descuento ToursRed+:
                           </span>
-                          <span className="font-medium">-${exemptionUsed.toFixed(2)}</span>
+                          <span className="font-medium">-{formatCurrencyMXN(exemptionUsed)}</span>
                         </div>
                       )}
                       <div className="flex justify-between text-sm text-orange-600">
                         <span>Cargo por Servicio (a pagar):</span>
-                        <span className="font-medium">+${serviceCharge.toFixed(2)}</span>
+                        <span className="font-medium">+{formatCurrencyMXN(serviceCharge)}</span>
                       </div>
                     </>
                   );
@@ -2166,7 +2167,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <Award className="h-3 w-3 mr-1" />
                     ToursRed Points aplicados:
                   </span>
-                  <span className="font-medium">-${pointsDiscountAmount.toFixed(2)} ({pointsApplied.toLocaleString()} pts)</span>
+                  <span className="font-medium">-{formatCurrencyMXN(pointsDiscountAmount)} ({pointsApplied.toLocaleString()} pts)</span>
                 </div>
               )}
 
@@ -2189,10 +2190,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
             {shouldWaiveServiceCharge && exemptionUsed > 0 && (
               <div className="bg-green-50 border border-green-200 rounded-md p-2 mt-2">
                 <p className="text-xs text-green-800 font-medium text-center">
-                  ✓ Ahorraste ${exemptionUsed.toFixed(2)} con ToursRed+
+                  ✓ Ahorraste {formatCurrencyMXN(exemptionUsed)} con ToursRed+
                   {hasReachedExemptionLimit && (
                     <span className="block text-[10px] text-gray-600 mt-0.5">
-                      (Límite mensual: ${remainingExemption.toFixed(2)} restantes de $500.00)
+                      (Límite mensual: {formatCurrency(remainingExemption)} restantes de $500.00)
                     </span>
                   )}
                 </p>

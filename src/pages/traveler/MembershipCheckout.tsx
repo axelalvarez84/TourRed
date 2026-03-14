@@ -4,6 +4,7 @@ import { Crown, Check, ArrowLeft, Tag, X, Shield, CreditCard, Calendar, Zap, Spa
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { useMembershipPrices } from '../../hooks/useMembershipPrices';
+import { formatCurrencyMXN, formatCurrency } from '../../utils/formatCurrency';
 
 interface AppliedDiscount {
   code: string;
@@ -350,12 +351,12 @@ export default function MembershipCheckout() {
             <div className="border-t border-gray-100 pt-5 space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">{planLabel}</span>
-                <span className="text-gray-900">${planPrice.toFixed(2)} MXN</span>
+                <span className="text-gray-900">{formatCurrencyMXN(planPrice)} MXN</span>
               </div>
               {isFreeMonthApplied && (
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-green-600">Primer mes gratis</span>
-                  <span className="text-green-600">-${planPrice.toFixed(2)} MXN</span>
+                  <span className="text-green-600">-{formatCurrencyMXN(planPrice)} MXN</span>
                 </div>
               )}
               {hasMonetaryDiscount && (
@@ -363,12 +364,12 @@ export default function MembershipCheckout() {
                   <span className="text-green-600">
                     Descuento ({isPercentageDiscount ? `${appliedDiscount.discountValue}%` : 'codigo'})
                   </span>
-                  <span className="text-green-600">-${discountAmount.toFixed(2)} MXN</span>
+                  <span className="text-green-600">-{formatCurrencyMXN(discountAmount)} MXN</span>
                 </div>
               )}
               <div className="border-t border-gray-200 pt-3 flex items-center justify-between">
                 <span className="font-semibold text-gray-900">Total a pagar hoy</span>
-                <span className="text-2xl font-bold text-gray-900">${todayTotal.toFixed(2)} MXN</span>
+                <span className="text-2xl font-bold text-gray-900">{formatCurrencyMXN(todayTotal)} MXN</span>
               </div>
             </div>
 

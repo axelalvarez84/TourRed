@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard, Crown, Gift, Award, Users, Globe } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 interface EmailSettings {
   id: string;
@@ -271,7 +272,7 @@ const AdminSettings: React.FC = () => {
               </div>
               <p className="text-xs text-gray-500 mt-1">
                 Ejemplo: Si el anticipo es $1,000 y el cargo es {platformSettings.service_charge_percentage}%,
-                el viajero pagará ${(1000 + (1000 * platformSettings.service_charge_percentage / 100)).toFixed(2)}
+                el viajero pagará ${formatCurrency(1000 + (1000 * platformSettings.service_charge_percentage / 100))}
               </p>
             </div>
 
@@ -301,8 +302,8 @@ const AdminSettings: React.FC = () => {
               </div>
               <p className="text-xs text-gray-500 mt-1">
                 Ejemplo: Tour de $5,000 con anticipo de $1,000. Comisión {platformSettings.agency_commission_percentage}% = $
-                {(5000 * platformSettings.agency_commission_percentage / 100).toFixed(2)}.
-                La agencia recibe ${(1000 - (5000 * platformSettings.agency_commission_percentage / 100)).toFixed(2)} del anticipo
+                {formatCurrency(5000 * platformSettings.agency_commission_percentage / 100)}.
+                La agencia recibe ${formatCurrency(1000 - (5000 * platformSettings.agency_commission_percentage / 100))} del anticipo
               </p>
             </div>
           </div>
@@ -466,13 +467,13 @@ const AdminSettings: React.FC = () => {
           <div className="mt-4 bg-blue-50 border border-blue-200 rounded-md p-4">
             <h4 className="text-sm font-semibold text-blue-900 mb-2">Vista Previa del Ahorro:</h4>
             <div className="text-sm text-blue-800 space-y-1">
-              <p>• Plan Mensual x 12 meses = ${(platformSettings.membership_monthly_price * 12).toFixed(2)} MXN</p>
-              <p>• Plan Anual = ${platformSettings.membership_annual_price.toFixed(2)} MXN</p>
+              <p>• Plan Mensual x 12 meses = ${formatCurrency(platformSettings.membership_monthly_price * 12)} MXN</p>
+              <p>• Plan Anual = ${formatCurrency(platformSettings.membership_annual_price)} MXN</p>
               <p className="font-semibold text-green-700">
-                • Ahorro con Plan Anual = ${((platformSettings.membership_monthly_price * 12) - platformSettings.membership_annual_price).toFixed(2)} MXN
+                • Ahorro con Plan Anual = ${formatCurrency((platformSettings.membership_monthly_price * 12) - platformSettings.membership_annual_price)} MXN
                 ({Math.round((((platformSettings.membership_monthly_price * 12) - platformSettings.membership_annual_price) / (platformSettings.membership_monthly_price * 12)) * 100)}% de descuento)
               </p>
-              <p>• Equivalente Mensual del Plan Anual = ${(platformSettings.membership_annual_price / 12).toFixed(2)} MXN/mes</p>
+              <p>• Equivalente Mensual del Plan Anual = ${formatCurrency(platformSettings.membership_annual_price / 12)} MXN/mes</p>
             </div>
           </div>
         </div>
@@ -538,7 +539,7 @@ const AdminSettings: React.FC = () => {
                 />
               </div>
               <p className="mt-1 text-xs text-gray-500">
-                Equivalente a ${(platformSettings.referral_bonus_points / 100).toFixed(2)} MXN
+                Equivalente a ${formatCurrency(platformSettings.referral_bonus_points / 100)} MXN
               </p>
             </div>
 

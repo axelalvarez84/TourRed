@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter, Star, X, User, MessageSquare, UserCheck, UserX, FileSpreadsheet, FileText, Download, QrCode, Car, Globe, Send } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { formatCurrency, formatCurrencyMXN } from '../../utils/formatCurrency';
 import { getAgencyBookings, getTourBookingReport, supabase, parseDateFromDB } from '../../lib/supabase';
 import { Booking } from '../../types';
 import { format } from 'date-fns';
@@ -689,7 +690,7 @@ const AgencyBookings: React.FC = () => {
         throw new Error(result.error || 'Error al cancelar la reserva');
       }
 
-      alert(`Reserva cancelada exitosamente.\n\nEl viajero ha recibido un reembolso de $${result.refund_amount?.toFixed(2) || '0.00'} en su ToursRed Cash.`);
+      alert(`Reserva cancelada exitosamente.\n\nEl viajero ha recibido un reembolso de $${formatCurrency(result.refund_amount ?? 0)} en su ToursRed Cash.`);
 
       handleCloseCancelBookingModal();
       fetchAgencyData();
@@ -1386,7 +1387,7 @@ const AgencyBookings: React.FC = () => {
                             )}
                             {(booking as any).cancellation_refund_amount !== null && (booking as any).cancellation_refund_amount !== undefined && (
                               <p>
-                                <strong>Reembolsado al viajero:</strong> ${Number((booking as any).cancellation_refund_amount).toFixed(2)}
+                                <strong>Reembolsado al viajero:</strong> ${formatCurrencyMXN(Number((booking as any).cancellation_refund_amount))}
                               </p>
                             )}
                           </div>
@@ -1692,13 +1693,13 @@ const AgencyBookings: React.FC = () => {
                 </div>
                 <div className="bg-blue-50 rounded-lg p-4">
                   <div className="text-2xl font-bold text-blue-600">
-                    ${reportData.summary.totalDeposit.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    {formatCurrencyMXN(reportData.summary.totalDeposit)}
                   </div>
                   <div className="text-sm text-gray-600">Anticipo Recibido</div>
                 </div>
                 <div className="bg-orange-50 rounded-lg p-4">
                   <div className="text-2xl font-bold text-orange-600">
-                    ${reportData.summary.totalRemaining.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    {formatCurrencyMXN(reportData.summary.totalRemaining)}
                   </div>
                   <div className="text-sm text-gray-600">Saldo Pendiente</div>
                 </div>
@@ -1767,12 +1768,12 @@ const AgencyBookings: React.FC = () => {
                         </td>
                         <td className="px-4 py-4">
                           <div className="font-medium">
-                            ${Number(booking.deposit_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                            {formatCurrencyMXN(Number(booking.deposit_amount))}
                           </div>
                         </td>
                         <td className="px-4 py-4">
                           <div className="font-medium text-orange-600">
-                            ${(Number(booking.total_price) - Number(booking.deposit_amount)).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                            {formatCurrencyMXN(Number(booking.total_price) - Number(booking.deposit_amount))}
                           </div>
                         </td>
                         <td className="px-4 py-4">
@@ -2076,7 +2077,7 @@ const AgencyBookings: React.FC = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Anticipo pagado:</span>
-                    <span className="font-semibold">${(cancelBookingModal.booking.deposit_amount || 0).toFixed(2)}</span>
+                    <span className="font-semibold">${formatCurrencyMXN(cancelBookingModal.booking.deposit_amount || 0)}</span>
                   </div>
                 </div>
               </div>
@@ -2107,7 +2108,7 @@ const AgencyBookings: React.FC = () => {
                       <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
                       <div className="text-sm text-orange-800">
                         <p className="font-semibold mb-1">Servicios adicionales no reembolsables incluidos</p>
-                        <p>Esta reserva tiene <strong>${totalNonRefundable.toFixed(2)}</strong> en servicios marcados como no reembolsables. Como eres tú quien cancela, <strong>todos los servicios se reembolsan al viajero</strong>, incluyendo los no reembolsables. Tu agencia absorbe ese costo.</p>
+                        <p>Esta reserva tiene <strong>${formatCurrencyMXN(totalNonRefundable)}</strong> en servicios marcados como no reembolsables. Como eres tú quien cancela, <strong>todos los servicios se reembolsan al viajero</strong>, incluyendo los no reembolsables. Tu agencia absorbe ese costo.</p>
                       </div>
                     </div>
                   </div>

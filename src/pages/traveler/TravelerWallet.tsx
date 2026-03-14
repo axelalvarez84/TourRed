@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Wallet, TrendingUp, TrendingDown, Calendar, DollarSign, Gift, RefreshCw, Award, AlertCircle, ArrowUpCircle, ArrowDownCircle, Check, X, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { formatCurrencyMXN } from '../../utils/formatCurrency';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { format } from 'date-fns';
@@ -303,7 +304,7 @@ const TravelerWallet: React.FC = () => {
             <div>
               <p className="text-accent-100 text-sm mb-2">Saldo Disponible</p>
               <p className="text-5xl font-bold">
-                ${Number(wallet.balance).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatCurrencyMXN(Number(wallet.balance))}
               </p>
               <p className="text-accent-100 mt-2">{wallet.currency}</p>
             </div>
@@ -319,7 +320,7 @@ const TravelerWallet: React.FC = () => {
                 <p className="text-sm text-accent-100">Total Recibido</p>
               </div>
               <p className="text-2xl font-bold">
-                ${totalCredits.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatCurrencyMXN(totalCredits)}
               </p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
@@ -328,7 +329,7 @@ const TravelerWallet: React.FC = () => {
                 <p className="text-sm text-accent-100">Total Utilizado</p>
               </div>
               <p className="text-2xl font-bold">
-                ${totalDebits.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatCurrencyMXN(totalDebits)}
               </p>
             </div>
           </div>
@@ -537,10 +538,10 @@ const TravelerWallet: React.FC = () => {
                     <div className="text-right">
                       <p className={`text-lg font-bold ${getTransactionColor(transaction.amount)}`}>
                         {transaction.amount >= 0 ? '+' : ''}
-                        ${Math.abs(Number(transaction.amount)).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatCurrencyMXN(Math.abs(Number(transaction.amount)))}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
-                        Saldo: ${Number(transaction.balance_after).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        Saldo: {formatCurrencyMXN(Number(transaction.balance_after))}
                       </p>
                     </div>
                   </div>

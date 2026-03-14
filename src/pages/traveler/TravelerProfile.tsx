@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Calendar, Save, CreditCard as Edit, X, MapPin, CreditCard, Globe, Phone, Wallet } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { formatCurrencyMXN } from '../../utils/formatCurrency';
 import { supabase } from '../../lib/supabase';
 import TravelerReviewsDisplay from '../../components/TravelerReviewsDisplay';
 import ProfilePictureUploader from '../../components/ProfilePictureUploader';
@@ -357,7 +358,7 @@ const TravelerProfile: React.FC = () => {
                 <div className="flex items-center justify-center gap-2 mb-1">
                   <Wallet className="h-5 w-5 text-accent-600" />
                   <div className="text-2xl font-bold text-accent-600">
-                    ${(profile.wallet_balance || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatCurrencyMXN(profile.wallet_balance || 0)}
                   </div>
                 </div>
                 <div className="text-xs font-semibold text-accent-700">ToursRed Cash</div>

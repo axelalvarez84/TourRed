@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { formatCurrency } from '../../utils/formatCurrency';
 import { Award, TrendingUp, TrendingDown, Clock, ArrowUp, ArrowDown, AlertCircle, HelpCircle, Calendar, Crown } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -255,7 +256,7 @@ const TravelerPointsPage: React.FC = () => {
                   {(wallet?.balance || 0).toLocaleString()}
                 </div>
                 <div className="text-amber-100 text-sm">
-                  ${((wallet?.balance || 0) / 100).toFixed(2)} MXN de valor
+                  ${formatCurrencyMXN((wallet?.balance || 0) / 100)} MXN de valor
                 </div>
               </div>
 
@@ -297,7 +298,7 @@ const TravelerPointsPage: React.FC = () => {
                       Tus puntos están acumulados pero bloqueados
                     </h4>
                     <p className="text-sm text-amber-800 mb-3">
-                      Tienes <strong>{(wallet.balance || 0).toLocaleString()} puntos</strong> acumulados (equivalente a <strong>${((wallet.balance || 0) / 100).toFixed(2)} MXN</strong>), pero necesitas una membresía ToursRed+ activa para poder usarlos en tus reservas.
+                      Tienes <strong>{(wallet.balance || 0).toLocaleString()} puntos</strong> acumulados (equivalente a <strong>${formatCurrencyMXN((wallet.balance || 0) / 100)} MXN</strong>), pero necesitas una membresía ToursRed+ activa para poder usarlos en tus reservas.
                     </p>
                     <Link
                       to="/traveler/membership"
