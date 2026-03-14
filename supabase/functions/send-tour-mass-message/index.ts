@@ -24,6 +24,7 @@ interface Attendee {
   travelers_count: number;
   selected_date: string | null;
   selected_time: string | null;
+  booking_code: string | null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -224,6 +225,7 @@ Deno.serve(async (req: Request) => {
 
       <div class="tour-badge">
         <p class="tour-name">${tour.name}</p>
+        ${attendee.booking_code ? `<p class="tour-meta" style="font-size:12px; color:#6b7280; margin-top:2px;">Reserva #${attendee.booking_code}</p>` : ""}
         ${tourDateLine ? `<p class="tour-meta">${tourDateLine}</p>` : ""}
         <p class="tour-meta">${tour.destination}</p>
       </div>
