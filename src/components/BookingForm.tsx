@@ -596,7 +596,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
       const usosUsadosEnEstaReserva = gruposConPromo;
       const usosDisponibles = max_uses !== null ? Math.max(0, max_uses - times_used - usosUsadosEnEstaReserva) : null;
 
-      let label = `${min_travelers} x $${fixed_group_price.toLocaleString()} — ${gruposConPromo} grupo${gruposConPromo > 1 ? 's' : ''} con precio especial`;
+      let label = `${min_travelers} x $${formatCurrency(fixed_group_price)} — ${gruposConPromo} grupo${gruposConPromo > 1 ? 's' : ''} con precio especial`;
       if (gruposSinPromo > 0) {
         label += ` (${gruposSinPromo * min_travelers} viajero${gruposSinPromo * min_travelers > 1 ? 's' : ''} a precio normal)`;
       }
@@ -1004,9 +1004,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
       <div className="mb-4">
         <div className="text-sm text-gray-500 mb-1">Precio por persona</div>
-        <div className="text-2xl font-bold text-primary-600">${tour.price.toLocaleString()}</div>
+        <div className="text-2xl font-bold text-primary-600">{formatCurrencyMXN(tour.price)}</div>
         <div className="text-sm text-gray-500 mt-1">
-          Depósito: ${depositAmount.toLocaleString()} ({effectiveDepositPercentage}%)
+          Depósito: {formatCurrencyMXN(depositAmount)} ({effectiveDepositPercentage}%)
         </div>
       </div>
 
@@ -1271,7 +1271,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-sm font-medium text-gray-900">Adultos</div>
-                        <div className="text-xs text-gray-500">13-59 años &middot; ${getPrecioPorCategoria('adulto').toLocaleString()}/persona</div>
+                        <div className="text-xs text-gray-500">13-59 años &middot; {formatCurrencyMXN(getPrecioPorCategoria('adulto'))}/persona</div>
                       </div>
                       <div className="flex items-center space-x-3">
                         <button
@@ -1298,7 +1298,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-sm font-medium text-gray-900">Niños</div>
-                        <div className="text-xs text-gray-500">3-12 años &middot; ${getPrecioPorCategoria('nino').toLocaleString()}/persona</div>
+                        <div className="text-xs text-gray-500">3-12 años &middot; {formatCurrencyMXN(getPrecioPorCategoria('nino'))}/persona</div>
                       </div>
                       <div className="flex items-center space-x-3">
                         <button
@@ -1325,7 +1325,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-sm font-medium text-gray-900">Infantes</div>
-                        <div className="text-xs text-gray-500">0-2 años &middot; ${getPrecioPorCategoria('infante').toLocaleString()}/persona</div>
+                        <div className="text-xs text-gray-500">0-2 años &middot; {formatCurrencyMXN(getPrecioPorCategoria('infante'))}/persona</div>
                       </div>
                       <div className="flex items-center space-x-3">
                         <button
@@ -1352,7 +1352,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-sm font-medium text-gray-900">Adultos Mayores</div>
-                        <div className="text-xs text-gray-500">60+ con INAPAM &middot; ${getPrecioPorCategoria('adulto_mayor').toLocaleString()}/persona</div>
+                        <div className="text-xs text-gray-500">60+ con INAPAM &middot; {formatCurrencyMXN(getPrecioPorCategoria('adulto_mayor'))}/persona</div>
                       </div>
                       <div className="flex items-center space-x-3">
                         <button
@@ -1379,7 +1379,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <div className="flex items-center justify-between border-t pt-3">
                       <div>
                         <div className="text-sm font-medium text-gray-900">Mascotas</div>
-                        <div className="text-xs text-gray-500">Perro o gato &middot; {getPrecioPorCategoria('mascota') > 0 ? `$${getPrecioPorCategoria('mascota').toLocaleString()}` : 'Gratis'}</div>
+                        <div className="text-xs text-gray-500">Perro o gato &middot; {getPrecioPorCategoria('mascota') > 0 ? formatCurrencyMXN(getPrecioPorCategoria('mascota')) : 'Gratis'}</div>
                       </div>
                       <div className="flex items-center space-x-3">
                         <button
@@ -1441,7 +1441,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                 )}
               </div>
               <span className="text-sm font-bold text-rose-700 flex-shrink-0">
-                -${promoDiscountAmount.toLocaleString()}
+                -{formatCurrencyMXN(promoDiscountAmount)}
               </span>
             </div>
           </div>
@@ -1510,7 +1510,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                           <p className="text-xs text-gray-500 mt-0.5">{svc.description}</p>
                         )}
                         <p className="text-sm font-medium text-primary-600 mt-1">
-                          ${svc.price_per_person.toLocaleString()} / persona
+                          {formatCurrencyMXN(svc.price_per_person)} / persona
                         </p>
                       </div>
 
@@ -1539,8 +1539,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
                     {qty > 0 && (
                       <div className="mt-2 pt-2 border-t border-amber-200 flex justify-between text-xs">
-                        <span className="text-gray-600">{qty} × ${svc.price_per_person.toLocaleString()}</span>
-                        <span className="font-semibold text-amber-700">+${(qty * svc.price_per_person).toLocaleString()}</span>
+                        <span className="text-gray-600">{qty} × {formatCurrencyMXN(svc.price_per_person)}</span>
+                        <span className="font-semibold text-amber-700">+{formatCurrencyMXN(qty * svc.price_per_person)}</span>
                       </div>
                     )}
                   </div>
@@ -1556,7 +1556,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
               <Sparkles className="h-5 w-5 text-amber-600 mr-2 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h4 className="text-sm font-bold text-gray-900 mb-1">
-                  ¡Ahorra ${serviceCharge.toLocaleString()} con ToursRed+!
+                  ¡Ahorra {formatCurrencyMXN(serviceCharge)} con ToursRed+!
                 </h4>
                 <p className="text-xs text-gray-700">
                   Los miembros ToursRed+ no pagan cargo por servicio en reservas nacionales. Agrega una membresía a tu compra y comienza a ahorrar hoy.
@@ -1791,7 +1791,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                   Saldo ToursRed Cash Disponible
                 </h4>
                 <p className="text-xs text-gray-700">
-                  Tienes ${walletBalance.toLocaleString()} MXN disponibles. Úsalos para reducir el total a pagar.
+                  Tienes {formatCurrencyMXN(walletBalance)} MXN disponibles. Úsalos para reducir el total a pagar.
                 </p>
               </div>
             </div>
@@ -1813,13 +1813,13 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-700">Se aplicarán:</span>
                   <span className="font-bold text-amber-600">
-                    -${toursRedCashApplied.toLocaleString()} MXN
+                    -{formatCurrencyMXN(toursRedCashApplied)} MXN
                   </span>
                 </div>
                 <div className="flex justify-between text-xs text-gray-600 mt-1">
                   <span>Saldo restante después de esta reserva:</span>
                   <span className="font-medium">
-                    ${(walletBalance - toursRedCashApplied).toLocaleString()} MXN
+                    {formatCurrencyMXN(walletBalance - toursRedCashApplied)} MXN
                   </span>
                 </div>
               </div>
@@ -1859,12 +1859,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                 </div>
                 {isServiceFeeDiscount && serviceChargeDiscountAmount > 0 && (
                   <p className="text-xs text-green-700 mt-1 ml-7">
-                    Ahorro en Cargo por Servicio: -${serviceChargeDiscountAmount.toLocaleString()} MXN
+                    Ahorro en Cargo por Servicio: -{formatCurrencyMXN(serviceChargeDiscountAmount)} MXN
                   </p>
                 )}
                 {!isServiceFeeDiscount && discountAmount > 0 && (
                   <p className="text-xs text-green-700 mt-1 ml-7">
-                    Ahorro: -${discountAmount.toLocaleString()} MXN
+                    Ahorro: -{formatCurrencyMXN(discountAmount)} MXN
                     {appliedDiscount.discount_applies_to === 'payment_amount' ? ' (sobre monto a pagar)' : ' (sobre costo total)'}
                   </p>
                 )}
@@ -1919,36 +1919,36 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
             {travelerCounts.adultos > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">{travelerCounts.adultos} Adulto{travelerCounts.adultos > 1 ? 's' : ''} × ${getPrecioPorCategoria('adulto').toLocaleString()}:</span>
-                <span className="font-medium">${precioAdultos.toLocaleString()}</span>
+                <span className="text-gray-600">{travelerCounts.adultos} Adulto{travelerCounts.adultos > 1 ? 's' : ''} × {formatCurrencyMXN(getPrecioPorCategoria('adulto'))}:</span>
+                <span className="font-medium">{formatCurrencyMXN(precioAdultos)}</span>
               </div>
             )}
 
             {travelerCounts.ninos > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">{travelerCounts.ninos} Niño{travelerCounts.ninos > 1 ? 's' : ''} × ${getPrecioPorCategoria('nino').toLocaleString()}:</span>
-                <span className="font-medium">${precioNinos.toLocaleString()}</span>
+                <span className="text-gray-600">{travelerCounts.ninos} Niño{travelerCounts.ninos > 1 ? 's' : ''} × {formatCurrencyMXN(getPrecioPorCategoria('nino'))}:</span>
+                <span className="font-medium">{formatCurrencyMXN(precioNinos)}</span>
               </div>
             )}
 
             {travelerCounts.infantes > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">{travelerCounts.infantes} Infante{travelerCounts.infantes > 1 ? 's' : ''} × ${getPrecioPorCategoria('infante').toLocaleString()}:</span>
-                <span className="font-medium">${precioInfantes.toLocaleString()}</span>
+                <span className="text-gray-600">{travelerCounts.infantes} Infante{travelerCounts.infantes > 1 ? 's' : ''} × {formatCurrencyMXN(getPrecioPorCategoria('infante'))}:</span>
+                <span className="font-medium">{formatCurrencyMXN(precioInfantes)}</span>
               </div>
             )}
 
             {travelerCounts.adultos_mayores > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">{travelerCounts.adultos_mayores} Adulto{travelerCounts.adultos_mayores > 1 ? 's' : ''} Mayor{travelerCounts.adultos_mayores > 1 ? 'es' : ''} × ${getPrecioPorCategoria('adulto_mayor').toLocaleString()}:</span>
-                <span className="font-medium">${precioAdultosMayores.toLocaleString()}</span>
+                <span className="text-gray-600">{travelerCounts.adultos_mayores} Adulto{travelerCounts.adultos_mayores > 1 ? 's' : ''} Mayor{travelerCounts.adultos_mayores > 1 ? 'es' : ''} × {formatCurrencyMXN(getPrecioPorCategoria('adulto_mayor'))}:</span>
+                <span className="font-medium">{formatCurrencyMXN(precioAdultosMayores)}</span>
               </div>
             )}
 
             {travelerCounts.mascotas > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">{travelerCounts.mascotas} Mascota{travelerCounts.mascotas > 1 ? 's' : ''} × ${getPrecioPorCategoria('mascota').toLocaleString()}:</span>
-                <span className="font-medium">${precioMascotas.toLocaleString()}</span>
+                <span className="text-gray-600">{travelerCounts.mascotas} Mascota{travelerCounts.mascotas > 1 ? 's' : ''} × {formatCurrencyMXN(getPrecioPorCategoria('mascota'))}:</span>
+                <span className="font-medium">{formatCurrencyMXN(precioMascotas)}</span>
               </div>
             )}
 
@@ -1958,7 +1958,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                   <Tag className="h-3 w-3" />
                   {promoResult.label}:
                 </span>
-                <span className="font-medium">-${promoDiscountAmount.toLocaleString()}</span>
+                <span className="font-medium">-{formatCurrencyMXN(promoDiscountAmount)}</span>
               </div>
             )}
 
@@ -1977,7 +1977,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                             <span className="text-orange-600 text-xs">(no reemb.)</span>
                           )}
                         </span>
-                        <span className="font-medium">${(qty * svc.price_per_person).toLocaleString()}</span>
+                        <span className="font-medium">{formatCurrencyMXN(qty * svc.price_per_person)}</span>
                       </div>
                     );
                   })
@@ -1994,7 +1994,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                       <Car className="w-3 h-3" />
                       Pick Up — {selectedZoneData.name} ({selectedZoneData.cost_type === 'por_persona' ? 'por persona' : 'por reserva'}):
                     </span>
-                    <span className="font-medium">${pickupExtraCost.toLocaleString()}</span>
+                    <span className="font-medium">{formatCurrencyMXN(pickupExtraCost)}</span>
                   </div>
                 )}
                 {languageExtraCost > 0 && selectedLanguageData && (
@@ -2003,7 +2003,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                       <Globe className="w-3 h-3" />
                       Idioma — {selectedLanguageData.language} ({selectedLanguageData.cost_type === 'por_persona' ? 'por persona' : 'fijo'}):
                     </span>
-                    <span className="font-medium">${languageExtraCost.toLocaleString()}</span>
+                    <span className="font-medium">{formatCurrencyMXN(languageExtraCost)}</span>
                   </div>
                 )}
               </div>
@@ -2013,7 +2013,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Precio Total del Tour:</span>
                 <span className={`font-semibold ${appliedDiscount && appliedDiscount.discount_applies_to === 'total_price' ? 'line-through text-gray-400' : ''}`}>
-                  ${grossTotalPrice.toLocaleString()}
+                  {formatCurrencyMXN(grossTotalPrice)}
                 </span>
               </div>
               {appliedDiscount && appliedDiscount.discount_applies_to === 'total_price' && discountAmount > 0 && (
@@ -2023,17 +2023,17 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                       <Ticket className="h-3 w-3 mr-1" />
                       Descuento ({appliedDiscount.code}):
                     </span>
-                    <span className="font-medium">-${discountAmount.toLocaleString()}</span>
+                    <span className="font-medium">-{formatCurrencyMXN(discountAmount)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Precio con descuento:</span>
-                    <span className="font-semibold">${totalPrice.toLocaleString()}</span>
+                    <span className="font-semibold">{formatCurrencyMXN(totalPrice)}</span>
                   </div>
                 </>
               )}
               <div className="flex justify-between text-sm mt-1">
                 <span className="text-gray-600">Depósito ({effectiveDepositPercentage}%):</span>
-                <span className="font-medium">${depositAmount.toLocaleString()}</span>
+                <span className="font-medium">{formatCurrencyMXN(depositAmount)}</span>
               </div>
 
               {(() => {
@@ -2104,7 +2104,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                         <Crown className="h-3 w-3 mr-1" />
                         Cargo por Servicio ({serviceChargePercentage}%):
                       </span>
-                      <span className="font-medium line-through text-gray-400">${fullServiceCharge.toLocaleString()}</span>
+                      <span className="font-medium line-through text-gray-400">{formatCurrencyMXN(fullServiceCharge)}</span>
                     </div>
                   );
                 }
@@ -2136,7 +2136,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                 return (
                   <div className="flex justify-between text-sm text-orange-600 mt-1">
                     <span>Cargo por Servicio ({serviceChargePercentage}%):</span>
-                    <span className="font-medium">+${serviceCharge.toLocaleString()}</span>
+                    <span className="font-medium">+{formatCurrencyMXN(serviceCharge)}</span>
                   </div>
                 );
               })()}
@@ -2147,7 +2147,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <Ticket className="h-3 w-3 mr-1" />
                     Descuento ({appliedDiscount.code}):
                   </span>
-                  <span className="font-medium">-${discountAmount.toLocaleString()}</span>
+                  <span className="font-medium">-{formatCurrencyMXN(discountAmount)}</span>
                 </div>
               )}
 
@@ -2157,7 +2157,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <Crown className="h-3 w-3 mr-1" />
                     Membresía ToursRed+ ({selectedMembershipPlan === 'monthly' ? 'Mensual' : 'Anual'}):
                   </span>
-                  <span className="font-medium">+${membershipCost.toLocaleString()}</span>
+                  <span className="font-medium">+{formatCurrencyMXN(membershipCost)}</span>
                 </div>
               )}
 
@@ -2177,14 +2177,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <Wallet className="h-3 w-3 mr-1" />
                     ToursRed Cash aplicado:
                   </span>
-                  <span className="font-medium">-${toursRedCashApplied.toLocaleString()}</span>
+                  <span className="font-medium">-{formatCurrencyMXN(toursRedCashApplied)}</span>
                 </div>
               )}
             </div>
 
             <div className="border-t pt-2 flex justify-between">
               <span className="font-bold text-gray-900">Total a Pagar Ahora:</span>
-              <span className="font-bold text-primary-600 text-lg">${totalToPayNow.toLocaleString()}</span>
+              <span className="font-bold text-primary-600 text-lg">{formatCurrencyMXN(totalToPayNow)}</span>
             </div>
 
             {shouldWaiveServiceCharge && exemptionUsed > 0 && (
@@ -2201,7 +2201,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
             )}
 
             <div className="text-xs text-gray-500 mt-2">
-              <div>Saldo Restante: ${(grossTotalPrice - depositAmount - (appliedDiscount?.discount_applies_to === 'total_price' ? discountAmount : 0)).toLocaleString()}</div>
+              <div>Saldo Restante: {formatCurrencyMXN(grossTotalPrice - depositAmount - (appliedDiscount?.discount_applies_to === 'total_price' ? discountAmount : 0))}</div>
             </div>
           </div>
         )}

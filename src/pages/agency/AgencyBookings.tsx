@@ -914,7 +914,7 @@ const AgencyBookings: React.FC = () => {
           <div className="text-sm text-gray-500">Completadas</div>
         </div>
         <div className="bg-white rounded-lg shadow-md p-4">
-          <div className="text-2xl font-bold text-accent-600">${stats.totalRevenue.toLocaleString()}</div>
+          <div className="text-2xl font-bold text-accent-600">{formatCurrencyMXN(stats.totalRevenue)}</div>
           <div className="text-sm text-gray-500">Ingresos Recibidos</div>
         </div>
       </div>
@@ -1125,7 +1125,7 @@ const AgencyBookings: React.FC = () => {
                       <div>
                         <div className="text-sm text-gray-500">Saldo Pendiente</div>
                         <div className="font-medium">
-                          ${((booking.total_price || 0) - (booking.deposit_amount || 0)).toLocaleString()}
+                          {formatCurrencyMXN((booking.total_price || 0) - (booking.deposit_amount || 0))}
                         </div>
                       </div>
                     </div>
@@ -1228,7 +1228,7 @@ const AgencyBookings: React.FC = () => {
                               )}
                             </div>
                             <span className={`font-medium ${bos.is_cancelled ? 'text-gray-400' : 'text-amber-700'}`}>
-                              ${Number(bos.subtotal).toLocaleString()}
+                              {formatCurrencyMXN(Number(bos.subtotal))}
                             </span>
                           </div>
                         ))}
@@ -1938,15 +1938,15 @@ const AgencyBookings: React.FC = () => {
                           {Number((traveler as any).promo_discount_per_traveler) > 0 ? (
                             <span className="flex items-center gap-1.5">
                               <span className="text-sm text-gray-400 line-through">
-                                ${(Number(traveler.precio_aplicado) + Number((traveler as any).promo_discount_per_traveler)).toLocaleString()}
+                                {formatCurrencyMXN(Number(traveler.precio_aplicado) + Number((traveler as any).promo_discount_per_traveler))}
                               </span>
                               <span className={`text-sm font-bold ${(traveler as any).is_cancelled ? 'text-gray-400 line-through' : 'text-emerald-600'}`}>
-                                ${Number(traveler.precio_aplicado).toLocaleString()}
+                                {formatCurrencyMXN(Number(traveler.precio_aplicado))}
                               </span>
                             </span>
                           ) : (
                             <span className={`text-sm font-medium ${(traveler as any).is_cancelled ? 'text-gray-400 line-through' : 'text-gray-500'}`}>
-                              ${Number(traveler.precio_aplicado).toLocaleString()}
+                              {formatCurrencyMXN(Number(traveler.precio_aplicado))}
                             </span>
                           )}
                         </div>

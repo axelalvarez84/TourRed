@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { Users, ArrowLeft, Save, UserPlus, Check, AlertCircle, AlertTriangle, Lock } from 'lucide-react';
+import { formatCurrencyMXN, formatCurrency } from '../utils/formatCurrency';
 import { supabase } from '../lib/supabase';
 import { Booking, BookingTraveler, Tour, FrequentCompanion } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -986,10 +987,10 @@ const TravelersInfoPage: React.FC = () => {
                     {traveler.promo_discount_per_traveler > 0 ? (
                       <span className="flex items-center gap-1.5">
                         <span className="text-sm text-gray-400 line-through">
-                          ${(traveler.precio_aplicado + traveler.promo_discount_per_traveler).toLocaleString()}
+                          {formatCurrencyMXN(traveler.precio_aplicado + traveler.promo_discount_per_traveler)}
                         </span>
                         <span className="text-sm font-bold text-emerald-600">
-                          ${traveler.precio_aplicado.toLocaleString()}
+                          {formatCurrencyMXN(traveler.precio_aplicado)}
                         </span>
                         <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">
                           -{traveler.promo_discount_per_traveler.toLocaleString()} desc. grupal
@@ -997,7 +998,7 @@ const TravelersInfoPage: React.FC = () => {
                       </span>
                     ) : (
                       <span className="text-sm text-gray-500">
-                        (${traveler.precio_aplicado.toLocaleString()})
+                        ({formatCurrencyMXN(traveler.precio_aplicado)})
                       </span>
                     )}
                   </h3>

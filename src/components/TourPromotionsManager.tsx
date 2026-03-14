@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tag, Plus, CreditCard as Edit2, Trash2, ToggleLeft, ToggleRight, AlertCircle, Check, X, Calendar, Users, Loader2, Info, Percent } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { formatCurrency } from '../utils/formatCurrency';
 
 interface TourPromotion {
   id: string;
@@ -248,7 +249,7 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
   const getPromotionLabel = (promo: TourPromotion) => {
     if (promo.promotion_type === '2x1') return '2x1 — Viajan 2, paga 1';
     if (promo.promotion_type === '3x2') return '3x2 — Viajan 3, pagan 2';
-    if (promo.promotion_type === 'nxprecio') return `${promo.min_travelers} por $${promo.fixed_group_price?.toLocaleString()} — Precio especial para grupos de ${promo.min_travelers}`;
+    if (promo.promotion_type === 'nxprecio') return `${promo.min_travelers} por $${formatCurrency(promo.fixed_group_price ?? 0)} — Precio especial para grupos de ${promo.min_travelers}`;
     return `Precio grupal — ${promo.group_discount_percentage}% desc. por persona a partir de ${promo.min_travelers} viajeros`;
   };
 
@@ -410,7 +411,7 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
                     </div>
                     {exampleDiscount > 0 && (
                       <p className="text-xs text-emerald-600 mt-1 font-medium">
-                        Ej: adulto a ${tourPrice.toLocaleString()} → ahorra ${exampleDiscount.toLocaleString()}
+                        Ej: adulto a ${formatCurrency(tourPrice)} → ahorra ${formatCurrency(exampleDiscount)}
                       </p>
                     )}
                   </div>
@@ -446,7 +447,7 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
                       />
                       <span className="absolute right-2.5 top-2 text-xs text-gray-400 pointer-events-none">viajeros</span>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">Precio normal: ${(tourPrice * (parseInt(formData.min_travelers) || 2)).toLocaleString()}</p>
+                    <p className="text-xs text-gray-400 mt-1">Precio normal: ${formatCurrency(tourPrice * (parseInt(formData.min_travelers) || 2))}</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -458,12 +459,12 @@ const TourPromotionsManager: React.FC<TourPromotionsManagerProps> = ({ tourId, a
                       step="0.01"
                       value={formData.fixed_group_price}
                       onChange={e => setFormData(prev => ({ ...prev, fixed_group_price: e.target.value }))}
-                      placeholder={`Ej: ${Math.round(tourPrice * (formData.min_travelers || 2) * 0.85).toLocaleString()}`}
+                      placeholder={`Ej: ${formatCurrency(Math.round(tourPrice * (formData.min_travelers || 2) * 0.85))}`}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
                     />
                     {formData.fixed_group_price && parseFloat(formData.fixed_group_price) > 0 && (
                       <p className="text-xs text-emerald-600 mt-1 font-medium">
-                        ${Math.round(parseFloat(formData.fixed_group_price) / (formData.min_travelers || 2)).toLocaleString()} por persona
+                        ${formatCurrency(Math.round(parseFloat(formData.fixed_group_price) / (formData.min_travelers || 2)))} por persona
                       </p>
                     )}
                   </div>

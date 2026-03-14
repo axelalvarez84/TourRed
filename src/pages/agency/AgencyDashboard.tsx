@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, MapPin, Calendar, Users, DollarSign, Activity, AlertCircle, CreditCard } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { formatCurrency, formatCurrencyMXN } from '../../utils/formatCurrency';
 import { supabase } from '../../lib/supabase';
 
 interface DashboardStats {
@@ -318,11 +319,11 @@ const AgencyDashboard: React.FC = () => {
           <h2 className="text-xl font-semibold mb-4">Ingresos Netos</h2>
           <div className="flex items-center text-3xl font-bold text-secondary-600">
             <DollarSign className="h-8 w-8 mr-2" />
-            <span>${stats.totalRevenue.toLocaleString()}</span>
+            <span>{formatCurrencyMXN(stats.totalRevenue)}</span>
           </div>
           <p className="text-gray-600 mt-2">
             {stats.pendingPayouts > 0 
-              ? `$${stats.pendingPayouts.toLocaleString()} pendientes`
+              ? `$${formatCurrency(stats.pendingPayouts)} pendientes`
               : 'Después de comisiones'
             }
           </p>
@@ -385,7 +386,7 @@ const AgencyDashboard: React.FC = () => {
                       {new Date(activity.created_at).toLocaleDateString('es-ES')}
                     </span>
                     <span className="text-xs text-gray-500">
-                      ${activity.deposit_amount?.toLocaleString()} depósito
+                      {formatCurrencyMXN(activity.deposit_amount ?? 0)} depósito
                     </span>
                     {activity.payment_status === 'succeeded' && (
                       <span className="text-xs text-green-600 font-medium">

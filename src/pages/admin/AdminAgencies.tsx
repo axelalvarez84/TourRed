@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Building, Users, Eye, EyeOff, Mail, Phone, Globe, Calendar, Search, Filter, MoreVertical, CheckCircle, XCircle, CreditCard as Edit, Save, X, Percent, DollarSign, AlertTriangle, User, MapPin, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { getAllAgencies, updateAgencyStatus, supabase } from '../../lib/supabase';
-import { formatCurrencyMXN } from '../../utils/formatCurrency';
+import { formatCurrency, formatCurrencyMXN } from '../../utils/formatCurrency';
 
 interface Agency {
   id: string;
@@ -1195,19 +1195,19 @@ const AdminAgencies: React.FC = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Ingresos Totales de la Agencia:</span>
-                      <span className="font-medium">${(selectedAgency.total_revenue || 0).toLocaleString()}</span>
+                      <span className="font-medium">{formatCurrencyMXN(selectedAgency.total_revenue || 0)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Comisiones Generadas:</span>
                       <span className="font-medium text-orange-600">
-                        ${(((selectedAgency.total_revenue || 0) * editForm.commission_rate)).toLocaleString()}
+                        {formatCurrencyMXN((selectedAgency.total_revenue || 0) * editForm.commission_rate)}
                       </span>
                     </div>
                     <div className="border-t pt-2 mt-2">
                       <div className="flex justify-between text-base font-bold">
                         <span>Ingresos Netos de la Agencia:</span>
                         <span className="text-green-600">
-                          ${(((selectedAgency.total_revenue || 0) * (1 - editForm.commission_rate))).toLocaleString()}
+                          {formatCurrencyMXN((selectedAgency.total_revenue || 0) * (1 - editForm.commission_rate))}
                         </span>
                       </div>
                     </div>
@@ -1233,10 +1233,10 @@ const AdminAgencies: React.FC = () => {
                     <div className="text-xs text-gray-600">
                       <p><strong>Ejemplo con tour de $10,000:</strong></p>
                       <ul className="list-disc list-inside space-y-1 mt-1">
-                        <li>Comisión plataforma: ${(10000 * editForm.commission_rate).toLocaleString()}</li>
+                        <li>Comisión plataforma: {formatCurrencyMXN(10000 * editForm.commission_rate)}</li>
                         <li>Cargo servicio (3%): $300</li>
-                        <li>Total plataforma: ${(10000 * editForm.commission_rate + 300).toLocaleString()}</li>
-                        <li>Agencia recibe: ${(10000 * (1 - editForm.commission_rate)).toLocaleString()}</li>
+                        <li>Total plataforma: {formatCurrencyMXN(10000 * editForm.commission_rate + 300)}</li>
+                        <li>Agencia recibe: {formatCurrencyMXN(10000 * (1 - editForm.commission_rate))}</li>
                       </ul>
                     </div>
                   </div>

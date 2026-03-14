@@ -4,6 +4,7 @@ import { MapPin, Calendar, Star, Users, Building, Heart, Tag, RefreshCw } from '
 import { Tour } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { formatCurrency } from '../utils/formatCurrency';
 
 interface TourCardProps {
   tour: Tour & {
@@ -169,7 +170,7 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
             {activePromo.promotion_type === '2x1' ? '2x1' :
              activePromo.promotion_type === '3x2' ? '3x2' :
              activePromo.promotion_type === 'nxprecio' && activePromo.fixed_group_price !== null
-               ? `${activePromo.min_travelers} x $${activePromo.fixed_group_price.toLocaleString()}`
+               ? `${activePromo.min_travelers} x $${formatCurrency(activePromo.fixed_group_price)}`
              : activePromo.promotion_type === 'grupo_precio_fijo' && activePromo.group_discount_percentage !== null
                ? `-${activePromo.group_discount_percentage}% Grupal`
                : 'Oferta'}

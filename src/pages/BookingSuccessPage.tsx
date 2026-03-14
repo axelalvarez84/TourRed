@@ -289,32 +289,32 @@ const BookingSuccessPage: React.FC = () => {
                   {/* Desglose por categoría de viajeros */}
                   {booking.adults_count > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">{booking.adults_count} {booking.adults_count === 1 ? 'Adulto' : 'Adultos'} × ${booking.adult_price?.toLocaleString()}:</span>
-                      <span className="font-medium">${((booking.adult_price || 0) * (booking.adults_count || 0)).toLocaleString()}</span>
+                      <span className="text-gray-600">{booking.adults_count} {booking.adults_count === 1 ? 'Adulto' : 'Adultos'} × {formatCurrencyMXN(booking.adult_price ?? 0)}:</span>
+                      <span className="font-medium">{formatCurrencyMXN((booking.adult_price || 0) * (booking.adults_count || 0))}</span>
                     </div>
                   )}
                   {booking.children_count > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">{booking.children_count} {booking.children_count === 1 ? 'Niño' : 'Niños'} × ${booking.child_price?.toLocaleString()}:</span>
-                      <span className="font-medium">${((booking.child_price || 0) * (booking.children_count || 0)).toLocaleString()}</span>
+                      <span className="text-gray-600">{booking.children_count} {booking.children_count === 1 ? 'Niño' : 'Niños'} × {formatCurrencyMXN(booking.child_price ?? 0)}:</span>
+                      <span className="font-medium">{formatCurrencyMXN((booking.child_price || 0) * (booking.children_count || 0))}</span>
                     </div>
                   )}
                   {booking.infants_count > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">{booking.infants_count} {booking.infants_count === 1 ? 'Infante' : 'Infantes'} × ${booking.infant_price?.toLocaleString()}:</span>
-                      <span className="font-medium">${((booking.infant_price || 0) * (booking.infants_count || 0)).toLocaleString()}</span>
+                      <span className="text-gray-600">{booking.infants_count} {booking.infants_count === 1 ? 'Infante' : 'Infantes'} × {formatCurrencyMXN(booking.infant_price ?? 0)}:</span>
+                      <span className="font-medium">{formatCurrencyMXN((booking.infant_price || 0) * (booking.infants_count || 0))}</span>
                     </div>
                   )}
                   {booking.seniors_count > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">{booking.seniors_count} {booking.seniors_count === 1 ? 'Adulto Mayor' : 'Adultos Mayores'} × ${booking.senior_price?.toLocaleString()}:</span>
-                      <span className="font-medium">${((booking.senior_price || 0) * (booking.seniors_count || 0)).toLocaleString()}</span>
+                      <span className="text-gray-600">{booking.seniors_count} {booking.seniors_count === 1 ? 'Adulto Mayor' : 'Adultos Mayores'} × {formatCurrencyMXN(booking.senior_price ?? 0)}:</span>
+                      <span className="font-medium">{formatCurrencyMXN((booking.senior_price || 0) * (booking.seniors_count || 0))}</span>
                     </div>
                   )}
                   {booking.pets_count > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">{booking.pets_count} {booking.pets_count === 1 ? 'Mascota' : 'Mascotas'} × ${booking.pet_price?.toLocaleString()}:</span>
-                      <span className="font-medium">${((booking.pet_price || 0) * (booking.pets_count || 0)).toLocaleString()}</span>
+                      <span className="text-gray-600">{booking.pets_count} {booking.pets_count === 1 ? 'Mascota' : 'Mascotas'} × {formatCurrencyMXN(booking.pet_price ?? 0)}:</span>
+                      <span className="font-medium">{formatCurrencyMXN((booking.pet_price || 0) * (booking.pets_count || 0))}</span>
                     </div>
                   )}
 
@@ -348,12 +348,12 @@ const BookingSuccessPage: React.FC = () => {
 
                   <div className="flex justify-between border-t pt-2 mt-2">
                     <span className="text-gray-700 font-medium">Precio Total del Tour:</span>
-                    <span className="font-bold">${booking.total_price?.toLocaleString()}</span>
+                    <span className="font-bold">{formatCurrencyMXN(booking.total_price ?? 0)}</span>
                   </div>
 
                   <div className="flex justify-between">
                     <span className="text-gray-600">Depósito ({tour.deposit_percentage}%):</span>
-                    <span className="font-medium">${booking.deposit_amount?.toLocaleString()}</span>
+                    <span className="font-medium">{formatCurrencyMXN(booking.deposit_amount ?? 0)}</span>
                   </div>
 
                   {booking.service_charge !== undefined && booking.service_charge !== null && (
@@ -460,7 +460,7 @@ const BookingSuccessPage: React.FC = () => {
 
                   <div className="flex justify-between text-sm text-gray-500 mt-2">
                     <span>Saldo Restante:</span>
-                    <span>${((booking.total_price || 0) - (booking.deposit_amount || 0)).toLocaleString()}</span>
+                    <span>{formatCurrencyMXN((booking.total_price || 0) - (booking.deposit_amount || 0))}</span>
                   </div>
                 </div>
 
@@ -510,7 +510,7 @@ const BookingSuccessPage: React.FC = () => {
                 <div className="font-medium flex items-center">
                   Pago del Saldo
                   <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">
-                    ${((booking.total_price || 0) - (booking.deposit_amount || 0)).toLocaleString()}
+                    {formatCurrencyMXN((booking.total_price || 0) - (booking.deposit_amount || 0))}
                   </span>
                 </div>
                 <div className="text-sm text-gray-600">

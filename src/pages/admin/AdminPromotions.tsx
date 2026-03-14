@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Tag, Search, Filter, Eye, ToggleLeft, ToggleRight, AlertCircle, Check, Calendar, Users, Building, X, ChevronDown, Loader2 } from 'lucide-react';
+import { formatCurrency } from '../../utils/formatCurrency';
 import { supabase } from '../../lib/supabase';
 
 interface TourPromotion {
@@ -286,7 +287,7 @@ const AdminPromotions: React.FC = () => {
                       )}
                       {promo.promotion_type === 'nxprecio' && promo.fixed_group_price && (
                         <div className="text-xs text-gray-500 mt-0.5">
-                          {promo.min_travelers} por ${promo.fixed_group_price.toLocaleString()}
+                          {promo.min_travelers} por ${formatCurrency(promo.fixed_group_price)}
                         </div>
                       )}
                     </td>

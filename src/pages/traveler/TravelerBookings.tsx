@@ -1214,7 +1214,7 @@ const TravelerBookings: React.FC = () => {
                       <DollarSign className="h-4 w-4 text-gray-400 mr-2" />
                       <div>
                         <div className="text-sm text-gray-500">Total Pagado</div>
-                        <div className="font-medium">${booking.user_payment?.toLocaleString() || booking.deposit_amount?.toLocaleString()}</div>
+                        <div className="font-medium">{formatCurrencyMXN(booking.user_payment ?? booking.deposit_amount ?? 0)}</div>
                       </div>
                     </div>
 
@@ -1312,11 +1312,11 @@ const TravelerBookings: React.FC = () => {
                             </div>
                             <div className="text-right">
                               <span className={`font-medium ${bos.is_cancelled ? 'text-gray-400' : 'text-amber-700'}`}>
-                                ${Number(bos.subtotal).toLocaleString()}
+                                {formatCurrencyMXN(Number(bos.subtotal))}
                               </span>
                               {bos.is_cancelled && bos.refund_amount > 0 && (
                                 <span className="block text-xs text-green-600">
-                                  Reembolso: ${Number(bos.refund_amount).toLocaleString()}
+                                  Reembolso: {formatCurrencyMXN(Number(bos.refund_amount))}
                                 </span>
                               )}
                             </div>
@@ -1332,16 +1332,16 @@ const TravelerBookings: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <div className="text-gray-500">Precio Total del Tour:</div>
-                        <div className="font-medium">${booking.total_price?.toLocaleString()}</div>
+                        <div className="font-medium">{formatCurrencyMXN(booking.total_price ?? 0)}</div>
                       </div>
                       <div>
                         <div className="text-gray-500">Depósito Pagado:</div>
-                        <div className="font-medium">${booking.deposit_amount?.toLocaleString()}</div>
+                        <div className="font-medium">{formatCurrencyMXN(booking.deposit_amount ?? 0)}</div>
                       </div>
                       {booking.service_charge && (
                         <div>
                           <div className="text-gray-500">Cargo por Servicio:</div>
-                          <div className="font-medium">${booking.service_charge.toLocaleString()}</div>
+                          <div className="font-medium">{formatCurrencyMXN(booking.service_charge)}</div>
                         </div>
                       )}
                       <div>
@@ -1351,7 +1351,7 @@ const TravelerBookings: React.FC = () => {
                       <div>
                         <div className="text-gray-500">Saldo Restante:</div>
                         <div className="font-medium">
-                          ${((booking.total_price || 0) - (booking.deposit_amount || 0)).toLocaleString()}
+                          {formatCurrencyMXN((booking.total_price || 0) - (booking.deposit_amount || 0))}
                         </div>
                       </div>
                       {(booking as any).paypal_transaction_id && (
@@ -1649,15 +1649,15 @@ const TravelerBookings: React.FC = () => {
                           {Number((traveler as any).promo_discount_per_traveler) > 0 ? (
                             <span className="flex items-center gap-1.5">
                               <span className="text-sm text-gray-400 line-through">
-                                ${(Number(traveler.precio_aplicado) + Number((traveler as any).promo_discount_per_traveler)).toLocaleString()}
+                                {formatCurrencyMXN(Number(traveler.precio_aplicado) + Number((traveler as any).promo_discount_per_traveler))}
                               </span>
                               <span className={`text-sm font-bold ${(traveler as any).is_cancelled ? 'text-gray-400 line-through' : 'text-emerald-600'}`}>
-                                ${Number(traveler.precio_aplicado).toLocaleString()}
+                                {formatCurrencyMXN(Number(traveler.precio_aplicado))}
                               </span>
                             </span>
                           ) : (
                             <span className={`text-sm font-medium ${(traveler as any).is_cancelled ? 'text-gray-400 line-through' : 'text-gray-500'}`}>
-                              ${Number(traveler.precio_aplicado).toLocaleString()}
+                              {formatCurrencyMXN(Number(traveler.precio_aplicado))}
                             </span>
                           )}
                         </div>
@@ -2291,7 +2291,7 @@ const TravelerBookings: React.FC = () => {
                       <>
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">{discountAmount > 0 ? 'Subtotal:' : 'Monto Original:'}</span>
-                          <span className="font-semibold">${preDiscountAmount.toLocaleString()}</span>
+                          <span className="font-semibold">{formatCurrencyMXN(preDiscountAmount)}</span>
                         </div>
 
                         {discountAmount > 0 && (
@@ -2300,7 +2300,7 @@ const TravelerBookings: React.FC = () => {
                               <span className="text-blue-800">
                                 Descuento Aplicado{discountCode?.code ? ` (${discountCode.code})` : ''}:
                               </span>
-                              <span className="font-semibold text-blue-800">-${discountAmount.toLocaleString()}</span>
+                              <span className="font-semibold text-blue-800">-{formatCurrencyMXN(discountAmount)}</span>
                             </div>
                           </div>
                         )}
@@ -2308,7 +2308,7 @@ const TravelerBookings: React.FC = () => {
                         {discountAmount > 0 && (
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Monto con Descuento:</span>
-                            <span className="font-semibold">${userPayment.toLocaleString()}</span>
+                            <span className="font-semibold">{formatCurrencyMXN(userPayment)}</span>
                           </div>
                         )}
                       </>
@@ -2338,7 +2338,7 @@ const TravelerBookings: React.FC = () => {
                         <div className="border-t pt-3">
                           <div className="flex justify-between items-center mb-2">
                             <span className="text-sm font-medium text-gray-700">Tu Saldo ToursRed Cash:</span>
-                            <span className="text-lg font-bold text-green-600">${paymentModal.walletBalance.toLocaleString()}</span>
+                            <span className="text-lg font-bold text-green-600">{formatCurrencyMXN(paymentModal.walletBalance)}</span>
                           </div>
 
                           <div className="mt-4">
@@ -2377,7 +2377,7 @@ const TravelerBookings: React.FC = () => {
                               </button>
                             </div>
                             <p className="mt-1 text-xs text-gray-500">
-                              Máximo: ${Math.min(paymentModal.walletBalance, remainingAmount).toLocaleString()}
+                              Máximo: {formatCurrencyMXN(Math.min(paymentModal.walletBalance, remainingAmount))}
                             </p>
                           </div>
                         </div>
@@ -2386,7 +2386,7 @@ const TravelerBookings: React.FC = () => {
                           <div className="bg-green-50 border border-green-200 rounded-md p-3">
                             <div className="flex justify-between text-sm">
                               <span className="text-green-800">ToursRed Cash Aplicado:</span>
-                              <span className="font-semibold text-green-800">-${paymentModal.toursRedCashToUse.toLocaleString()}</span>
+                              <span className="font-semibold text-green-800">-{formatCurrencyMXN(paymentModal.toursRedCashToUse)}</span>
                             </div>
                           </div>
                         )}
@@ -2398,12 +2398,12 @@ const TravelerBookings: React.FC = () => {
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total a Pagar{paymentModal.toursRedCashToUse > 0 ? ` con ${paymentModal.selectedProvider === 'mercadopago' ? 'MercadoPago' : paymentModal.selectedProvider === 'paypal' ? 'PayPal' : 'Stripe'}` : ''}:</span>
                       <span className="text-primary-600">
-                        ${(() => {
+                        {formatCurrencyMXN((() => {
                           const originalAmount = paymentModal.booking?.user_payment || paymentModal.booking?.deposit_amount || 0;
                           const pointsAlreadyUsed = ((paymentModal.booking?.points_used || 0) / 100);
                           const remainingAmount = originalAmount - pointsAlreadyUsed;
-                          return Math.max(0, remainingAmount - paymentModal.toursRedCashToUse).toLocaleString();
-                        })()}
+                          return Math.max(0, remainingAmount - paymentModal.toursRedCashToUse);
+                        })())}
                       </span>
                     </div>
                   </div>
@@ -2618,7 +2618,7 @@ const TravelerBookings: React.FC = () => {
                           <DollarSign className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
                           <span>
                             Recibirás un <strong>reembolso del 100%</strong> de tu depósito (
-                            ${rescheduleModal.booking.deposit_amount?.toLocaleString()} MXN)
+                            {formatCurrencyMXN(rescheduleModal.booking.deposit_amount ?? 0)} MXN)
                           </span>
                         </li>
                         {Number(rescheduleModal.booking.toursred_cash_used || 0) > 0 && (
@@ -2626,7 +2626,7 @@ const TravelerBookings: React.FC = () => {
                             <DollarSign className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
                             <span>
                               También se reembolsará el ToursRed Cash utilizado (
-                              ${Number(rescheduleModal.booking.toursred_cash_used).toLocaleString()} MXN)
+                              {formatCurrencyMXN(Number(rescheduleModal.booking.toursred_cash_used))} MXN)
                             </span>
                           </li>
                         )}

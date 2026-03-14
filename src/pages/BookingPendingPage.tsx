@@ -4,6 +4,7 @@ import { Clock, CheckCircle, MapPin, Users, Calendar, ArrowRight, Home, Bell } f
 import { supabase, parseDateFromDB } from '../lib/supabase';
 import { Booking, Tour } from '../types';
 import { format } from 'date-fns';
+import { formatCurrencyMXN } from '../utils/formatCurrency';
 
 const BookingPendingPage: React.FC = () => {
   const { bookingId } = useParams<{ bookingId: string }>();
@@ -187,23 +188,23 @@ const BookingPendingPage: React.FC = () => {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Precio Total del Tour:</span>
-                    <span className="font-medium">${booking.total_price?.toLocaleString()}</span>
+                    <span className="font-medium">{formatCurrencyMXN(booking.total_price ?? 0)}</span>
                   </div>
                   
                   <div className="flex justify-between">
                     <span className="text-gray-600">Depósito a Pagar:</span>
-                    <span className="font-medium">${booking.deposit_amount?.toLocaleString()}</span>
+                    <span className="font-medium">{formatCurrencyMXN(booking.deposit_amount ?? 0)}</span>
                   </div>
                   
                   <div className="flex justify-between">
                     <span className="text-gray-600">Cargo por Servicio:</span>
-                    <span className="font-medium">${booking.service_charge?.toLocaleString()}</span>
+                    <span className="font-medium">{formatCurrencyMXN(booking.service_charge ?? 0)}</span>
                   </div>
                   
                   <div className="border-t border-gray-200 pt-2 mt-2">
                     <div className="flex justify-between text-lg font-bold">
                       <span className="text-yellow-600">Total a Pagar (si se aprueba):</span>
-                      <span className="text-yellow-600">${booking.user_payment?.toLocaleString()}</span>
+                      <span className="text-yellow-600">{formatCurrencyMXN(booking.user_payment ?? 0)}</span>
                     </div>
                   </div>
                 </div>

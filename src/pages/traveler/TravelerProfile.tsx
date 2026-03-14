@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Calendar, Save, CreditCard as Edit, X, MapPin, CreditCard, Globe, Phone, Wallet } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { formatCurrencyMXN } from '../../utils/formatCurrency';
+import { formatCurrency, formatCurrencyMXN } from '../../utils/formatCurrency';
 import { supabase } from '../../lib/supabase';
 import TravelerReviewsDisplay from '../../components/TravelerReviewsDisplay';
 import ProfilePictureUploader from '../../components/ProfilePictureUploader';
@@ -351,7 +351,7 @@ const TravelerProfile: React.FC = () => {
                 <div className="text-sm text-gray-500">Reservas Realizadas</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-success-600">${(profile.total_spent || 0).toLocaleString()}</div>
+                <div className="text-2xl font-bold text-success-600">{formatCurrencyMXN(profile.total_spent || 0)}</div>
                 <div className="text-sm text-gray-500">Total Invertido en Viajes</div>
               </div>
               <div className="text-center bg-gradient-to-br from-accent-50 to-accent-100 rounded-lg py-3 border-2 border-accent-200">
@@ -815,7 +815,7 @@ const TravelerProfile: React.FC = () => {
                     </div>
                   </div>
                   <div className="text-2xl font-bold text-success-600">
-                    ${(profile.total_spent || 0).toLocaleString()}
+                    {formatCurrencyMXN(profile.total_spent || 0)}
                   </div>
                 </div>
               </div>
