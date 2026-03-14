@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Check, CheckCheck, Clock, X, Filter, Search, Trash2 } from 'lucide-react';
+import { Bell, Check, CheckCheck, Clock, X, Filter, Search, Trash2, MessageSquare, Building2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Notification } from '../types';
@@ -13,6 +13,7 @@ const NotificationsPage: React.FC = () => {
   const [error, setError] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [detailNotification, setDetailNotification] = useState<Notification | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -120,7 +121,9 @@ const NotificationsPage: React.FC = () => {
       case 'booking_confirmed':
         return <CheckCheck className="h-5 w-5 text-green-500" />;
       case 'message_received':
-        return <div className="h-5 w-5 flex items-center justify-center text-blue-500">💬</div>;
+        return <MessageSquare className="h-5 w-5 text-blue-500" />;
+      case 'tour_announcement':
+        return <Building2 className="h-5 w-5 text-blue-600" />;
       default:
         return <Bell className="h-5 w-5 text-gray-500" />;
     }
@@ -141,6 +144,8 @@ const NotificationsPage: React.FC = () => {
         return `/messages${data.conversation_id ? `?conversation=${data.conversation_id}` : ''}`;
       case 'tour_updated':
         return `/tours/${data.tour_id}`;
+      case 'tour_announcement':
+        return null;
       default:
         return '#';
     }
@@ -164,6 +169,8 @@ const NotificationsPage: React.FC = () => {
         return 'Tour Actualizado';
       case 'system_announcement':
         return 'Anuncio del Sistema';
+      case 'tour_announcement':
+        return 'Mensaje de Agencia';
       default:
         return type;
     }
@@ -249,6 +256,7 @@ const NotificationsPage: React.FC = () => {
                 <option value="booking_confirmed">Reservas Confirmadas</option>
                 <option value="message_received">Mensajes</option>
                 <option value="system_announcement">Anuncios</option>
+                <option value="tour_announcement">Mensajes de Agencia</option>
               </select>
             </div>
           </div>
@@ -322,17 +330,27 @@ const NotificationsPage: React.FC = () => {
                         {notification.message}
                       </p>
                       <div className="mt-3">
-                        <Link
-                          to={getNotificationLink(notification)}
-                          className="text-sm text-primary-600 hover:text-primary-800"
-                          onClick={() => {
-                            if (!notification.is_read) {
-                              markAsRead(notification.id);
-                            }
-                          }}
-                        >
-                          Ver detalles
-                        </Link>
+                        {notification.type === 'tour_announcement' ? (
+                          <button
+                            className="text-sm text-primary-600 hover:text-primary-800"
+                            onClick={() => {
+                              if (!notification.is_read) markAsRead(notification.id);
+                              setDetailNotification(notification);
+                            }}
+                          >
+                            Ver detalles
+                          </button>
+                        ) : getNotificationLink(notification) && getNotificationLink(notification) !== '#' ? (
+                          <Link
+                            to={getNotificationLink(notification) as string}
+                            className="text-sm text-primary-600 hover:text-primary-800"
+                            onClick={() => {
+                              if (!notification.is_read) markAsRead(notification.id);
+                            }}
+                          >
+                            Ver detalles
+                          </Link>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -342,6 +360,65 @@ const NotificationsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Tour announcement detail modal */}
+      {detailNotification && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 py-8">
+            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setDetailNotification(null)} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-auto">
+              <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                    <Building2 className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-gray-900 leading-tight">{detailNotification.title}</h2>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {detailNotification.data?.agency_name as string || 'Agencia'} · {formatDate(detailNotification.created_at)}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setDetailNotification(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+
+              {(detailNotification.data?.tour_name || detailNotification.data?.booking_code) && (
+                <div className="mx-6 mt-5 bg-blue-50 rounded-xl px-4 py-3 space-y-0.5">
+                  {detailNotification.data?.tour_name && (
+                    <p className="text-sm font-semibold text-blue-800">{detailNotification.data.tour_name as string}</p>
+                  )}
+                  {detailNotification.data?.booking_code && (
+                    <p className="text-xs text-blue-600">Reserva #{detailNotification.data.booking_code as string}</p>
+                  )}
+                </div>
+              )}
+
+              <div className="px-6 py-5">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Mensaje</p>
+                <div className="bg-gray-50 rounded-xl border-l-4 border-blue-400 px-5 py-4">
+                  <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                    {detailNotification.message}
+                  </p>
+                </div>
+              </div>
+
+              <div className="px-6 pb-5 flex justify-end">
+                <button
+                  onClick={() => setDetailNotification(null)}
+                  className="btn btn-primary"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
