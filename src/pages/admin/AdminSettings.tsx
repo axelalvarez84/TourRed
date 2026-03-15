@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard, Crown, Gift, Award, Users, Globe } from 'lucide-react';
+import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard, Crown, Gift, Award, Users, Globe, FileText, Shield } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../utils/formatCurrency';
 
@@ -30,6 +30,15 @@ interface PlatformSettings {
   mercadopago_access_token: string;
   paypal_client_id: string;
   paypal_client_secret: string;
+  pac_provider: string;
+  pac_api_key_encrypted: string;
+  pac_organization_id: string;
+  cfdi_serie_booking: string;
+  cfdi_serie_commission: string;
+  pac_sandbox_mode: boolean;
+  pac_issuer_rfc: string;
+  pac_issuer_razon_social: string;
+  pac_issuer_regimen_fiscal: string;
 }
 
 const AdminSettings: React.FC = () => {
@@ -59,6 +68,15 @@ const AdminSettings: React.FC = () => {
     mercadopago_access_token: '',
     paypal_client_id: '',
     paypal_client_secret: '',
+    pac_provider: 'none',
+    pac_api_key_encrypted: '',
+    pac_organization_id: '',
+    cfdi_serie_booking: 'A',
+    cfdi_serie_commission: 'B',
+    pac_sandbox_mode: true,
+    pac_issuer_rfc: '',
+    pac_issuer_razon_social: '',
+    pac_issuer_regimen_fiscal: '',
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -140,6 +158,15 @@ const AdminSettings: React.FC = () => {
             mercadopago_access_token: platformSettings.mercadopago_access_token,
             paypal_client_id: platformSettings.paypal_client_id,
             paypal_client_secret: platformSettings.paypal_client_secret,
+            pac_provider: platformSettings.pac_provider,
+            pac_api_key_encrypted: platformSettings.pac_api_key_encrypted,
+            pac_organization_id: platformSettings.pac_organization_id,
+            cfdi_serie_booking: platformSettings.cfdi_serie_booking,
+            cfdi_serie_commission: platformSettings.cfdi_serie_commission,
+            pac_sandbox_mode: platformSettings.pac_sandbox_mode,
+            pac_issuer_rfc: platformSettings.pac_issuer_rfc,
+            pac_issuer_razon_social: platformSettings.pac_issuer_razon_social,
+            pac_issuer_regimen_fiscal: platformSettings.pac_issuer_regimen_fiscal,
             updated_at: new Date().toISOString(),
             updated_by: user?.id
           })
@@ -830,6 +857,160 @@ const AdminSettings: React.FC = () => {
               />
             </div>
           </div>
+        </div>
+
+        {/* PAC / CFDI Configuration */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center space-x-3 mb-2">
+            <FileText className="w-6 h-6 text-primary-600" />
+            <h2 className="text-xl font-semibold text-gray-900">Configuración CFDI / PAC</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-6">
+            Configura el proveedor de timbrado (PAC) para la emisión de Comprobantes Fiscales Digitales por Internet.
+            La arquitectura está diseñada para cambiar de proveedor sin modificar la lógica de negocio.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Proveedor PAC Activo</label>
+              <select
+                value={platformSettings.pac_provider}
+                onChange={(e) => setPlatformSettings(prev => ({ ...prev, pac_provider: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="none">Sin proveedor (desactivado)</option>
+                <option value="facturapi">FacturAPI</option>
+                <option value="sw_sapien">SW Sapien</option>
+                <option value="contpaqi">Contpaqi Cloud</option>
+              </select>
+              <p className="text-xs text-gray-400 mt-1">Cambiar el proveedor no afecta los CFDI ya emitidos.</p>
+            </div>
+
+            <div className="flex items-center gap-3 md:pt-6">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={platformSettings.pac_sandbox_mode}
+                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, pac_sandbox_mode: e.target.checked }))}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+              </label>
+              <div>
+                <div className="text-sm font-medium text-gray-700">Modo Sandbox</div>
+                <div className="text-xs text-gray-400">{platformSettings.pac_sandbox_mode ? 'Activo (pruebas)' : 'Producción (CFDIs reales)'}</div>
+              </div>
+              {!platformSettings.pac_sandbox_mode && (
+                <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-error-100 text-error-700">
+                  <Shield className="h-3 w-3" /> Producción
+                </span>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">API Key del PAC</label>
+              <input
+                type="password"
+                value={platformSettings.pac_api_key_encrypted}
+                onChange={(e) => setPlatformSettings(prev => ({ ...prev, pac_api_key_encrypted: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                placeholder="sk_live_xxxxxxxxxxxx o equivalente"
+                autoComplete="off"
+              />
+              <p className="text-xs text-gray-400 mt-1">En FacturAPI: Configuración → API Keys → Live Key.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">ID de Organización / Emisor</label>
+              <input
+                type="text"
+                value={platformSettings.pac_organization_id}
+                onChange={(e) => setPlatformSettings(prev => ({ ...prev, pac_organization_id: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                placeholder="ID de la organización en el PAC"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Serie CFDI — Reservas</label>
+              <input
+                type="text"
+                value={platformSettings.cfdi_serie_booking}
+                onChange={(e) => setPlatformSettings(prev => ({ ...prev, cfdi_serie_booking: e.target.value.toUpperCase() }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 uppercase"
+                maxLength={5}
+                placeholder="A"
+              />
+              <p className="text-xs text-gray-400 mt-1">Serie para facturas de viajeros (comprobantes de pago de tours).</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Serie CFDI — Comisiones</label>
+              <input
+                type="text"
+                value={platformSettings.cfdi_serie_commission}
+                onChange={(e) => setPlatformSettings(prev => ({ ...prev, cfdi_serie_commission: e.target.value.toUpperCase() }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 uppercase"
+                maxLength={5}
+                placeholder="B"
+              />
+              <p className="text-xs text-gray-400 mt-1">Serie para facturas de comisión emitidas a las agencias.</p>
+            </div>
+          </div>
+
+          <div className="mt-6 border-t pt-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+              <Shield className="h-4 w-4 text-primary-500" />
+              Datos del Emisor (ToursRed)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">RFC del Emisor</label>
+                <input
+                  type="text"
+                  value={platformSettings.pac_issuer_rfc}
+                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, pac_issuer_rfc: e.target.value.toUpperCase() }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 uppercase font-mono text-sm"
+                  placeholder="RFC de ToursRed"
+                  maxLength={13}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Razón Social</label>
+                <input
+                  type="text"
+                  value={platformSettings.pac_issuer_razon_social}
+                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, pac_issuer_razon_social: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Nombre legal de ToursRed"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Régimen Fiscal</label>
+                <select
+                  value={platformSettings.pac_issuer_regimen_fiscal}
+                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, pac_issuer_regimen_fiscal: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                >
+                  <option value="">Seleccionar</option>
+                  <option value="601">601 - General de Ley Personas Morales</option>
+                  <option value="603">603 - Personas Morales con Fines no Lucrativos</option>
+                  <option value="612">612 - Personas Físicas con Actividades Empresariales</option>
+                  <option value="621">621 - Incorporación Fiscal</option>
+                  <option value="625">625 - Régimen Simplificado de Confianza</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {platformSettings.pac_provider !== 'none' && (
+            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-md p-4 text-sm text-blue-700">
+              <strong>Proveedor activo: {platformSettings.pac_provider}</strong>
+              {platformSettings.pac_sandbox_mode
+                ? ' — Modo sandbox. Los CFDIs generados son de prueba y no tienen validez fiscal.'
+                : ' — Modo producción. Los CFDIs generados son válidos ante el SAT.'}
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end">

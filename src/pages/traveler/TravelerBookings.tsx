@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X, CreditCard as Edit, UserCheck, XCircle, CalendarX, Check, Wallet, Lock, UserMinus, Car, Globe } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import TravelerCfdiList from '../../components/TravelerCfdiList';
 import { getUserBookings, parseDateFromDB, supabase, calculateCancellationPolicy, processCancellation, calculatePartialCancellationPolicy, processPartialCancellation, PartialCancellationTraveler } from '../../lib/supabase';
 import { Booking, PendingReschedule } from '../../types';
 import { format } from 'date-fns';
@@ -2730,6 +2731,13 @@ const TravelerBookings: React.FC = () => {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* CFDI Section */}
+      {user && (
+        <div className="container mx-auto px-4 pb-8">
+          <TravelerCfdiList userId={user.id} />
         </div>
       )}
     </div>
