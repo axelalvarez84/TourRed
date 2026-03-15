@@ -395,8 +395,8 @@ const NavBar: React.FC = () => {
 
                 {isProfileOpen && (
                   <div
-                    className="origin-top-right absolute right-0 mt-2 rounded-md shadow-lg py-1 bg-blue-50 ring-1 ring-black ring-opacity-5 focus:outline-none"
-                    style={{ minWidth: isAgencyStaff ? '230px' : '192px' }}
+                    className="origin-top-right absolute right-0 mt-2 rounded-md shadow-lg py-1 bg-blue-50 ring-1 ring-black ring-opacity-5 focus:outline-none overflow-y-auto"
+                    style={{ minWidth: isAgencyStaff ? '230px' : '192px', maxHeight: 'calc(100vh - 5rem)' }}
                     role="menu"
                     aria-orientation="vertical"
                     aria-labelledby="user-menu-button"
