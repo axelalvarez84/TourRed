@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { useAgencyId } from '../../hooks/useAgencyId';
 import { DollarSign, TrendingUp, Calendar, Download, FileText, CheckCircle, Clock, Eye, CreditCard, FileSpreadsheet } from 'lucide-react';
 import { formatCurrencyMXN } from '../../utils/formatCurrency';
 import { format } from 'date-fns';
@@ -11,6 +12,7 @@ import * as XLSX from 'xlsx';
 
 const AgencyFinancials: React.FC = () => {
   const { user } = useAuth();
+  const { agencyId: resolvedAgencyId } = useAgencyId();
   const [agencyId, setAgencyId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [summary, setSummary] = useState<FinancialSummary>({
@@ -26,33 +28,16 @@ const AgencyFinancials: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   useEffect(() => {
-    if (user?.id) {
-      fetchAgencyData();
+    if (resolvedAgencyId) {
+      setAgencyId(resolvedAgencyId);
     }
-  }, [user?.id]);
+  }, [resolvedAgencyId]);
 
   useEffect(() => {
     if (agencyId) {
       fetchFinancialData();
     }
   }, [agencyId, startDate, endDate, statusFilter]);
-
-  const fetchAgencyData = async () => {
-    if (!user?.id) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('agencies')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error) throw error;
-      setAgencyId(data.id);
-    } catch (error) {
-      console.error('Error fetching agency:', error);
-    }
-  };
 
   const fetchFinancialData = async () => {
     if (!agencyId) return;

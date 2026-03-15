@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useAgencyId } from '../../hooks/useAgencyId';
 import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination, getTourCategories } from '../../lib/supabase';
 import { Plus, Search, X, CreditCard as Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban, ShoppingBag, Info, Percent, Route, RefreshCw, Layers, Car, Globe, AlertTriangle } from 'lucide-react';
 import TourPromotionsManager from '../../components/TourPromotionsManager';
@@ -59,6 +60,7 @@ interface SelectedDeparturePoint extends DeparturePoint {
 
 const AgencyTours: React.FC = () => {
   const { user, isAgencyStaff, staffInfo } = useAuth();
+  const { agencyId: resolvedAgencyId } = useAgencyId();
   const canCreate = !isAgencyStaff || (staffInfo?.permissions.canManageTours ?? false);
   const canEdit = !isAgencyStaff || (staffInfo?.permissions.canEditTours ?? false) || (staffInfo?.permissions.canManageTours ?? false);
   const canDelete = !isAgencyStaff || (staffInfo?.permissions.canManageTours ?? false);
@@ -210,7 +212,7 @@ const AgencyTours: React.FC = () => {
     fetchAgencyTours();
     fetchAllDestinations();
     fetchCategories();
-  }, [user?.id]);
+  }, [user?.id, resolvedAgencyId]);
 
   // Restaurar borrador al cargar
   useEffect(() => {
@@ -333,13 +335,11 @@ const AgencyTours: React.FC = () => {
   };
 
   const fetchAgencyTours = async () => {
-    if (!user?.id) return;
+    if (!user?.id || !resolvedAgencyId) return;
 
     try {
       setIsLoading(true);
       setError('');
-
-      console.log('🎯 Cargando tours de la agencia para usuario:', user.id);
 
       // Verificar si la agencia está aprobada
       const { data: userData, error: userError } = await supabase
@@ -352,36 +352,14 @@ const AgencyTours: React.FC = () => {
         setIsAgencyApproved(userData.is_approved !== false);
       }
 
-      // Primero obtener el ID de la agencia
-      const { data: agencyData, error: agencyError } = await supabase
-        .from('agencies')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (agencyError) {
-        if (agencyError.code === 'PGRST116') {
-          setError('No se encontró perfil de agencia para este usuario');
-          return;
-        }
-        throw new Error(agencyError.message);
-      }
-
-      if (!agencyData) {
-        setError('No se encontró perfil de agencia');
-        return;
-      }
-
-      console.log('🏢 ID de agencia encontrado:', agencyData.id);
-
-      // Obtener tours de la agencia
+      // Obtener tours de la agencia usando el ID resuelto
       const { data: toursData, error: toursError } = await supabase
         .from('tours')
         .select(`
           *,
           agencies(id, name, rating)
         `)
-        .eq('agency_id', agencyData.id)
+        .eq('agency_id', resolvedAgencyId)
         .order('created_at', { ascending: false });
 
       if (toursError) {
@@ -792,15 +770,6 @@ const AgencyTours: React.FC = () => {
         admite_adultos: duplicatingTour.admite_adultos !== undefined ? duplicatingTour.admite_adultos : true,
         admite_adultos_mayores: duplicatingTour.admite_adultos_mayores !== undefined ? duplicatingTour.admite_adultos_mayores : true,
       };
-
-      // Obtener la agencia ID
-      const { data: agencyData, error: agencyError } = await supabase
-        .from('agencies')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (agencyError) throw agencyError;
 
       // Crear el nuevo tour
       const { error } = await createTour(tourData, [], user.id);

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Users, Plus, UserCheck, UserX, CreditCard as Edit2, Search, Shield, ChevronDown, ChevronUp, AlertCircle, CheckCircle, X, Loader2, Eye, Pencil, Settings } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useAgencyId } from '../../hooks/useAgencyId';
 
 interface StaffMember {
   id: string;
@@ -101,6 +102,7 @@ function tourLevelLabel(p: StaffMember['permissions']): string {
 
 export default function AgencyStaff() {
   const { user, isAgencyStaff } = useAuth();
+  const { agencyId: resolvedAgencyId } = useAgencyId();
   const [agencyId, setAgencyId] = useState<string | null>(null);
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,14 +122,8 @@ export default function AgencyStaff() {
   const [permissions, setPermissions] = useState<PermissionsForm>({ ...defaultPermissions });
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { fetchAgencyId(); }, [user?.id]);
+  useEffect(() => { if (resolvedAgencyId) setAgencyId(resolvedAgencyId); }, [resolvedAgencyId]);
   useEffect(() => { if (agencyId) fetchStaff(); }, [agencyId]);
-
-  const fetchAgencyId = async () => {
-    if (!user?.id) return;
-    const { data } = await supabase.from('agencies').select('id').eq('user_id', user.id).maybeSingle();
-    if (data) setAgencyId(data.id);
-  };
 
   const fetchStaff = async () => {
     if (!agencyId) return;

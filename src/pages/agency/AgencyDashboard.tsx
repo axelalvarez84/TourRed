@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, MapPin, Calendar, Users, DollarSign, Activity, AlertCircle, CreditCard } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useAgencyId } from '../../hooks/useAgencyId';
 import { formatCurrency, formatCurrencyMXN } from '../../utils/formatCurrency';
 import { supabase } from '../../lib/supabase';
 
@@ -18,6 +19,7 @@ interface DashboardStats {
 
 const AgencyDashboard: React.FC = () => {
   const { user, isAgencyStaff, staffInfo } = useAuth();
+  const { agencyId: hookAgencyId } = useAgencyId();
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
     totalTours: 0,
@@ -34,48 +36,16 @@ const AgencyDashboard: React.FC = () => {
   const [agencyId, setAgencyId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user?.id) {
-      fetchAgencyData();
+    if (hookAgencyId) {
+      fetchAgencyData(hookAgencyId);
     }
-  }, [user?.id, staffInfo?.agencyId]);
+  }, [hookAgencyId]);
 
-  const fetchAgencyData = async () => {
-    if (!user?.id) return;
-
+  const fetchAgencyData = async (resolvedAgencyId: string) => {
     try {
       setIsLoading(true);
       setError('');
 
-      console.log('🏢 Cargando datos de agencia para usuario:', user.id);
-
-      let resolvedAgencyId: string | null = null;
-
-      if (isAgencyStaff && staffInfo?.agencyId) {
-        resolvedAgencyId = staffInfo.agencyId;
-      } else {
-        // Primero obtener el ID de la agencia
-        const { data: agencyData, error: agencyError } = await supabase
-          .from('agencies')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
-
-        if (agencyError) {
-          if (agencyError.code === 'PGRST116') {
-            setError('No se encontró perfil de agencia para este usuario');
-            return;
-          }
-          throw new Error(agencyError.message);
-        }
-
-        if (!agencyData) {
-          setError('No se encontró perfil de agencia');
-          return;
-        }
-        resolvedAgencyId = agencyData.id;
-      }
-
-      console.log('✅ ID de agencia encontrado:', resolvedAgencyId);
       setAgencyId(resolvedAgencyId);
       const agencyData = { id: resolvedAgencyId };
 

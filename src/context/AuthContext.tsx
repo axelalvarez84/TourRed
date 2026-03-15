@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase, getCurrentUser, UserRole } from '../lib/supabase';
 
 export interface AdminPermissions {
@@ -50,6 +50,9 @@ interface AuthContextType {
   permissions: AdminPermissions | null;
   isAgencyStaff: boolean;
   staffInfo: AgencyStaffInfo | null;
+  allStaffInfo: AgencyStaffInfo[];
+  activeAgencyId: string | null;
+  switchActiveAgency: (agencyId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -64,6 +67,9 @@ const AuthContext = createContext<AuthContextType>({
   permissions: null,
   isAgencyStaff: false,
   staffInfo: null,
+  allStaffInfo: [],
+  activeAgencyId: null,
+  switchActiveAgency: () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -75,7 +81,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [permissions, setPermissions] = useState<AdminPermissions | null>(null);
-  const [staffInfo, setStaffInfo] = useState<AgencyStaffInfo | null>(null);
+  const [allStaffInfo, setAllStaffInfo] = useState<AgencyStaffInfo[]>([]);
+  const [activeAgencyId, setActiveAgencyId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('active_agency_id') || null;
+    } catch {
+      return null;
+    }
+  });
 
   const getCachedRole = (userId: string): UserRole | null => {
     try {
@@ -126,12 +139,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loadStaffInfo = async (userId: string): Promise<AgencyStaffInfo | null> => {
+  const loadStaffInfo = async (userId: string): Promise<AgencyStaffInfo[]> => {
     try {
       const { data, error } = await supabase.rpc('get_staff_with_permissions', { p_user_id: userId });
-      if (error || !data || data.length === 0) return null;
-      const row = data[0];
-      return {
+      if (error || !data || data.length === 0) return [];
+      return data.map((row: any) => ({
         staffId: row.staff_id,
         agencyId: row.agency_id,
         agencyName: row.agency_name,
@@ -148,11 +160,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           canViewMessages: row.can_view_messages,
           canManageDestinations: row.can_manage_destinations,
         }
-      };
+      }));
     } catch {
-      return null;
+      return [];
     }
   };
+
+  const switchActiveAgency = useCallback((agencyId: string) => {
+    setActiveAgencyId(agencyId);
+    try {
+      localStorage.setItem('active_agency_id', agencyId);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const determineUserRole = async (authUser: any, forceRefresh: boolean = false): Promise<{ role: UserRole; emailVerified: boolean }> => {
     if (!authUser) {
@@ -302,24 +323,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setIsSuperAdmin(false);
             setPermissions(null);
           }
-          setStaffInfo(null);
+          setAllStaffInfo([]);
         } else if (role === UserRole.TRAVELER) {
           setIsSuperAdmin(false);
           setPermissions(null);
-          // Verificar si este viajero es tambien coordinador de alguna agencia
           const staff = await loadStaffInfo(authUser.id);
-          setStaffInfo(staff);
+          setAllStaffInfo(staff);
+          if (staff.length > 0) {
+            setActiveAgencyId(prev => {
+              const isValid = staff.some(s => s.agencyId === prev);
+              if (!isValid) {
+                const firstId = staff[0].agencyId;
+                try { localStorage.setItem('active_agency_id', firstId); } catch {}
+                return firstId;
+              }
+              return prev;
+            });
+          }
         } else {
           setIsSuperAdmin(false);
           setPermissions(null);
-          setStaffInfo(null);
+          setAllStaffInfo([]);
         }
       } else {
         setUserRole(null);
         setIsEmailVerified(false);
         setIsSuperAdmin(false);
         setPermissions(null);
-        setStaffInfo(null);
+        setAllStaffInfo([]);
+        setActiveAgencyId(null);
         try {
           sessionStorage.removeItem('auth_state');
           localStorage.clear();
@@ -335,7 +367,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsEmailVerified(true);
           setIsSuperAdmin(true);
           setPermissions(null);
-          setStaffInfo(null);
+          setAllStaffInfo([]);
         } else {
           const cachedRole = getCachedRole(authUser.id);
           if (cachedRole) {
@@ -348,14 +380,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           setIsSuperAdmin(false);
           setPermissions(null);
-          setStaffInfo(null);
+          setAllStaffInfo([]);
         }
       } else {
         setUserRole(null);
         setIsEmailVerified(false);
         setIsSuperAdmin(false);
         setPermissions(null);
-        setStaffInfo(null);
+        setAllStaffInfo([]);
+        setActiveAgencyId(null);
       }
     } finally {
       console.log('✅ Finalizando carga - estableciendo isLoading: false');
@@ -432,7 +465,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLoading(false);
         setIsSuperAdmin(false);
         setPermissions(null);
-        setStaffInfo(null);
+        setAllStaffInfo([]);
+        setActiveAgencyId(null);
         try {
           sessionStorage.removeItem('auth_state');
         } catch (err) {
@@ -450,7 +484,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isAdmin = userRole === UserRole.ADMIN;
   const isAgency = userRole === UserRole.AGENCY;
   const isTraveler = userRole === UserRole.TRAVELER;
-  const isAgencyStaff = isTraveler && staffInfo !== null;
+  const isAgencyStaff = isTraveler && allStaffInfo.length > 0;
+
+  const staffInfo: AgencyStaffInfo | null = useMemo(() => {
+    if (allStaffInfo.length === 0) return null;
+    return allStaffInfo.find(s => s.agencyId === activeAgencyId) ?? allStaffInfo[0];
+  }, [allStaffInfo, activeAgencyId]);
 
   const contextValue = useMemo(() => ({
     user,
@@ -464,7 +503,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     permissions,
     isAgencyStaff,
     staffInfo,
-  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isEmailVerified, isSuperAdmin, permissions, isAgencyStaff, staffInfo]);
+    allStaffInfo,
+    activeAgencyId,
+    switchActiveAgency,
+  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isEmailVerified, isSuperAdmin, permissions, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency]);
 
   useEffect(() => {
     console.log('🎭 Estado del contexto actualizado:', {
@@ -478,9 +520,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       permissions,
       isAgencyStaff,
       staffInfo,
+      allStaffInfo: allStaffInfo.length,
+      activeAgencyId,
       isLoading
     });
-  }, [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isEmailVerified, isSuperAdmin, permissions, isAgencyStaff, staffInfo]);
+  }, [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isEmailVerified, isSuperAdmin, permissions, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId]);
 
   return (
     <AuthContext.Provider value={contextValue}>

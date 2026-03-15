@@ -9,9 +9,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import ReviewForm from '../../components/ReviewForm';
 import { exportTourReportToExcel, exportTourReportToPDF } from '../../utils/reportExports';
 import TourMassMessageModal from '../../components/TourMassMessageModal';
+import { useAgencyId } from '../../hooks/useAgencyId';
 
 const AgencyBookings: React.FC = () => {
   const { user } = useAuth();
+  const { agencyId: resolvedAgencyId, loading: agencyLoading } = useAgencyId();
   const navigate = useNavigate();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,55 +57,36 @@ const AgencyBookings: React.FC = () => {
   const [agencyName, setAgencyName] = useState<string>('');
 
   useEffect(() => {
-    if (user?.id) {
-      fetchAgencyData();
+    if (!agencyLoading && resolvedAgencyId) {
+      fetchAgencyData(resolvedAgencyId);
+    } else if (!agencyLoading && !resolvedAgencyId) {
+      setError('No se encontró perfil de agencia para este usuario');
+      setIsLoading(false);
     }
-  }, [user?.id]);
+  }, [resolvedAgencyId, agencyLoading]);
 
-  const fetchAgencyData = async () => {
-    if (!user?.id) return;
-
+  const fetchAgencyData = async (currentAgencyId: string) => {
     try {
       setIsLoading(true);
       setError('');
-      
-      console.log('🏢 Obteniendo ID de agencia para usuario:', user.id);
 
-      // Primero obtener el ID y nombre de la agencia
-      const { data: agencyData, error: agencyError } = await supabase
+      const { data: agencyMeta } = await supabase
         .from('agencies')
-        .select('id, name')
-        .eq('user_id', user.id)
-        .single();
+        .select('name')
+        .eq('id', currentAgencyId)
+        .maybeSingle();
 
-      if (agencyError) {
-        if (agencyError.code === 'PGRST116') {
-          setError('No se encontró perfil de agencia para este usuario');
-          return;
-        }
-        throw new Error(agencyError.message);
-      }
+      setAgencyId(currentAgencyId);
+      setAgencyName(agencyMeta?.name ?? '');
 
-      if (!agencyData) {
-        setError('No se encontró perfil de agencia');
-        return;
-      }
-
-      console.log('✅ ID de agencia encontrado:', agencyData.id);
-      setAgencyId(agencyData.id);
-      setAgencyName(agencyData.name);
-
-      // Obtener reservas de la agencia
-      const { data: bookingsData, error: bookingsError } = await getAgencyBookings(agencyData.id);
+      const { data: bookingsData, error: bookingsError } = await getAgencyBookings(currentAgencyId);
 
       if (bookingsError) {
         throw new Error(bookingsError.message);
       }
 
-      console.log('✅ Reservas de agencia cargadas:', bookingsData);
       setBookings(bookingsData || []);
 
-      // Load optional services for all bookings
       if (bookingsData && bookingsData.length > 0) {
         const ids = bookingsData.map((b: any) => b.id);
         const { data: optSvcs } = await supabase
@@ -121,18 +104,16 @@ const AgencyBookings: React.FC = () => {
         }
       }
 
-      // OPTIMIZED: Limit tours and only count IDs
       const { data: toursData, error: toursError } = await supabase
         .from('tours')
         .select('id, name, destination, start_date, end_date, tour_type')
-        .eq('agency_id', agencyData.id)
+        .eq('agency_id', currentAgencyId)
         .order('start_date', { ascending: false })
         .limit(50);
 
       if (!toursError && toursData) {
         const toursWithBookings = await Promise.all(
           toursData.map(async (tour) => {
-            // OPTIMIZED: Count only IDs instead of all columns
             const { count } = await supabase
               .from('bookings')
               .select('id', { count: 'exact', head: true })
@@ -146,7 +127,7 @@ const AgencyBookings: React.FC = () => {
         const toursFiltered = toursWithBookings.filter(t => t.bookingsCount > 0);
         setAvailableTours(toursFiltered);
       }
-      
+
     } catch (err: any) {
       console.error('❌ Error cargando reservas de agencia:', err);
       setError(err.message || 'Error al cargar las reservas');

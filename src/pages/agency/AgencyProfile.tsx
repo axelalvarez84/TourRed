@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Building, Mail, Phone, Globe, Star, CreditCard as Edit, Save, X, Upload, User, Calendar, MapPin } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { useAgencyId } from '../../hooks/useAgencyId';
 import ImageUploader from '../../components/ImageUploader';
 import ChangePasswordSection from '../../components/ChangePasswordSection';
 
@@ -38,6 +39,7 @@ interface AgencyProfile {
 
 const AgencyProfile: React.FC = () => {
   const { user } = useAuth();
+  const { agencyId: resolvedAgencyId } = useAgencyId();
   const [agency, setAgency] = useState<AgencyProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -73,38 +75,33 @@ const AgencyProfile: React.FC = () => {
   });
 
   useEffect(() => {
-    fetchAgencyProfile();
-  }, [user?.id]);
+    if (resolvedAgencyId) {
+      fetchAgencyProfile(resolvedAgencyId);
+    }
+  }, [resolvedAgencyId]);
 
-  const fetchAgencyProfile = async () => {
-    if (!user?.id) return;
-
+  const fetchAgencyProfile = async (currentAgencyId: string) => {
     try {
       setIsLoading(true);
       setError('');
 
-      console.log('🏢 Cargando perfil de agencia para usuario:', user.id);
-
-      // Obtener perfil de agencia con información del usuario
       const { data: agencyData, error: agencyError } = await supabase
         .from('agencies')
         .select(`
           *,
           users(first_name, last_name, email)
         `)
-        .eq('user_id', user.id)
-        .single();
+        .eq('id', currentAgencyId)
+        .maybeSingle();
 
       if (agencyError) {
-        if (agencyError.code === 'PGRST116') {
-          // No se encontró perfil de agencia
-          setError('No se encontró un perfil de agencia para este usuario. ¿Necesitas registrarte como agencia?');
-          return;
-        }
         throw new Error(agencyError.message);
       }
 
-      console.log('✅ Perfil de agencia cargado:', agencyData);
+      if (!agencyData) {
+        setError('No se encontró un perfil de agencia para este usuario.');
+        return;
+      }
 
       // Obtener estadísticas
       const [toursResult, bookingsResult] = await Promise.all([

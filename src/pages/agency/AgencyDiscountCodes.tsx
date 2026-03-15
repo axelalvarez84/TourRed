@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Ticket, Plus, Edit2, Trash2, Eye, Percent, DollarSign, Calendar, Users, AlertCircle, CheckCircle, XCircle, Search, Globe, Target } from 'lucide-react';
+import { Ticket, Plus, CreditCard as Edit2, Trash2, Eye, Percent, DollarSign, Calendar, Users, AlertCircle, CheckCircle, XCircle, Search, Globe, Target } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useAgencyId } from '../../hooks/useAgencyId';
 import { AgencyDiscountCode, AgencyTour } from '../../types';
 
 interface UsageRecord {
@@ -14,6 +15,7 @@ interface UsageRecord {
 
 export default function AgencyDiscountCodes() {
   const { user } = useAuth();
+  const { agencyId: resolvedAgencyId } = useAgencyId();
   const [codes, setCodes] = useState<AgencyDiscountCode[]>([]);
   const [agencyId, setAgencyId] = useState<string | null>(null);
   const [agencyTours, setAgencyTours] = useState<AgencyTour[]>([]);
@@ -43,8 +45,10 @@ export default function AgencyDiscountCodes() {
   });
 
   useEffect(() => {
-    fetchAgencyData();
-  }, [user?.id]);
+    if (resolvedAgencyId) {
+      setAgencyId(resolvedAgencyId);
+    }
+  }, [resolvedAgencyId]);
 
   useEffect(() => {
     if (agencyId) {
@@ -52,23 +56,6 @@ export default function AgencyDiscountCodes() {
       fetchAgencyTours();
     }
   }, [agencyId]);
-
-  const fetchAgencyData = async () => {
-    if (!user?.id) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('agencies')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error) throw error;
-      setAgencyId(data.id);
-    } catch (err) {
-      console.error('Error fetching agency data:', err);
-    }
-  };
 
   const fetchAgencyTours = async () => {
     if (!agencyId) return;
