@@ -124,6 +124,8 @@ const NotificationsPage: React.FC = () => {
         return <MessageSquare className="h-5 w-5 text-blue-500" />;
       case 'tour_announcement':
         return <Building2 className="h-5 w-5 text-blue-600" />;
+      case 'system_announcement':
+        return <Bell className="h-5 w-5 text-orange-500" />;
       default:
         return <Bell className="h-5 w-5 text-gray-500" />;
     }
@@ -145,6 +147,7 @@ const NotificationsPage: React.FC = () => {
       case 'tour_updated':
         return `/tours/${data.tour_id}`;
       case 'tour_announcement':
+      case 'system_announcement':
         return null;
       default:
         return '#';
@@ -171,6 +174,8 @@ const NotificationsPage: React.FC = () => {
         return 'Anuncio del Sistema';
       case 'tour_announcement':
         return 'Mensaje de Agencia';
+      case 'system_announcement':
+        return 'Comunicado ToursRed';
       default:
         return type;
     }
@@ -290,9 +295,9 @@ const NotificationsPage: React.FC = () => {
                 key={notification.id}
                 className={`bg-blue-100 rounded-lg shadow-md overflow-hidden transition-all ${
                   !notification.is_read ? 'border-l-4 border-primary-500' : ''
-                } ${notification.type === 'tour_announcement' ? 'cursor-pointer' : ''}`}
+                } ${(notification.type === 'tour_announcement' || notification.type === 'system_announcement') ? 'cursor-pointer' : ''}`}
                 onClick={() => {
-                  if (notification.type === 'tour_announcement') {
+                  if (notification.type === 'tour_announcement' || notification.type === 'system_announcement') {
                     if (!notification.is_read) markAsRead(notification.id);
                     setDetailNotification(notification);
                   }
@@ -336,10 +341,11 @@ const NotificationsPage: React.FC = () => {
                         {notification.message}
                       </p>
                       <div className="mt-3">
-                        {notification.type === 'tour_announcement' ? (
+                        {(notification.type === 'tour_announcement' || notification.type === 'system_announcement') ? (
                           <button
                             className="text-sm text-primary-600 hover:text-primary-800"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               if (!notification.is_read) markAsRead(notification.id);
                               setDetailNotification(notification);
                             }}
@@ -375,13 +381,15 @@ const NotificationsPage: React.FC = () => {
             <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-auto">
               <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-                    <Building2 className="h-5 w-5 text-blue-600" />
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${detailNotification.type === 'system_announcement' ? 'bg-orange-50' : 'bg-blue-50'}`}>
+                    {detailNotification.type === 'system_announcement'
+                      ? <Bell className="h-5 w-5 text-orange-500" />
+                      : <Building2 className="h-5 w-5 text-blue-600" />}
                   </div>
                   <div>
                     <h2 className="text-base font-bold text-gray-900 leading-tight">{detailNotification.title}</h2>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {detailNotification.data?.agency_name as string || 'Agencia'} · {formatDate(detailNotification.created_at)}
+                      {detailNotification.type === 'system_announcement' ? 'ToursRed' : (detailNotification.data?.agency_name as string || 'Agencia')} · {formatDate(detailNotification.created_at)}
                     </p>
                   </div>
                 </div>

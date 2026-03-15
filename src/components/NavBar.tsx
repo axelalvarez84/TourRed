@@ -144,6 +144,7 @@ const NavBar: React.FC = () => {
       menuItems.push({ to: '/admin/referrals', label: 'Referidos' });
       menuItems.push({ to: '/admin/promotions', label: 'Promociones' });
       menuItems.push({ to: '/admin/tour-messages', label: 'Mensajes de Agencias' });
+      menuItems.push({ to: '/admin/broadcast-messages', label: 'Mensajes Masivos' });
 
       return menuItems;
     }

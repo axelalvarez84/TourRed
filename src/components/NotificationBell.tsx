@@ -166,6 +166,8 @@ const NotificationBell: React.FC = () => {
         return <MessageSquare className="h-5 w-5 text-blue-500" />;
       case 'tour_announcement':
         return <Building2 className="h-5 w-5 text-blue-600" />;
+      case 'system_announcement':
+        return <Bell className="h-5 w-5 text-orange-500" />;
       default:
         return <Bell className="h-5 w-5 text-gray-500" />;
     }
@@ -187,6 +189,7 @@ const NotificationBell: React.FC = () => {
       case 'tour_updated':
         return `/tours/${data.tour_id}`;
       case 'tour_announcement':
+      case 'system_announcement':
         return null;
       default:
         return '#';
@@ -196,7 +199,7 @@ const NotificationBell: React.FC = () => {
   const handleNotificationClick = (notification: Notification) => {
     if (!notification.is_read) markAsRead(notification.id);
 
-    if (notification.type === 'tour_announcement') {
+    if (notification.type === 'tour_announcement' || notification.type === 'system_announcement') {
       setIsOpen(false);
       setDetailNotification(notification);
       return;
@@ -317,13 +320,15 @@ const NotificationBell: React.FC = () => {
             <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-auto">
               <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-                    <Building2 className="h-5 w-5 text-blue-600" />
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${detailNotification.type === 'system_announcement' ? 'bg-orange-50' : 'bg-blue-50'}`}>
+                    {detailNotification.type === 'system_announcement'
+                      ? <Bell className="h-5 w-5 text-orange-500" />
+                      : <Building2 className="h-5 w-5 text-blue-600" />}
                   </div>
                   <div>
                     <h2 className="text-base font-bold text-gray-900 leading-tight">{detailNotification.title}</h2>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {(detailNotification.data?.agency_name as string) || 'Agencia'} · {formatTimeAgo(detailNotification.created_at)}
+                      {detailNotification.type === 'system_announcement' ? 'ToursRed' : ((detailNotification.data?.agency_name as string) || 'Agencia')} · {formatTimeAgo(detailNotification.created_at)}
                     </p>
                   </div>
                 </div>
