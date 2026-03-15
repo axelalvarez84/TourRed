@@ -195,7 +195,7 @@ const NavBar: React.FC = () => {
       const items: { to: string; label: string }[] = [
         { to: '/agency/dashboard', label: 'Panel' },
       ];
-      if (staffInfo.permissions.canManageTours) items.push({ to: '/agency/tours', label: 'Tours' });
+      if (staffInfo.permissions.canViewTours || staffInfo.permissions.canEditTours || staffInfo.permissions.canManageTours) items.push({ to: '/agency/tours', label: 'Tours' });
       if (staffInfo.permissions.canManageDestinations) items.push({ to: '/agency/destinations', label: 'Destinos' });
       if (staffInfo.permissions.canViewBookings) items.push({ to: '/agency/bookings', label: 'Reservas' });
       if (staffInfo.permissions.canManageDiscountCodes) items.push({ to: '/agency/discount-codes', label: 'Codigos Descuento' });

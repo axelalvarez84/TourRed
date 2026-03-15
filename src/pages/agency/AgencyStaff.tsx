@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, UserCheck, UserX, CreditCard as Edit2, Search, Shield, ChevronDown, ChevronUp, AlertCircle, CheckCircle, X, Loader2 } from 'lucide-react';
+import { Users, Plus, UserCheck, UserX, CreditCard as Edit2, Search, Shield, ChevronDown, ChevronUp, AlertCircle, CheckCircle, X, Loader2, Eye, Pencil, Settings } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -20,6 +20,8 @@ interface StaffMember {
     id: string;
     can_scan_checkin: boolean;
     can_view_bookings: boolean;
+    can_view_tours: boolean;
+    can_edit_tours: boolean;
     can_manage_tours: boolean;
     can_view_financials: boolean;
     can_view_reports: boolean;
@@ -29,10 +31,12 @@ interface StaffMember {
   } | null;
 }
 
+type TourPermLevel = 'none' | 'view' | 'edit' | 'manage';
+
 interface PermissionsForm {
   can_scan_checkin: boolean;
   can_view_bookings: boolean;
-  can_manage_tours: boolean;
+  tour_level: TourPermLevel;
   can_view_financials: boolean;
   can_view_reports: boolean;
   can_manage_discount_codes: boolean;
@@ -43,7 +47,7 @@ interface PermissionsForm {
 const defaultPermissions: PermissionsForm = {
   can_scan_checkin: false,
   can_view_bookings: false,
-  can_manage_tours: false,
+  tour_level: 'none',
   can_view_financials: false,
   can_view_reports: false,
   can_manage_discount_codes: false,
@@ -51,27 +55,49 @@ const defaultPermissions: PermissionsForm = {
   can_manage_destinations: false,
 };
 
-const permissionLabels: Record<keyof PermissionsForm, string> = {
-  can_scan_checkin: 'Escanear Check-in QR',
-  can_view_bookings: 'Ver Reservas',
-  can_manage_tours: 'Gestionar Tours',
-  can_view_financials: 'Ver Finanzas',
-  can_view_reports: 'Ver Reportes',
-  can_manage_discount_codes: 'Gestionar Codigos de Descuento',
-  can_view_messages: 'Ver Mensajes',
-  can_manage_destinations: 'Gestionar Destinos',
-};
+const tourLevels: { value: TourPermLevel; label: string; description: string; icon: React.ReactNode }[] = [
+  { value: 'none', label: 'Sin acceso', description: 'No puede ver ni acceder al modulo de tours', icon: <X className="w-4 h-4" /> },
+  { value: 'view', label: 'Solo ver', description: 'Puede ver el listado y detalles de los tours, sin modificar nada', icon: <Eye className="w-4 h-4" /> },
+  { value: 'edit', label: 'Ver y editar', description: 'Puede editar tours existentes pero no crear ni eliminarlos', icon: <Pencil className="w-4 h-4" /> },
+  { value: 'manage', label: 'Gestion completa', description: 'Puede crear, editar y eliminar tours', icon: <Settings className="w-4 h-4" /> },
+];
 
-const permissionDescriptions: Record<keyof PermissionsForm, string> = {
-  can_scan_checkin: 'Puede confirmar asistencia de viajeros mediante codigo QR',
-  can_view_bookings: 'Puede ver el listado de reservas y sus detalles',
-  can_manage_tours: 'Puede crear, editar y gestionar los tours de la agencia',
-  can_view_financials: 'Puede ver los estados de cuenta y registros financieros',
-  can_view_reports: 'Puede acceder a los reportes de actividad',
-  can_manage_discount_codes: 'Puede crear y gestionar codigos de descuento',
-  can_view_messages: 'Puede leer y responder mensajes de la agencia',
-  can_manage_destinations: 'Puede crear y gestionar los destinos de la agencia',
-};
+interface SimplePermission {
+  key: keyof Omit<PermissionsForm, 'tour_level'>;
+  label: string;
+  description: string;
+}
+
+const simplePermissions: SimplePermission[] = [
+  { key: 'can_scan_checkin', label: 'Escanear Check-in QR', description: 'Confirmar asistencia de viajeros mediante codigo QR' },
+  { key: 'can_view_bookings', label: 'Ver Reservas', description: 'Ver el listado de reservas y sus detalles' },
+  { key: 'can_view_financials', label: 'Ver Finanzas', description: 'Ver estados de cuenta y registros financieros' },
+  { key: 'can_view_reports', label: 'Ver Reportes', description: 'Acceder a los reportes de actividad' },
+  { key: 'can_manage_discount_codes', label: 'Gestionar Codigos de Descuento', description: 'Crear y gestionar codigos de descuento' },
+  { key: 'can_view_messages', label: 'Ver Mensajes', description: 'Leer y responder mensajes de la agencia' },
+  { key: 'can_manage_destinations', label: 'Gestionar Destinos', description: 'Crear y gestionar los destinos de la agencia' },
+];
+
+function tourLevelFromPerms(p: StaffMember['permissions']): TourPermLevel {
+  if (!p) return 'none';
+  if (p.can_manage_tours) return 'manage';
+  if (p.can_edit_tours) return 'edit';
+  if (p.can_view_tours) return 'view';
+  return 'none';
+}
+
+function tourLevelToDbFields(level: TourPermLevel) {
+  return {
+    can_view_tours: level === 'view' || level === 'edit' || level === 'manage',
+    can_edit_tours: level === 'edit' || level === 'manage',
+    can_manage_tours: level === 'manage',
+  };
+}
+
+function tourLevelLabel(p: StaffMember['permissions']): string {
+  const level = tourLevelFromPerms(p);
+  return tourLevels.find(l => l.value === level)?.label ?? 'Sin acceso';
+}
 
 export default function AgencyStaff() {
   const { user, isAgencyStaff } = useAuth();
@@ -94,52 +120,36 @@ export default function AgencyStaff() {
   const [permissions, setPermissions] = useState<PermissionsForm>({ ...defaultPermissions });
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    fetchAgencyId();
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (agencyId) fetchStaff();
-  }, [agencyId]);
+  useEffect(() => { fetchAgencyId(); }, [user?.id]);
+  useEffect(() => { if (agencyId) fetchStaff(); }, [agencyId]);
 
   const fetchAgencyId = async () => {
     if (!user?.id) return;
-    try {
-      const { data, error } = await supabase
-        .from('agencies')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (error) throw error;
-      if (data) setAgencyId(data.id);
-    } catch (err) {
-      console.error('Error fetching agency:', err);
-    }
+    const { data } = await supabase.from('agencies').select('id').eq('user_id', user.id).maybeSingle();
+    if (data) setAgencyId(data.id);
   };
 
   const fetchStaff = async () => {
     if (!agencyId) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error: err } = await supabase
         .from('agency_staff')
         .select(`
           id, user_id, title, is_active, linked_at, unlinked_at,
           user:users!agency_staff_user_id_fkey(first_name, last_name, email, profile_picture_url),
-          permissions:agency_staff_permissions(id, can_scan_checkin, can_view_bookings, can_manage_tours, can_view_financials, can_view_reports, can_manage_discount_codes, can_view_messages, can_manage_destinations)
+          permissions:agency_staff_permissions(id, can_scan_checkin, can_view_bookings, can_view_tours, can_edit_tours, can_manage_tours, can_view_financials, can_view_reports, can_manage_discount_codes, can_view_messages, can_manage_destinations)
         `)
         .eq('agency_id', agencyId)
         .order('linked_at', { ascending: false });
-
-      if (error) throw error;
-      const mapped = (data || []).map((s: any) => ({
+      if (err) throw err;
+      setStaffList((data || []).map((s: any) => ({
         ...s,
         user: Array.isArray(s.user) ? s.user[0] : s.user,
         permissions: Array.isArray(s.permissions) ? s.permissions[0] || null : s.permissions,
-      }));
-      setStaffList(mapped);
-    } catch (err) {
-      console.error('Error fetching staff:', err);
+      })));
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -151,134 +161,91 @@ export default function AgencyStaff() {
     setUserSearchError('');
     setFoundUser(null);
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('users')
         .select('id, first_name, last_name, email')
         .eq('email', emailSearch.trim().toLowerCase())
         .maybeSingle();
-      if (error) throw error;
-      if (!data) {
-        setUserSearchError('No se encontro un usuario con ese correo electronico.');
-        return;
-      }
-      const alreadyLinked = staffList.find(s => s.user_id === data.id && s.is_active);
-      if (alreadyLinked) {
-        setUserSearchError('Este usuario ya es coordinador activo de tu agencia.');
-        return;
+      if (!data) { setUserSearchError('No se encontro un usuario con ese correo.'); return; }
+      if (staffList.find(s => s.user_id === data.id && s.is_active)) {
+        setUserSearchError('Este usuario ya es coordinador activo de tu agencia.'); return;
       }
       setFoundUser(data);
-    } catch {
-      setUserSearchError('Error al buscar el usuario. Intenta de nuevo.');
-    } finally {
-      setSearchingUser(false);
-    }
+    } catch { setUserSearchError('Error al buscar el usuario. Intenta de nuevo.'); }
+    finally { setSearchingUser(false); }
   };
 
   const openAddModal = () => {
-    setEditingStaff(null);
-    setEmailSearch('');
-    setFoundUser(null);
-    setUserSearchError('');
-    setTitle('Coordinador');
-    setPermissions({ ...defaultPermissions });
-    setError('');
-    setShowModal(true);
+    setEditingStaff(null); setEmailSearch(''); setFoundUser(null);
+    setUserSearchError(''); setTitle('Coordinador');
+    setPermissions({ ...defaultPermissions }); setError(''); setShowModal(true);
   };
 
   const openEditModal = (staff: StaffMember) => {
-    setEditingStaff(staff);
-    setEmailSearch(staff.user.email);
-    setFoundUser(null);
-    setUserSearchError('');
-    setTitle(staff.title);
-    if (staff.permissions) {
-      setPermissions({
-        can_scan_checkin: staff.permissions.can_scan_checkin,
-        can_view_bookings: staff.permissions.can_view_bookings,
-        can_manage_tours: staff.permissions.can_manage_tours,
-        can_view_financials: staff.permissions.can_view_financials,
-        can_view_reports: staff.permissions.can_view_reports,
-        can_manage_discount_codes: staff.permissions.can_manage_discount_codes,
-        can_view_messages: staff.permissions.can_view_messages,
-        can_manage_destinations: staff.permissions.can_manage_destinations,
-      });
-    } else {
-      setPermissions({ ...defaultPermissions });
-    }
-    setError('');
-    setShowModal(true);
+    setEditingStaff(staff); setEmailSearch(staff.user.email);
+    setFoundUser(null); setUserSearchError(''); setTitle(staff.title);
+    setPermissions({
+      can_scan_checkin: staff.permissions?.can_scan_checkin ?? false,
+      can_view_bookings: staff.permissions?.can_view_bookings ?? false,
+      tour_level: tourLevelFromPerms(staff.permissions),
+      can_view_financials: staff.permissions?.can_view_financials ?? false,
+      can_view_reports: staff.permissions?.can_view_reports ?? false,
+      can_manage_discount_codes: staff.permissions?.can_manage_discount_codes ?? false,
+      can_view_messages: staff.permissions?.can_view_messages ?? false,
+      can_manage_destinations: staff.permissions?.can_manage_destinations ?? false,
+    });
+    setError(''); setShowModal(true);
+  };
+
+  const buildDbPerms = () => {
+    const { tour_level, ...rest } = permissions;
+    return { ...rest, ...tourLevelToDbFields(tour_level) };
   };
 
   const handleSave = async () => {
     if (!agencyId) return;
-    setSaving(true);
-    setError('');
+    setSaving(true); setError('');
     try {
+      const dbPerms = buildDbPerms();
       if (editingStaff) {
-        const { error: titleError } = await supabase
-          .from('agency_staff')
-          .update({ title })
-          .eq('id', editingStaff.id);
-        if (titleError) throw titleError;
-
+        await supabase.from('agency_staff').update({ title }).eq('id', editingStaff.id);
         if (editingStaff.permissions) {
-          const { error: permError } = await supabase
-            .from('agency_staff_permissions')
-            .update({ ...permissions, updated_at: new Date().toISOString() })
+          await supabase.from('agency_staff_permissions')
+            .update({ ...dbPerms, updated_at: new Date().toISOString() })
             .eq('staff_id', editingStaff.id);
-          if (permError) throw permError;
         } else {
-          const { error: permError } = await supabase
-            .from('agency_staff_permissions')
-            .insert({ staff_id: editingStaff.id, ...permissions });
-          if (permError) throw permError;
+          await supabase.from('agency_staff_permissions')
+            .insert({ staff_id: editingStaff.id, ...dbPerms });
         }
         setSuccess('Permisos actualizados correctamente.');
       } else {
-        if (!foundUser) {
-          setError('Busca y selecciona un usuario primero.');
-          setSaving(false);
-          return;
-        }
-
-        const existingInactive = staffList.find(s => s.user_id === foundUser.id && !s.is_active);
+        if (!foundUser) { setError('Busca y selecciona un usuario primero.'); setSaving(false); return; }
+        const existing = staffList.find(s => s.user_id === foundUser.id && !s.is_active);
         let staffId: string;
-
-        if (existingInactive) {
-          const { error: reactivateError } = await supabase
-            .from('agency_staff')
+        if (existing) {
+          await supabase.from('agency_staff')
             .update({ is_active: true, title, linked_at: new Date().toISOString(), unlinked_at: null })
-            .eq('id', existingInactive.id);
-          if (reactivateError) throw reactivateError;
-          staffId = existingInactive.id;
-
-          if (existingInactive.permissions) {
-            await supabase.from('agency_staff_permissions').update({ ...permissions }).eq('staff_id', staffId);
+            .eq('id', existing.id);
+          staffId = existing.id;
+          if (existing.permissions) {
+            await supabase.from('agency_staff_permissions').update({ ...dbPerms }).eq('staff_id', staffId);
           } else {
-            await supabase.from('agency_staff_permissions').insert({ staff_id: staffId, ...permissions });
+            await supabase.from('agency_staff_permissions').insert({ staff_id: staffId, ...dbPerms });
           }
         } else {
-          const { data: newStaff, error: staffError } = await supabase
-            .from('agency_staff')
+          const { data: ns } = await supabase.from('agency_staff')
             .insert({ agency_id: agencyId, user_id: foundUser.id, title, is_active: true })
-            .select('id')
-            .single();
-          if (staffError) throw staffError;
-          staffId = newStaff.id;
-
-          const { error: permError } = await supabase
-            .from('agency_staff_permissions')
-            .insert({ staff_id: staffId, ...permissions });
-          if (permError) throw permError;
+            .select('id').single();
+          staffId = ns.id;
+          await supabase.from('agency_staff_permissions').insert({ staff_id: staffId, ...dbPerms });
         }
         setSuccess('Coordinador vinculado correctamente.');
       }
-
       setShowModal(false);
       await fetchStaff();
       setTimeout(() => setSuccess(''), 3000);
-    } catch (err: any) {
-      setError(err.message || 'Error al guardar los cambios.');
+    } catch (e: any) {
+      setError(e.message || 'Error al guardar.');
     } finally {
       setSaving(false);
     }
@@ -286,39 +253,29 @@ export default function AgencyStaff() {
 
   const handleUnlink = async (staff: StaffMember) => {
     if (!confirm(`Desvincular a ${staff.user.first_name} ${staff.user.last_name} como coordinador?`)) return;
-    try {
-      const { error } = await supabase
-        .from('agency_staff')
-        .update({ is_active: false, unlinked_at: new Date().toISOString() })
-        .eq('id', staff.id);
-      if (error) throw error;
-      setSuccess('Coordinador desvinculado.');
-      await fetchStaff();
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err: any) {
-      setError(err.message);
-    }
+    await supabase.from('agency_staff')
+      .update({ is_active: false, unlinked_at: new Date().toISOString() }).eq('id', staff.id);
+    setSuccess('Coordinador desvinculado.');
+    await fetchStaff();
+    setTimeout(() => setSuccess(''), 3000);
   };
 
   const handleRelink = async (staff: StaffMember) => {
-    try {
-      const { error } = await supabase
-        .from('agency_staff')
-        .update({ is_active: true, linked_at: new Date().toISOString(), unlinked_at: null })
-        .eq('id', staff.id);
-      if (error) throw error;
-      setSuccess('Coordinador reactivado.');
-      await fetchStaff();
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err: any) {
-      setError(err.message);
-    }
+    await supabase.from('agency_staff')
+      .update({ is_active: true, linked_at: new Date().toISOString(), unlinked_at: null }).eq('id', staff.id);
+    setSuccess('Coordinador reactivado.');
+    await fetchStaff();
+    setTimeout(() => setSuccess(''), 3000);
   };
 
   const toggleGrantAll = () => {
-    const allGranted = Object.values(permissions).every(Boolean);
-    const newVal = !allGranted;
-    setPermissions(Object.fromEntries(Object.keys(defaultPermissions).map(k => [k, newVal])) as PermissionsForm);
+    const allSimple = simplePermissions.every(p => permissions[p.key]);
+    const allGranted = allSimple && permissions.tour_level === 'manage';
+    if (allGranted) {
+      setPermissions({ ...Object.fromEntries(simplePermissions.map(p => [p.key, false])), tour_level: 'none' } as PermissionsForm);
+    } else {
+      setPermissions({ ...Object.fromEntries(simplePermissions.map(p => [p.key, true])), tour_level: 'manage' } as PermissionsForm);
+    }
   };
 
   const filteredStaff = staffList.filter(s => {
@@ -328,10 +285,8 @@ export default function AgencyStaff() {
   });
 
   const activeCount = staffList.filter(s => s.is_active).length;
-
   const formatDate = (d: string) => new Date(d).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' });
-
-  const initials = (staff: StaffMember) => `${staff.user.first_name?.[0] || ''}${staff.user.last_name?.[0] || ''}`.toUpperCase();
+  const initials = (s: StaffMember) => `${s.user.first_name?.[0] || ''}${s.user.last_name?.[0] || ''}`.toUpperCase();
 
   if (isAgencyStaff) {
     return (
@@ -345,6 +300,8 @@ export default function AgencyStaff() {
     );
   }
 
+  const allGranted = simplePermissions.every(p => permissions[p.key]) && permissions.tour_level === 'manage';
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
@@ -356,25 +313,19 @@ export default function AgencyStaff() {
               {activeCount} coordinador{activeCount !== 1 ? 'es' : ''} activo{activeCount !== 1 ? 's' : ''}
             </p>
           </div>
-          <button
-            onClick={openAddModal}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Agregar coordinador
+          <button onClick={openAddModal} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors text-sm">
+            <Plus className="w-4 h-4" /> Agregar coordinador
           </button>
         </div>
 
         {success && (
           <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-800 rounded-lg px-4 py-3 mb-6 text-sm">
-            <CheckCircle className="w-4 h-4 flex-shrink-0" />
-            {success}
+            <CheckCircle className="w-4 h-4 flex-shrink-0" /> {success}
           </div>
         )}
         {error && (
           <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-800 rounded-lg px-4 py-3 mb-6 text-sm">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            {error}
+            <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
             <button onClick={() => setError('')} className="ml-auto"><X className="w-4 h-4" /></button>
           </div>
         )}
@@ -383,19 +334,11 @@ export default function AgencyStaff() {
           <div className="flex flex-col sm:flex-row gap-3 p-4 border-b border-gray-100">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Buscar coordinador..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
+              <input type="text" placeholder="Buscar coordinador..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
             </div>
-            <select
-              value={filterActive}
-              onChange={e => setFilterActive(e.target.value as any)}
-              className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
-            >
+            <select value={filterActive} onChange={e => setFilterActive(e.target.value as any)}
+              className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
               <option value="all">Todos</option>
               <option value="active">Activos</option>
               <option value="inactive">Inactivos</option>
@@ -403,9 +346,7 @@ export default function AgencyStaff() {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-            </div>
+            <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div>
           ) : filteredStaff.length === 0 ? (
             <div className="text-center py-16">
               <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -418,9 +359,9 @@ export default function AgencyStaff() {
                 <div key={staff.id} className="p-4">
                   <div className="flex items-start gap-4">
                     <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-700 font-semibold text-sm flex items-center justify-center flex-shrink-0 overflow-hidden">
-                      {staff.user.profile_picture_url ? (
-                        <img src={staff.user.profile_picture_url} alt="" className="w-full h-full object-cover" />
-                      ) : initials(staff)}
+                      {staff.user.profile_picture_url
+                        ? <img src={staff.user.profile_picture_url} alt="" className="w-full h-full object-cover" />
+                        : initials(staff)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -431,55 +372,58 @@ export default function AgencyStaff() {
                       </div>
                       <p className="text-gray-500 text-xs mt-0.5">{staff.user.email}</p>
                       <p className="text-gray-600 text-xs mt-0.5">{staff.title} &bull; Vinculado {formatDate(staff.linked_at)}</p>
-                      {!staff.is_active && staff.unlinked_at && (
-                        <p className="text-gray-400 text-xs">Desvinculado {formatDate(staff.unlinked_at)}</p>
-                      )}
+                      {!staff.is_active && staff.unlinked_at && <p className="text-gray-400 text-xs">Desvinculado {formatDate(staff.unlinked_at)}</p>}
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {staff.is_active && (
                         <>
-                          <button
-                            onClick={() => setExpandedStaff(expandedStaff === staff.id ? null : staff.id)}
-                            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                            title="Ver permisos"
-                          >
+                          <button onClick={() => setExpandedStaff(expandedStaff === staff.id ? null : staff.id)}
+                            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Ver permisos">
                             {expandedStaff === staff.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                           </button>
-                          <button
-                            onClick={() => openEditModal(staff)}
-                            className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                            title="Editar permisos"
-                          >
+                          <button onClick={() => openEditModal(staff)}
+                            className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="Editar">
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => handleUnlink(staff)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Desvincular"
-                          >
+                          <button onClick={() => handleUnlink(staff)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Desvincular">
                             <UserX className="w-4 h-4" />
                           </button>
                         </>
                       )}
                       {!staff.is_active && (
-                        <button
-                          onClick={() => handleRelink(staff)}
-                          className="px-3 py-1.5 text-xs font-medium text-primary-600 border border-primary-200 hover:bg-primary-50 rounded-lg transition-colors"
-                        >
+                        <button onClick={() => handleRelink(staff)}
+                          className="px-3 py-1.5 text-xs font-medium text-primary-600 border border-primary-200 hover:bg-primary-50 rounded-lg transition-colors">
                           Reactivar
                         </button>
                       )}
                     </div>
                   </div>
 
-                  {expandedStaff === staff.id && staff.permissions && (
-                    <div className="mt-4 ml-14 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {(Object.keys(permissionLabels) as (keyof PermissionsForm)[]).map(key => (
-                        <div key={key} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs ${staff.permissions![key] ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-400'}`}>
-                          {staff.permissions![key] ? <CheckCircle className="w-3 h-3 flex-shrink-0" /> : <X className="w-3 h-3 flex-shrink-0" />}
-                          <span>{permissionLabels[key]}</span>
+                  {expandedStaff === staff.id && (
+                    <div className="mt-4 ml-14 space-y-3">
+                      <div className="p-3 rounded-lg border border-gray-100 bg-gray-50">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tours</p>
+                        <div className="flex items-center gap-2">
+                          {tourLevelFromPerms(staff.permissions) === 'none'
+                            ? <X className="w-3.5 h-3.5 text-gray-400" />
+                            : <CheckCircle className="w-3.5 h-3.5 text-green-600" />}
+                          <span className={`text-xs font-medium ${tourLevelFromPerms(staff.permissions) === 'none' ? 'text-gray-400' : 'text-green-700'}`}>
+                            {tourLevelLabel(staff.permissions)}
+                          </span>
                         </div>
-                      ))}
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {simplePermissions.map(sp => {
+                          const granted = staff.permissions?.[sp.key] ?? false;
+                          return (
+                            <div key={sp.key} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs ${granted ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-400'}`}>
+                              {granted ? <CheckCircle className="w-3 h-3 flex-shrink-0" /> : <X className="w-3 h-3 flex-shrink-0" />}
+                              <span>{sp.label}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -504,8 +448,7 @@ export default function AgencyStaff() {
             <div className="p-6 space-y-6">
               {error && (
                 <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  {error}
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
                 </div>
               )}
 
@@ -515,28 +458,18 @@ export default function AgencyStaff() {
                   <p className="text-gray-900 font-medium text-sm bg-gray-50 px-3 py-2 rounded-lg">{editingStaff.user.email}</p>
                 ) : (
                   <div className="flex gap-2">
-                    <input
-                      type="email"
-                      value={emailSearch}
+                    <input type="email" value={emailSearch}
                       onChange={e => { setEmailSearch(e.target.value); setFoundUser(null); setUserSearchError(''); }}
                       placeholder="correo@ejemplo.com"
                       className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      onKeyDown={e => e.key === 'Enter' && handleSearchUser()}
-                    />
-                    <button
-                      onClick={handleSearchUser}
-                      disabled={searchingUser || !emailSearch.trim()}
-                      className="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors flex items-center gap-1"
-                    >
-                      {searchingUser ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                      Buscar
+                      onKeyDown={e => e.key === 'Enter' && handleSearchUser()} />
+                    <button onClick={handleSearchUser} disabled={searchingUser || !emailSearch.trim()}
+                      className="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors flex items-center gap-1">
+                      {searchingUser ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} Buscar
                     </button>
                   </div>
                 )}
-
-                {userSearchError && (
-                  <p className="text-red-600 text-xs mt-2 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{userSearchError}</p>
-                )}
+                {userSearchError && <p className="text-red-600 text-xs mt-2 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{userSearchError}</p>}
                 {foundUser && (
                   <div className="mt-2 flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
                     <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
@@ -550,56 +483,69 @@ export default function AgencyStaff() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Cargo / Titulo</label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
+                <input type="text" value={title} onChange={e => setTitle(e.target.value)}
                   placeholder="ej. Coordinador, Guia, Supervisor..."
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-4">
                   <label className="text-sm font-medium text-gray-700">Permisos</label>
-                  <button
-                    onClick={toggleGrantAll}
-                    className="text-xs text-primary-600 hover:text-primary-700 font-medium"
-                  >
-                    {Object.values(permissions).every(Boolean) ? 'Quitar todos' : 'Otorgar todos'}
+                  <button onClick={toggleGrantAll} className="text-xs text-primary-600 hover:text-primary-700 font-medium">
+                    {allGranted ? 'Quitar todos' : 'Otorgar todos'}
                   </button>
                 </div>
-                <div className="space-y-2">
-                  {(Object.keys(permissionLabels) as (keyof PermissionsForm)[]).map(key => (
-                    <label key={key} className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-primary-200 hover:bg-primary-50/30 cursor-pointer transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={permissions[key]}
-                        onChange={e => setPermissions(p => ({ ...p, [key]: e.target.checked }))}
-                        className="mt-0.5 w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900">{permissionLabels[key]}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{permissionDescriptions[key]}</p>
-                      </div>
-                    </label>
-                  ))}
+
+                <div className="mb-5">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Acceso a Tours</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {tourLevels.map(level => (
+                      <button
+                        key={level.value}
+                        type="button"
+                        onClick={() => setPermissions(p => ({ ...p, tour_level: level.value }))}
+                        className={`flex flex-col items-start gap-1 p-3 rounded-xl border-2 text-left transition-all ${
+                          permissions.tour_level === level.value
+                            ? 'border-primary-500 bg-primary-50'
+                            : 'border-gray-200 hover:border-gray-300 bg-white'
+                        }`}
+                      >
+                        <div className={`flex items-center gap-1.5 font-medium text-sm ${permissions.tour_level === level.value ? 'text-primary-700' : 'text-gray-700'}`}>
+                          <span className={permissions.tour_level === level.value ? 'text-primary-600' : 'text-gray-400'}>{level.icon}</span>
+                          {level.label}
+                        </div>
+                        <p className="text-xs text-gray-500 leading-snug">{level.description}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Otros permisos</p>
+                  <div className="space-y-1.5">
+                    {simplePermissions.map(sp => (
+                      <label key={sp.key} className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-primary-200 hover:bg-primary-50/30 cursor-pointer transition-colors">
+                        <input type="checkbox" checked={permissions[sp.key]}
+                          onChange={e => setPermissions(p => ({ ...p, [sp.key]: e.target.checked }))}
+                          className="mt-0.5 w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">{sp.label}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{sp.description}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
 
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
-              <button
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-              >
+              <button onClick={() => setShowModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
                 Cancelar
               </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || (!editingStaff && !foundUser)}
-                className="px-5 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50 transition-colors flex items-center gap-2"
-              >
+              <button onClick={handleSave} disabled={saving || (!editingStaff && !foundUser)}
+                className="px-5 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50 transition-colors flex items-center gap-2">
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                 {editingStaff ? 'Guardar cambios' : 'Vincular coordinador'}
               </button>

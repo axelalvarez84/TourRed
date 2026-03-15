@@ -20,6 +20,8 @@ export interface AdminPermissions {
 export interface AgencyStaffPermissions {
   canScanCheckin: boolean;
   canViewBookings: boolean;
+  canViewTours: boolean;
+  canEditTours: boolean;
   canManageTours: boolean;
   canViewFinancials: boolean;
   canViewReports: boolean;
@@ -137,6 +139,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         permissions: {
           canScanCheckin: row.can_scan_checkin,
           canViewBookings: row.can_view_bookings,
+          canViewTours: row.can_view_tours,
+          canEditTours: row.can_edit_tours,
           canManageTours: row.can_manage_tours,
           canViewFinancials: row.can_view_financials,
           canViewReports: row.can_view_reports,

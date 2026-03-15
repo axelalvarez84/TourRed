@@ -225,7 +225,7 @@ const App: React.FC = () => {
           <Route
             path="/agency/tours"
             element={
-              <ProtectedRoute allowedRoles={[UserRole.AGENCY]} staffPermission="canManageTours">
+              <ProtectedRoute allowedRoles={[UserRole.AGENCY]} staffPermission="canViewTours">
                 <AgencyTours />
               </ProtectedRoute>
             }

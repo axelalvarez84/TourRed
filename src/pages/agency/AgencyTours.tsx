@@ -58,7 +58,10 @@ interface SelectedDeparturePoint extends DeparturePoint {
 }
 
 const AgencyTours: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isAgencyStaff, staffInfo } = useAuth();
+  const canCreate = !isAgencyStaff || (staffInfo?.permissions.canManageTours ?? false);
+  const canEdit = !isAgencyStaff || (staffInfo?.permissions.canEditTours ?? false) || (staffInfo?.permissions.canManageTours ?? false);
+  const canDelete = !isAgencyStaff || (staffInfo?.permissions.canManageTours ?? false);
   const [tours, setTours] = useState<Tour[]>([]);
   const [categories, setCategories] = useState<TourCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -1756,23 +1759,25 @@ const AgencyTours: React.FC = () => {
             }
           </p>
         </div>
-        <button
-          onClick={isCreating ? handleCancel : handleCreate}
-          className={isCreating ? "btn btn-outline" : "btn btn-primary"}
-          disabled={editingTour}
-        >
-          {isCreating ? (
-            <>
-              <X className="h-5 w-5 mr-2" />
-              Cancelar
-            </>
-          ) : (
-            <>
-              <Plus className="h-5 w-5 mr-2" />
-              Crear Nuevo Tour
-            </>
-          )}
-        </button>
+        {canCreate && (
+          <button
+            onClick={isCreating ? handleCancel : handleCreate}
+            className={isCreating ? "btn btn-outline" : "btn btn-primary"}
+            disabled={editingTour}
+          >
+            {isCreating ? (
+              <>
+                <X className="h-5 w-5 mr-2" />
+                Cancelar
+              </>
+            ) : (
+              <>
+                <Plus className="h-5 w-5 mr-2" />
+                Crear Nuevo Tour
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {error && (
@@ -3893,13 +3898,12 @@ const AgencyTours: React.FC = () => {
           <p className="text-gray-600 mb-6">
             Comienza creando tu primer tour para atraer viajeros a tu agencia.
           </p>
-          <button
-            onClick={handleCreate}
-            className="btn btn-primary"
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            Crear Mi Primer Tour
-          </button>
+          {canCreate && (
+            <button onClick={handleCreate} className="btn btn-primary">
+              <Plus className="h-5 w-5 mr-2" />
+              Crear Mi Primer Tour
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -3973,46 +3977,56 @@ const AgencyTours: React.FC = () => {
                     >
                       <Eye className="h-4 w-4" />
                     </button>
-                    <button
-                      onClick={() => handleEdit(tour)}
-                      className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
-                      title="Editar tour"
-                      disabled={isSubmitting || isCreating || editingTour || duplicatingTour}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleOpenReschedule(tour)}
-                      className="p-2 text-gray-400 hover:text-amber-600 transition-colors"
-                      title="Reagendar tour"
-                      disabled={isSubmitting || isCreating || editingTour || duplicatingTour || new Date(tour.start_date) < new Date() || tour.cancelled_by_agency}
-                    >
-                      <CalendarX className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleOpenCancel(tour)}
-                      className="p-2 text-gray-400 hover:text-orange-600 transition-colors"
-                      title="Cancelar tour completo"
-                      disabled={isSubmitting || isCreating || editingTour || duplicatingTour || new Date(tour.start_date) <= new Date() || tour.cancelled_by_agency}
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDuplicate(tour)}
-                      className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
-                      title="Duplicar tour"
-                      disabled={isSubmitting || isCreating || editingTour || duplicatingTour}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(tour.id, tour.name)}
-                      className="p-2 text-gray-400 hover:text-error-600 transition-colors"
-                      title="Eliminar tour"
-                      disabled={isSubmitting || duplicatingTour}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {canEdit && (
+                      <button
+                        onClick={() => handleEdit(tour)}
+                        className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
+                        title="Editar tour"
+                        disabled={isSubmitting || isCreating || editingTour || duplicatingTour}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                    )}
+                    {canEdit && (
+                      <button
+                        onClick={() => handleOpenReschedule(tour)}
+                        className="p-2 text-gray-400 hover:text-amber-600 transition-colors"
+                        title="Reagendar tour"
+                        disabled={isSubmitting || isCreating || editingTour || duplicatingTour || new Date(tour.start_date) < new Date() || tour.cancelled_by_agency}
+                      >
+                        <CalendarX className="h-4 w-4" />
+                      </button>
+                    )}
+                    {canEdit && (
+                      <button
+                        onClick={() => handleOpenCancel(tour)}
+                        className="p-2 text-gray-400 hover:text-orange-600 transition-colors"
+                        title="Cancelar tour completo"
+                        disabled={isSubmitting || isCreating || editingTour || duplicatingTour || new Date(tour.start_date) <= new Date() || tour.cancelled_by_agency}
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </button>
+                    )}
+                    {canCreate && (
+                      <button
+                        onClick={() => handleDuplicate(tour)}
+                        className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
+                        title="Duplicar tour"
+                        disabled={isSubmitting || isCreating || editingTour || duplicatingTour}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        onClick={() => handleDelete(tour.id, tour.name)}
+                        className="p-2 text-gray-400 hover:text-error-600 transition-colors"
+                        title="Eliminar tour"
+                        disabled={isSubmitting || duplicatingTour}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
