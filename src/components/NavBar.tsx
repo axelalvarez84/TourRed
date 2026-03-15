@@ -23,7 +23,7 @@ interface AdminMenuGroup {
 }
 
 const NavBar: React.FC = () => {
-  const { user, isAdmin, isAgency, isTraveler, isEmailVerified, isSuperAdmin, permissions } = useAuth();
+  const { user, isAdmin, isAgency, isTraveler, isEmailVerified, isSuperAdmin, permissions, isAgencyStaff, staffInfo } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isToursDropdownOpen, setIsToursDropdownOpen] = useState(false);
@@ -104,6 +104,7 @@ const NavBar: React.FC = () => {
   const getDashboardLink = () => {
     if (isAdmin) return '/admin/dashboard';
     if (isAgency) return '/agency/dashboard';
+    if (isAgencyStaff) return '/agency/dashboard';
     return '/traveler/dashboard';
   };
 
@@ -186,7 +187,20 @@ const NavBar: React.FC = () => {
         { to: '/agency/bookings', label: 'Reservas' },
         { to: '/agency/discount-codes', label: 'Codigos Descuento' },
         { to: '/agency/financials', label: 'Finanzas' },
+        { to: '/agency/staff', label: 'Coordinadores' },
       ];
+    }
+
+    if (isAgencyStaff && staffInfo) {
+      const items: { to: string; label: string }[] = [
+        { to: '/agency/dashboard', label: 'Panel' },
+      ];
+      if (staffInfo.permissions.canManageTours) items.push({ to: '/agency/tours', label: 'Tours' });
+      if (staffInfo.permissions.canManageDestinations) items.push({ to: '/agency/destinations', label: 'Destinos' });
+      if (staffInfo.permissions.canViewBookings) items.push({ to: '/agency/bookings', label: 'Reservas' });
+      if (staffInfo.permissions.canManageDiscountCodes) items.push({ to: '/agency/discount-codes', label: 'Codigos Descuento' });
+      if (staffInfo.permissions.canViewFinancials) items.push({ to: '/agency/financials', label: 'Finanzas' });
+      return items;
     }
 
     if (isTraveler) {

@@ -31,6 +31,7 @@ import AgencyProfile from './pages/agency/AgencyProfile';
 import AgencyDestinations from './pages/agency/AgencyDestinations';
 import AgencyDiscountCodes from './pages/agency/AgencyDiscountCodes';
 import AgencyFinancials from './pages/agency/AgencyFinancials';
+import AgencyStaff from './pages/agency/AgencyStaff';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminAgencies from './pages/admin/AdminAgencies';
 import AdminUsers from './pages/admin/AdminUsers';
@@ -224,7 +225,7 @@ const App: React.FC = () => {
           <Route
             path="/agency/tours"
             element={
-              <ProtectedRoute allowedRoles={[UserRole.AGENCY]}>
+              <ProtectedRoute allowedRoles={[UserRole.AGENCY]} staffPermission="canManageTours">
                 <AgencyTours />
               </ProtectedRoute>
             }
@@ -232,7 +233,7 @@ const App: React.FC = () => {
           <Route
             path="/agency/bookings"
             element={
-              <ProtectedRoute allowedRoles={[UserRole.AGENCY]}>
+              <ProtectedRoute allowedRoles={[UserRole.AGENCY]} staffPermission="canViewBookings">
                 <AgencyBookings />
               </ProtectedRoute>
             }
@@ -240,7 +241,7 @@ const App: React.FC = () => {
           <Route
             path="/agency/discount-codes"
             element={
-              <ProtectedRoute allowedRoles={[UserRole.AGENCY]}>
+              <ProtectedRoute allowedRoles={[UserRole.AGENCY]} staffPermission="canManageDiscountCodes">
                 <AgencyDiscountCodes />
               </ProtectedRoute>
             }
@@ -256,7 +257,7 @@ const App: React.FC = () => {
           <Route
             path="/agency/destinations"
             element={
-              <ProtectedRoute allowedRoles={[UserRole.AGENCY]}>
+              <ProtectedRoute allowedRoles={[UserRole.AGENCY]} staffPermission="canManageDestinations">
                 <AgencyDestinations />
               </ProtectedRoute>
             }
@@ -264,8 +265,16 @@ const App: React.FC = () => {
           <Route
             path="/agency/financials"
             element={
-              <ProtectedRoute allowedRoles={[UserRole.AGENCY]}>
+              <ProtectedRoute allowedRoles={[UserRole.AGENCY]} staffPermission="canViewFinancials">
                 <AgencyFinancials />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/agency/staff"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.AGENCY]}>
+                <AgencyStaff />
               </ProtectedRoute>
             }
           />
@@ -471,12 +480,13 @@ const ProfileRedirect: React.FC = () => {
 };
 
 const DashboardRedirect: React.FC = () => {
-  const { isAdmin, isAgency, isTraveler } = useAuth();
-  
+  const { isAdmin, isAgency, isTraveler, isAgencyStaff } = useAuth();
+
   if (isAdmin) return <Navigate to="/admin/dashboard" />;
   if (isAgency) return <Navigate to="/agency/dashboard" />;
+  if (isAgencyStaff) return <Navigate to="/agency/dashboard" />;
   if (isTraveler) return <Navigate to="/traveler/dashboard" />;
-  
+
   return <Navigate to="/login" />;
 };
 

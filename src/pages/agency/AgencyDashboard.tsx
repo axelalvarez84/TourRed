@@ -17,7 +17,7 @@ interface DashboardStats {
 }
 
 const AgencyDashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isAgencyStaff, staffInfo } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
     totalTours: 0,
@@ -37,7 +37,7 @@ const AgencyDashboard: React.FC = () => {
     if (user?.id) {
       fetchAgencyData();
     }
-  }, [user?.id]);
+  }, [user?.id, staffInfo?.agencyId]);
 
   const fetchAgencyData = async () => {
     if (!user?.id) return;
@@ -45,31 +45,39 @@ const AgencyDashboard: React.FC = () => {
     try {
       setIsLoading(true);
       setError('');
-      
-      console.log('🏢 Cargando datos de agencia para usuario:', user.id);
-      
-      // Primero obtener el ID de la agencia
-      const { data: agencyData, error: agencyError } = await supabase
-        .from('agencies')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
 
-      if (agencyError) {
-        if (agencyError.code === 'PGRST116') {
-          setError('No se encontró perfil de agencia para este usuario');
+      console.log('🏢 Cargando datos de agencia para usuario:', user.id);
+
+      let resolvedAgencyId: string | null = null;
+
+      if (isAgencyStaff && staffInfo?.agencyId) {
+        resolvedAgencyId = staffInfo.agencyId;
+      } else {
+        // Primero obtener el ID de la agencia
+        const { data: agencyData, error: agencyError } = await supabase
+          .from('agencies')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (agencyError) {
+          if (agencyError.code === 'PGRST116') {
+            setError('No se encontró perfil de agencia para este usuario');
+            return;
+          }
+          throw new Error(agencyError.message);
+        }
+
+        if (!agencyData) {
+          setError('No se encontró perfil de agencia');
           return;
         }
-        throw new Error(agencyError.message);
+        resolvedAgencyId = agencyData.id;
       }
 
-      if (!agencyData) {
-        setError('No se encontró perfil de agencia');
-        return;
-      }
-
-      console.log('✅ ID de agencia encontrado:', agencyData.id);
-      setAgencyId(agencyData.id);
+      console.log('✅ ID de agencia encontrado:', resolvedAgencyId);
+      setAgencyId(resolvedAgencyId);
+      const agencyData = { id: resolvedAgencyId };
 
       // OPTIMIZED: Select only needed columns + pagination
       const [
@@ -241,14 +249,23 @@ const AgencyDashboard: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Panel de la Agencia</h1>
-        <button
-          onClick={() => navigate('/agency/tours')}
-          className="btn btn-primary"
-        >
-          <Plus className="h-5 w-5 mr-2" />
-          Crear Nuevo Tour
-        </button>
+        <div>
+          <h1 className="text-3xl font-bold">Panel de la Agencia</h1>
+          {isAgencyStaff && staffInfo && (
+            <p className="text-sm text-gray-500 mt-1">
+              Coordinador de <span className="font-medium text-primary-600">{staffInfo.agencyName}</span> &mdash; {staffInfo.title}
+            </p>
+          )}
+        </div>
+        {(!isAgencyStaff || staffInfo?.permissions.canManageTours) && (
+          <button
+            onClick={() => navigate('/agency/tours')}
+            className="btn btn-primary"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Crear Nuevo Tour
+          </button>
+        )}
       </div>
 
       {error && (

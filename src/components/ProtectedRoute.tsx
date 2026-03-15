@@ -6,10 +6,11 @@ import { UserRole } from '../lib/supabase';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles: UserRole[];
+  staffPermission?: keyof import('../context/AuthContext').AgencyStaffPermissions;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
-  const { user, userRole, isLoading, isEmailVerified } = useAuth();
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles, staffPermission }) => {
+  const { user, userRole, isLoading, isEmailVerified, isAgencyStaff, staffInfo } = useAuth();
   const [shouldRedirect, setShouldRedirect] = useState(false);
   const redirectTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -58,20 +59,39 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
     return <Navigate to="/verify-email" replace />;
   }
 
-  if (!userRole || !allowedRoles.includes(userRole)) {
-    // Redirect to the appropriate dashboard based on role
-    if (userRole === UserRole.ADMIN) {
-      return <Navigate to="/admin/dashboard" replace />;
-    } else if (userRole === UserRole.AGENCY) {
-      return <Navigate to="/agency/dashboard" replace />;
-    } else if (userRole === UserRole.TRAVELER) {
-      return <Navigate to="/traveler/dashboard" replace />;
-    } else {
-      return <Navigate to="/" replace />;
+  // Check if user has one of the allowed roles
+  if (userRole && allowedRoles.includes(userRole)) {
+    // If a specific staff permission is required and the user is agency staff,
+    // check that permission
+    if (staffPermission && isAgencyStaff && staffInfo) {
+      if (!staffInfo.permissions[staffPermission]) {
+        return <Navigate to="/agency/dashboard" replace />;
+      }
     }
+    return <>{children}</>;
   }
 
-  return <>{children}</>;
+  // Allow agency staff (traveler role with active staff vinculacion) to access agency routes
+  if (allowedRoles.includes(UserRole.AGENCY) && isAgencyStaff && staffInfo) {
+    if (staffPermission && !staffInfo.permissions[staffPermission]) {
+      return <Navigate to="/agency/dashboard" replace />;
+    }
+    return <>{children}</>;
+  }
+
+  // Redirect to the appropriate dashboard based on role
+  if (userRole === UserRole.ADMIN) {
+    return <Navigate to="/admin/dashboard" replace />;
+  } else if (userRole === UserRole.AGENCY) {
+    return <Navigate to="/agency/dashboard" replace />;
+  } else if (userRole === UserRole.TRAVELER) {
+    if (isAgencyStaff) {
+      return <Navigate to="/agency/dashboard" replace />;
+    }
+    return <Navigate to="/traveler/dashboard" replace />;
+  } else {
+    return <Navigate to="/" replace />;
+  }
 };
 
 export default ProtectedRoute;

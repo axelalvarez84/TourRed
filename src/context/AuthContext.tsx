@@ -17,6 +17,25 @@ export interface AdminPermissions {
   canManageDiscountCodes: boolean;
 }
 
+export interface AgencyStaffPermissions {
+  canScanCheckin: boolean;
+  canViewBookings: boolean;
+  canManageTours: boolean;
+  canViewFinancials: boolean;
+  canViewReports: boolean;
+  canManageDiscountCodes: boolean;
+  canViewMessages: boolean;
+  canManageDestinations: boolean;
+}
+
+export interface AgencyStaffInfo {
+  staffId: string;
+  agencyId: string;
+  agencyName: string;
+  title: string;
+  permissions: AgencyStaffPermissions;
+}
+
 interface AuthContextType {
   user: any | null;
   userRole: UserRole | null;
@@ -27,6 +46,8 @@ interface AuthContextType {
   isEmailVerified: boolean;
   isSuperAdmin: boolean;
   permissions: AdminPermissions | null;
+  isAgencyStaff: boolean;
+  staffInfo: AgencyStaffInfo | null;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -39,6 +60,8 @@ const AuthContext = createContext<AuthContextType>({
   isEmailVerified: false,
   isSuperAdmin: false,
   permissions: null,
+  isAgencyStaff: false,
+  staffInfo: null,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -50,6 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [permissions, setPermissions] = useState<AdminPermissions | null>(null);
+  const [staffInfo, setStaffInfo] = useState<AgencyStaffInfo | null>(null);
 
   const getCachedRole = (userId: string): UserRole | null => {
     try {
@@ -100,6 +124,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loadStaffInfo = async (userId: string): Promise<AgencyStaffInfo | null> => {
+    try {
+      const { data, error } = await supabase.rpc('get_staff_with_permissions', { p_user_id: userId });
+      if (error || !data || data.length === 0) return null;
+      const row = data[0];
+      return {
+        staffId: row.staff_id,
+        agencyId: row.agency_id,
+        agencyName: row.agency_name,
+        title: row.title,
+        permissions: {
+          canScanCheckin: row.can_scan_checkin,
+          canViewBookings: row.can_view_bookings,
+          canManageTours: row.can_manage_tours,
+          canViewFinancials: row.can_view_financials,
+          canViewReports: row.can_view_reports,
+          canManageDiscountCodes: row.can_manage_discount_codes,
+          canViewMessages: row.can_view_messages,
+          canManageDestinations: row.can_manage_destinations,
+        }
+      };
+    } catch {
+      return null;
+    }
+  };
+
   const determineUserRole = async (authUser: any, forceRefresh: boolean = false): Promise<{ role: UserRole; emailVerified: boolean }> => {
     if (!authUser) {
       console.log('ℹ️ No hay usuario autenticado');
@@ -145,7 +195,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('❌ Error consultando perfil:', error);
-        // Intentar usar metadata como fallback
         if (metadataRole && Object.values(UserRole).includes(metadataRole as UserRole)) {
           console.log('⚠️ Usando rol de metadata debido a error en BD:', metadataRole);
           setCachedRole(authUser.id, metadataRole as UserRole);
@@ -154,11 +203,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (profile) {
         console.log('✅ Perfil encontrado en BD:', profile);
 
-        // Verificar si el usuario está bloqueado
         if (profile.is_active === false) {
           console.log('🚫 Usuario bloqueado, cerrando sesión');
           await supabase.auth.signOut();
-          // Redirigir al login con mensaje
           if (typeof window !== 'undefined') {
             window.location.href = '/login?blocked=true';
           }
@@ -174,7 +221,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (err: any) {
       console.error('❌ Error en consulta de BD (puede ser timeout):', err.message);
-      // Intentar usar metadata como fallback
       if (metadataRole && Object.values(UserRole).includes(metadataRole as UserRole)) {
         console.log('⚠️ Usando rol de metadata debido a timeout:', metadataRole);
         setCachedRole(authUser.id, metadataRole as UserRole);
@@ -182,14 +228,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // Si hay metadata, usar eso
     if (metadataRole && Object.values(UserRole).includes(metadataRole as UserRole)) {
       console.log('✅ Usando rol de metadata:', metadataRole);
       setCachedRole(authUser.id, metadataRole as UserRole);
       return { role: metadataRole as UserRole, emailVerified: true };
     }
 
-    // Por defecto, traveler
     console.log('🎒 Asignando rol por defecto: traveler');
     setCachedRole(authUser.id, UserRole.TRAVELER);
     return { role: UserRole.TRAVELER, emailVerified: true };
@@ -254,15 +298,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setIsSuperAdmin(false);
             setPermissions(null);
           }
+          setStaffInfo(null);
+        } else if (role === UserRole.TRAVELER) {
+          setIsSuperAdmin(false);
+          setPermissions(null);
+          // Verificar si este viajero es tambien coordinador de alguna agencia
+          const staff = await loadStaffInfo(authUser.id);
+          setStaffInfo(staff);
         } else {
           setIsSuperAdmin(false);
           setPermissions(null);
+          setStaffInfo(null);
         }
       } else {
         setUserRole(null);
         setIsEmailVerified(false);
         setIsSuperAdmin(false);
         setPermissions(null);
+        setStaffInfo(null);
         try {
           sessionStorage.removeItem('auth_state');
           localStorage.clear();
@@ -278,6 +331,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsEmailVerified(true);
           setIsSuperAdmin(true);
           setPermissions(null);
+          setStaffInfo(null);
         } else {
           const cachedRole = getCachedRole(authUser.id);
           if (cachedRole) {
@@ -290,12 +344,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           setIsSuperAdmin(false);
           setPermissions(null);
+          setStaffInfo(null);
         }
       } else {
         setUserRole(null);
         setIsEmailVerified(false);
         setIsSuperAdmin(false);
         setPermissions(null);
+        setStaffInfo(null);
       }
     } finally {
       console.log('✅ Finalizando carga - estableciendo isLoading: false');
@@ -310,18 +366,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('🚀 Inicializando autenticación...');
 
       try {
-        // Intentar cargar desde cache primero para evitar parpadeos
         const cachedAuth = getCachedAuthState();
         if (cachedAuth && cachedAuth.userId) {
           console.log('💾 Restaurando estado desde cache temporalmente...');
-          // Establecer estado temporal desde cache
           setUser({ id: cachedAuth.userId });
           setUserRole(cachedAuth.role);
           setIsEmailVerified(cachedAuth.emailVerified);
-          // Pero mantener isLoading en true hasta validar
         }
 
-        // Obtener usuario actual con timeout
         const timeoutPromise = new Promise<null>((resolve) =>
           setTimeout(() => {
             console.log('⏱️ Timeout en getCurrentUser, continuando sin usuario');
@@ -349,17 +401,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    // Ejecutar inicialización
     initializeAuth();
 
-    // Configurar listener de cambios de auth
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('🔔 Cambio de estado de auth:', event);
 
       if (!mounted) return;
 
       if (event === 'SIGNED_IN') {
-        // No bloquear el callback, ejecutar en background
         updateAuthState(session?.user || null, true).catch(err => {
           console.error('Error en updateAuthState:', err);
         });
@@ -367,7 +416,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session?.user) {
           console.log('♻️ Token refrescado - actualizando usuario sin revalidar rol');
           setUser(session.user);
-          // No revalidar el rol en refresh, usar el cache
           const cachedRole = getCachedRole(session.user.id);
           if (cachedRole) {
             setUserRole(cachedRole);
@@ -380,6 +428,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLoading(false);
         setIsSuperAdmin(false);
         setPermissions(null);
+        setStaffInfo(null);
         try {
           sessionStorage.removeItem('auth_state');
         } catch (err) {
@@ -397,6 +446,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isAdmin = userRole === UserRole.ADMIN;
   const isAgency = userRole === UserRole.AGENCY;
   const isTraveler = userRole === UserRole.TRAVELER;
+  const isAgencyStaff = isTraveler && staffInfo !== null;
 
   const contextValue = useMemo(() => ({
     user,
@@ -407,8 +457,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isTraveler,
     isEmailVerified,
     isSuperAdmin,
-    permissions
-  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isEmailVerified, isSuperAdmin, permissions]);
+    permissions,
+    isAgencyStaff,
+    staffInfo,
+  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isEmailVerified, isSuperAdmin, permissions, isAgencyStaff, staffInfo]);
 
   useEffect(() => {
     console.log('🎭 Estado del contexto actualizado:', {
@@ -420,9 +472,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isEmailVerified,
       isSuperAdmin,
       permissions,
+      isAgencyStaff,
+      staffInfo,
       isLoading
     });
-  }, [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isEmailVerified, isSuperAdmin, permissions]);
+  }, [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isEmailVerified, isSuperAdmin, permissions, isAgencyStaff, staffInfo]);
 
   return (
     <AuthContext.Provider value={contextValue}>

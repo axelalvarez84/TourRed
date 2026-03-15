@@ -66,7 +66,7 @@ const formatCurrency = (amount: number) => formatCurrencyMXN(amount);
 export default function BookingCheckinPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user, isLoading: authLoading, isAgency, isAdmin } = useAuth();
+  const { user, isLoading: authLoading, isAgency, isAdmin, isAgencyStaff, staffInfo } = useAuth();
   const token = searchParams.get('token');
 
   const [details, setDetails] = useState<CheckinDetails | null>(null);
@@ -147,6 +147,7 @@ export default function BookingCheckinPage() {
           token,
           checkin_type: type,
           no_show_traveler_ids: noShowIds,
+          ...(isAgencyStaff && staffInfo ? { scanned_by_staff_id: staffInfo.staffId } : {}),
         }),
       });
       const data = await res.json();

@@ -38,7 +38,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { token, checkin_type, no_show_traveler_ids } = await req.json();
+    const { token, checkin_type, no_show_traveler_ids, scanned_by_staff_id } = await req.json();
 
     if (!token || !checkin_type || !['full', 'partial'].includes(checkin_type)) {
       return new Response(
@@ -106,10 +106,29 @@ Deno.serve(async (req: Request) => {
       .eq("id", user.id)
       .maybeSingle();
 
-    const isAgency = booking.agency?.user_id === user.id;
+    const isAgencyOwner = booking.agency?.user_id === user.id;
     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
 
-    if (!isAgency && !isAdmin) {
+    // Check if user is an authorized coordinator for this agency
+    let isAuthorizedStaff = false;
+    if (!isAgencyOwner && !isAdmin) {
+      const { data: staffRecord } = await supabase
+        .from("agency_staff")
+        .select("id, agency_staff_permissions(can_scan_checkin)")
+        .eq("user_id", user.id)
+        .eq("agency_id", booking.agency_id)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (staffRecord) {
+        const perms = Array.isArray(staffRecord.agency_staff_permissions)
+          ? staffRecord.agency_staff_permissions[0]
+          : staffRecord.agency_staff_permissions;
+        isAuthorizedStaff = perms?.can_scan_checkin === true;
+      }
+    }
+
+    if (!isAgencyOwner && !isAdmin && !isAuthorizedStaff) {
       return new Response(
         JSON.stringify({ error: "Solo la agencia del tour puede confirmar el check-in" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -136,7 +155,10 @@ Deno.serve(async (req: Request) => {
 
     await supabase
       .from("booking_checkin_tokens")
-      .update({ redeemed_at: checkinAt })
+      .update({
+        redeemed_at: checkinAt,
+        ...(scanned_by_staff_id ? { scanned_by_staff_id } : {}),
+      })
       .eq("id", tokenRecord.id);
 
     let noShowTravelerNames: string[] = [];
