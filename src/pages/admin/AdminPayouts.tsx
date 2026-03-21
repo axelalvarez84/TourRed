@@ -29,6 +29,8 @@ interface CompletedTourData {
   commission_records_exist: boolean;
   commission_records_count: number;
   total_commission_pending: number;
+  total_commission_processed: number;
+  payment_status: 'no_commissions' | 'pending' | 'processed' | 'partial';
   ready_for_payout: boolean;
   can_create_commissions: boolean;
 }
@@ -38,6 +40,7 @@ const AdminPayouts: React.FC = () => {
   const [view, setView] = useState<'by-agency' | 'by-tour'>('by-tour');
   const [agencySummaries, setAgencySummaries] = useState<AgencyPayoutSummary[]>([]);
   const [completedTours, setCompletedTours] = useState<CompletedTourData[]>([]);
+  const [tourFilter, setTourFilter] = useState<'pending' | 'processed' | 'all'>('pending');
   const [selectedAgency, setSelectedAgency] = useState<string | null>(null);
   const [selectedTour, setSelectedTour] = useState<string | null>(null);
   const [showProcessModal, setShowProcessModal] = useState(false);
@@ -343,6 +346,26 @@ const AdminPayouts: React.FC = () => {
               </div>
             )}
 
+            <div className="flex gap-2 mb-4">
+              {(['pending', 'processed', 'all'] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setTourFilter(f)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    tourFilter === f
+                      ? f === 'pending'
+                        ? 'bg-yellow-500 text-white'
+                        : f === 'processed'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-700 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {f === 'pending' ? 'Pendientes de Pago' : f === 'processed' ? 'Pagados' : 'Todos'}
+                </button>
+              ))}
+            </div>
+
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -357,13 +380,13 @@ const AdminPayouts: React.FC = () => {
                       Fecha Fin
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Días Completado
+                      Dias Completado
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Reservas
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Comisión Pendiente
+                      Comision
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Estado
@@ -374,14 +397,32 @@ const AdminPayouts: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {completedTours.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
-                        No hay tours completados pendientes de pago
-                      </td>
-                    </tr>
-                  ) : (
-                    completedTours.map((tour) => (
+                  {(() => {
+                    const filtered = completedTours.filter((tour) => {
+                      if (tourFilter === 'pending') {
+                        return tour.payment_status === 'pending' || tour.payment_status === 'partial' || tour.payment_status === 'no_commissions';
+                      }
+                      if (tourFilter === 'processed') {
+                        return tour.payment_status === 'processed';
+                      }
+                      return true;
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                            {tourFilter === 'processed'
+                              ? 'No hay tours con pagos procesados'
+                              : tourFilter === 'pending'
+                              ? 'No hay tours pendientes de pago'
+                              : 'No hay tours completados'}
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filtered.map((tour) => (
                       <tr key={tour.tour_id} className="hover:bg-gray-50">
                         <td className="px-6 py-4">
                           <div className="text-sm font-medium text-gray-900">{tour.tour_name}</div>
@@ -395,7 +436,7 @@ const AdminPayouts: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900">{tour.days_completed} días</div>
+                          <div className="text-sm text-gray-900">{tour.days_completed} dias</div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-900">{tour.bookings_count}</div>
@@ -406,18 +447,40 @@ const AdminPayouts: React.FC = () => {
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          {tour.commission_records_exist ? (
-                            <div className="text-sm font-bold text-green-600">
-                              {formatCurrency(tour.total_commission_pending)}
+                          {tour.payment_status === 'processed' ? (
+                            <div>
+                              <div className="text-sm font-bold text-blue-600">
+                                {formatCurrency(tour.total_commission_processed)}
+                              </div>
+                              <div className="text-xs text-gray-400">pagado</div>
+                            </div>
+                          ) : tour.commission_records_exist ? (
+                            <div>
+                              <div className="text-sm font-bold text-green-600">
+                                {formatCurrency(tour.total_commission_pending)}
+                              </div>
+                              {tour.payment_status === 'partial' && (
+                                <div className="text-xs text-gray-400">
+                                  +{formatCurrency(tour.total_commission_processed)} pagado
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <span className="text-sm text-gray-400">-</span>
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          {!tour.commission_records_exist ? (
+                          {tour.payment_status === 'no_commissions' ? (
                             <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full font-medium">
                               Sin Comisiones
+                            </span>
+                          ) : tour.payment_status === 'processed' ? (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
+                              Pagado
+                            </span>
+                          ) : tour.payment_status === 'partial' ? (
+                            <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full font-medium">
+                              Pago Parcial
                             </span>
                           ) : tour.ready_for_payout ? (
                             <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
@@ -430,7 +493,12 @@ const AdminPayouts: React.FC = () => {
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          {!tour.commission_records_exist && tour.can_create_commissions ? (
+                          {tour.payment_status === 'processed' ? (
+                            <div className="flex items-center gap-2 text-sm text-blue-600">
+                              <CheckCircle className="h-4 w-4" />
+                              <span>Pago Completado</span>
+                            </div>
+                          ) : !tour.commission_records_exist && tour.can_create_commissions ? (
                             <button
                               onClick={() => createCommissionRecords(tour.tour_id)}
                               disabled={isCreatingCommissions}
@@ -448,7 +516,7 @@ const AdminPayouts: React.FC = () => {
                                 </>
                               )}
                             </button>
-                          ) : tour.commission_records_exist && tour.ready_for_payout ? (
+                          ) : tour.ready_for_payout ? (
                             <button
                               onClick={() => {
                                 setSelectedTour(tour.tour_id);
@@ -460,18 +528,18 @@ const AdminPayouts: React.FC = () => {
                               <DollarSign className="h-4 w-4" />
                               Procesar Pago
                             </button>
-                          ) : tour.commission_records_exist ? (
+                          ) : tour.commission_records_exist && tour.payment_status === 'pending' ? (
                             <div className="flex items-center gap-2 text-sm text-gray-500">
                               <Clock className="h-4 w-4" />
-                              <span>Esperando {3 - tour.days_completed} días</span>
+                              <span>Esperando {3 - tour.days_completed} dias</span>
                             </div>
                           ) : (
                             <span className="text-sm text-gray-400">-</span>
                           )}
                         </td>
                       </tr>
-                    ))
-                  )}
+                    ));
+                  })()}
                 </tbody>
               </table>
             </div>
