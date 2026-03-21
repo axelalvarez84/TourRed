@@ -53,6 +53,7 @@ import AdminPromotions from './pages/admin/AdminPromotions';
 import AdminTourMessages from './pages/admin/AdminTourMessages';
 import AdminBroadcastMessages from './pages/admin/AdminBroadcastMessages';
 import AdminCfdi from './pages/admin/AdminCfdi';
+import AdminContabilidad from './pages/admin/AdminContabilidad';
 import MegaTravelPage from './pages/international/MegaTravelPage';
 import NefertariTravelPage from './pages/international/NefertariTravelPage';
 import ExoticcaPage from './pages/international/ExoticcaPage';
@@ -454,6 +455,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                 <AdminCfdi />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/contabilidad"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminContabilidad />
               </ProtectedRoute>
             }
           />

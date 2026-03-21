@@ -67,7 +67,7 @@ async function facturapiStamp(
   apiKey: string,
   organizationId: string,
   request: CfdiRequest,
-  sandboxMode: boolean
+  _sandboxMode: boolean
 ): Promise<CfdiResult> {
   const baseUrl = "https://www.facturapi.io/v2";
 
@@ -137,6 +137,117 @@ async function facturapiStamp(
 }
 
 // =============================================
+// ZOHO BOOKS ADAPTER (uses Zoho Books Mexico CFDI stamping)
+// Zoho Books Mexico edition stamps via SW Sapien internally.
+// =============================================
+async function zohoBooksStamp(
+  supabaseClient: ReturnType<typeof createClient>,
+  orgId: string,
+  request: CfdiRequest,
+  sandboxMode: boolean
+): Promise<CfdiResult> {
+  const { data: tokenRow } = await supabaseClient
+    .from("zoho_oauth_tokens")
+    .select("access_token, refresh_token, access_token_expires_at, api_domain")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!tokenRow) throw new Error("Zoho OAuth token not found. Connect Zoho Books in Admin Settings.");
+
+  const expiresAt = new Date(tokenRow.access_token_expires_at).getTime();
+  let accessToken = tokenRow.access_token;
+  let apiDomain = tokenRow.api_domain;
+
+  if (expiresAt - Date.now() < 5 * 60 * 1000) {
+    const { data: platformSettings } = await supabaseClient
+      .from("platform_settings")
+      .select("zoho_client_id, zoho_client_secret, zoho_region")
+      .maybeSingle();
+
+    if (!platformSettings?.zoho_client_id || !platformSettings?.zoho_client_secret) {
+      throw new Error("Zoho client credentials not configured.");
+    }
+
+    const region = platformSettings.zoho_region || "com";
+    const refreshBody = new URLSearchParams({
+      refresh_token: tokenRow.refresh_token,
+      client_id: platformSettings.zoho_client_id,
+      client_secret: platformSettings.zoho_client_secret,
+      grant_type: "refresh_token",
+    });
+
+    const refreshRes = await fetch(`https://accounts.zoho.${region}/oauth/v2/token`, {
+      method: "POST",
+      body: refreshBody,
+    });
+
+    if (!refreshRes.ok) throw new Error("Zoho token refresh failed");
+    const refreshData = await refreshRes.json();
+    accessToken = refreshData.access_token;
+    apiDomain = refreshData.api_domain ?? apiDomain;
+    const newExpiry = new Date(Date.now() + (refreshData.expires_in ?? 3600) * 1000).toISOString();
+
+    await supabaseClient.from("zoho_oauth_tokens").update({
+      access_token: accessToken,
+      access_token_expires_at: newExpiry,
+      api_domain: apiDomain,
+    }).eq("refresh_token", tokenRow.refresh_token);
+  }
+
+  const baseUrl = `${apiDomain}/books/v3`;
+  const headers = {
+    Authorization: `Zoho-oauthtoken ${accessToken}`,
+    "Content-Type": "application/json",
+  };
+
+  const zohoInvoice: Record<string, unknown> = {
+    customer_id: request.receptor.rfc,
+    reference_number: request.serie,
+    date: new Date().toISOString().split("T")[0],
+    currency_code: "MXN",
+    line_items: request.conceptos.map((c) => ({
+      name: c.descripcion,
+      description: c.descripcion,
+      quantity: c.cantidad,
+      rate: c.valor_unitario,
+      tax_percentage: 16,
+    })),
+    is_inclusive_tax: false,
+    notes: sandboxMode ? "[SANDBOX - CFDI de prueba]" : undefined,
+  };
+
+  if (request.tercero) {
+    zohoInvoice.cf_tercero_rfc = request.tercero.rfc;
+    zohoInvoice.cf_tercero_nombre = request.tercero.nombre;
+  }
+
+  const res = await fetch(`${baseUrl}/invoices?organization_id=${orgId}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(zohoInvoice),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Zoho Books error ${res.status}: ${err}`);
+  }
+
+  const data = await res.json() as { invoice: { invoice_id: string; invoice_number: string; created_time: string } };
+  const inv = data.invoice;
+
+  return {
+    pac_invoice_id: inv.invoice_id,
+    uuid_fiscal: inv.invoice_id,
+    folio: inv.invoice_number ?? "",
+    serie: request.serie,
+    xml_url: `${baseUrl}/invoices/${inv.invoice_id}?organization_id=${orgId}&accept=xml`,
+    pdf_url: `${baseUrl}/invoices/${inv.invoice_id}?organization_id=${orgId}&accept=pdf`,
+    stamped_at: inv.created_time ?? new Date().toISOString(),
+  };
+}
+
+// =============================================
 // PROVIDER DISPATCHER (add new PACs here)
 // =============================================
 async function stampCfdi(
@@ -144,13 +255,17 @@ async function stampCfdi(
   apiKey: string,
   orgId: string,
   request: CfdiRequest,
-  sandboxMode: boolean
+  sandboxMode: boolean,
+  supabaseClient?: ReturnType<typeof createClient>
 ): Promise<CfdiResult> {
   switch (provider) {
+    case "zoho_books":
+      if (!supabaseClient) throw new Error("supabaseClient required for zoho_books provider");
+      return zohoBooksStamp(supabaseClient, orgId, request, sandboxMode);
     case "facturapi":
       return facturapiStamp(apiKey, orgId, request, sandboxMode);
     default:
-      throw new Error(`Unknown PAC provider: ${provider}`);
+      throw new Error(`Unknown PAC provider: ${provider}. Supported: zoho_books, facturapi`);
   }
 }
 
@@ -316,7 +431,8 @@ Deno.serve(async (req: Request) => {
         settings.pac_api_key_encrypted!,
         settings.pac_organization_id || "",
         cfdiRequest,
-        settings.pac_sandbox_mode
+        settings.pac_sandbox_mode,
+        supabase
       );
     } catch (stampError) {
       // Update record with error

@@ -38,19 +38,76 @@ async function facturapiCancel(
   return data.id ?? pacInvoiceId;
 }
 
+async function zohoBooksCancel(
+  supabaseClient: ReturnType<typeof createClient>,
+  orgId: string,
+  pacInvoiceId: string
+): Promise<string> {
+  const { data: tokenRow } = await supabaseClient
+    .from("zoho_oauth_tokens")
+    .select("access_token, refresh_token, access_token_expires_at, api_domain")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!tokenRow) throw new Error("Zoho OAuth token not found. Connect Zoho Books in Admin Settings.");
+
+  let accessToken = tokenRow.access_token;
+  let apiDomain = tokenRow.api_domain;
+
+  if (new Date(tokenRow.access_token_expires_at).getTime() - Date.now() < 5 * 60 * 1000) {
+    const { data: ps } = await supabaseClient
+      .from("platform_settings")
+      .select("zoho_client_id, zoho_client_secret, zoho_region")
+      .maybeSingle();
+    if (!ps?.zoho_client_id) throw new Error("Zoho client credentials not configured.");
+    const region = ps.zoho_region || "com";
+    const rb = new URLSearchParams({
+      refresh_token: tokenRow.refresh_token,
+      client_id: ps.zoho_client_id,
+      client_secret: ps.zoho_client_secret,
+      grant_type: "refresh_token",
+    });
+    const rr = await fetch(`https://accounts.zoho.${region}/oauth/v2/token`, { method: "POST", body: rb });
+    if (!rr.ok) throw new Error("Zoho token refresh failed");
+    const rd = await rr.json();
+    accessToken = rd.access_token;
+    apiDomain = rd.api_domain ?? apiDomain;
+    const newExpiry = new Date(Date.now() + (rd.expires_in ?? 3600) * 1000).toISOString();
+    await supabaseClient.from("zoho_oauth_tokens").update({
+      access_token: accessToken, access_token_expires_at: newExpiry, api_domain: apiDomain,
+    }).eq("refresh_token", tokenRow.refresh_token);
+  }
+
+  const baseUrl = `${apiDomain}/books/v3`;
+  const res = await fetch(`${baseUrl}/invoices/${pacInvoiceId}/void?organization_id=${orgId}`, {
+    method: "POST",
+    headers: { Authorization: `Zoho-oauthtoken ${accessToken}`, "Content-Type": "application/json" },
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Zoho Books cancel error ${res.status}: ${err}`);
+  }
+  return pacInvoiceId;
+}
+
 async function cancelWithProvider(
   provider: string,
   apiKey: string,
   orgId: string,
   pacInvoiceId: string,
   motivo: string,
-  uuidSustitucion?: string
+  uuidSustitucion?: string,
+  supabaseClient?: ReturnType<typeof createClient>
 ): Promise<string> {
   switch (provider) {
+    case "zoho_books":
+      if (!supabaseClient) throw new Error("supabaseClient required for zoho_books provider");
+      return zohoBooksCancel(supabaseClient, orgId, pacInvoiceId);
     case "facturapi":
       return facturapiCancel(apiKey, orgId, pacInvoiceId, motivo, uuidSustitucion);
     default:
-      throw new Error(`Unknown PAC provider: ${provider}`);
+      throw new Error(`Unknown PAC provider: ${provider}. Supported: zoho_books, facturapi`);
   }
 }
 
@@ -148,7 +205,8 @@ Deno.serve(async (req: Request) => {
         settings.pac_organization_id || "",
         cfdi.pac_invoice_id,
         motivo,
-        uuid_sustitucion
+        uuid_sustitucion,
+        supabase
       );
     } catch (cancelErr) {
       await supabase

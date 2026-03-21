@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard, Crown, Gift, Award, Users, Globe, FileText, Shield } from 'lucide-react';
+import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard, Crown, Gift, Award, Users, Globe, FileText, Shield, BookOpen, Link, Unlink, RefreshCw, ExternalLink } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../utils/formatCurrency';
 
@@ -39,6 +39,13 @@ interface PlatformSettings {
   pac_issuer_rfc: string;
   pac_issuer_razon_social: string;
   pac_issuer_regimen_fiscal: string;
+  accounting_provider: string;
+  accounting_sync_enabled: boolean;
+  zoho_client_id: string;
+  zoho_client_secret: string;
+  zoho_org_id: string;
+  zoho_region: string;
+  zoho_sandbox_mode: boolean;
 }
 
 const AdminSettings: React.FC = () => {
@@ -77,7 +84,24 @@ const AdminSettings: React.FC = () => {
     pac_issuer_rfc: '',
     pac_issuer_razon_social: '',
     pac_issuer_regimen_fiscal: '',
+    accounting_provider: 'none',
+    accounting_sync_enabled: false,
+    zoho_client_id: '',
+    zoho_client_secret: '',
+    zoho_org_id: '',
+    zoho_region: 'com',
+    zoho_sandbox_mode: true,
   });
+  const [zohoStatus, setZohoStatus] = useState<{
+    connected: boolean;
+    token_expires_at?: string;
+    is_expired?: boolean;
+    scope?: string;
+    last_updated?: string;
+  } | null>(null);
+  const [zohoGrantToken, setZohoGrantToken] = useState('');
+  const [isConnectingZoho, setIsConnectingZoho] = useState(false);
+  const [isCheckingZoho, setIsCheckingZoho] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{
@@ -87,7 +111,54 @@ const AdminSettings: React.FC = () => {
 
   useEffect(() => {
     fetchSettings();
+    checkZohoStatus();
   }, []);
+
+  const checkZohoStatus = async () => {
+    setIsCheckingZoho(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('zoho-oauth-connect', {
+        body: { action: 'check_status' },
+      });
+      if (!error && data) setZohoStatus(data);
+    } catch {
+      // silent
+    } finally {
+      setIsCheckingZoho(false);
+    }
+  };
+
+  const handleConnectZoho = async () => {
+    if (!zohoGrantToken.trim()) {
+      setMessage({ type: 'error', text: 'Ingresa el Grant Token de Zoho Self Client' });
+      return;
+    }
+    setIsConnectingZoho(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('zoho-oauth-connect', {
+        body: { action: 'exchange_grant_token', grant_token: zohoGrantToken.trim() },
+      });
+      if (error || !data?.success) throw new Error(error?.message || data?.error || 'Error al conectar con Zoho');
+      setZohoGrantToken('');
+      setMessage({ type: 'success', text: 'Zoho Books conectado exitosamente' });
+      await checkZohoStatus();
+    } catch (err: any) {
+      setMessage({ type: 'error', text: `Error al conectar Zoho: ${err.message}` });
+    } finally {
+      setIsConnectingZoho(false);
+    }
+  };
+
+  const handleDisconnectZoho = async () => {
+    if (!confirm('¿Desconectar Zoho Books? La sincronizacion contable dejara de funcionar hasta volver a conectar.')) return;
+    try {
+      await supabase.functions.invoke('zoho-oauth-connect', { body: { action: 'disconnect' } });
+      setZohoStatus({ connected: false });
+      setMessage({ type: 'success', text: 'Zoho Books desconectado' });
+    } catch (err: any) {
+      setMessage({ type: 'error', text: `Error: ${err.message}` });
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -167,6 +238,13 @@ const AdminSettings: React.FC = () => {
             pac_issuer_rfc: platformSettings.pac_issuer_rfc,
             pac_issuer_razon_social: platformSettings.pac_issuer_razon_social,
             pac_issuer_regimen_fiscal: platformSettings.pac_issuer_regimen_fiscal,
+            accounting_provider: platformSettings.accounting_provider,
+            accounting_sync_enabled: platformSettings.accounting_sync_enabled,
+            zoho_client_id: platformSettings.zoho_client_id,
+            zoho_client_secret: platformSettings.zoho_client_secret,
+            zoho_org_id: platformSettings.zoho_org_id,
+            zoho_region: platformSettings.zoho_region,
+            zoho_sandbox_mode: platformSettings.zoho_sandbox_mode,
             updated_at: new Date().toISOString(),
             updated_by: user?.id
           })
@@ -879,7 +957,8 @@ const AdminSettings: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
               >
                 <option value="none">Sin proveedor (desactivado)</option>
-                <option value="facturapi">FacturAPI</option>
+                <option value="zoho_books">Zoho Books (Recomendado — via SW Sapien)</option>
+                <option value="facturapi">FacturAPI (PAC de contingencia)</option>
                 <option value="sw_sapien">SW Sapien</option>
                 <option value="contpaqi">Contpaqi Cloud</option>
               </select>
@@ -1009,6 +1088,239 @@ const AdminSettings: React.FC = () => {
               {platformSettings.pac_sandbox_mode
                 ? ' — Modo sandbox. Los CFDIs generados son de prueba y no tienen validez fiscal.'
                 : ' — Modo producción. Los CFDIs generados son válidos ante el SAT.'}
+            </div>
+          )}
+        </div>
+
+        {/* Accounting Integration */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center space-x-3 mb-2">
+            <BookOpen className="w-6 h-6 text-primary-600" />
+            <h2 className="text-xl font-semibold text-gray-900">Integracion Contable</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-6">
+            Sincronizacion en tiempo real con tu sistema contable. Arquitectura modular: cambiar de Zoho Books a Odoo u otro sistema
+            solo requiere configurar el nuevo proveedor aqui — sin modificar el resto de la plataforma.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Proveedor Contable Activo</label>
+              <select
+                value={platformSettings.accounting_provider}
+                onChange={(e) => setPlatformSettings(prev => ({ ...prev, accounting_provider: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="none">Sin proveedor (desactivado)</option>
+                <option value="zoho_books">Zoho Books (Recomendado)</option>
+                <option value="odoo">Odoo (Proximamente)</option>
+                <option value="quickbooks">QuickBooks (Proximamente)</option>
+                <option value="contpaqi_cloud">Contpaqi Cloud (Proximamente)</option>
+              </select>
+              <p className="text-xs text-gray-400 mt-1">Cambiar el proveedor no afecta registros ya sincronizados.</p>
+            </div>
+
+            <div className="flex items-center gap-3 md:pt-6">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={platformSettings.accounting_sync_enabled}
+                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, accounting_sync_enabled: e.target.checked }))}
+                  disabled={platformSettings.accounting_provider === 'none'}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600 peer-disabled:opacity-50"></div>
+              </label>
+              <div>
+                <div className="text-sm font-medium text-gray-700">Sincronizacion en Tiempo Real</div>
+                <div className="text-xs text-gray-400">
+                  {platformSettings.accounting_sync_enabled ? 'Activa — reservas, pagos y contactos se sincronizan automaticamente' : 'Inactiva'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {platformSettings.accounting_provider === 'zoho_books' && (
+            <div className="space-y-6">
+              <div className="border border-gray-200 rounded-lg p-5">
+                <h3 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-primary-500" />
+                  Credenciales Zoho Books
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Client ID</label>
+                    <input
+                      type="text"
+                      value={platformSettings.zoho_client_id}
+                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, zoho_client_id: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                      placeholder="1000.XXXXXXXXXXXXXXXXXXXXXXXXXX"
+                      autoComplete="off"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Zoho Developer Console → Tu App → Client ID</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Client Secret</label>
+                    <input
+                      type="password"
+                      value={platformSettings.zoho_client_secret}
+                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, zoho_client_secret: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                      placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                      autoComplete="off"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Zoho Developer Console → Tu App → Client Secret</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Organization ID</label>
+                    <input
+                      type="text"
+                      value={platformSettings.zoho_org_id}
+                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, zoho_org_id: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                      placeholder="123456789"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Zoho Books → Configuracion → Organizacion → ID</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Region del Servidor</label>
+                    <select
+                      value={platformSettings.zoho_region}
+                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, zoho_region: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                    >
+                      <option value="com">Global (zoho.com) — Recomendado Mexico</option>
+                      <option value="eu">Europa (zoho.eu)</option>
+                      <option value="in">India (zoho.in)</option>
+                      <option value="com.au">Australia (zoho.com.au)</option>
+                      <option value="jp">Japon (zoho.jp)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center gap-3">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={platformSettings.zoho_sandbox_mode}
+                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, zoho_sandbox_mode: e.target.checked }))}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                  </label>
+                  <div>
+                    <div className="text-sm font-medium text-gray-700">Modo Sandbox (Organizacion de Pruebas)</div>
+                    <div className="text-xs text-gray-400">{platformSettings.zoho_sandbox_mode ? 'Activo — usando organizacion de pruebas en Zoho' : 'Produccion — datos reales'}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border border-gray-200 rounded-lg p-5">
+                <h3 className="text-sm font-semibold text-gray-800 mb-1 flex items-center gap-2">
+                  <Link className="w-4 h-4 text-primary-500" />
+                  Conexion OAuth con Zoho Books
+                </h3>
+                <p className="text-xs text-gray-500 mb-4">
+                  Para conectar, genera un Grant Token en Zoho Developer Console usando el metodo Self Client
+                  (scope: ZohoBooks.fullaccess.all) y pegalo aqui. Este paso se hace una sola vez.
+                </p>
+
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+                    zohoStatus?.connected && !zohoStatus?.is_expired
+                      ? 'bg-green-100 text-green-700'
+                      : zohoStatus?.connected && zohoStatus?.is_expired
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full ${
+                      zohoStatus?.connected && !zohoStatus?.is_expired ? 'bg-green-500' :
+                      zohoStatus?.connected ? 'bg-amber-500' : 'bg-gray-400'
+                    }`} />
+                    {isCheckingZoho ? 'Verificando...' :
+                      zohoStatus?.connected && !zohoStatus?.is_expired ? 'Conectado' :
+                      zohoStatus?.connected && zohoStatus?.is_expired ? 'Token expirado' :
+                      'Sin conectar'}
+                  </div>
+                  {zohoStatus?.token_expires_at && (
+                    <span className="text-xs text-gray-500">
+                      Token expira: {new Date(zohoStatus.token_expires_at).toLocaleString('es-MX')}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={checkZohoStatus}
+                    disabled={isCheckingZoho}
+                    className="ml-auto text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1 disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isCheckingZoho ? 'animate-spin' : ''}`} />
+                    Verificar
+                  </button>
+                </div>
+
+                {!zohoStatus?.connected ? (
+                  <div className="space-y-3">
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-xs text-blue-800">
+                      <p className="font-semibold mb-1">Pasos para conectar Zoho Books:</p>
+                      <ol className="list-decimal ml-4 space-y-1">
+                        <li>Ve a <a href="https://api-console.zoho.com" target="_blank" rel="noopener noreferrer" className="underline font-medium inline-flex items-center gap-0.5">api-console.zoho.com <ExternalLink className="w-3 h-3" /></a></li>
+                        <li>Selecciona tu app y haz clic en "Self Client"</li>
+                        <li>En "Scope" escribe: <span className="font-mono bg-blue-100 px-1 rounded">ZohoBooks.fullaccess.all</span></li>
+                        <li>En "Time Duration" selecciona 10 minutos</li>
+                        <li>Copia el Grant Token generado y pegalo abajo</li>
+                      </ol>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={zohoGrantToken}
+                        onChange={(e) => setZohoGrantToken(e.target.value)}
+                        placeholder="Pega el Grant Token de Zoho Self Client aqui..."
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleConnectZoho}
+                        disabled={isConnectingZoho || !zohoGrantToken.trim()}
+                        className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                      >
+                        {isConnectingZoho ? <Loader className="w-4 h-4 animate-spin" /> : <Link className="w-4 h-4" />}
+                        Conectar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleDisconnectZoho}
+                    className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-md hover:bg-red-50 text-sm font-medium"
+                  >
+                    <Unlink className="w-4 h-4" />
+                    Desconectar Zoho Books
+                  </button>
+                )}
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-4 text-sm text-blue-800">
+                <p className="font-semibold mb-1">Que se sincroniza automaticamente:</p>
+                <ul className="text-xs space-y-1 list-disc ml-4">
+                  <li>Agencias aprobadas → Contactos (Proveedor) en Zoho Books</li>
+                  <li>Viajeros con datos fiscales → Contactos (Cliente) en Zoho Books</li>
+                  <li>Reservas confirmadas → Facturas de ingreso en Zoho Books</li>
+                  <li>Pagos a agencias → Facturas de proveedor + Pagos en Zoho Books</li>
+                </ul>
+                <p className="text-xs mt-2 text-blue-600">
+                  Monitorea el estado de sincronizacion en: Admin → Contabilidad
+                </p>
+              </div>
+            </div>
+          )}
+
+          {platformSettings.accounting_provider !== 'none' && platformSettings.accounting_provider !== 'zoho_books' && (
+            <div className="bg-amber-50 border border-amber-200 rounded-md p-4 text-sm text-amber-800">
+              <strong>{platformSettings.accounting_provider === 'odoo' ? 'Odoo' : platformSettings.accounting_provider === 'quickbooks' ? 'QuickBooks' : 'Contpaqi Cloud'}</strong> — La integracion con este proveedor esta en desarrollo.
+              El adaptador existe en el codigo y puede activarse cuando se implementen las credenciales correspondientes.
             </div>
           )}
         </div>
