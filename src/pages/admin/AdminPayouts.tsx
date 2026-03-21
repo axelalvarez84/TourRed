@@ -516,6 +516,7 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
   tourId,
   onSuccess
 }) => {
+  const formatCurrency = (amount: number) => formatCurrencyMXN(amount);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState<'bank_transfer' | 'check' | 'paypal' | 'mercadopago' | 'other'>('bank_transfer');
