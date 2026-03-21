@@ -131,6 +131,36 @@ const AgencyTours: React.FC = () => {
     cancellation_reason: '',
   });
 
+  const [receptivoActionsModal, setReceptivoActionsModal] = useState<{
+    open: boolean;
+    tour: Tour | null;
+    action: 'slot-cancel' | 'slot-reschedule' | 'full-cancel' | null;
+    slots: any[];
+    selectedSlot: any | null;
+    isLoadingSlots: boolean;
+    isSubmitting: boolean;
+    error: string;
+    success: boolean;
+    reason: string;
+    newSlotDate: string;
+    newSlotTime: string;
+    bookingsInSlot: number;
+  }>({
+    open: false,
+    tour: null,
+    action: null,
+    slots: [],
+    selectedSlot: null,
+    isLoadingSlots: false,
+    isSubmitting: false,
+    error: '',
+    success: false,
+    reason: '',
+    newSlotDate: '',
+    newSlotTime: '',
+    bookingsInSlot: 0,
+  });
+
   const [tourType, setTourType] = useState<TourType>('excursion');
   const [receptivoModality, setReceptivoModality] = useState<ReceptivoModality>('compartido');
   const [receptivoTab, setReceptivoTab] = useState<'info' | 'horarios' | 'bloqueos' | 'calendario'>('info');
@@ -939,6 +969,187 @@ const AgencyTours: React.FC = () => {
         ...prev,
         isSubmitting: false,
         error: errorMessage,
+      }));
+    }
+  };
+
+  const handleOpenReceptivoActions = async (tour: Tour, action: 'slot-cancel' | 'slot-reschedule' | 'full-cancel') => {
+    if (tour.cancelled_by_agency) {
+      alert('Este tour ya fue cancelado.');
+      return;
+    }
+
+    setReceptivoActionsModal({
+      open: true,
+      tour,
+      action,
+      slots: [],
+      selectedSlot: null,
+      isLoadingSlots: action !== 'full-cancel',
+      isSubmitting: false,
+      error: '',
+      success: false,
+      reason: '',
+      newSlotDate: '',
+      newSlotTime: '',
+      bookingsInSlot: 0,
+    });
+
+    if (action !== 'full-cancel') {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const { data: slotsData, error: slotsError } = await supabase
+          .from('tour_slots')
+          .select('*')
+          .eq('tour_id', tour.id)
+          .eq('status', 'available')
+          .gte('slot_date', today)
+          .order('slot_date', { ascending: true })
+          .order('departure_time', { ascending: true });
+
+        if (slotsError) throw slotsError;
+
+        setReceptivoActionsModal(prev => ({
+          ...prev,
+          slots: slotsData || [],
+          isLoadingSlots: false,
+        }));
+      } catch (err: any) {
+        setReceptivoActionsModal(prev => ({
+          ...prev,
+          error: 'Error al cargar los slots disponibles',
+          isLoadingSlots: false,
+        }));
+      }
+    }
+  };
+
+  const handleSelectSlot = async (slot: any) => {
+    setReceptivoActionsModal(prev => ({ ...prev, selectedSlot: slot, bookingsInSlot: 0 }));
+
+    const { count } = await supabase
+      .from('bookings')
+      .select('*', { count: 'exact', head: true })
+      .eq('tour_id', receptivoActionsModal.tour?.id || '')
+      .eq('selected_date', slot.slot_date)
+      .eq('selected_time', slot.departure_time)
+      .in('status', ['confirmed', 'pending'])
+      .is('cancelled_at', null);
+
+    setReceptivoActionsModal(prev => ({ ...prev, bookingsInSlot: count || 0 }));
+  };
+
+  const handleCloseReceptivoActions = () => {
+    setReceptivoActionsModal({
+      open: false,
+      tour: null,
+      action: null,
+      slots: [],
+      selectedSlot: null,
+      isLoadingSlots: false,
+      isSubmitting: false,
+      error: '',
+      success: false,
+      reason: '',
+      newSlotDate: '',
+      newSlotTime: '',
+      bookingsInSlot: 0,
+    });
+  };
+
+  const handleSubmitReceptivoSlotAction = async () => {
+    const { tour, action, selectedSlot, reason, newSlotDate, newSlotTime } = receptivoActionsModal;
+    if (!tour || !selectedSlot) return;
+
+    if (reason.trim().length < 20) {
+      setReceptivoActionsModal(prev => ({ ...prev, error: 'El motivo debe tener al menos 20 caracteres.' }));
+      return;
+    }
+
+    if (action === 'slot-reschedule') {
+      if (!newSlotDate || !newSlotTime) {
+        setReceptivoActionsModal(prev => ({ ...prev, error: 'Debes seleccionar la nueva fecha y hora.' }));
+        return;
+      }
+      if (newSlotDate <= selectedSlot.slot_date) {
+        setReceptivoActionsModal(prev => ({ ...prev, error: 'La nueva fecha debe ser posterior a la fecha actual del slot.' }));
+        return;
+      }
+    }
+
+    setReceptivoActionsModal(prev => ({ ...prev, isSubmitting: true, error: '' }));
+
+    try {
+      if (action === 'slot-cancel') {
+        const { data, error } = await supabase.functions.invoke('process-receptivo-slot-cancellation', {
+          body: {
+            slot_id: selectedSlot.id,
+            tour_id: tour.id,
+            cancellation_reason: reason.trim(),
+          },
+        });
+        if (error) throw error;
+        if (data && !data.success) throw new Error(data.error || 'Error al cancelar el slot');
+      } else if (action === 'slot-reschedule') {
+        const { data, error } = await supabase.functions.invoke('process-receptivo-slot-cancellation', {
+          body: {
+            slot_id: selectedSlot.id,
+            tour_id: tour.id,
+            cancellation_reason: reason.trim(),
+            reschedule_to_date: newSlotDate,
+            reschedule_to_time: newSlotTime,
+          },
+        });
+        if (error) throw error;
+        if (data && !data.success) throw new Error(data.error || 'Error al reagendar el slot');
+      }
+
+      setReceptivoActionsModal(prev => ({ ...prev, isSubmitting: false, success: true }));
+      setTimeout(() => {
+        handleCloseReceptivoActions();
+        fetchAgencyTours();
+      }, 2500);
+    } catch (err: any) {
+      setReceptivoActionsModal(prev => ({
+        ...prev,
+        isSubmitting: false,
+        error: err.message || 'Error al procesar la accion',
+      }));
+    }
+  };
+
+  const handleSubmitReceptivoFullCancel = async () => {
+    const { tour, reason } = receptivoActionsModal;
+    if (!tour) return;
+
+    if (reason.trim().length < 50) {
+      setReceptivoActionsModal(prev => ({ ...prev, error: 'El motivo debe tener al menos 50 caracteres.' }));
+      return;
+    }
+
+    setReceptivoActionsModal(prev => ({ ...prev, isSubmitting: true, error: '' }));
+
+    try {
+      const { data, error } = await supabase.functions.invoke('process-tour-cancellation', {
+        body: {
+          tour_id: tour.id,
+          cancellation_reason: reason.trim(),
+          is_receptivo_full_cancel: true,
+        },
+      });
+      if (error) throw error;
+      if (data && !data.success) throw new Error(data.error || 'Error al cancelar el tour');
+
+      setReceptivoActionsModal(prev => ({ ...prev, isSubmitting: false, success: true }));
+      setTimeout(() => {
+        handleCloseReceptivoActions();
+        fetchAgencyTours();
+      }, 2500);
+    } catch (err: any) {
+      setReceptivoActionsModal(prev => ({
+        ...prev,
+        isSubmitting: false,
+        error: err.message || 'Error al cancelar el tour',
       }));
     }
   };
@@ -3712,6 +3923,216 @@ const AgencyTours: React.FC = () => {
         </div>
       )}
 
+      {/* Modal de Acciones para Tours Receptivos (por slot) */}
+      {receptivoActionsModal.open && receptivoActionsModal.tour && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {(() => {
+              const { action, tour, slots, selectedSlot, isLoadingSlots, isSubmitting, error, success, reason, newSlotDate, newSlotTime, bookingsInSlot } = receptivoActionsModal;
+
+              const actionConfig = {
+                'slot-cancel': {
+                  title: 'Cancelar un Slot Especifico',
+                  icon: <XCircle className="h-6 w-6 text-orange-600" />,
+                  iconBg: 'bg-orange-100',
+                  successMsg: 'Slot cancelado. Los viajeros afectados seran notificados y reembolsados.',
+                },
+                'slot-reschedule': {
+                  title: 'Reagendar un Slot Especifico',
+                  icon: <CalendarX className="h-6 w-6 text-amber-600" />,
+                  iconBg: 'bg-amber-100',
+                  successMsg: 'Slot reagendado. Los viajeros seran notificados con la nueva fecha y hora.',
+                },
+                'full-cancel': {
+                  title: 'Cancelar Tour Completo',
+                  icon: <Ban className="h-6 w-6 text-red-700" />,
+                  iconBg: 'bg-red-100',
+                  successMsg: 'Tour cancelado completamente. Todos los viajeros seran notificados y reembolsados.',
+                },
+              }[action!] || { title: '', icon: null, iconBg: '', successMsg: '' };
+
+              return (
+                <>
+                  <div className="flex items-center mb-5">
+                    <div className={`w-10 h-10 ${actionConfig.iconBg} rounded-full flex items-center justify-center mr-3`}>
+                      {actionConfig.icon}
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">{actionConfig.title}</h2>
+                      <p className="text-sm text-gray-500">{tour.name}</p>
+                    </div>
+                  </div>
+
+                  {success ? (
+                    <div className="text-center py-10">
+                      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <p className="text-gray-700 font-medium">{actionConfig.successMsg}</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-5">
+                      {action === 'full-cancel' && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-sm font-semibold text-red-900 mb-1">Esta accion detendra el tour de forma permanente</p>
+                              <p className="text-sm text-red-800">Todos los slots futuros seran cancelados. Los viajeros con reservas activas recibiran un reembolso del 100%. Usa esta opcion solo si ya no vas a operar este tour.</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {action !== 'full-cancel' && (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Selecciona el slot a {action === 'slot-cancel' ? 'cancelar' : 'reagendar'}
+                            </label>
+                            {isLoadingSlots ? (
+                              <div className="flex items-center justify-center py-8">
+                                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600"></div>
+                              </div>
+                            ) : slots.length === 0 ? (
+                              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center text-gray-500 text-sm">
+                                No hay slots futuros disponibles para este tour.
+                              </div>
+                            ) : (
+                              <div className="max-h-52 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                                {slots.map((slot) => (
+                                  <button
+                                    key={slot.id}
+                                    type="button"
+                                    onClick={() => handleSelectSlot(slot)}
+                                    className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center justify-between ${selectedSlot?.id === slot.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''}`}
+                                  >
+                                    <div>
+                                      <p className="text-sm font-medium text-gray-900">
+                                        {format(new Date(slot.slot_date + 'T00:00:00'), 'EEEE dd/MM/yyyy').replace(/^\w/, c => c.toUpperCase())}
+                                      </p>
+                                      <p className="text-xs text-gray-500">
+                                        Salida: {slot.departure_time?.slice(0, 5)} &bull; Capacidad: {slot.booked_count}/{slot.capacity}
+                                      </p>
+                                    </div>
+                                    {selectedSlot?.id === slot.id && (
+                                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">Seleccionado</span>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {selectedSlot && bookingsInSlot > 0 && (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
+                              <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                              <p className="text-sm text-yellow-800">
+                                <span className="font-medium">{bookingsInSlot} {bookingsInSlot === 1 ? 'viajero sera afectado' : 'viajeros seran afectados'}.</span>
+                                {action === 'slot-cancel' && ' Se emitira un reembolso del 100% del anticipo en ToursRed Cash.'}
+                                {action === 'slot-reschedule' && ' Se les notificara la nueva fecha y podran aceptar o rechazar el cambio.'}
+                              </p>
+                            </div>
+                          )}
+
+                          {action === 'slot-reschedule' && selectedSlot && (
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Nueva Fecha</label>
+                                <input
+                                  type="date"
+                                  value={newSlotDate}
+                                  min={new Date().toISOString().split('T')[0]}
+                                  onChange={(e) => setReceptivoActionsModal(prev => ({ ...prev, newSlotDate: e.target.value }))}
+                                  className="input w-full"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Nueva Hora de Salida</label>
+                                <input
+                                  type="time"
+                                  value={newSlotTime}
+                                  onChange={(e) => setReceptivoActionsModal(prev => ({ ...prev, newSlotTime: e.target.value }))}
+                                  className="input w-full"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Motivo {action === 'full-cancel' ? '(min. 50 caracteres)' : '(min. 20 caracteres)'} *
+                        </label>
+                        <textarea
+                          value={reason}
+                          onChange={(e) => setReceptivoActionsModal(prev => ({ ...prev, reason: e.target.value }))}
+                          className="input w-full"
+                          rows={4}
+                          placeholder={
+                            action === 'full-cancel'
+                              ? 'Explica el motivo por el que se cancela definitivamente este tour (zona cerrada, falta de quorum, etc.)...'
+                              : action === 'slot-cancel'
+                              ? 'Explica el motivo de la cancelacion de esta fecha (clima, aforo minimo no alcanzado, etc.)...'
+                              : 'Explica el motivo del cambio de fecha y hora...'
+                          }
+                        />
+                        <p className="text-xs text-gray-400 mt-1">{reason.length} caracteres</p>
+                      </div>
+
+                      {error && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4 flex-shrink-0" />{error}
+                        </div>
+                      )}
+
+                      <div className="flex justify-end gap-3 pt-3 border-t">
+                        <button
+                          type="button"
+                          onClick={handleCloseReceptivoActions}
+                          disabled={isSubmitting}
+                          className="btn btn-outline"
+                        >
+                          Volver
+                        </button>
+                        <button
+                          type="button"
+                          onClick={action === 'full-cancel' ? handleSubmitReceptivoFullCancel : handleSubmitReceptivoSlotAction}
+                          disabled={
+                            isSubmitting ||
+                            (action !== 'full-cancel' && !selectedSlot) ||
+                            (action === 'full-cancel' && reason.trim().length < 50) ||
+                            (action !== 'full-cancel' && reason.trim().length < 20)
+                          }
+                          className={`btn text-white disabled:opacity-50 disabled:cursor-not-allowed ${
+                            action === 'full-cancel' ? 'bg-red-700 hover:bg-red-800' :
+                            action === 'slot-cancel' ? 'bg-orange-600 hover:bg-orange-700' :
+                            'bg-amber-600 hover:bg-amber-700'
+                          }`}
+                        >
+                          {isSubmitting ? (
+                            <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>Procesando...</>
+                          ) : action === 'full-cancel' ? (
+                            <><Ban className="h-4 w-4 mr-2" />Cancelar Tour Definitivamente</>
+                          ) : action === 'slot-cancel' ? (
+                            <><XCircle className="h-4 w-4 mr-2" />Cancelar este Slot</>
+                          ) : (
+                            <><CalendarX className="h-4 w-4 mr-2" />Reagendar este Slot</>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
       {/* Modal de Cancelar Tour */}
       {cancelModal.open && cancelModal.tour && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -3956,26 +4377,53 @@ const AgencyTours: React.FC = () => {
                         <Edit className="h-4 w-4" />
                       </button>
                     )}
-                    {canEdit && (
-                      <button
-                        onClick={() => handleOpenReschedule(tour)}
-                        className="p-2 text-gray-400 hover:text-amber-600 transition-colors"
-                        title="Reagendar tour"
-                        disabled={isSubmitting || isCreating || editingTour || duplicatingTour || new Date(tour.start_date) < new Date() || tour.cancelled_by_agency}
-                      >
-                        <CalendarX className="h-4 w-4" />
-                      </button>
-                    )}
-                    {canEdit && (
-                      <button
-                        onClick={() => handleOpenCancel(tour)}
-                        className="p-2 text-gray-400 hover:text-orange-600 transition-colors"
-                        title="Cancelar tour completo"
-                        disabled={isSubmitting || isCreating || editingTour || duplicatingTour || new Date(tour.start_date) <= new Date() || tour.cancelled_by_agency}
-                      >
-                        <XCircle className="h-4 w-4" />
-                      </button>
-                    )}
+                    {canEdit && tour.tour_type === 'receptivo' ? (
+                      <>
+                        <button
+                          onClick={() => handleOpenReceptivoActions(tour, 'slot-reschedule')}
+                          className="p-2 text-gray-400 hover:text-amber-600 transition-colors"
+                          title="Reagendar un slot especifico"
+                          disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour || !!tour.cancelled_by_agency}
+                        >
+                          <CalendarX className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenReceptivoActions(tour, 'slot-cancel')}
+                          className="p-2 text-gray-400 hover:text-orange-600 transition-colors"
+                          title="Cancelar un slot especifico"
+                          disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour || !!tour.cancelled_by_agency}
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenReceptivoActions(tour, 'full-cancel')}
+                          className="p-2 text-gray-400 hover:text-red-700 transition-colors"
+                          title="Cancelar tour completo (dejar de operar)"
+                          disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour || !!tour.cancelled_by_agency}
+                        >
+                          <Ban className="h-4 w-4" />
+                        </button>
+                      </>
+                    ) : canEdit ? (
+                      <>
+                        <button
+                          onClick={() => handleOpenReschedule(tour)}
+                          className="p-2 text-gray-400 hover:text-amber-600 transition-colors"
+                          title="Reagendar tour"
+                          disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour || new Date(tour.start_date) < new Date() || !!tour.cancelled_by_agency}
+                        >
+                          <CalendarX className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenCancel(tour)}
+                          className="p-2 text-gray-400 hover:text-orange-600 transition-colors"
+                          title="Cancelar tour completo"
+                          disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour || new Date(tour.start_date) <= new Date() || !!tour.cancelled_by_agency}
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </button>
+                      </>
+                    ) : null}
                     {canCreate && (
                       <button
                         onClick={() => handleDuplicate(tour)}
