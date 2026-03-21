@@ -1002,7 +1002,7 @@ const AgencyTours: React.FC = () => {
           .from('tour_slots')
           .select('*')
           .eq('tour_id', tour.id)
-          .eq('status', 'available')
+          .in('status', ['activo', 'lleno'])
           .gte('slot_date', today)
           .order('slot_date', { ascending: true })
           .order('departure_time', { ascending: true });

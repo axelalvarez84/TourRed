@@ -178,7 +178,7 @@ Deno.serve(async (req: Request) => {
         departure_time: reschedule_to_time + ":00",
         capacity: slot.capacity,
         booked_count: 0,
-        status: "available",
+        status: "activo",
         is_auto_generated: false,
         min_travelers_reached: false,
         notes: `Reagendado desde ${slot.slot_date} ${slot.departure_time}. Motivo: ${cancellation_reason}`,
