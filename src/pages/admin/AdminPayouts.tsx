@@ -523,6 +523,7 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
   const [notes, setNotes] = useState('');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const loadPaymentDetails = async () => {
@@ -569,6 +570,7 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
     if (!paymentDetails || !paymentDetails.records) return;
 
     setIsProcessing(true);
+    setErrorMessage(null);
 
     try {
       const commissionIds = paymentDetails.records.map((r: any) => r.id);
@@ -581,7 +583,7 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
         const timestamp = Date.now();
         const fileName = `${agencyId || tourId}_${timestamp}.${fileExt}`;
 
-        const { error: uploadError, data: uploadData } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('payment-receipts')
           .upload(fileName, receiptFile);
 
@@ -598,7 +600,7 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
         setUploadingReceipt(false);
       }
 
-      const { error: updateError } = await supabase
+      const { error: updateError, count } = await supabase
         .from('commission_records')
         .update({
           status: 'processed',
@@ -609,14 +611,15 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
           payment_receipt_filename: receiptFilename,
           notified_at: new Date().toISOString()
         })
-        .in('id', commissionIds);
+        .in('id', commissionIds)
+        .select('id');
 
       if (updateError) throw updateError;
 
       const agencyIdToNotify = agencyId || paymentDetails.records[0]?.agency_id;
 
       if (agencyIdToNotify) {
-        await supabase.functions.invoke('send-payout-confirmation', {
+        const { error: emailError } = await supabase.functions.invoke('send-payout-confirmation', {
           body: {
             agency_id: agencyIdToNotify,
             commission_ids: commissionIds,
@@ -626,12 +629,15 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
             receipt_url: receiptUrl
           }
         });
+        if (emailError) {
+          console.error('Error enviando confirmacion de pago por email:', emailError);
+        }
       }
 
       onSuccess();
     } catch (error: any) {
       console.error('Error processing payment:', error);
-      alert('Error al procesar el pago: ' + error.message);
+      setErrorMessage(error.message || 'Error desconocido al procesar el pago');
     } finally {
       setIsProcessing(false);
       setUploadingReceipt(false);
@@ -736,6 +742,18 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
                 </div>
               </div>
             </div>
+
+            {errorMessage && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-red-800">
+                    <p className="font-medium mb-1">Error al procesar el pago:</p>
+                    <p>{errorMessage}</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-4">
               <button
