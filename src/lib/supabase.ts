@@ -1731,40 +1731,25 @@ export const processCancellation = async (
       }
     }
 
-    if (policy.amountToAgency > 0) {
-      const { data: existingCommission } = await supabase
-        .from('commission_records')
-        .select('*')
-        .eq('booking_id', bookingId)
-        .maybeSingle();
+    if (policy.amountToAgency > 0 && (policy.policyType === '50_percent' || policy.policyType === 'no_refund')) {
+      const { error: penaltyError } = await supabase
+        .from('cancellation_penalty_records')
+        .insert({
+          booking_id: bookingId,
+          agency_id: booking.agency_id,
+          tour_id: booking.tour_id,
+          cancellation_type: 'full',
+          cancellation_id: cancellation.id,
+          cancellation_policy_type: policy.policyType,
+          original_booking_amount: policy.originalDepositAmount,
+          gross_penalty: policy.originalDepositAmount - policy.refundAmountToTraveler,
+          agency_net_amount: policy.amountToAgency,
+          platform_amount: policy.amountToPlatform,
+          status: 'pending'
+        });
 
-      if (existingCommission) {
-        const { error: updateCommissionError } = await supabase
-          .from('commission_records')
-          .update({
-            agency_amount: policy.amountToAgency,
-            platform_amount: policy.amountToPlatform,
-            status: 'pending'
-          })
-          .eq('id', existingCommission.id);
-
-        if (updateCommissionError) {
-          console.error('⚠️ Error actualizando commission_record:', updateCommissionError);
-        }
-      } else {
-        const { error: createCommissionError } = await supabase
-          .from('commission_records')
-          .insert({
-            booking_id: bookingId,
-            agency_id: booking.agency_id,
-            agency_amount: policy.amountToAgency,
-            platform_amount: policy.amountToPlatform,
-            status: 'pending'
-          });
-
-        if (createCommissionError) {
-          console.error('⚠️ Error creando commission_record:', createCommissionError);
-        }
+      if (penaltyError) {
+        console.error('⚠️ Error creando cancellation_penalty_record:', penaltyError);
       }
     }
 
@@ -2085,32 +2070,25 @@ export const processPartialCancellation = async (
 
     if (updateBookingError) throw updateBookingError;
 
-    if (policy.amountToAgency > 0) {
-      const { data: existingCommission } = await supabase
-        .from('commission_records')
-        .select('id, agency_amount, platform_amount')
-        .eq('booking_id', bookingId)
-        .maybeSingle();
+    if (policy.amountToAgency > 0 && (policy.policyType === '50_percent' || policy.policyType === 'no_refund')) {
+      const { error: penaltyError } = await supabase
+        .from('cancellation_penalty_records')
+        .insert({
+          booking_id: bookingId,
+          agency_id: booking.agency_id,
+          tour_id: (booking.tours as any).id,
+          cancellation_type: 'partial',
+          partial_cancellation_id: partialCancellation.id,
+          cancellation_policy_type: policy.policyType,
+          original_booking_amount: policy.originalPartialAmount,
+          gross_penalty: policy.originalPartialAmount - policy.refundAmountToTraveler,
+          agency_net_amount: policy.amountToAgency,
+          platform_amount: policy.amountToPlatform,
+          status: 'pending'
+        });
 
-      if (existingCommission) {
-        await supabase
-          .from('commission_records')
-          .update({
-            agency_amount: Number(existingCommission.agency_amount || 0) + policy.amountToAgency,
-            platform_amount: Number(existingCommission.platform_amount || 0) + policy.amountToPlatform,
-            status: 'pending'
-          })
-          .eq('id', existingCommission.id);
-      } else {
-        await supabase
-          .from('commission_records')
-          .insert({
-            booking_id: bookingId,
-            agency_id: booking.agency_id,
-            agency_amount: policy.amountToAgency,
-            platform_amount: policy.amountToPlatform,
-            status: 'pending'
-          });
+      if (penaltyError) {
+        console.error('⚠️ Error creando cancellation_penalty_record (parcial):', penaltyError);
       }
     }
 

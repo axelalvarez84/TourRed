@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { DollarSign, Calendar, Clock, CheckCircle, AlertCircle, Download, Plus, RefreshCw, Upload } from 'lucide-react';
+import { DollarSign, Calendar, Clock, CheckCircle, AlertCircle, Download, Plus, RefreshCw, Upload, ShieldAlert } from 'lucide-react';
 import { formatCurrencyMXN } from '../../utils/formatCurrency';
-import { format, isAfter } from 'date-fns';
+import { format } from 'date-fns';
 import type { CommissionRecord, Agency, Tour, AgencyPayout } from '../../types';
 
 interface AgencyPayoutSummary {
   agency_id: string;
   agency_name: string;
+  total_pending_commissions: number;
+  total_pending_penalties: number;
   total_pending: number;
-  tours_count: number;
   commission_records_count: number;
+  penalty_records_count: number;
   last_payout_date?: string;
   days_since_last_payout?: number;
   frequency: string;
@@ -37,13 +39,17 @@ interface CompletedTourData {
 
 const AdminPayouts: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [view, setView] = useState<'by-agency' | 'by-tour'>('by-tour');
+  const [view, setView] = useState<'by-agency' | 'by-tour' | 'penalties'>('by-tour');
   const [agencySummaries, setAgencySummaries] = useState<AgencyPayoutSummary[]>([]);
   const [completedTours, setCompletedTours] = useState<CompletedTourData[]>([]);
+  const [penaltyRecords, setPenaltyRecords] = useState<any[]>([]);
   const [tourFilter, setTourFilter] = useState<'pending' | 'processed' | 'all'>('pending');
+  const [penaltyFilter, setPenaltyFilter] = useState<'pending' | 'processed' | 'all'>('pending');
   const [selectedAgency, setSelectedAgency] = useState<string | null>(null);
   const [selectedTour, setSelectedTour] = useState<string | null>(null);
+  const [selectedPenaltyIds, setSelectedPenaltyIds] = useState<string[]>([]);
   const [showProcessModal, setShowProcessModal] = useState(false);
+  const [showPenaltyModal, setShowPenaltyModal] = useState(false);
   const [isCreatingCommissions, setIsCreatingCommissions] = useState(false);
   const [creationMessage, setCreationMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
@@ -54,11 +60,12 @@ const AdminPayouts: React.FC = () => {
   const fetchPayoutData = async () => {
     try {
       setIsLoading(true);
-
       if (view === 'by-agency') {
         await fetchAgencyView();
-      } else {
+      } else if (view === 'by-tour') {
         await fetchTourView();
+      } else {
+        await fetchPenaltiesView();
       }
     } catch (error) {
       console.error('Error fetching payout data:', error);
@@ -68,25 +75,25 @@ const AdminPayouts: React.FC = () => {
   };
 
   const fetchAgencyView = async () => {
-    const { data: commissionRecords, error } = await supabase
-      .from('commission_records')
-      .select(`
-        *,
-        agencies!inner(id, name)
-      `)
-      .eq('status', 'pending');
+    const [commissionsRes, penaltiesRes] = await Promise.all([
+      supabase
+        .from('commission_records')
+        .select('*, agencies!inner(id, name)')
+        .eq('status', 'pending'),
+      supabase
+        .from('cancellation_penalty_records')
+        .select('*, agencies!inner(id, name)')
+        .eq('status', 'pending'),
+    ]);
 
-    if (error) {
-      console.error('Error fetching commission records:', error);
-      throw error;
-    }
+    if (commissionsRes.error) throw commissionsRes.error;
 
-    if (!commissionRecords || commissionRecords.length === 0) {
-      setAgencySummaries([]);
-      return;
-    }
-
-    const agencyIds = [...new Set(commissionRecords.map(r => r.agency_id))];
+    const agencyIds = [
+      ...new Set([
+        ...(commissionsRes.data || []).map((r: any) => r.agency_id),
+        ...(penaltiesRes.data || []).map((r: any) => r.agency_id),
+      ])
+    ];
 
     const { data: payoutSchedules } = await supabase
       .from('payout_schedules')
@@ -94,34 +101,45 @@ const AdminPayouts: React.FC = () => {
       .in('agency_id', agencyIds);
 
     const scheduleMap = new Map(payoutSchedules?.map(s => [s.agency_id, s]) || []);
-
     const agencyMap = new Map<string, AgencyPayoutSummary>();
 
-    commissionRecords?.forEach((record) => {
-      const agencyId = record.agency_id;
+    const ensureAgency = (agencyId: string, agencyName: string) => {
       if (!agencyMap.has(agencyId)) {
         const schedule = scheduleMap.get(agencyId);
         const lastPayoutDate = schedule?.last_payout_date;
         const daysSince = lastPayoutDate
           ? Math.floor((Date.now() - new Date(lastPayoutDate).getTime()) / (1000 * 60 * 60 * 24))
           : undefined;
-
         agencyMap.set(agencyId, {
           agency_id: agencyId,
-          agency_name: record.agencies.name,
+          agency_name: agencyName,
+          total_pending_commissions: 0,
+          total_pending_penalties: 0,
           total_pending: 0,
-          tours_count: 0,
           commission_records_count: 0,
+          penalty_records_count: 0,
           last_payout_date: lastPayoutDate,
           days_since_last_payout: daysSince,
           frequency: schedule?.frequency || 'weekly',
           next_scheduled_payout: schedule?.next_scheduled_payout,
         });
       }
+    };
 
-      const summary = agencyMap.get(agencyId)!;
-      summary.total_pending += Number(record.agency_net_amount);
-      summary.commission_records_count++;
+    commissionsRes.data?.forEach((record: any) => {
+      ensureAgency(record.agency_id, record.agencies.name);
+      const s = agencyMap.get(record.agency_id)!;
+      s.total_pending_commissions += Number(record.agency_net_amount);
+      s.commission_records_count++;
+      s.total_pending += Number(record.agency_net_amount);
+    });
+
+    penaltiesRes.data?.forEach((record: any) => {
+      ensureAgency(record.agency_id, record.agencies.name);
+      const s = agencyMap.get(record.agency_id)!;
+      s.total_pending_penalties += Number(record.agency_net_amount);
+      s.penalty_records_count++;
+      s.total_pending += Number(record.agency_net_amount);
     });
 
     setAgencySummaries(Array.from(agencyMap.values()).sort((a, b) => b.total_pending - a.total_pending));
@@ -129,70 +147,75 @@ const AdminPayouts: React.FC = () => {
 
   const fetchTourView = async () => {
     const { data, error } = await supabase.rpc('get_completed_tours_with_commission_status');
-
-    if (error) {
-      console.error('Error fetching completed tours:', error);
-      throw error;
-    }
-
+    if (error) throw error;
     setCompletedTours(data || []);
+  };
+
+  const fetchPenaltiesView = async () => {
+    const { data, error } = await supabase
+      .from('cancellation_penalty_records')
+      .select(`
+        *,
+        agencies(name),
+        tours(name, start_date),
+        bookings(booking_code, user_id)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    setPenaltyRecords(data || []);
   };
 
   const createCommissionRecords = async (tourId: string) => {
     setIsCreatingCommissions(true);
     setCreationMessage(null);
-
     try {
       const { data, error } = await supabase.rpc('create_commission_records_for_tour', {
         p_tour_id: tourId
       });
-
       if (error) throw error;
-
       if (data.success) {
         setCreationMessage({
           type: 'success',
           text: `${data.created_count} comisiones creadas para "${data.tour_name}". ${data.skipped_count > 0 ? `${data.skipped_count} ya existían.` : ''}`
         });
-
         await fetchPayoutData();
       } else {
-        setCreationMessage({
-          type: 'error',
-          text: data.message || 'Error al crear comisiones'
-        });
+        setCreationMessage({ type: 'error', text: data.message || 'Error al crear comisiones' });
       }
     } catch (error: any) {
-      console.error('Error creating commission records:', error);
-      setCreationMessage({
-        type: 'error',
-        text: error.message || 'Error al crear comisiones'
-      });
+      setCreationMessage({ type: 'error', text: error.message || 'Error al crear comisiones' });
     } finally {
       setIsCreatingCommissions(false);
-
-      setTimeout(() => {
-        setCreationMessage(null);
-      }, 5000);
+      setTimeout(() => setCreationMessage(null), 5000);
     }
   };
 
   const formatCurrency = (amount: number) => formatCurrencyMXN(amount);
 
   const getFrequencyBadge = (frequency: string) => {
-    const labels = {
-      weekly: 'Semanal',
-      biweekly: 'Quincenal',
-      monthly: 'Mensual',
-      custom: 'Personalizado',
+    const labels: Record<string, string> = {
+      weekly: 'Semanal', biweekly: 'Quincenal', monthly: 'Mensual', custom: 'Personalizado',
     };
-
     return (
       <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-        {labels[frequency as keyof typeof labels] || frequency}
+        {labels[frequency] || frequency}
       </span>
     );
   };
+
+  const getPolicyBadge = (policyType: string) => {
+    if (policyType === '50_percent') {
+      return <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium">50% Penalización</span>;
+    }
+    return <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-medium">Sin Reembolso</span>;
+  };
+
+  const filteredPenalties = penaltyRecords.filter(r => {
+    if (penaltyFilter === 'pending') return r.status === 'pending';
+    if (penaltyFilter === 'processed') return r.status === 'processed';
+    return true;
+  });
 
   if (isLoading) {
     return (
@@ -206,19 +229,15 @@ const AdminPayouts: React.FC = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Gestión de Pagos</h1>
-        <p className="mt-2 text-gray-600">
-          Administra y procesa pagos a agencias
-        </p>
+        <p className="mt-2 text-gray-600">Administra y procesa pagos a agencias</p>
       </div>
 
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div className="flex gap-4 mb-6">
+        <div className="flex gap-4 mb-6 flex-wrap">
           <button
             onClick={() => setView('by-agency')}
             className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-              view === 'by-agency'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              view === 'by-agency' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             Por Agencia
@@ -226,47 +245,41 @@ const AdminPayouts: React.FC = () => {
           <button
             onClick={() => setView('by-tour')}
             className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-              view === 'by-tour'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              view === 'by-tour' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             Por Tour Completado
           </button>
+          <button
+            onClick={() => setView('penalties')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${
+              view === 'penalties' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <ShieldAlert className="h-4 w-4" />
+            Penalizaciones por Cancelación
+          </button>
         </div>
 
-        {view === 'by-agency' ? (
+        {view === 'by-agency' && (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Agencia
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total Pendiente
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Registros
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Último Pago
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Frecuencia
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Próximo Pago
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Acciones
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agencia</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Comisiones Pendientes</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Penalizaciones Pendientes</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total a Pagar</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Último Pago</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frecuencia</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Próximo Pago</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {agencySummaries.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                       No hay pagos pendientes
                     </td>
                   </tr>
@@ -277,30 +290,39 @@ const AdminPayouts: React.FC = () => {
                         <div className="text-sm font-medium text-gray-900">{agency.agency_name}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm font-bold text-green-600">
+                        <div className="text-sm font-semibold text-green-700">
+                          {formatCurrency(agency.total_pending_commissions)}
+                        </div>
+                        <div className="text-xs text-gray-400">{agency.commission_records_count} registros</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {agency.total_pending_penalties > 0 ? (
+                          <>
+                            <div className="text-sm font-semibold text-orange-600">
+                              {formatCurrency(agency.total_pending_penalties)}
+                            </div>
+                            <div className="text-xs text-gray-400">{agency.penalty_records_count} penalizaciones</div>
+                          </>
+                        ) : (
+                          <span className="text-sm text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-bold text-blue-700">
                           {formatCurrency(agency.total_pending)}
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">{agency.commission_records_count}</div>
-                      </td>
-                      <td className="px-6 py-4">
                         {agency.last_payout_date ? (
                           <div>
-                            <div className="text-sm text-gray-900">
-                              {format(new Date(agency.last_payout_date), 'dd/MM/yyyy')}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              Hace {agency.days_since_last_payout} días
-                            </div>
+                            <div className="text-sm text-gray-900">{format(new Date(agency.last_payout_date), 'dd/MM/yyyy')}</div>
+                            <div className="text-xs text-gray-500">Hace {agency.days_since_last_payout} días</div>
                           </div>
                         ) : (
                           <span className="text-sm text-gray-500">Sin pagos previos</span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
-                        {getFrequencyBadge(agency.frequency)}
-                      </td>
+                      <td className="px-6 py-4">{getFrequencyBadge(agency.frequency)}</td>
                       <td className="px-6 py-4">
                         {agency.next_scheduled_payout ? (
                           <div className="text-sm text-gray-900">
@@ -327,7 +349,9 @@ const AdminPayouts: React.FC = () => {
               </tbody>
             </table>
           </div>
-        ) : (
+        )}
+
+        {view === 'by-tour' && (
           <div>
             {creationMessage && (
               <div className={`mb-4 p-4 rounded-lg ${
@@ -336,16 +360,11 @@ const AdminPayouts: React.FC = () => {
                   : 'bg-red-100 text-red-800 border border-red-200'
               }`}>
                 <div className="flex items-center gap-2">
-                  {creationMessage.type === 'success' ? (
-                    <CheckCircle className="h-5 w-5" />
-                  ) : (
-                    <AlertCircle className="h-5 w-5" />
-                  )}
+                  {creationMessage.type === 'success' ? <CheckCircle className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
                   <p className="text-sm font-medium">{creationMessage.text}</p>
                 </div>
               </div>
             )}
-
             <div className="flex gap-2 mb-4">
               {(['pending', 'processed', 'all'] as const).map((f) => (
                 <button
@@ -353,11 +372,7 @@ const AdminPayouts: React.FC = () => {
                   onClick={() => setTourFilter(f)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     tourFilter === f
-                      ? f === 'pending'
-                        ? 'bg-yellow-500 text-white'
-                        : f === 'processed'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-700 text-white'
+                      ? f === 'pending' ? 'bg-yellow-500 text-white' : f === 'processed' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
@@ -365,105 +380,53 @@ const AdminPayouts: React.FC = () => {
                 </button>
               ))}
             </div>
-
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Tour
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Agencia
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Fecha Fin
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Dias Completado
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Reservas
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Comision
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Estado
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Acciones
-                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tour</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agencia</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Fin</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dias Completado</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reservas</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Comision</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {(() => {
                     const filtered = completedTours.filter((tour) => {
-                      if (tourFilter === 'pending') {
-                        return tour.payment_status === 'pending' || tour.payment_status === 'partial' || tour.payment_status === 'no_commissions';
-                      }
-                      if (tourFilter === 'processed') {
-                        return tour.payment_status === 'processed';
-                      }
+                      if (tourFilter === 'pending') return tour.payment_status === 'pending' || tour.payment_status === 'partial' || tour.payment_status === 'no_commissions';
+                      if (tourFilter === 'processed') return tour.payment_status === 'processed';
                       return true;
                     });
-
                     if (filtered.length === 0) {
                       return (
                         <tr>
                           <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
-                            {tourFilter === 'processed'
-                              ? 'No hay tours con pagos procesados'
-                              : tourFilter === 'pending'
-                              ? 'No hay tours pendientes de pago'
-                              : 'No hay tours completados'}
+                            {tourFilter === 'processed' ? 'No hay tours con pagos procesados' : tourFilter === 'pending' ? 'No hay tours pendientes de pago' : 'No hay tours completados'}
                           </td>
                         </tr>
                       );
                     }
-
                     return filtered.map((tour) => (
                       <tr key={tour.tour_id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900">{tour.tour_name}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900">{tour.agency_name}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900">
-                            {format(new Date(tour.end_date), 'dd/MM/yyyy')}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900">{tour.days_completed} dias</div>
-                        </td>
+                        <td className="px-6 py-4"><div className="text-sm font-medium text-gray-900">{tour.tour_name}</div></td>
+                        <td className="px-6 py-4"><div className="text-sm text-gray-900">{tour.agency_name}</div></td>
+                        <td className="px-6 py-4"><div className="text-sm text-gray-900">{format(new Date(tour.end_date), 'dd/MM/yyyy')}</div></td>
+                        <td className="px-6 py-4"><div className="text-sm text-gray-900">{tour.days_completed} dias</div></td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-900">{tour.bookings_count}</div>
-                          {tour.commission_records_exist && (
-                            <div className="text-xs text-gray-500">
-                              {tour.commission_records_count} comisiones
-                            </div>
-                          )}
+                          {tour.commission_records_exist && <div className="text-xs text-gray-500">{tour.commission_records_count} comisiones</div>}
                         </td>
                         <td className="px-6 py-4">
                           {tour.payment_status === 'processed' ? (
-                            <div>
-                              <div className="text-sm font-bold text-blue-600">
-                                {formatCurrency(tour.total_commission_processed)}
-                              </div>
-                              <div className="text-xs text-gray-400">pagado</div>
-                            </div>
+                            <div><div className="text-sm font-bold text-blue-600">{formatCurrency(tour.total_commission_processed)}</div><div className="text-xs text-gray-400">pagado</div></div>
                           ) : tour.commission_records_exist ? (
                             <div>
-                              <div className="text-sm font-bold text-green-600">
-                                {formatCurrency(tour.total_commission_pending)}
-                              </div>
-                              {tour.payment_status === 'partial' && (
-                                <div className="text-xs text-gray-400">
-                                  +{formatCurrency(tour.total_commission_processed)} pagado
-                                </div>
-                              )}
+                              <div className="text-sm font-bold text-green-600">{formatCurrency(tour.total_commission_pending)}</div>
+                              {tour.payment_status === 'partial' && <div className="text-xs text-gray-400">+{formatCurrency(tour.total_commission_processed)} pagado</div>}
                             </div>
                           ) : (
                             <span className="text-sm text-gray-400">-</span>
@@ -471,68 +434,37 @@ const AdminPayouts: React.FC = () => {
                         </td>
                         <td className="px-6 py-4">
                           {tour.payment_status === 'no_commissions' ? (
-                            <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full font-medium">
-                              Sin Comisiones
-                            </span>
+                            <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full font-medium">Sin Comisiones</span>
                           ) : tour.payment_status === 'processed' ? (
-                            <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
-                              Pagado
-                            </span>
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">Pagado</span>
                           ) : tour.payment_status === 'partial' ? (
-                            <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full font-medium">
-                              Pago Parcial
-                            </span>
+                            <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full font-medium">Pago Parcial</span>
                           ) : tour.ready_for_payout ? (
-                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
-                              Listo para Pago
-                            </span>
+                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">Listo para Pago</span>
                           ) : (
-                            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium">
-                              En Espera
-                            </span>
+                            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium">En Espera</span>
                           )}
                         </td>
                         <td className="px-6 py-4">
                           {tour.payment_status === 'processed' ? (
-                            <div className="flex items-center gap-2 text-sm text-blue-600">
-                              <CheckCircle className="h-4 w-4" />
-                              <span>Pago Completado</span>
-                            </div>
+                            <div className="flex items-center gap-2 text-sm text-blue-600"><CheckCircle className="h-4 w-4" /><span>Pago Completado</span></div>
                           ) : !tour.commission_records_exist && tour.can_create_commissions ? (
                             <button
                               onClick={() => createCommissionRecords(tour.tour_id)}
                               disabled={isCreatingCommissions}
-                              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50"
                             >
-                              {isCreatingCommissions ? (
-                                <>
-                                  <RefreshCw className="h-4 w-4 animate-spin" />
-                                  Creando...
-                                </>
-                              ) : (
-                                <>
-                                  <Plus className="h-4 w-4" />
-                                  Crear Comisiones
-                                </>
-                              )}
+                              {isCreatingCommissions ? <><RefreshCw className="h-4 w-4 animate-spin" />Creando...</> : <><Plus className="h-4 w-4" />Crear Comisiones</>}
                             </button>
                           ) : tour.ready_for_payout ? (
                             <button
-                              onClick={() => {
-                                setSelectedTour(tour.tour_id);
-                                setSelectedAgency(tour.agency_id);
-                                setShowProcessModal(true);
-                              }}
+                              onClick={() => { setSelectedTour(tour.tour_id); setSelectedAgency(tour.agency_id); setShowProcessModal(true); }}
                               className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm font-medium"
                             >
-                              <DollarSign className="h-4 w-4" />
-                              Procesar Pago
+                              <DollarSign className="h-4 w-4" />Procesar Pago
                             </button>
                           ) : tour.commission_records_exist && tour.payment_status === 'pending' ? (
-                            <div className="flex items-center gap-2 text-sm text-gray-500">
-                              <Clock className="h-4 w-4" />
-                              <span>Esperando {3 - tour.days_completed} dias</span>
-                            </div>
+                            <div className="flex items-center gap-2 text-sm text-gray-500"><Clock className="h-4 w-4" /><span>Esperando {3 - tour.days_completed} dias</span></div>
                           ) : (
                             <span className="text-sm text-gray-400">-</span>
                           )}
@@ -545,24 +477,115 @@ const AdminPayouts: React.FC = () => {
             </div>
           </div>
         )}
+
+        {view === 'penalties' && (
+          <div>
+            <div className="flex gap-2 mb-4">
+              {(['pending', 'processed', 'all'] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setPenaltyFilter(f)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    penaltyFilter === f
+                      ? f === 'pending' ? 'bg-orange-500 text-white' : f === 'processed' ? 'bg-green-600 text-white' : 'bg-gray-700 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {f === 'pending' ? 'Pendientes' : f === 'processed' ? 'Pagadas' : 'Todas'}
+                </button>
+              ))}
+            </div>
+
+            {filteredPenalties.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-lg">
+                <ShieldAlert className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 font-medium">No hay penalizaciones {penaltyFilter === 'pending' ? 'pendientes' : penaltyFilter === 'processed' ? 'pagadas' : ''}</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agencia</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tour</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Política</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto Bruto</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Neto Agencia</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredPenalties.map((record) => (
+                      <tr key={record.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm text-gray-900">{format(new Date(record.created_at), 'dd/MM/yyyy')}</td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{record.agencies?.name || '-'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900">{record.tours?.name || '-'}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 text-xs rounded-full font-medium ${record.cancellation_type === 'full' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                            {record.cancellation_type === 'full' ? 'Total' : 'Parcial'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">{getPolicyBadge(record.cancellation_policy_type)}</td>
+                        <td className="px-6 py-4 text-sm font-semibold text-gray-900">{formatCurrency(Number(record.gross_penalty))}</td>
+                        <td className="px-6 py-4 text-sm font-bold text-orange-700">{formatCurrency(Number(record.agency_net_amount))}</td>
+                        <td className="px-6 py-4">
+                          {record.status === 'pending' ? (
+                            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium">Pendiente</span>
+                          ) : (
+                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">Pagada</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          {record.status === 'pending' ? (
+                            <button
+                              onClick={() => { setSelectedPenaltyIds([record.id]); setSelectedAgency(record.agency_id); setShowPenaltyModal(true); }}
+                              className="flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 text-sm font-medium"
+                            >
+                              <DollarSign className="h-4 w-4" />Pagar
+                            </button>
+                          ) : (
+                            <div className="text-sm text-gray-500">
+                              {record.processed_at ? format(new Date(record.processed_at), 'dd/MM/yyyy') : '-'}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-gray-50">
+                    <tr className="font-bold">
+                      <td colSpan={5} className="px-6 py-4 text-sm text-gray-900">TOTALES</td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{formatCurrency(filteredPenalties.reduce((s, r) => s + Number(r.gross_penalty), 0))}</td>
+                      <td className="px-6 py-4 text-sm text-orange-700">{formatCurrency(filteredPenalties.reduce((s, r) => s + Number(r.agency_net_amount), 0))}</td>
+                      <td colSpan={2}></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {showProcessModal && (
         <ProcessPaymentModal
           isOpen={showProcessModal}
-          onClose={() => {
-            setShowProcessModal(false);
-            setSelectedAgency(null);
-            setSelectedTour(null);
-          }}
+          onClose={() => { setShowProcessModal(false); setSelectedAgency(null); setSelectedTour(null); }}
           agencyId={selectedAgency}
           tourId={selectedTour}
-          onSuccess={async () => {
-            await fetchPayoutData();
-            setShowProcessModal(false);
-            setSelectedAgency(null);
-            setSelectedTour(null);
-          }}
+          onSuccess={async () => { await fetchPayoutData(); setShowProcessModal(false); setSelectedAgency(null); setSelectedTour(null); }}
+        />
+      )}
+
+      {showPenaltyModal && (
+        <ProcessPenaltyModal
+          isOpen={showPenaltyModal}
+          penaltyIds={selectedPenaltyIds}
+          onClose={() => { setShowPenaltyModal(false); setSelectedPenaltyIds([]); setSelectedAgency(null); }}
+          onSuccess={async () => { await fetchPayoutData(); setShowPenaltyModal(false); setSelectedPenaltyIds([]); setSelectedAgency(null); }}
         />
       )}
     </div>
@@ -577,13 +600,7 @@ interface ProcessPaymentModalProps {
   onSuccess: () => void;
 }
 
-const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
-  isOpen,
-  onClose,
-  agencyId,
-  tourId,
-  onSuccess
-}) => {
+const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({ isOpen, onClose, agencyId, tourId, onSuccess }) => {
   const formatCurrency = (amount: number) => formatCurrencyMXN(amount);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
@@ -599,31 +616,32 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
         try {
           let query = supabase
             .from('commission_records')
-            .select(`
-              *,
-              agencies!inner(id, name),
-              tours!inner(id, name)
-            `)
+            .select('*, agencies!inner(id, name), tours!inner(id, name)')
             .eq('status', 'pending');
-
-          if (tourId) {
-            query = query.eq('tour_id', tourId);
-          } else if (agencyId) {
-            query = query.eq('agency_id', agencyId);
-          }
-
+          if (tourId) query = query.eq('tour_id', tourId);
+          else if (agencyId) query = query.eq('agency_id', agencyId);
           const { data, error } = await query;
-
           if (error) throw error;
 
-          const totalAmount = data?.reduce((sum, record) => sum + Number(record.agency_net_amount), 0) || 0;
-          const recordsCount = data?.length || 0;
+          let penaltyQuery = supabase
+            .from('cancellation_penalty_records')
+            .select('*, agencies!inner(id, name)')
+            .eq('status', 'pending');
+          if (agencyId) penaltyQuery = penaltyQuery.eq('agency_id', agencyId);
+          const { data: penalties } = await penaltyQuery;
+
+          const commissionTotal = data?.reduce((sum, r) => sum + Number(r.agency_net_amount), 0) || 0;
+          const penaltyTotal = penalties?.reduce((sum, r) => sum + Number(r.agency_net_amount), 0) || 0;
 
           setPaymentDetails({
             records: data,
-            totalAmount,
-            recordsCount,
-            agencyName: data?.[0]?.agencies?.name || '',
+            penalties: penalties || [],
+            totalAmount: commissionTotal + penaltyTotal,
+            commissionTotal,
+            penaltyTotal,
+            recordsCount: data?.length || 0,
+            penaltiesCount: penalties?.length || 0,
+            agencyName: data?.[0]?.agencies?.name || penalties?.[0]?.agencies?.name || '',
             tourName: data?.[0]?.tours?.name || ''
           });
         } catch (error) {
@@ -635,83 +653,79 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
   }, [isOpen, agencyId, tourId]);
 
   const processPayment = async () => {
-    if (!paymentDetails || !paymentDetails.records) return;
-
+    if (!paymentDetails) return;
     setIsProcessing(true);
     setErrorMessage(null);
-
     try {
-      const commissionIds = paymentDetails.records.map((r: any) => r.id);
       let receiptUrl = null;
       let receiptFilename = null;
-
       if (receiptFile) {
         setUploadingReceipt(true);
         const fileExt = receiptFile.name.split('.').pop();
-        const timestamp = Date.now();
-        const fileName = `${agencyId || tourId}_${timestamp}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('payment-receipts')
-          .upload(fileName, receiptFile);
-
-        if (uploadError) {
-          throw new Error('Error al subir comprobante: ' + uploadError.message);
-        }
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('payment-receipts')
-          .getPublicUrl(fileName);
-
+        const fileName = `${agencyId || tourId}_${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage.from('payment-receipts').upload(fileName, receiptFile);
+        if (uploadError) throw new Error('Error al subir comprobante: ' + uploadError.message);
+        const { data: { publicUrl } } = supabase.storage.from('payment-receipts').getPublicUrl(fileName);
         receiptUrl = publicUrl;
         receiptFilename = receiptFile.name;
         setUploadingReceipt(false);
       }
 
-      const { error: updateError, count } = await supabase
-        .from('commission_records')
-        .update({
-          status: 'processed',
-          processed_at: new Date().toISOString(),
-          payment_method: paymentMethod,
-          payment_notes: notes || null,
-          payment_receipt_url: receiptUrl,
-          payment_receipt_filename: receiptFilename,
-          notified_at: new Date().toISOString()
-        })
-        .in('id', commissionIds)
-        .select('id');
+      if (paymentDetails.records?.length > 0) {
+        const commissionIds = paymentDetails.records.map((r: any) => r.id);
+        const { error: updateError } = await supabase
+          .from('commission_records')
+          .update({
+            status: 'processed',
+            processed_at: new Date().toISOString(),
+            payment_method: paymentMethod,
+            payment_notes: notes || null,
+            payment_receipt_url: receiptUrl,
+            payment_receipt_filename: receiptFilename,
+            notified_at: new Date().toISOString()
+          })
+          .in('id', commissionIds);
+        if (updateError) throw updateError;
+      }
 
-      if (updateError) throw updateError;
+      if (paymentDetails.penalties?.length > 0) {
+        const penaltyIds = paymentDetails.penalties.map((r: any) => r.id);
+        const { error: penaltyUpdateError } = await supabase
+          .from('cancellation_penalty_records')
+          .update({
+            status: 'processed',
+            processed_at: new Date().toISOString(),
+            payment_method: paymentMethod,
+            payment_notes: notes || null,
+            payment_receipt_url: receiptUrl,
+            payment_receipt_filename: receiptFilename,
+          })
+          .in('id', penaltyIds);
+        if (penaltyUpdateError) throw penaltyUpdateError;
+      }
 
-      const agencyIdToNotify = agencyId || paymentDetails.records[0]?.agency_id;
-
-      if (agencyIdToNotify) {
-        const { error: emailError } = await supabase.functions.invoke('send-payout-confirmation', {
+      const agencyIdToNotify = agencyId || paymentDetails.records?.[0]?.agency_id;
+      if (agencyIdToNotify && paymentDetails.records?.length > 0) {
+        await supabase.functions.invoke('send-payout-confirmation', {
           body: {
             agency_id: agencyIdToNotify,
-            commission_ids: commissionIds,
+            commission_ids: paymentDetails.records.map((r: any) => r.id),
             total_amount: paymentDetails.totalAmount,
             payment_method: paymentMethod,
             payment_notes: notes,
             receipt_url: receiptUrl
           }
         });
-        if (emailError) {
-          console.error('Error enviando confirmacion de pago por email:', emailError);
-        }
       }
 
       onSuccess();
     } catch (error: any) {
-      console.error('Error processing payment:', error);
       setErrorMessage(error.message || 'Error desconocido al procesar el pago');
     } finally {
       setIsProcessing(false);
       setUploadingReceipt(false);
     }
   };
-
 
   if (!isOpen) return null;
 
@@ -722,36 +736,42 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
           <h3 className="text-2xl font-bold text-gray-900">Procesar Pago</h3>
           {paymentDetails && (
             <p className="mt-2 text-gray-600">
-              {tourId
-                ? `Tour: ${paymentDetails.tourName}`
-                : `Agencia: ${paymentDetails.agencyName}`}
+              {tourId ? `Tour: ${paymentDetails.tourName}` : `Agencia: ${paymentDetails.agencyName}`}
             </p>
           )}
         </div>
 
         {paymentDetails ? (
           <div className="space-y-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Total a Pagar</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {formatCurrency(paymentDetails.totalAmount)}
-                  </p>
+                  <p className="text-2xl font-bold text-blue-600">{formatCurrency(paymentDetails.totalAmount)}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Comisiones</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {paymentDetails.recordsCount}
-                  </p>
+                  <p className="text-sm text-gray-600">Registros</p>
+                  <p className="text-2xl font-bold text-gray-900">{paymentDetails.recordsCount + paymentDetails.penaltiesCount}</p>
                 </div>
               </div>
+              {paymentDetails.commissionTotal > 0 && (
+                <div className="border-t border-blue-200 pt-3 grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">Comisiones de tours: </span>
+                    <span className="font-semibold text-green-700">{formatCurrency(paymentDetails.commissionTotal)}</span>
+                  </div>
+                  {paymentDetails.penaltyTotal > 0 && (
+                    <div>
+                      <span className="text-gray-600">Penalizaciones: </span>
+                      <span className="font-semibold text-orange-600">{formatCurrency(paymentDetails.penaltyTotal)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Método de Pago
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Método de Pago</label>
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value as any)}
@@ -766,29 +786,19 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Comprobante de Pago (opcional)
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Comprobante de Pago (opcional)</label>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/jpg,application/pdf"
                 onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
-              <p className="mt-1 text-xs text-gray-500">
-                Formatos permitidos: JPG, PNG, PDF (máx. 5MB)
-              </p>
-              {receiptFile && (
-                <p className="mt-2 text-sm text-green-600">
-                  Archivo seleccionado: {receiptFile.name}
-                </p>
-              )}
+              <p className="mt-1 text-xs text-gray-500">Formatos permitidos: JPG, PNG, PDF (máx. 5MB)</p>
+              {receiptFile && <p className="mt-2 text-sm text-green-600">Archivo seleccionado: {receiptFile.name}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notas (opcional)
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Notas (opcional)</label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -801,13 +811,7 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-yellow-800">
-                  <p className="font-medium mb-1">Importante:</p>
-                  <p>
-                    Al confirmar, las comisiones se marcarán como procesadas. Asegúrate de
-                    haber realizado la transferencia bancaria antes de continuar.
-                  </p>
-                </div>
+                <p className="text-sm text-yellow-800">Al confirmar, los registros se marcarán como procesados. Asegúrate de haber realizado la transferencia antes de continuar.</p>
               </div>
             </div>
 
@@ -815,50 +819,150 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm text-red-800">
-                    <p className="font-medium mb-1">Error al procesar el pago:</p>
-                    <p>{errorMessage}</p>
-                  </div>
+                  <div className="text-sm text-red-800"><p className="font-medium mb-1">Error:</p><p>{errorMessage}</p></div>
                 </div>
               </div>
             )}
 
             <div className="flex gap-4">
-              <button
-                onClick={onClose}
-                disabled={isProcessing}
-                className="flex-1 bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300 font-medium disabled:opacity-50"
-              >
-                Cancelar
-              </button>
+              <button onClick={onClose} disabled={isProcessing} className="flex-1 bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300 font-medium disabled:opacity-50">Cancelar</button>
               <button
                 onClick={processPayment}
                 disabled={isProcessing || uploadingReceipt}
                 className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {uploadingReceipt ? (
-                  <>
-                    <Upload className="h-5 w-5 animate-pulse" />
-                    Subiendo comprobante...
-                  </>
-                ) : isProcessing ? (
-                  <>
-                    <RefreshCw className="h-5 w-5 animate-spin" />
-                    Procesando...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="h-5 w-5" />
-                    Confirmar Pago
-                  </>
-                )}
+                {uploadingReceipt ? <><Upload className="h-5 w-5 animate-pulse" />Subiendo...</> : isProcessing ? <><RefreshCw className="h-5 w-5 animate-spin" />Procesando...</> : <><CheckCircle className="h-5 w-5" />Confirmar Pago</>}
               </button>
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center py-12">
-            <RefreshCw className="h-8 w-8 animate-spin text-blue-600" />
+          <div className="flex items-center justify-center py-12"><RefreshCw className="h-8 w-8 animate-spin text-blue-600" /></div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+interface ProcessPenaltyModalProps {
+  isOpen: boolean;
+  penaltyIds: string[];
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const ProcessPenaltyModal: React.FC<ProcessPenaltyModalProps> = ({ isOpen, penaltyIds, onClose, onSuccess }) => {
+  const formatCurrency = (amount: number) => formatCurrencyMXN(amount);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [details, setDetails] = useState<any>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'bank_transfer' | 'check' | 'paypal' | 'mercadopago' | 'other'>('bank_transfer');
+  const [notes, setNotes] = useState('');
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!isOpen || penaltyIds.length === 0) return;
+      const { data } = await supabase
+        .from('cancellation_penalty_records')
+        .select('*, agencies(name), tours(name)')
+        .in('id', penaltyIds);
+      const total = data?.reduce((s, r) => s + Number(r.agency_net_amount), 0) || 0;
+      setDetails({ records: data, total, agencyName: data?.[0]?.agencies?.name || '' });
+    };
+    load();
+  }, [isOpen, penaltyIds]);
+
+  const processPayment = async () => {
+    if (!details) return;
+    setIsProcessing(true);
+    setErrorMessage(null);
+    try {
+      let receiptUrl = null;
+      let receiptFilename = null;
+      if (receiptFile) {
+        setUploadingReceipt(true);
+        const fileExt = receiptFile.name.split('.').pop();
+        const fileName = `penalty_${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage.from('payment-receipts').upload(fileName, receiptFile);
+        if (uploadError) throw new Error('Error al subir comprobante: ' + uploadError.message);
+        const { data: { publicUrl } } = supabase.storage.from('payment-receipts').getPublicUrl(fileName);
+        receiptUrl = publicUrl;
+        receiptFilename = receiptFile.name;
+        setUploadingReceipt(false);
+      }
+
+      const { error } = await supabase
+        .from('cancellation_penalty_records')
+        .update({
+          status: 'processed',
+          processed_at: new Date().toISOString(),
+          payment_method: paymentMethod,
+          payment_notes: notes || null,
+          payment_receipt_url: receiptUrl,
+          payment_receipt_filename: receiptFilename,
+        })
+        .in('id', penaltyIds);
+
+      if (error) throw error;
+      onSuccess();
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Error al procesar el pago');
+    } finally {
+      setIsProcessing(false);
+      setUploadingReceipt(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div className="mb-6">
+          <h3 className="text-2xl font-bold text-gray-900">Pagar Penalización</h3>
+          {details && <p className="mt-2 text-gray-600">Agencia: {details.agencyName}</p>}
+        </div>
+        {details ? (
+          <div className="space-y-5">
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <p className="text-sm text-gray-600">Total de Penalización a Pagar</p>
+              <p className="text-2xl font-bold text-orange-600">{formatCurrency(details.total)}</p>
+              <p className="text-xs text-gray-500 mt-1">{penaltyIds.length} registro(s)</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Método de Pago</label>
+              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as any)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <option value="bank_transfer">Transferencia Bancaria</option>
+                <option value="check">Cheque</option>
+                <option value="paypal">PayPal</option>
+                <option value="mercadopago">Mercado Pago</option>
+                <option value="other">Otro</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Comprobante (opcional)</label>
+              <input type="file" accept="image/jpeg,image/png,image/jpg,application/pdf" onChange={(e) => setReceiptFile(e.target.files?.[0] || null)} className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
+              {receiptFile && <p className="mt-2 text-sm text-green-600">{receiptFile.name}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Notas (opcional)</label>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Notas adicionales..." />
+            </div>
+            {errorMessage && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
+                <AlertCircle className="h-4 w-4 inline mr-2" />{errorMessage}
+              </div>
+            )}
+            <div className="flex gap-4">
+              <button onClick={onClose} disabled={isProcessing} className="flex-1 bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300 font-medium disabled:opacity-50">Cancelar</button>
+              <button onClick={processPayment} disabled={isProcessing || uploadingReceipt} className="flex-1 bg-orange-600 text-white px-6 py-3 rounded-lg hover:bg-orange-700 font-medium disabled:opacity-50 flex items-center justify-center gap-2">
+                {uploadingReceipt ? <><Upload className="h-5 w-5 animate-pulse" />Subiendo...</> : isProcessing ? <><RefreshCw className="h-5 w-5 animate-spin" />Procesando...</> : <><CheckCircle className="h-5 w-5" />Confirmar Pago</>}
+              </button>
+            </div>
           </div>
+        ) : (
+          <div className="flex items-center justify-center py-12"><RefreshCw className="h-8 w-8 animate-spin text-orange-600" /></div>
         )}
       </div>
     </div>

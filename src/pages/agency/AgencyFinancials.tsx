@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { useAgencyId } from '../../hooks/useAgencyId';
-import { DollarSign, TrendingUp, Calendar, Download, FileText, CheckCircle, Clock, Eye, CreditCard, FileSpreadsheet } from 'lucide-react';
+import { DollarSign, TrendingUp, Calendar, Download, FileText, CheckCircle, Clock, Eye, CreditCard, FileSpreadsheet, ShieldAlert } from 'lucide-react';
 import AgencyCfdiList from '../../components/AgencyCfdiList';
 import { formatCurrencyMXN } from '../../utils/formatCurrency';
 import { format } from 'date-fns';
@@ -24,6 +24,7 @@ const AgencyFinancials: React.FC = () => {
   const [tourSummaries, setTourSummaries] = useState<TourFinancialSummary[]>([]);
   const [commissionRecords, setCommissionRecords] = useState<CommissionRecord[]>([]);
   const [processedPayments, setProcessedPayments] = useState<any[]>([]);
+  const [penaltyRecords, setPenaltyRecords] = useState<any[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -78,6 +79,14 @@ const AgencyFinancials: React.FC = () => {
       if (error) throw error;
 
       setCommissionRecords(records || []);
+
+      const { data: penaltiesData } = await supabase
+        .from('cancellation_penalty_records')
+        .select('*, tours(name, start_date)')
+        .eq('agency_id', agencyId)
+        .order('created_at', { ascending: false });
+
+      setPenaltyRecords(penaltiesData || []);
 
       const pending = records?.filter(r => {
         if (r.status === 'voided' || r.status === 'disputed') return false;
@@ -673,20 +682,20 @@ const AgencyFinancials: React.FC = () => {
           <p className="text-xs text-gray-500 mt-4">Ingresos totales acumulados</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
+        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-orange-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Próximo Pago</p>
+              <p className="text-sm font-medium text-gray-600">Penalizaciones Pendientes</p>
               <p className="text-2xl font-bold text-gray-900 mt-2">
-                {summary.next_payout_date ? format(new Date(summary.next_payout_date), 'dd/MM') : '-'}
+                {formatCurrency(penaltyRecords.filter(r => r.status === 'pending').reduce((s, r) => s + Number(r.agency_net_amount), 0))}
               </p>
             </div>
-            <div className="p-3 bg-purple-100 rounded-full">
-              <Calendar className="h-6 w-6 text-purple-600" />
+            <div className="p-3 bg-orange-100 rounded-full">
+              <ShieldAlert className="h-6 w-6 text-orange-600" />
             </div>
           </div>
           <p className="text-xs text-gray-500 mt-4">
-            {summary.next_payout_amount ? formatCurrency(summary.next_payout_amount) : 'Por determinar'}
+            {penaltyRecords.filter(r => r.status === 'pending').length} cancelaciones con penalización
           </p>
         </div>
       </div>
@@ -899,6 +908,86 @@ const AgencyFinancials: React.FC = () => {
           </div>
         )}
       </div>
+
+      {penaltyRecords.length > 0 && (
+        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <ShieldAlert className="h-5 w-5 text-orange-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Penalizaciones por Cancelación</h2>
+              <p className="text-sm text-gray-500">Montos correspondientes a cancelaciones con política de penalización</p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tour</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Política</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto Bruto</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Te Corresponde</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {penaltyRecords.map((record) => (
+                  <tr key={record.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {format(new Date(record.created_at), 'dd/MM/yyyy')}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                      {record.tours?.name || '-'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 text-xs rounded-full font-medium ${record.cancellation_type === 'full' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {record.cancellation_type === 'full' ? 'Total' : 'Parcial'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {record.cancellation_policy_type === '50_percent' ? (
+                        <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium">50% Penalización</span>
+                      ) : (
+                        <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-medium">Sin Reembolso</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900 font-medium">
+                      {formatCurrency(Number(record.gross_penalty))}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-bold text-orange-700">
+                      {formatCurrency(Number(record.agency_net_amount))}
+                    </td>
+                    <td className="px-6 py-4">
+                      {record.status === 'pending' ? (
+                        <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-sm rounded-full font-medium">Pendiente de pago</span>
+                      ) : (
+                        <div>
+                          <span className="px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full font-medium">Pagado</span>
+                          {record.processed_at && (
+                            <p className="text-xs text-gray-500 mt-1 ml-1">{format(new Date(record.processed_at), 'dd/MM/yyyy')}</p>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-gray-50">
+                <tr className="font-bold">
+                  <td colSpan={4} className="px-6 py-4 text-sm text-gray-900">TOTALES</td>
+                  <td className="px-6 py-4 text-sm text-gray-900">{formatCurrency(penaltyRecords.reduce((s, r) => s + Number(r.gross_penalty), 0))}</td>
+                  <td className="px-6 py-4 text-sm text-orange-700">{formatCurrency(penaltyRecords.reduce((s, r) => s + Number(r.agency_net_amount), 0))}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
         <div className="flex flex-col sm:flex-row items-start gap-4">
