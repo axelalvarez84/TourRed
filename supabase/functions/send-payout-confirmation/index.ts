@@ -33,7 +33,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    console.log("🚀 send-payout-confirmation: Función iniciada");
+    console.log("send-payout-confirmation: Funcion iniciada");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -48,9 +48,9 @@ Deno.serve(async (req: Request) => {
       receipt_url
     }: PayoutConfirmationRequest = await req.json();
 
-    console.log("📝 Agency ID:", agency_id);
-    console.log("📝 Commission IDs:", commission_ids);
-    console.log("💰 Total Amount:", total_amount);
+    console.log("Agency ID:", agency_id);
+    console.log("Commission IDs:", commission_ids);
+    console.log("Total Amount:", total_amount);
 
     const { data: agency, error: agencyError } = await supabase
       .from("agencies")
@@ -59,32 +59,30 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (agencyError || !agency) {
-      console.error("❌ Error al obtener agencia:", agencyError);
+      console.error("Error al obtener agencia:", agencyError);
       throw new Error("Agencia no encontrada");
     }
 
-    const { data: adminSettings, error: settingsError } = await supabase
-      .from("platform_settings")
-      .select("smtp_api_key, admin_email")
-      .eq("id", 1)
-      .single();
+    const { data: emailSettings, error: settingsError } = await supabase
+      .from("email_settings")
+      .select("*")
+      .maybeSingle();
 
-    if (settingsError || !adminSettings?.smtp_api_key) {
-      console.error("❌ Error configuración email:", settingsError);
-      throw new Error("Configuración de email no disponible");
+    if (settingsError || !emailSettings?.smtp_api_key) {
+      console.error("Error configuracion email:", settingsError);
+      throw new Error("Configuracion de email no disponible");
     }
 
-    const { data: logoData } = await supabase
+    const { data: platformSettings } = await supabase
       .from("platform_settings")
-      .select("logo_url")
+      .select("admin_email, logo_url")
       .eq("id", 1)
-      .single();
+      .maybeSingle();
 
-    const logoUrl = logoData?.logo_url || `${supabaseUrl}/storage/v1/object/public/images/logo.png`;
-
+    const logoUrl = platformSettings?.logo_url || "https://huzsedewwzjywcpbkjkm.supabase.co/storage/v1/object/public/images/email-logo.png";
     const agencyEmail = agency.users?.email || agency.email;
     const agencyName = agency.name;
-    const adminEmail = adminSettings.admin_email || "admin@toursred.com";
+    const adminEmail = platformSettings?.admin_email || emailSettings.from_email || "admin@toursred.com";
     const paymentMethodLabel = PAYMENT_METHOD_LABELS[payment_method] || payment_method;
 
     const formattedAmount = new Intl.NumberFormat('es-MX', {
@@ -101,14 +99,14 @@ Deno.serve(async (req: Request) => {
     const receiptSection = receipt_url
       ? `
         <tr>
-          <td style="padding: 20px 0;">
+          <td style="padding: 20px 0 0 0;">
             <table style="width: 100%; border-collapse: collapse;">
               <tr>
-                <td style="padding: 15px; background-color: #f0f9ff; border-radius: 8px;">
-                  <p style="margin: 0 0 10px 0; color: #1e40af; font-weight: 600;">📄 Comprobante de Pago</p>
+                <td style="padding: 15px; background-color: #f0f9ff; border-radius: 8px; border: 1px solid #bae6fd;">
+                  <p style="margin: 0 0 10px 0; color: #0369a1; font-weight: 600; font-size: 14px;">Comprobante de Pago</p>
                   <a href="${receipt_url}"
-                     style="display: inline-block; padding: 10px 20px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">
-                    Ver Comprobante
+                     style="display: inline-block; padding: 10px 20px; background-color: #0369a1; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px;">
+                    Descargar Comprobante
                   </a>
                 </td>
               </tr>
@@ -121,167 +119,191 @@ Deno.serve(async (req: Request) => {
     const notesSection = payment_notes
       ? `
         <tr>
-          <td style="padding: 20px 0;">
-            <p style="color: #4b5563; margin: 0 0 5px 0; font-weight: 600;">Notas:</p>
-            <p style="color: #6b7280; margin: 0;">${payment_notes}</p>
+          <td style="padding: 20px 0 0 0;">
+            <p style="color: #374151; margin: 0 0 5px 0; font-weight: 600; font-size: 14px;">Notas del pago:</p>
+            <p style="color: #6b7280; margin: 0; font-size: 14px; line-height: 1.5;">${payment_notes}</p>
           </td>
         </tr>
       `
       : '';
 
-    const emailHtml = `
-      <!DOCTYPE html>
-      <html lang="es">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Confirmación de Pago</title>
-      </head>
-      <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6;">
-        <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    const htmlContent = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirmacion de Pago</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f3f4f6;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 10px; overflow: hidden; border: 1px solid #e5e7eb;">
+
+          <!-- Header -->
           <tr>
-            <td style="padding: 40px 0;">
-              <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden;">
-                <!-- Header -->
+            <td style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); padding: 35px 30px; text-align: center;">
+              <img src="${logoUrl}" alt="ToursRed" style="max-width: 160px; height: auto; margin-bottom: 18px; display: block; margin-left: auto; margin-right: auto;">
+              <h1 style="color: white; margin: 0; font-size: 26px; font-weight: 700;">Pago Procesado</h1>
+              <p style="color: rgba(255, 255, 255, 0.9); margin: 8px 0 0 0; font-size: 15px;">Se ha realizado un pago a tu agencia</p>
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding: 35px 30px;">
+              <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 18px 0;">
+                Hola <strong>${agencyName}</strong>,
+              </p>
+              <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 0 0 28px 0;">
+                Te informamos que se ha procesado un pago correspondiente a las comisiones generadas por tus tours en ToursRed.
+              </p>
+
+              <!-- Payment Summary Box -->
+              <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
                 <tr>
-                  <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
-                    <img src="${logoUrl}" alt="ToursRed" style="max-width: 180px; height: auto; margin-bottom: 20px;">
-                    <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 700;">💸 Pago Procesado</h1>
-                    <p style="color: rgba(255, 255, 255, 0.9); margin: 10px 0 0 0; font-size: 16px;">Se ha procesado un pago a tu agencia</p>
-                  </td>
-                </tr>
-
-                <!-- Content -->
-                <tr>
-                  <td style="padding: 40px 30px;">
-                    <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-                      Hola <strong>${agencyName}</strong>,
-                    </p>
-
-                    <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 0 0 30px 0;">
-                      Te informamos que se ha procesado un pago correspondiente a las comisiones de tus tours en ToursRed.
-                    </p>
-
-                    <!-- Payment Details -->
-                    <table style="width: 100%; border-collapse: collapse; margin: 30px 0;">
+                  <td style="padding: 24px; background-color: #f0fdf4; border-radius: 10px; border: 1px solid #bbf7d0;">
+                    <table style="width: 100%;">
                       <tr>
-                        <td style="padding: 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px;">
-                          <table style="width: 100%;">
+                        <td style="padding-bottom: 16px; border-bottom: 1px solid #d1fae5;">
+                          <p style="color: #166534; margin: 0; font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Monto Total Pagado</p>
+                          <p style="color: #15803d; margin: 6px 0 0 0; font-size: 34px; font-weight: 700;">${formattedAmount}</p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <table style="width: 100%; margin-top: 16px;">
                             <tr>
-                              <td style="padding: 10px 0;">
-                                <p style="color: rgba(255, 255, 255, 0.9); margin: 0; font-size: 14px;">Monto Total</p>
-                                <p style="color: white; margin: 5px 0 0 0; font-size: 32px; font-weight: 700;">${formattedAmount}</p>
+                              <td style="width: 50%; padding-right: 10px; vertical-align: top;">
+                                <p style="color: #4b5563; margin: 0; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Metodo de Pago</p>
+                                <p style="color: #1f2937; margin: 4px 0 0 0; font-size: 15px; font-weight: 600;">${paymentMethodLabel}</p>
                               </td>
-                            </tr>
-                            <tr>
-                              <td style="padding: 15px 0 5px 0; border-top: 1px solid rgba(255, 255, 255, 0.2);">
-                                <p style="color: rgba(255, 255, 255, 0.9); margin: 0; font-size: 13px;">Método de Pago</p>
-                                <p style="color: white; margin: 5px 0 0 0; font-size: 16px; font-weight: 600;">${paymentMethodLabel}</p>
+                              <td style="width: 25%; padding-right: 10px; vertical-align: top;">
+                                <p style="color: #4b5563; margin: 0; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Comisiones</p>
+                                <p style="color: #1f2937; margin: 4px 0 0 0; font-size: 15px; font-weight: 600;">${commission_ids.length}</p>
                               </td>
-                            </tr>
-                            <tr>
-                              <td style="padding: 10px 0 5px 0;">
-                                <p style="color: rgba(255, 255, 255, 0.9); margin: 0; font-size: 13px;">Comisiones Pagadas</p>
-                                <p style="color: white; margin: 5px 0 0 0; font-size: 16px; font-weight: 600;">${commission_ids.length}</p>
-                              </td>
-                            </tr>
-                            <tr>
-                              <td style="padding: 10px 0 0 0;">
-                                <p style="color: rgba(255, 255, 255, 0.9); margin: 0; font-size: 13px;">Fecha de Pago</p>
-                                <p style="color: white; margin: 5px 0 0 0; font-size: 16px; font-weight: 600;">${currentDate}</p>
+                              <td style="width: 25%; vertical-align: top;">
+                                <p style="color: #4b5563; margin: 0; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Fecha</p>
+                                <p style="color: #1f2937; margin: 4px 0 0 0; font-size: 15px; font-weight: 600;">${currentDate}</p>
                               </td>
                             </tr>
                           </table>
                         </td>
                       </tr>
                     </table>
-
-                    ${receiptSection}
-                    ${notesSection}
-
-                    <table style="width: 100%; margin: 30px 0;">
-                      <tr>
-                        <td style="text-align: center;">
-                          <a href="${supabaseUrl.replace('https://', 'https://www.')}/agency/financials"
-                             style="display: inline-block; padding: 14px 32px; background-color: #7c3aed; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
-                            Ver Estado Financiero
-                          </a>
-                        </td>
-                      </tr>
-                    </table>
-
-                    <div style="margin-top: 30px; padding: 20px; background-color: #f9fafb; border-left: 4px solid #10b981; border-radius: 6px;">
-                      <p style="color: #059669; margin: 0 0 10px 0; font-weight: 600;">ℹ️ Información Importante</p>
-                      <p style="color: #4b5563; margin: 0; font-size: 14px; line-height: 1.6;">
-                        El pago puede tardar de 1 a 3 días hábiles en reflejarse en tu cuenta, dependiendo del método de pago utilizado.
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-
-                <!-- Footer -->
-                <tr>
-                  <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
-                    <p style="color: #6b7280; margin: 0 0 10px 0; font-size: 14px;">
-                      Si tienes alguna pregunta, contáctanos en
-                    </p>
-                    <p style="margin: 0 0 15px 0;">
-                      <a href="mailto:${adminEmail}" style="color: #7c3aed; text-decoration: none; font-weight: 600;">${adminEmail}</a>
-                    </p>
-                    <p style="color: #9ca3af; margin: 0; font-size: 12px;">
-                      © ${new Date().getFullYear()} ToursRed. Todos los derechos reservados.
-                    </p>
                   </td>
                 </tr>
               </table>
+
+              <!-- Receipt and Notes -->
+              <table style="width: 100%; border-collapse: collapse;">
+                ${receiptSection}
+                ${notesSection}
+              </table>
+
+              <!-- CTA Button -->
+              <table style="width: 100%; margin: 30px 0 10px 0;">
+                <tr>
+                  <td style="text-align: center;">
+                    <a href="https://www.toursred.com/agency/financials"
+                       style="display: inline-block; padding: 14px 32px; background-color: #dc2626; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">
+                      Ver Estado Financiero
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Important Note -->
+              <div style="margin-top: 28px; padding: 18px 20px; background-color: #fefce8; border-left: 4px solid #ca8a04; border-radius: 6px;">
+                <p style="color: #92400e; margin: 0 0 6px 0; font-weight: 600; font-size: 14px;">Informacion Importante</p>
+                <p style="color: #78350f; margin: 0; font-size: 13px; line-height: 1.6;">
+                  El pago puede tardar de 1 a 3 dias habiles en reflejarse en tu cuenta, dependiendo del metodo de pago utilizado.
+                </p>
+              </div>
             </td>
           </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 25px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="color: #6b7280; margin: 0 0 8px 0; font-size: 13px;">
+                Si tienes alguna pregunta, contactanos en
+              </p>
+              <p style="margin: 0 0 12px 0;">
+                <a href="mailto:${adminEmail}" style="color: #dc2626; text-decoration: none; font-weight: 600; font-size: 13px;">${adminEmail}</a>
+              </p>
+              <p style="color: #9ca3af; margin: 0; font-size: 12px;">
+                Este es un correo automatico, por favor no respondas a este mensaje.
+              </p>
+              <p style="color: #9ca3af; margin: 6px 0 0 0; font-size: 12px;">
+                &copy; ${new Date().getFullYear()} ToursRed. Todos los derechos reservados.
+              </p>
+            </td>
+          </tr>
+
         </table>
-      </body>
-      </html>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
     `;
 
-    console.log("📧 Enviando email a agencia:", agencyEmail);
+    const textBody = `
+Hola ${agencyName},
 
-    const emailResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
+Se ha procesado un pago correspondiente a las comisiones de tus tours en ToursRed.
+
+DETALLE DEL PAGO:
+- Monto Total: ${formattedAmount}
+- Metodo de Pago: ${paymentMethodLabel}
+- Comisiones Pagadas: ${commission_ids.length}
+- Fecha: ${currentDate}
+${payment_notes ? `- Notas: ${payment_notes}` : ''}
+${receipt_url ? `- Comprobante: ${receipt_url}` : ''}
+
+Puedes consultar tu estado financiero en: https://www.toursred.com/agency/financials
+
+El pago puede tardar de 1 a 3 dias habiles en reflejarse en tu cuenta.
+
+Para cualquier duda, contactanos en: ${adminEmail}
+
+Equipo ToursRed
+    `;
+
+    console.log("Enviando email a agencia:", agencyEmail);
+
+    const emailPayload = {
+      api_key: emailSettings.smtp_api_key,
+      to: [agencyEmail, adminEmail],
+      sender: "no-reply@toursred.com",
+      subject: `Pago Procesado - ${formattedAmount} | ToursRed`,
+      html_body: htmlContent,
+      text_body: textBody,
+    };
+
+    const emailResponse = await fetch("https://api.smtp2go.com/v3/email/send", {
       method: "POST",
       headers: {
-        "Accept": "application/json",
         "Content-Type": "application/json",
-        "api-key": adminSettings.smtp_api_key,
       },
-      body: JSON.stringify({
-        sender: {
-          name: "ToursRed",
-          email: "noreply@toursred.com",
-        },
-        to: [
-          {
-            email: agencyEmail,
-            name: agencyName,
-          },
-          {
-            email: adminEmail,
-            name: "Admin ToursRed",
-          }
-        ],
-        subject: `💸 Pago Procesado - ${formattedAmount}`,
-        htmlContent: emailHtml,
-      }),
+      body: JSON.stringify(emailPayload),
     });
 
-    if (!emailResponse.ok) {
-      const errorText = await emailResponse.text();
-      console.error("❌ Error enviando email:", errorText);
-      throw new Error(`Error al enviar email: ${errorText}`);
+    const result = await emailResponse.json();
+
+    if (!emailResponse.ok || result.data?.error) {
+      console.error("SMTP2GO API Error:", result);
+      throw new Error(result.data?.error || `SMTP2GO API Error: ${emailResponse.status}`);
     }
 
-    console.log("✅ Email enviado exitosamente");
+    console.log("Email enviado exitosamente:", result);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: "Email de confirmación enviado exitosamente"
+        message: "Email de confirmacion enviado exitosamente"
       }),
       {
         status: 200,
@@ -290,10 +312,10 @@ Deno.serve(async (req: Request) => {
     );
 
   } catch (error: any) {
-    console.error("❌ Error en send-payout-confirmation:", error);
+    console.error("Error en send-payout-confirmation:", error);
     return new Response(
       JSON.stringify({
-        error: error.message || "Error al enviar confirmación de pago"
+        error: error.message || "Error al enviar confirmacion de pago"
       }),
       {
         status: 500,
