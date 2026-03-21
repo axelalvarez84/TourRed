@@ -80,16 +80,10 @@ const AgencyFinancials: React.FC = () => {
       setCommissionRecords(records || []);
 
       const pending = records?.filter(r => {
+        if (r.status === 'voided' || r.status === 'disputed') return false;
         const booking = r.bookings;
         if (!booking) return false;
-
-        const isPaid = booking.payment_status === 'succeeded';
-        const isCancelled = booking.cancelled_at || booking.status === 'cancelled';
-
-        if (!isPaid) return false;
-
-        if (isCancelled && Number(r.agency_net_amount) <= 0) return false;
-
+        if (booking.payment_status !== 'succeeded') return false;
         return r.status === 'pending';
       }).reduce((sum, r) => sum + Number(r.agency_net_amount), 0) || 0;
 
@@ -98,32 +92,20 @@ const AgencyFinancials: React.FC = () => {
       startOfMonth.setHours(0, 0, 0, 0);
 
       const paidThisMonth = records?.filter(r => {
+        if (r.status === 'voided' || r.status === 'disputed') return false;
         const booking = r.bookings;
         if (!booking) return false;
-
-        const isPaid = booking.payment_status === 'succeeded';
-        const isCancelled = booking.cancelled_at || booking.status === 'cancelled';
-
-        if (!isPaid) return false;
-
-        if (isCancelled && Number(r.agency_net_amount) <= 0) return false;
-
+        if (booking.payment_status !== 'succeeded') return false;
         if (r.status !== 'processed' && r.status !== 'paid_out') return false;
         const processedDate = new Date(r.processed_at || r.created_at);
         return processedDate >= startOfMonth;
       }).reduce((sum, r) => sum + Number(r.agency_net_amount), 0) || 0;
 
       const totalLifetime = records?.filter(r => {
+        if (r.status === 'voided' || r.status === 'disputed') return false;
         const booking = r.bookings;
         if (!booking) return false;
-
-        const isPaid = booking.payment_status === 'succeeded';
-        const isCancelled = booking.cancelled_at || booking.status === 'cancelled';
-
-        if (!isPaid) return false;
-
-        if (isCancelled && Number(r.agency_net_amount) <= 0) return false;
-
+        if (booking.payment_status !== 'succeeded') return false;
         return r.status === 'processed' || r.status === 'paid_out';
       }).reduce((sum, r) => sum + Number(r.agency_net_amount), 0) || 0;
 
@@ -136,20 +118,15 @@ const AgencyFinancials: React.FC = () => {
       const tourMap = new Map<string, TourFinancialSummary>();
 
       records?.forEach(record => {
+        if (record.status === 'voided' || record.status === 'disputed') return;
+
         const booking = record.bookings;
         if (!booking || !booking.tour_id) return;
 
         const tour = booking.tours;
         if (!tour) return;
 
-        const isPaid = booking.payment_status === 'succeeded';
-        const isCancelled = booking.cancelled_at || booking.status === 'cancelled';
-
-        if (!isPaid) return;
-
-        if (isCancelled && Number(record.agency_net_amount) <= 0) {
-          return;
-        }
+        if (booking.payment_status !== 'succeeded') return;
 
         const tourId = booking.tour_id;
 
@@ -184,16 +161,10 @@ const AgencyFinancials: React.FC = () => {
       const processedPaymentsMap = new Map<string, any>();
 
       records?.filter(r => {
+        if (r.status === 'voided' || r.status === 'disputed') return false;
         const booking = r.bookings;
         if (!booking) return false;
-
-        const isPaid = booking.payment_status === 'succeeded';
-        const isCancelled = booking.cancelled_at || booking.status === 'cancelled';
-
-        if (!isPaid) return false;
-
-        if (isCancelled && Number(r.agency_net_amount) <= 0) return false;
-
+        if (booking.payment_status !== 'succeeded') return false;
         return r.status === 'processed' && r.processed_at;
       }).forEach(record => {
         const paymentDate = format(new Date(record.processed_at), 'yyyy-MM-dd');
