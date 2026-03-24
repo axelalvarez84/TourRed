@@ -858,18 +858,18 @@ const AgencyTours: React.FC = () => {
   };
 
   const handleOpenReschedule = async (tour: Tour) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayUTC = new Date();
+    todayUTC.setUTCHours(0, 0, 0, 0);
 
-    const startDate = new Date(tour.start_date + 'T00:00:00');
-    startDate.setHours(0, 0, 0, 0);
+    const [ty, tm, td] = tour.start_date.split('-').map(Number);
+    const startDate = new Date(Date.UTC(ty, tm - 1, td));
 
-    if (startDate < today) {
+    if (startDate < todayUTC) {
       alert('No puedes reagendar un tour que ya ha iniciado o finalizado.');
       return;
     }
 
-    const daysUntilStart = Math.floor((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const daysUntilStart = Math.floor((startDate.getTime() - todayUTC.getTime()) / (1000 * 60 * 60 * 24));
     if (daysUntilStart < 2) {
       alert('No puedes reagendar un tour con menos de 48 horas (2 días) de anticipación.');
       return;
@@ -940,9 +940,11 @@ const AgencyTours: React.FC = () => {
 
     if (!rescheduleModal.tour || !user) return;
 
-    const today = new Date();
-    const newStartDate = new Date(rescheduleFormData.new_start_date);
-    const daysUntilNewStart = (newStartDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+    const todayUTC = new Date();
+    todayUTC.setUTCHours(0, 0, 0, 0);
+    const [sy, sm, sd] = rescheduleFormData.new_start_date.split('-').map(Number);
+    const newStartDate = new Date(Date.UTC(sy, sm - 1, sd));
+    const daysUntilNewStart = (newStartDate.getTime() - todayUTC.getTime()) / (1000 * 60 * 60 * 24);
 
     if (daysUntilNewStart < 4) {
       setRescheduleModal(prev => ({
@@ -4031,7 +4033,7 @@ const AgencyTours: React.FC = () => {
                             value={rescheduleFormData.new_start_date}
                             onChange={(e) => setRescheduleFormData({ ...rescheduleFormData, new_start_date: e.target.value })}
                             className="input"
-                            min={new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                            min={(() => { const d = new Date(); d.setDate(d.getDate() + 4); return d.toLocaleDateString('en-CA'); })()}
                             required
                           />
                           <p className="text-xs text-gray-500 mt-1">
