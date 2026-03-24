@@ -123,6 +123,24 @@ const TravelerBookings: React.FC = () => {
     action: null,
   });
   const [pendingReschedules, setPendingReschedules] = useState<{ [bookingId: string]: PendingReschedule }>({});
+  const [pendingSlotReschedules, setPendingSlotReschedules] = useState<{ [bookingId: string]: any }>({});
+  const [slotRescheduleModal, setSlotRescheduleModal] = useState<{
+    open: boolean;
+    booking: Booking | null;
+    slotRescheduleInfo: any | null;
+    action: 'accept' | 'reject' | null;
+    isProcessing: boolean;
+    error: string;
+    success: boolean;
+  }>({
+    open: false,
+    booking: null,
+    slotRescheduleInfo: null,
+    action: null,
+    isProcessing: false,
+    error: '',
+    success: false,
+  });
   const [paymentValidationError, setPaymentValidationError] = useState<{
     open: boolean;
     bookingId: string;
@@ -200,6 +218,7 @@ const TravelerBookings: React.FC = () => {
       // Load pending reschedules for bookings that have them
       if (data && data.length > 0) {
         await loadPendingReschedules(data);
+        await loadPendingSlotReschedules(data);
       }
 
     } catch (err: any) {
@@ -230,6 +249,85 @@ const TravelerBookings: React.FC = () => {
     }
 
     setPendingReschedules(reschedules);
+  };
+
+  const loadPendingSlotReschedules = async (bookingsList: Booking[]) => {
+    const slotReschedules: { [bookingId: string]: any } = {};
+
+    for (const booking of bookingsList) {
+      if ((booking as any).has_pending_slot_reschedule) {
+        try {
+          const { data, error } = await supabase
+            .from('slot_reschedule_responses')
+            .select(`
+              *,
+              slot_reschedule_requests!inner(
+                id, resolution_type, reason, response_deadline, status,
+                target_slot_id,
+                tour_slots!slot_reschedule_requests_target_slot_id_fkey(slot_date, departure_time)
+              )
+            `)
+            .eq('booking_id', booking.id)
+            .eq('response', 'pending')
+            .maybeSingle();
+
+          if (!error && data) {
+            slotReschedules[booking.id] = data;
+          }
+        } catch (err) {
+          console.error(`Error loading slot reschedule for booking ${booking.id}:`, err);
+        }
+      }
+    }
+
+    setPendingSlotReschedules(slotReschedules);
+  };
+
+  const handleOpenSlotRescheduleModal = (booking: Booking, action: 'accept' | 'reject') => {
+    const slotRescheduleInfo = pendingSlotReschedules[booking.id];
+    if (!slotRescheduleInfo) {
+      alert('No se encontro informacion del reagendamiento');
+      return;
+    }
+    setSlotRescheduleModal({
+      open: true,
+      booking,
+      slotRescheduleInfo,
+      action,
+      isProcessing: false,
+      error: '',
+      success: false,
+    });
+  };
+
+  const handleRespondToSlotReschedule = async () => {
+    if (!slotRescheduleModal.booking || !slotRescheduleModal.action) return;
+
+    setSlotRescheduleModal(prev => ({ ...prev, isProcessing: true, error: '' }));
+
+    try {
+      const { data, error } = await supabase.functions.invoke('respond-to-slot-reschedule', {
+        body: {
+          booking_id: slotRescheduleModal.booking!.id,
+          response: slotRescheduleModal.action === 'accept' ? 'accepted' : 'rejected',
+        },
+      });
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Error al procesar la respuesta');
+
+      setSlotRescheduleModal(prev => ({ ...prev, isProcessing: false, success: true }));
+      await fetchBookings();
+      setTimeout(() => {
+        setSlotRescheduleModal(prev => ({ ...prev, open: false }));
+      }, 3000);
+    } catch (err: any) {
+      setSlotRescheduleModal(prev => ({
+        ...prev,
+        isProcessing: false,
+        error: err.message || 'Error al procesar la respuesta',
+      }));
+    }
   };
 
   const handleOpenRescheduleModal = (booking: Booking, action: 'accept' | 'reject') => {
@@ -1518,6 +1616,91 @@ const TravelerBookings: React.FC = () => {
                     </div>
                   )}
 
+                  {/* Slot Reschedule Pending Alert */}
+                  {(booking as any).has_pending_slot_reschedule && pendingSlotReschedules[booking.id] && (
+                    <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-sky-50 border-2 border-blue-400 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <Clock className="h-6 w-6 text-blue-600 flex-shrink-0 mt-1" />
+                        <div className="flex-1">
+                          <h4 className="font-bold text-blue-900 text-base mb-1">Cambio de horario pendiente - Respuesta requerida</h4>
+                          <p className="text-sm text-blue-800 mb-3">
+                            <strong>Motivo:</strong> {pendingSlotReschedules[booking.id].slot_reschedule_requests?.reason}
+                          </p>
+
+                          <div className="grid grid-cols-2 gap-4 mb-3 bg-white/60 p-3 rounded-md">
+                            <div>
+                              <div className="text-xs text-gray-600 mb-1">Horario anterior:</div>
+                              <div className="font-semibold text-gray-900 line-through text-sm">
+                                {booking.selected_date} {booking.selected_time?.slice(0, 5)}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-600 mb-1">Nuevo horario:</div>
+                              <div className="font-semibold text-green-700 text-sm">
+                                {pendingSlotReschedules[booking.id].slot_reschedule_requests?.tour_slots?.slot_date}{' '}
+                                {pendingSlotReschedules[booking.id].slot_reschedule_requests?.tour_slots?.departure_time?.slice(0, 5)}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
+                            <p className="text-xs text-yellow-900">
+                              <strong>Plazo para responder:</strong>{' '}
+                              {pendingSlotReschedules[booking.id].slot_reschedule_requests?.response_deadline
+                                ? new Date(pendingSlotReschedules[booking.id].slot_reschedule_requests.response_deadline).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })
+                                : 'N/A'}
+                            </p>
+                            <p className="text-xs text-yellow-800 mt-1">
+                              Si no respondes antes de ese plazo, el nuevo horario se aceptara automaticamente.
+                            </p>
+                          </div>
+
+                          <div className="flex gap-3">
+                            <button
+                              onClick={() => handleOpenSlotRescheduleModal(booking as any, 'accept')}
+                              className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors text-sm"
+                            >
+                              <Check className="h-4 w-4" />
+                              Acepto el nuevo horario
+                            </button>
+                            <button
+                              onClick={() => handleOpenSlotRescheduleModal(booking as any, 'reject')}
+                              className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors text-sm"
+                            >
+                              <X className="h-4 w-4" />
+                              No puedo asistir
+                            </button>
+                          </div>
+
+                          <p className="text-xs text-gray-600 mt-3 italic">
+                            Si rechazas, recibiras un reembolso del 100% en tu ToursRed Cash de forma inmediata.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Slot Reschedule Response Status */}
+                  {!(booking as any).has_pending_slot_reschedule && (booking as any).slot_reschedule_response && (
+                    <div className={`mt-4 p-3 rounded-md border ${
+                      (booking as any).slot_reschedule_response === 'accepted' ? 'bg-green-50 border-green-200' :
+                      (booking as any).slot_reschedule_response === 'rejected' ? 'bg-red-50 border-red-200' :
+                      'bg-blue-50 border-blue-200'
+                    }`}>
+                      <p className={`text-sm ${
+                        (booking as any).slot_reschedule_response === 'accepted' ? 'text-green-800' :
+                        (booking as any).slot_reschedule_response === 'rejected' ? 'text-red-800' :
+                        'text-blue-800'
+                      }`}>
+                        <strong>
+                          {(booking as any).slot_reschedule_response === 'accepted' && '✓ Aceptaste el cambio de horario'}
+                          {(booking as any).slot_reschedule_response === 'rejected' && '✗ Rechazaste el cambio de horario y recibiste reembolso'}
+                          {(booking as any).slot_reschedule_response === 'auto_accepted' && '✓ El cambio de horario fue aceptado automaticamente'}
+                        </strong>
+                      </p>
+                    </div>
+                  )}
+
                   {/* Important Notes */}
                   {(booking as any).is_no_show && (
                     <div className="mt-4 p-3 bg-gray-900 border border-gray-800 rounded-md">
@@ -2730,6 +2913,108 @@ const TravelerBookings: React.FC = () => {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Cambio de Horario (Slot Reschedule) */}
+      {slotRescheduleModal.open && slotRescheduleModal.booking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            {slotRescheduleModal.success ? (
+              <div className="text-center py-8">
+                <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 ${slotRescheduleModal.action === 'accept' ? 'bg-green-100' : 'bg-blue-100'}`}>
+                  {slotRescheduleModal.action === 'accept'
+                    ? <Check className="h-8 w-8 text-green-600" />
+                    : <DollarSign className="h-8 w-8 text-blue-600" />
+                  }
+                </div>
+                <h3 className={`text-xl font-bold mb-2 ${slotRescheduleModal.action === 'accept' ? 'text-green-700' : 'text-blue-700'}`}>
+                  {slotRescheduleModal.action === 'accept' ? 'Nuevo horario aceptado' : 'Reembolso procesado'}
+                </h3>
+                <p className="text-sm text-gray-600">
+                  {slotRescheduleModal.action === 'accept'
+                    ? 'Tu reserva ha sido actualizada con el nuevo horario.'
+                    : 'El reembolso del 100% fue depositado en tu ToursRed Cash.'}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-start gap-3 mb-5">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${slotRescheduleModal.action === 'accept' ? 'bg-green-100' : 'bg-red-100'}`}>
+                    {slotRescheduleModal.action === 'accept'
+                      ? <Check className="h-5 w-5 text-green-600" />
+                      : <X className="h-5 w-5 text-red-600" />
+                    }
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">
+                      {slotRescheduleModal.action === 'accept' ? 'Confirmar aceptacion del nuevo horario' : 'Confirmar rechazo y solicitar reembolso'}
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      {slotRescheduleModal.action === 'accept'
+                        ? 'Tu reserva sera movida al nuevo horario indicado.'
+                        : 'Tu reserva sera cancelada y recibiras un reembolso del 100% en ToursRed Cash.'}
+                    </p>
+                  </div>
+                </div>
+
+                {slotRescheduleModal.slotRescheduleInfo && (
+                  <div className="bg-gray-50 rounded-lg p-4 mb-4 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Horario anterior:</span>
+                      <span className="font-medium text-gray-700 line-through">
+                        {slotRescheduleModal.booking.selected_date} {slotRescheduleModal.booking.selected_time?.slice(0, 5)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Nuevo horario:</span>
+                      <span className="font-medium text-green-700">
+                        {slotRescheduleModal.slotRescheduleInfo.slot_reschedule_requests?.tour_slots?.slot_date}{' '}
+                        {slotRescheduleModal.slotRescheduleInfo.slot_reschedule_requests?.tour_slots?.departure_time?.slice(0, 5)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Motivo:</span>
+                      <span className="text-gray-700 text-right max-w-[200px]">
+                        {slotRescheduleModal.slotRescheduleInfo.slot_reschedule_requests?.reason}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {slotRescheduleModal.error && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 flex items-center gap-2 mb-4">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />{slotRescheduleModal.error}
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setSlotRescheduleModal(prev => ({ ...prev, open: false }))}
+                    disabled={slotRescheduleModal.isProcessing}
+                    className="flex-1 btn btn-outline"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRespondToSlotReschedule}
+                    disabled={slotRescheduleModal.isProcessing}
+                    className={`flex-1 btn text-white disabled:opacity-50 ${slotRescheduleModal.action === 'accept' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                  >
+                    {slotRescheduleModal.isProcessing ? (
+                      <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>Procesando...</>
+                    ) : slotRescheduleModal.action === 'accept' ? (
+                      <><Check className="h-4 w-4 mr-2" />Aceptar nuevo horario</>
+                    ) : (
+                      <><X className="h-4 w-4 mr-2" />Rechazar y obtener reembolso</>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

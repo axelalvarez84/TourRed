@@ -39,7 +39,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json();
-    const { slot_id, tour_id, cancellation_reason, reschedule_to_date, reschedule_to_time } = body;
+    const { slot_id, tour_id, cancellation_reason, reschedule_to_date, reschedule_to_time, check_capacity_only } = body;
 
     if (!slot_id || !tour_id || !cancellation_reason) {
       return new Response(JSON.stringify({ success: false, error: "Faltan campos requeridos" }), {
@@ -102,6 +102,82 @@ Deno.serve(async (req: Request) => {
       .is("cancelled_at", null);
 
     if (bookingsError) throw bookingsError;
+
+    // Si es reagendado, verificar conflicto de cupo en el slot destino
+    if (isReschedule && affectedBookings && affectedBookings.length > 0) {
+      const rescheduleTime = reschedule_to_time.includes(":")
+        ? (reschedule_to_time.split(":").length === 3 ? reschedule_to_time : reschedule_to_time + ":00")
+        : reschedule_to_time + ":00";
+
+      const { data: targetSlots } = await adminClient
+        .from("tour_slots")
+        .select("id, capacity, booked_count, status, slot_date, departure_time")
+        .eq("tour_id", tour_id)
+        .eq("slot_date", reschedule_to_date)
+        .neq("status", "cancelado")
+        .neq("status", "bloqueado");
+
+      const targetSlot = targetSlots?.find((s: any) =>
+        s.departure_time === rescheduleTime || s.departure_time === reschedule_to_time
+      ) || (targetSlots && targetSlots.length === 1 ? targetSlots[0] : null);
+
+      if (targetSlot) {
+        const availableSpots = targetSlot.capacity - targetSlot.booked_count;
+        const travelersAffected = affectedBookings.length;
+
+        if (availableSpots < travelersAffected) {
+          if (check_capacity_only) {
+            return new Response(
+              JSON.stringify({
+                success: true,
+                conflict: true,
+                target_slot: {
+                  id: targetSlot.id,
+                  slot_date: targetSlot.slot_date,
+                  departure_time: targetSlot.departure_time,
+                  capacity: targetSlot.capacity,
+                  booked_count: targetSlot.booked_count,
+                  available_spots: availableSpots,
+                },
+                affected_travelers: travelersAffected,
+                spots_needed: travelersAffected - availableSpots,
+              }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+          // Si no es solo verificacion pero hay conflicto, devolver conflicto igualmente
+          return new Response(
+            JSON.stringify({
+              success: false,
+              conflict: true,
+              target_slot: {
+                id: targetSlot.id,
+                slot_date: targetSlot.slot_date,
+                departure_time: targetSlot.departure_time,
+                capacity: targetSlot.capacity,
+                booked_count: targetSlot.booked_count,
+                available_spots: availableSpots,
+              },
+              affected_travelers: travelersAffected,
+              spots_needed: travelersAffected - availableSpots,
+              error: "No hay cupo suficiente en el slot destino",
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } else if (check_capacity_only) {
+        // No hay slot existente en esa fecha/hora, no hay conflicto
+        return new Response(
+          JSON.stringify({ success: true, conflict: false }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } else if (check_capacity_only) {
+      return new Response(
+        JSON.stringify({ success: true, conflict: false }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const refundPromises = (affectedBookings || []).map(async (booking: any) => {
       const depositAmount = Number(booking.deposit_amount || 0);

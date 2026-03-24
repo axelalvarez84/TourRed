@@ -161,6 +161,34 @@ const AgencyTours: React.FC = () => {
     bookingsInSlot: 0,
   });
 
+  const [capacityConflictModal, setCapacityConflictModal] = useState<{
+    open: boolean;
+    targetSlot: { id: string; slot_date: string; departure_time: string; capacity: number; booked_count: number; available_spots: number } | null;
+    affectedTravelers: number;
+    spotsNeeded: number;
+    originalSlotId: string;
+    tourId: string;
+    reason: string;
+    resolution: 'new_slot' | 'expand_capacity' | 'refund' | null;
+    newSlotTime: string;
+    isSubmitting: boolean;
+    error: string;
+    success: boolean;
+  }>({
+    open: false,
+    targetSlot: null,
+    affectedTravelers: 0,
+    spotsNeeded: 0,
+    originalSlotId: '',
+    tourId: '',
+    reason: '',
+    resolution: null,
+    newSlotTime: '',
+    isSubmitting: false,
+    error: '',
+    success: false,
+  });
+
   const [tourType, setTourType] = useState<TourType>('excursion');
   const [receptivoModality, setReceptivoModality] = useState<ReceptivoModality>('compartido');
   const [receptivoTab, setReceptivoTab] = useState<'info' | 'horarios' | 'bloqueos' | 'calendario'>('info');
@@ -1098,10 +1126,41 @@ const AgencyTours: React.FC = () => {
             cancellation_reason: reason.trim(),
             reschedule_to_date: newSlotDate,
             reschedule_to_time: newSlotTime,
+            check_capacity_only: true,
           },
         });
         if (error) throw error;
-        if (data && !data.success) throw new Error(data.error || 'Error al reagendar el slot');
+
+        if (data?.conflict) {
+          setReceptivoActionsModal(prev => ({ ...prev, isSubmitting: false }));
+          setCapacityConflictModal({
+            open: true,
+            targetSlot: data.target_slot,
+            affectedTravelers: data.affected_travelers,
+            spotsNeeded: data.spots_needed,
+            originalSlotId: selectedSlot.id,
+            tourId: tour.id,
+            reason: reason.trim(),
+            resolution: null,
+            newSlotTime: '',
+            isSubmitting: false,
+            error: '',
+            success: false,
+          });
+          return;
+        }
+
+        const { data: rescheduleData, error: rescheduleError } = await supabase.functions.invoke('process-receptivo-slot-cancellation', {
+          body: {
+            slot_id: selectedSlot.id,
+            tour_id: tour.id,
+            cancellation_reason: reason.trim(),
+            reschedule_to_date: newSlotDate,
+            reschedule_to_time: newSlotTime,
+          },
+        });
+        if (rescheduleError) throw rescheduleError;
+        if (rescheduleData && !rescheduleData.success) throw new Error(rescheduleData.error || 'Error al reagendar el slot');
       }
 
       setReceptivoActionsModal(prev => ({ ...prev, isSubmitting: false, success: true }));
@@ -1114,6 +1173,66 @@ const AgencyTours: React.FC = () => {
         ...prev,
         isSubmitting: false,
         error: err.message || 'Error al procesar la accion',
+      }));
+    }
+  };
+
+  const handleSubmitCapacityConflictResolution = async () => {
+    const { targetSlot, originalSlotId, tourId, reason, resolution, newSlotTime, affectedTravelers } = capacityConflictModal;
+    if (!resolution) {
+      setCapacityConflictModal(prev => ({ ...prev, error: 'Debes seleccionar una opcion.' }));
+      return;
+    }
+
+    if (resolution === 'new_slot' && !newSlotTime) {
+      setCapacityConflictModal(prev => ({ ...prev, error: 'Debes ingresar la hora del nuevo horario.' }));
+      return;
+    }
+
+    setCapacityConflictModal(prev => ({ ...prev, isSubmitting: true, error: '' }));
+
+    try {
+      if (resolution === 'refund') {
+        const { data, error } = await supabase.functions.invoke('process-receptivo-slot-cancellation', {
+          body: {
+            slot_id: originalSlotId,
+            tour_id: tourId,
+            cancellation_reason: reason,
+          },
+        });
+        if (error) throw error;
+        if (data && !data.success) throw new Error(data.error || 'Error al procesar reembolsos');
+      } else {
+        const body: any = {
+          slot_id: originalSlotId,
+          tour_id: tourId,
+          reason: reason,
+          resolution_type: resolution,
+        };
+
+        if (resolution === 'expand_capacity') {
+          body.target_slot_id = targetSlot!.id;
+        } else if (resolution === 'new_slot') {
+          body.new_slot_date = targetSlot!.slot_date;
+          body.new_slot_time = newSlotTime;
+        }
+
+        const { data, error } = await supabase.functions.invoke('process-slot-reschedule-request', { body });
+        if (error) throw error;
+        if (data && !data.success) throw new Error(data.error || 'Error al procesar el reagendado');
+      }
+
+      setCapacityConflictModal(prev => ({ ...prev, isSubmitting: false, success: true }));
+      setTimeout(() => {
+        setCapacityConflictModal(prev => ({ ...prev, open: false }));
+        handleCloseReceptivoActions();
+        fetchAgencyTours();
+      }, 2500);
+    } catch (err: any) {
+      setCapacityConflictModal(prev => ({
+        ...prev,
+        isSubmitting: false,
+        error: err.message || 'Error al procesar la resolucion',
       }));
     }
   };
@@ -4129,6 +4248,180 @@ const AgencyTours: React.FC = () => {
                 </>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Conflicto de Cupo */}
+      {capacityConflictModal.open && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            {capacityConflictModal.success ? (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Solicitud procesada</h3>
+                <p className="text-sm text-gray-600">
+                  {capacityConflictModal.resolution === 'refund'
+                    ? 'Se han procesado los reembolsos a los viajeros afectados.'
+                    : 'Los viajeros tienen 12 horas para aceptar o rechazar el nuevo horario.'}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-start gap-3 mb-5">
+                  <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Conflicto de cupo detectado</h2>
+                    <p className="text-sm text-gray-500 mt-0.5">La fecha destino no tiene suficiente espacio para todos los viajeros afectados.</p>
+                  </div>
+                </div>
+
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-5 grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <p className="text-xs text-orange-700 font-medium mb-1">Cupo disponible</p>
+                    <p className="text-2xl font-bold text-orange-800">{capacityConflictModal.targetSlot?.available_spots ?? 0}</p>
+                    <p className="text-xs text-orange-600">de {capacityConflictModal.targetSlot?.capacity}</p>
+                  </div>
+                  <div className="border-x border-orange-200">
+                    <p className="text-xs text-orange-700 font-medium mb-1">Viajeros afectados</p>
+                    <p className="text-2xl font-bold text-orange-800">{capacityConflictModal.affectedTravelers}</p>
+                    <p className="text-xs text-orange-600">a mover</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-red-700 font-medium mb-1">Espacios faltantes</p>
+                    <p className="text-2xl font-bold text-red-700">{capacityConflictModal.spotsNeeded}</p>
+                    <p className="text-xs text-red-600">sin cupo</p>
+                  </div>
+                </div>
+
+                <p className="text-sm font-semibold text-gray-700 mb-3">Elige como resolver el conflicto:</p>
+
+                <div className="space-y-3 mb-5">
+                  <button
+                    type="button"
+                    onClick={() => setCapacityConflictModal(prev => ({ ...prev, resolution: 'new_slot', error: '' }))}
+                    className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                      capacityConflictModal.resolution === 'new_slot'
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${capacityConflictModal.resolution === 'new_slot' ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                        <Clock className={`h-4 w-4 ${capacityConflictModal.resolution === 'new_slot' ? 'text-blue-600' : 'text-gray-500'}`} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">Abrir nuevo horario</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Crear un horario adicional el {capacityConflictModal.targetSlot?.slot_date} con hora distinta. Los viajeros tendran 12 horas para aceptar o rechazar.</p>
+                      </div>
+                    </div>
+                    {capacityConflictModal.resolution === 'new_slot' && (
+                      <div className="mt-3 ml-11">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Hora del nuevo horario</label>
+                        <input
+                          type="time"
+                          value={capacityConflictModal.newSlotTime}
+                          onChange={(e) => setCapacityConflictModal(prev => ({ ...prev, newSlotTime: e.target.value }))}
+                          className="input text-sm py-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCapacityConflictModal(prev => ({ ...prev, resolution: 'expand_capacity', error: '' }))}
+                    className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                      capacityConflictModal.resolution === 'expand_capacity'
+                        ? 'border-green-500 bg-green-50'
+                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${capacityConflictModal.resolution === 'expand_capacity' ? 'bg-green-100' : 'bg-gray-100'}`}>
+                        <Users className={`h-4 w-4 ${capacityConflictModal.resolution === 'expand_capacity' ? 'text-green-600' : 'text-gray-500'}`} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">Ampliar capacidad del horario existente</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Aumentar el cupo del {capacityConflictModal.targetSlot?.slot_date} a las {capacityConflictModal.targetSlot?.departure_time?.slice(0, 5)} de {capacityConflictModal.targetSlot?.capacity} a {(capacityConflictModal.targetSlot?.booked_count ?? 0) + capacityConflictModal.affectedTravelers} lugares. Los viajeros tendran 12 horas para confirmar.
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCapacityConflictModal(prev => ({ ...prev, resolution: 'refund', error: '' }))}
+                    className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                      capacityConflictModal.resolution === 'refund'
+                        ? 'border-red-400 bg-red-50'
+                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${capacityConflictModal.resolution === 'refund' ? 'bg-red-100' : 'bg-gray-100'}`}>
+                        <XCircle className={`h-4 w-4 ${capacityConflictModal.resolution === 'refund' ? 'text-red-600' : 'text-gray-500'}`} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">Reembolsar a los viajeros afectados</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Cancelar las {capacityConflictModal.affectedTravelers} reserva(s) del slot origen y emitir reembolso del 100% en ToursRed Cash de forma inmediata.</p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                {capacityConflictModal.error && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 flex items-center gap-2 mb-4">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />{capacityConflictModal.error}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-3 pt-3 border-t">
+                  <button
+                    type="button"
+                    onClick={() => setCapacityConflictModal(prev => ({ ...prev, open: false }))}
+                    disabled={capacityConflictModal.isSubmitting}
+                    className="btn btn-outline"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSubmitCapacityConflictResolution}
+                    disabled={
+                      capacityConflictModal.isSubmitting ||
+                      !capacityConflictModal.resolution ||
+                      (capacityConflictModal.resolution === 'new_slot' && !capacityConflictModal.newSlotTime)
+                    }
+                    className={`btn text-white disabled:opacity-50 disabled:cursor-not-allowed ${
+                      capacityConflictModal.resolution === 'refund'
+                        ? 'bg-red-600 hover:bg-red-700'
+                        : capacityConflictModal.resolution === 'expand_capacity'
+                        ? 'bg-green-600 hover:bg-green-700'
+                        : 'bg-blue-600 hover:bg-blue-700'
+                    }`}
+                  >
+                    {capacityConflictModal.isSubmitting ? (
+                      <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>Procesando...</>
+                    ) : capacityConflictModal.resolution === 'refund' ? (
+                      <><XCircle className="h-4 w-4 mr-2" />Reembolsar viajeros</>
+                    ) : capacityConflictModal.resolution === 'expand_capacity' ? (
+                      <><Users className="h-4 w-4 mr-2" />Ampliar y reagendar</>
+                    ) : (
+                      <><Clock className="h-4 w-4 mr-2" />Crear nuevo horario</>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
