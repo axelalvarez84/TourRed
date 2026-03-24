@@ -1848,7 +1848,22 @@ const AgencyTours: React.FC = () => {
 
         if (agencyIdForSchedules) {
           if (editingTour) {
-            // Sync: update existing, insert new ones that have no id yet
+            // Sync completo: actualizar existentes, insertar nuevos, eliminar los que ya no estan en el draft
+            const draftIds = schedulesDraft.filter(s => s.id).map(s => s.id as string);
+
+            const { data: currentSchedules } = await supabase
+              .from('tour_schedules')
+              .select('id')
+              .eq('tour_id', tourId);
+
+            const toDelete = (currentSchedules || [])
+              .map((r: any) => r.id)
+              .filter((id: string) => !draftIds.includes(id));
+
+            if (toDelete.length > 0) {
+              await supabase.from('tour_schedules').delete().in('id', toDelete);
+            }
+
             for (const s of schedulesDraft) {
               if (s.id) {
                 await supabase.from('tour_schedules').update({
