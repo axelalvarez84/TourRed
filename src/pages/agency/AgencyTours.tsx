@@ -1163,7 +1163,11 @@ const AgencyTours: React.FC = () => {
         if (rescheduleData && !rescheduleData.success) throw new Error(rescheduleData.error || 'Error al reagendar el slot');
       }
 
-      setReceptivoActionsModal(prev => ({ ...prev, isSubmitting: false, success: true }));
+      setReceptivoActionsModal(prev => ({
+        ...prev,
+        isSubmitting: false,
+        success: true,
+      }));
       setTimeout(() => {
         handleCloseReceptivoActions();
         fetchAgencyTours();
@@ -4060,7 +4064,7 @@ const AgencyTours: React.FC = () => {
                   title: 'Reagendar un Slot Especifico',
                   icon: <CalendarX className="h-6 w-6 text-amber-600" />,
                   iconBg: 'bg-amber-100',
-                  successMsg: 'Slot reagendado. Los viajeros seran notificados con la nueva fecha y hora.',
+                  successMsg: 'Solicitud enviada. Los viajeros afectados tienen 12 horas para aceptar o rechazar el nuevo horario. Recibiran un email con los detalles.',
                 },
                 'full-cancel': {
                   title: 'Cancelar Tour Completo',

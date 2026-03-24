@@ -268,6 +268,26 @@ Deno.serve(async (req: Request) => {
           resolution_type: resolution_type,
         },
       });
+
+      EdgeRuntime.waitUntil(
+        fetch(`${supabaseUrl}/functions/v1/send-slot-reschedule-notification`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${anonKey}`,
+          },
+          body: JSON.stringify({
+            booking_id: booking.id,
+            request_id: rescheduleRequest.id,
+            original_date: slot.slot_date,
+            original_time: slot.departure_time,
+            new_date: newDate,
+            new_time: newTime,
+            reason: reason,
+            response_deadline: responseDeadline,
+          }),
+        }).catch(() => {})
+      );
     });
 
     await Promise.all(notificationPromises);
