@@ -889,7 +889,7 @@ const AgencyTours: React.FC = () => {
     minNewDate.setDate(minNewDate.getDate() + 4);
 
     setRescheduleFormData({
-      new_start_date: minNewDate.toISOString().split('T')[0],
+      new_start_date: minNewDate.toLocaleDateString('en-CA'),
       new_end_date: '',
       reschedule_reason: '',
     });
