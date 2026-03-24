@@ -1935,6 +1935,14 @@ const AgencyTours: React.FC = () => {
         }
       }
 
+      if (tourId && editingTour) {
+        try {
+          await supabase.rpc('sync_tour_slots_capacity_for_tour', { p_tour_id: tourId });
+        } catch (syncErr) {
+          console.warn('Could not sync slot capacities:', syncErr);
+        }
+      }
+
       // Recargar destinos disponibles después de crear nuevos
       await fetchAllDestinations();
 
@@ -2810,6 +2818,11 @@ const AgencyTours: React.FC = () => {
                                         is_active: scheduleForm.is_active,
                                         updated_at: new Date().toISOString(),
                                       }).eq('id', existing.id);
+                                      try {
+                                        await supabase.rpc('sync_tour_slots_capacity_for_tour', { p_tour_id: editingTour.id });
+                                      } catch (syncErr) {
+                                        console.warn('Could not sync slot capacities:', syncErr);
+                                      }
                                     }
                                     setSchedulesDraft(prev => prev.map((s, i) => i === editingScheduleIdx ? { ...scheduleForm } : s));
                                   } else {
