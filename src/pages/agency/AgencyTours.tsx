@@ -109,6 +109,8 @@ const AgencyTours: React.FC = () => {
     reschedule_reason: '',
   });
 
+  const [editingTourHasActiveBookings, setEditingTourHasActiveBookings] = useState(false);
+
   const [cancelModal, setCancelModal] = useState<{
     open: boolean;
     tour: Tour | null;
@@ -731,6 +733,17 @@ const AgencyTours: React.FC = () => {
       setSchedulesDraft([]);
     }
 
+    if (tour.tour_type === 'excursion') {
+      const { count } = await supabase
+        .from('bookings')
+        .select('*', { count: 'exact', head: true })
+        .eq('tour_id', tour.id)
+        .in('status', ['confirmed', 'pending']);
+      setEditingTourHasActiveBookings((count || 0) > 0);
+    } else {
+      setEditingTourHasActiveBookings(false);
+    }
+
     setEditingTour(tour);
     setIsCreating(false);
   };
@@ -740,6 +753,7 @@ const AgencyTours: React.FC = () => {
     setEditingTour(null);
     resetForm();
     setError('');
+    setEditingTourHasActiveBookings(false);
   };
 
   const handleDelete = async (tourId: string, tourName: string) => {
@@ -1602,8 +1616,8 @@ const AgencyTours: React.FC = () => {
         price: parseFloat(formData.price),
         deposit_percentage: parseInt(formData.deposit_percentage),
         image_url: tourImageData ? tourImageData.base64 : formData.image_url,
-        start_date: isReceptivo ? null : formData.start_date,
-        end_date: isReceptivo ? null : formData.end_date,
+        start_date: isReceptivo ? null : (editingTour && editingTourHasActiveBookings ? editingTour.start_date : formData.start_date),
+        end_date: isReceptivo ? null : (editingTour && editingTourHasActiveBookings ? editingTour.end_date : formData.end_date),
         max_travelers: formData.max_travelers ? parseInt(formData.max_travelers) : null,
         available_spots: isReceptivo ? null : (formData.available_spots ? parseInt(formData.available_spots) : null),
         destination: selectedDestinations.length > 0 ? selectedDestinations[0].name : '',
@@ -2345,32 +2359,75 @@ const AgencyTours: React.FC = () => {
               </div>
               <div className="p-5 space-y-5">
                 {tourType === 'excursion' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                        Fecha de Inicio <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.start_date}
-                        onChange={(e) => setFormData({...formData, start_date: e.target.value})}
-                        className="input"
-                        required={tourType === 'excursion'}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                        Fecha de Fin <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.end_date}
-                        onChange={(e) => setFormData({...formData, end_date: e.target.value})}
-                        className="input"
-                        min={formData.start_date}
-                        required={tourType === 'excursion'}
-                      />
-                    </div>
+                  <div className="space-y-3">
+                    {editingTour && editingTourHasActiveBookings ? (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 mt-0.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-amber-800">Fechas bloqueadas</p>
+                            <p className="text-xs text-amber-700 mt-0.5">
+                              Este tour tiene reservas activas. Para cambiar las fechas debes usar la opcion de reagendar, la cual notifica automaticamente a los viajeros.
+                            </p>
+                            <div className="mt-3 grid grid-cols-2 gap-3">
+                              <div>
+                                <p className="text-xs font-medium text-amber-700 mb-1">Fecha de Inicio</p>
+                                <div className="input bg-amber-100/60 text-amber-900 cursor-not-allowed select-none">
+                                  {formData.start_date || '—'}
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-amber-700 mb-1">Fecha de Fin</p>
+                                <div className="input bg-amber-100/60 text-amber-900 cursor-not-allowed select-none">
+                                  {formData.end_date || '—'}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleCancel();
+                                if (editingTour) handleOpenReschedule(editingTour);
+                              }}
+                              className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-amber-500 hover:bg-amber-600 transition-colors px-3 py-1.5 rounded-lg"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                              Reagendar tour
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                            Fecha de Inicio <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="date"
+                            value={formData.start_date}
+                            onChange={(e) => setFormData({...formData, start_date: e.target.value})}
+                            className="input"
+                            required={tourType === 'excursion'}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                            Fecha de Fin <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="date"
+                            value={formData.end_date}
+                            onChange={(e) => setFormData({...formData, end_date: e.target.value})}
+                            className="input"
+                            min={formData.start_date}
+                            required={tourType === 'excursion'}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
