@@ -82,16 +82,37 @@ Deno.serve(async (req: Request) => {
 
     const { data: agency, error: agencyError } = await supabase
       .from("agencies")
-      .select("id, name, contact_email, logo")
+      .select("id, name, contact_email, logo, user_id")
       .eq("id", agency_id)
-      .eq("user_id", user.id)
       .maybeSingle();
 
     if (agencyError || !agency) {
       return new Response(
-        JSON.stringify({ error: "No tienes permiso para enviar mensajes de esta agencia" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Agencia no encontrada" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    const isOwner = agency.user_id === user.id;
+
+    if (!isOwner) {
+      const { data: staffRecord } = await supabase
+        .from("agency_staff")
+        .select("id, agency_staff_permissions(can_manage_tours, can_view_messages)")
+        .eq("agency_id", agency_id)
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      const perms = staffRecord?.agency_staff_permissions as any;
+      const hasPermission = perms?.can_manage_tours || perms?.can_view_messages;
+
+      if (!staffRecord || !hasPermission) {
+        return new Response(
+          JSON.stringify({ error: "No tienes permiso para enviar mensajes de esta agencia" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     const { data: tour, error: tourError } = await supabase
