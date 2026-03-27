@@ -99,6 +99,10 @@ const TravelerDashboard: React.FC = () => {
             image_url,
             tour_type,
             agencies (name)
+          ),
+          tour_slots (
+            slot_date,
+            departure_time
           )
         `)
         .eq('user_id', user.id)
@@ -106,28 +110,9 @@ const TravelerDashboard: React.FC = () => {
 
       if (bookingsError) throw bookingsError;
 
-      const slotIds = (bookingsData || [])
-        .map(b => b.slot_id)
-        .filter(Boolean);
-
-      let slotsMap: Record<string, { slot_date: string; departure_time: string | null }> = {};
-      if (slotIds.length > 0) {
-        const { data: slotsData } = await supabase
-          .from('tour_slots')
-          .select('id, slot_date, departure_time')
-          .in('id', slotIds);
-        for (const slot of slotsData || []) {
-          slotsMap[slot.id] = slot;
-        }
-      }
-
       const todayDate = new Date(today);
 
       const filteredBookings = (bookingsData || [])
-        .map(booking => ({
-          ...booking,
-          tour_slots: booking.slot_id ? slotsMap[booking.slot_id] || null : null,
-        }))
         .filter(booking => {
           const isReceptivo = booking.tours.tour_type === 'receptivo';
           if (isReceptivo) {
