@@ -745,7 +745,7 @@ export const getUserBookings = async (userId: string) => {
         discount_codes:discount_code_id(code, discount_type, discount_value),
         created_at,
         updated_at,
-        tours:tour_id(id, name, destination, image_url, start_date, end_date, name_changes_not_allowed),
+        tours:tour_id(id, name, destination, image_url, start_date, end_date, name_changes_not_allowed, vehicle_map_type),
         agencies:agency_id(id, name, contact_email)
       `)
       .eq('user_id', userId)

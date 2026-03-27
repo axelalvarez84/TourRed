@@ -1491,6 +1491,31 @@ const TravelerBookings: React.FC = () => {
                     </div>
                   )}
 
+                  {/* Selected Seats */}
+                  {(booking.tours as any)?.vehicle_map_type && (booking as any).selected_seats && (booking as any).selected_seats.length > 0 && !(booking as any).needs_seat_reselection && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                      <h4 className="font-medium mb-2 flex items-center gap-2 text-blue-800">
+                        <Users className="h-4 w-4" />
+                        Asientos Asignados
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {[...(booking as any).selected_seats].sort((a: number, b: number) => a - b).map((seat: number) => (
+                          <span
+                            key={seat}
+                            className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-blue-600 text-white text-sm font-bold shadow-sm"
+                          >
+                            {seat}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-xs text-blue-700 mt-2">
+                        {(booking as any).selected_seats.length === 1
+                          ? '1 asiento reservado'
+                          : `${(booking as any).selected_seats.length} asientos reservados`}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Payment Summary */}
                   <div className="bg-gray-50 rounded-lg p-4 mb-4">
                     <h4 className="font-medium mb-2">Resumen de Pago</h4>
