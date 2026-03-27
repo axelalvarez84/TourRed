@@ -341,7 +341,14 @@ const TravelerBookings: React.FC = () => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        const context = (error as any).context;
+        if (context && typeof context.json === 'function') {
+          const body = await context.json().catch(() => null);
+          throw new Error(body?.error || error.message);
+        }
+        throw error;
+      }
       if (!data?.success) throw new Error(data?.error || 'Error al procesar la respuesta');
 
       setSlotRescheduleModal(prev => ({ ...prev, isProcessing: false, success: true }));
