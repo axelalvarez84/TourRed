@@ -43,30 +43,33 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
   const { data: agencies = [] } = useAgencies();
   const { data: departurePoints = [] } = useDeparturePoints();
 
+  const initialAgencyId = initialFilters.agency;
+
   useEffect(() => {
-    setFilteredAgencies(agencies);
-    if (initialFilters.agency && agencies.length > 0) {
-      const selectedAgency = agencies.find((a: any) => a.id === initialFilters.agency);
+    if (agencies.length === 0) return;
+    if (initialAgencyId) {
+      const selectedAgency = agencies.find((a: any) => a.id === initialAgencyId);
       if (selectedAgency) {
         setSelectedAgencyName(selectedAgency.name);
         setAgencySearchText(selectedAgency.name);
       }
     }
-  }, [agencies, initialFilters.agency]);
+    setFilteredAgencies(agencies);
+  }, [agencies, initialAgencyId]);
 
   useEffect(() => {
     setFilteredDeparturePoints(departurePoints);
   }, [departurePoints]);
 
   useEffect(() => {
-    if (agencySearchText === '') {
+    if (agencySearchText === '' || agencySearchText === selectedAgencyName) {
       setFilteredAgencies(agencies);
     } else {
       setFilteredAgencies(agencies.filter((ag: any) =>
         ag.name.toLowerCase().includes(agencySearchText.toLowerCase())
       ));
     }
-  }, [agencySearchText, agencies]);
+  }, [agencySearchText, agencies, selectedAgencyName]);
 
   useEffect(() => {
     if (departurePointSearchText === '') {
