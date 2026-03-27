@@ -96,7 +96,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: affectedBookings, error: bookingsError } = await adminClient
       .from("bookings")
-      .select("id, user_id, deposit_amount, service_charge, toursred_cash_used")
+      .select("id, user_id, deposit_amount, service_charge, toursred_cash_used, travelers_count")
       .eq("tour_id", tour_id)
       .eq("selected_date", slot.slot_date)
       .eq("selected_time", slot.departure_time)
@@ -128,7 +128,7 @@ Deno.serve(async (req: Request) => {
       // Verificar conflicto de cupo solo si ya hay reservas y hay slot existente en destino
       if (affectedBookings && affectedBookings.length > 0 && targetSlot) {
         const availableSpots = targetSlot.capacity - targetSlot.booked_count;
-        const travelersAffected = affectedBookings.length;
+        const travelersAffected = affectedBookings.reduce((sum: number, b: any) => sum + (b.travelers_count || 1), 0);
 
         if (availableSpots < travelersAffected) {
           // Hay conflicto de cupo - devolver para que la UI muestre opciones
