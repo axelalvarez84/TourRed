@@ -307,6 +307,16 @@ Deno.serve(async (req: Request) => {
           <span class="info-value">${booking.selected_language}</span>
         </div>
         ` : ''}
+        ${booking.selected_seats && Array.isArray(booking.selected_seats) && booking.selected_seats.length > 0 ? `
+        <div class="info-row" style="align-items: flex-start;">
+          <span class="info-label">Asientos asignados:</span>
+          <span class="info-value" style="display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end;">
+            ${[...booking.selected_seats].sort((a: number, b: number) => a - b).map((seat: number) => `
+              <span style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background-color: #2563eb; color: white; font-size: 13px; font-weight: 700; border-radius: 8px;">${seat}</span>
+            `).join('')}
+          </span>
+        </div>
+        ` : ''}
       </div>
 
       <div class="section">
@@ -564,6 +574,16 @@ Deno.serve(async (req: Request) => {
         <div class="info-row">
           <span class="info-label">Idioma del tour:</span>
           <span class="info-value">${booking.selected_language}</span>
+        </div>
+        ` : ''}
+        ${booking.selected_seats && Array.isArray(booking.selected_seats) && booking.selected_seats.length > 0 ? `
+        <div class="info-row" style="align-items: flex-start;">
+          <span class="info-label">Asientos asignados:</span>
+          <span class="info-value" style="display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end;">
+            ${[...booking.selected_seats].sort((a: number, b: number) => a - b).map((seat: number) => `
+              <span style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background-color: #2563eb; color: white; font-size: 13px; font-weight: 700; border-radius: 8px;">${seat}</span>
+            `).join('')}
+          </span>
         </div>
         ` : ''}
       </div>

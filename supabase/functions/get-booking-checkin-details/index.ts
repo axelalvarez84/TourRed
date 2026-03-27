@@ -81,6 +81,7 @@ Deno.serve(async (req: Request) => {
         count_mascotas,
         checkin_status,
         checkin_at,
+        selected_seats,
         user_id,
         agency_id,
         tour:tours(id, name, destination, start_date, end_date),
@@ -146,6 +147,7 @@ Deno.serve(async (req: Request) => {
           count_mascotas: booking.count_mascotas,
           checkin_status: booking.checkin_status,
           checkin_at: booking.checkin_at,
+          selected_seats: booking.selected_seats || [],
           tour: booking.tour,
           traveler: booking.traveler,
           agency: {

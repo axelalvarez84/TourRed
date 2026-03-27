@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { CheckCircle, XCircle, Clock, AlertTriangle, Users, MapPin, Calendar, DollarSign, QrCode, ChevronRight } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, AlertTriangle, Users, MapPin, Calendar, DollarSign, QrCode, ChevronRight, Bus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrencyMXN } from '../utils/formatCurrency';
@@ -36,6 +36,7 @@ interface CheckinDetails {
     count_mascotas: number;
     checkin_status: string | null;
     checkin_at: string | null;
+    selected_seats: number[];
     tour: { id: string; name: string; destination: string; start_date: string; end_date: string };
     traveler: { id: string; first_name: string; last_name: string; email: string; phone_number?: string };
     agency: { id: string; name: string; contact_email: string; contact_phone?: string };
@@ -355,6 +356,26 @@ export default function BookingCheckinPage() {
                         {t.is_no_show && (
                           <span className="text-xs bg-red-100 text-red-600 font-semibold px-2 py-0.5 rounded-full">No Show</span>
                         )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {details.booking.selected_seats && details.booking.selected_seats.length > 0 && (
+                <div className="bg-white rounded-2xl shadow-sm border border-blue-100 p-5 mb-5">
+                  <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                    <Bus className="w-4 h-4 text-blue-600" />
+                    Asientos Asignados
+                  </h3>
+                  <p className="text-xs text-gray-500 mb-3">Verifica que los viajeros ocupen los siguientes lugares en el vehículo.</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[...details.booking.selected_seats].sort((a, b) => a - b).map((seat) => (
+                      <div
+                        key={seat}
+                        className="w-11 h-11 bg-blue-600 text-white font-bold text-base rounded-xl flex items-center justify-center shadow-sm"
+                      >
+                        {seat}
                       </div>
                     ))}
                   </div>
