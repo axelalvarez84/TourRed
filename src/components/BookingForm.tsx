@@ -162,17 +162,21 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
       try {
         const { data, error } = await supabase
           .from('memberships')
-          .select('status')
+          .select('status, current_period_end')
           .eq('user_id', user.id)
-          .eq('status', 'active')
+          .in('status', ['active', 'cancelled'])
           .maybeSingle();
 
         if (error) {
           console.error('Error checking membership:', error);
           setHasMembership(false);
         } else {
-          setHasMembership(!!data);
-          console.log('✅ Estado de membresía:', !!data ? 'ACTIVA' : 'NO ACTIVA');
+          const isActive = !!data && (
+            data.status === 'active' ||
+            (data.status === 'cancelled' && data.current_period_end && new Date(data.current_period_end) > new Date())
+          );
+          setHasMembership(isActive);
+          console.log('✅ Estado de membresía:', isActive ? 'ACTIVA' : 'NO ACTIVA', data?.status, data?.current_period_end);
         }
       } catch (err) {
         console.error('Error loading membership:', err);
@@ -238,8 +242,18 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           setPointsWalletActive(false);
         } else {
           setPointsBalance(data?.balance || 0);
-          setPointsWalletActive(data?.is_active || false);
-          console.log('✅ Saldo ToursRed Points:', data?.balance || 0, '- Activo:', data?.is_active || false);
+          const { data: memData } = await supabase
+            .from('memberships')
+            .select('status, current_period_end')
+            .eq('user_id', user.id)
+            .in('status', ['active', 'cancelled'])
+            .maybeSingle();
+          const membershipStillActive = !!memData && (
+            memData.status === 'active' ||
+            (memData.status === 'cancelled' && memData.current_period_end && new Date(memData.current_period_end) > new Date())
+          );
+          setPointsWalletActive((data?.is_active || false) || membershipStillActive);
+          console.log('✅ Saldo ToursRed Points:', data?.balance || 0, '- Wallet activo:', (data?.is_active || false) || membershipStillActive);
         }
       } catch (err) {
         console.error('Error loading points wallet:', err);
