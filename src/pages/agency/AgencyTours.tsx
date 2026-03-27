@@ -3919,6 +3919,7 @@ const AgencyTours: React.FC = () => {
                           tourId={editingTour.id}
                           agencyId={editingTour.agency_id}
                           slotId={null}
+                          isReceptivo={true}
                         />
                       </div>
                     )}
@@ -3943,6 +3944,7 @@ const AgencyTours: React.FC = () => {
                     tourId={editingTour.id}
                     agencyId={editingTour.agency_id}
                     slotId={null}
+                    isReceptivo={tourType === 'receptivo'}
                   />
                 </div>
               </div>
@@ -4985,6 +4987,7 @@ const AgencyTours: React.FC = () => {
                 tourId={seatMapModal.tour.id}
                 agencyId={resolvedAgencyId}
                 slotId={null}
+                isReceptivo={(seatMapModal.tour as any).tour_type === 'receptivo'}
               />
             </div>
           </div>
