@@ -154,6 +154,7 @@ const AgencyTours: React.FC = () => {
     newSlotDate: string;
     newSlotTime: string;
     bookingsInSlot: number;
+    bookingsCountInSlot: number;
   }>({
     open: false,
     tour: null,
@@ -168,6 +169,7 @@ const AgencyTours: React.FC = () => {
     newSlotDate: '',
     newSlotTime: '',
     bookingsInSlot: 0,
+    bookingsCountInSlot: 0,
   });
 
   const [capacityConflictModal, setCapacityConflictModal] = useState<{
@@ -1083,7 +1085,7 @@ const AgencyTours: React.FC = () => {
   };
 
   const handleSelectSlot = async (slot: any) => {
-    setReceptivoActionsModal(prev => ({ ...prev, selectedSlot: slot, bookingsInSlot: 0 }));
+    setReceptivoActionsModal(prev => ({ ...prev, selectedSlot: slot, bookingsInSlot: 0, bookingsCountInSlot: 0 }));
 
     const { data: bookingsData } = await supabase
       .from('bookings')
@@ -1095,7 +1097,11 @@ const AgencyTours: React.FC = () => {
       .is('cancelled_at', null);
 
     const totalTravelers = (bookingsData || []).reduce((sum, b) => sum + (b.travelers_count || 0), 0);
-    setReceptivoActionsModal(prev => ({ ...prev, bookingsInSlot: totalTravelers }));
+    setReceptivoActionsModal(prev => ({
+      ...prev,
+      bookingsInSlot: totalTravelers,
+      bookingsCountInSlot: (bookingsData || []).length,
+    }));
   };
 
   const handleCloseReceptivoActions = () => {
@@ -4251,7 +4257,7 @@ const AgencyTours: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             {(() => {
-              const { action, tour, slots, selectedSlot, isLoadingSlots, isSubmitting, error, success, reason, newSlotDate, newSlotTime, bookingsInSlot } = receptivoActionsModal;
+              const { action, tour, slots, selectedSlot, isLoadingSlots, isSubmitting, error, success, reason, newSlotDate, newSlotTime, bookingsInSlot, bookingsCountInSlot } = receptivoActionsModal;
 
               const actionConfig = {
                 'slot-cancel': {
@@ -4353,7 +4359,7 @@ const AgencyTours: React.FC = () => {
                             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
                               <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
                               <p className="text-sm text-yellow-800">
-                                <span className="font-medium">{bookingsInSlot} {bookingsInSlot === 1 ? 'viajero sera afectado' : 'viajeros seran afectados'}.</span>
+                                <span className="font-medium">{bookingsInSlot} {bookingsInSlot === 1 ? 'viajero sera afectado' : 'viajeros seran afectados'} en {bookingsCountInSlot} {bookingsCountInSlot === 1 ? 'reserva' : 'reservas'}.</span>
                                 {action === 'slot-cancel' && ' Se emitira un reembolso del 100% del anticipo en ToursRed Cash.'}
                                 {action === 'slot-reschedule' && ' Se les notificara la nueva fecha y podran aceptar o rechazar el cambio.'}
                               </p>
