@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet, Award, Ticket, X, Check, Loader2, ShoppingBag, Info, Tag, RefreshCw, Clock, Car, Globe, AlertTriangle, MapPin } from 'lucide-react';
+import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet, Award, Ticket, X, Check, Loader2, ShoppingBag, Info, Tag, RefreshCw, Clock, Car, Globe, AlertTriangle, MapPin, Bus } from 'lucide-react';
+import SeatMapPicker from './seats/SeatMapPicker';
 import PaymentProviderSelector, { PaymentProvider } from './PaymentProviderSelector';
 import SlotCalendarPicker from './receptivo/SlotCalendarPicker';
 import SlotTimePicker from './receptivo/SlotTimePicker';
@@ -87,6 +88,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const isReceptivo = tour.tour_type === 'receptivo';
   const [selectedSlotDate, setSelectedSlotDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TourSlot | null>(null);
+  const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
+  const hasSeatMap = !!(tour as any).vehicle_map_type;
 
   const [pickupType, setPickupType] = useState<'meeting_point' | 'pickup'>('meeting_point');
   const [pickupHotelAddress, setPickupHotelAddress] = useState('');
@@ -847,6 +850,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
       return;
     }
 
+    if (hasSeatMap && selectedSeats.length < totalTravelers) {
+      setError(`Debes seleccionar ${totalTravelers} asiento${totalTravelers !== 1 ? 's' : ''} en el mapa del vehiculo antes de continuar.`);
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setError('');
@@ -894,6 +902,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         language_extra_cost: isReceptivo && selectedLanguageData ? (selectedLanguageData.extra_cost || 0) : 0,
         language_cost_type: isReceptivo && selectedLanguageData ? selectedLanguageData.cost_type : null,
         restrictions_accepted: hasRestrictions ? restrictionsAccepted : false,
+        selected_seats: hasSeatMap && selectedSeats.length > 0 ? selectedSeats : null,
       };
 
       console.log('📝 Creando reserva con datos:', bookingData);
@@ -924,6 +933,21 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
       if (selectedOptionals.length > 0) {
         await supabase.from('booking_optional_services').insert(selectedOptionals);
+      }
+
+      if (hasSeatMap && selectedSeats.length > 0) {
+        const slotIdForSeats = isReceptivo && selectedSlot ? selectedSlot.id : null;
+        const seatRecords = selectedSeats.map(seatNum => ({
+          tour_id: tour.id,
+          slot_id: slotIdForSeats,
+          agency_id: tour.agency_id,
+          seat_number: seatNum,
+          status: 'reservado',
+          booking_id: data.id,
+        }));
+        await supabase
+          .from('slot_seat_status')
+          .upsert(seatRecords, { onConflict: 'tour_id,slot_id,seat_number' });
       }
 
       navigate(`/booking-travelers/${data.id}`);
@@ -1084,6 +1108,35 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
               {formatDate(tour.start_date)} - {formatDate(tour.end_date)}
             </span>
           </div>
+        </div>
+      )}
+
+      {/* Mapa de asientos — cuando el tour tiene vehiculo configurado */}
+      {hasSeatMap && (
+        <div className="mb-4 space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Bus className="w-4 h-4 text-blue-600" />
+            <span className="text-sm font-semibold text-gray-700">Selecciona tus asientos</span>
+          </div>
+          {isReceptivo && !selectedSlot ? (
+            <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500 text-center">
+              Primero selecciona la fecha y horario del tour para ver el mapa de asientos.
+            </div>
+          ) : totalTravelers === 0 ? (
+            <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500 text-center">
+              Primero selecciona el numero de viajeros para continuar con la seleccion de asientos.
+            </div>
+          ) : (
+            <div className="border border-blue-200 rounded-xl p-4 bg-white">
+              <SeatMapPicker
+                tourId={tour.id}
+                slotId={isReceptivo && selectedSlot ? selectedSlot.id : null}
+                requiredSeats={totalTravelers}
+                selectedSeats={selectedSeats}
+                onSeatsSelected={setSelectedSeats}
+              />
+            </div>
+          )}
         </div>
       )}
 

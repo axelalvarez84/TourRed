@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAgencyId } from '../../hooks/useAgencyId';
 import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination, getTourCategories } from '../../lib/supabase';
-import { Plus, Search, X, CreditCard as Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban, ShoppingBag, Info, Percent, Route, RefreshCw, Layers, Car, Globe, AlertTriangle } from 'lucide-react';
+import { Plus, Search, X, CreditCard as Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban, ShoppingBag, Info, Percent, Route, RefreshCw, Layers, Car, Globe, AlertTriangle, Bus } from 'lucide-react';
+import { VehicleMapType } from '../../types/seats';
 import TourPromotionsManager from '../../components/TourPromotionsManager';
 import AgencyScheduleManager from '../../components/receptivo/AgencyScheduleManager';
 import AgencyBlackoutManager from '../../components/receptivo/AgencyBlackoutManager';
 import AgencySlotCalendar from '../../components/receptivo/AgencySlotCalendar';
+import SeatMapManager from '../../components/seats/SeatMapManager';
 import { TourType, ReceptivoModality, CancellationPolicy } from '../../types';
 
 interface OptionalService {
@@ -193,7 +195,7 @@ const AgencyTours: React.FC = () => {
 
   const [tourType, setTourType] = useState<TourType>('excursion');
   const [receptivoModality, setReceptivoModality] = useState<ReceptivoModality>('compartido');
-  const [receptivoTab, setReceptivoTab] = useState<'info' | 'horarios' | 'bloqueos' | 'calendario'>('info');
+  const [receptivoTab, setReceptivoTab] = useState<'info' | 'horarios' | 'bloqueos' | 'calendario' | 'asientos'>('info');
   const [receptivoData, setReceptivoData] = useState({
     operating_days: [] as number[],
     operating_months: [] as number[],
@@ -238,7 +240,13 @@ const AgencyTours: React.FC = () => {
     admite_ninos: true,
     admite_adultos: true,
     admite_adultos_mayores: true,
+    vehicle_map_type: null as VehicleMapType | null,
   });
+
+  const VEHICLE_OPTIONS: { type: VehicleMapType; label: string; capacity: number; description: string }[] = [
+    { type: 'sprinter_20', label: 'Sprinter / Van', capacity: 20, description: '20 pasajeros' },
+    { type: 'bus_50', label: 'Autobus', capacity: 50, description: '50 pasajeros' },
+  ];
 
   const [includes, setIncludes] = useState<string[]>(['']);
   const [excludes, setExcludes] = useState<string[]>(['']);
@@ -605,6 +613,7 @@ const AgencyTours: React.FC = () => {
       admite_ninos: tour.admite_ninos !== undefined ? tour.admite_ninos : true,
       admite_adultos: tour.admite_adultos !== undefined ? tour.admite_adultos : true,
       admite_adultos_mayores: tour.admite_adultos_mayores !== undefined ? tour.admite_adultos_mayores : true,
+      vehicle_map_type: (tour as any).vehicle_map_type || null,
     });
     setSelectedDestinations(selectedDest);
     setIncludes(tour.includes && tour.includes.length > 0 ? tour.includes : ['']);
@@ -1680,6 +1689,7 @@ const AgencyTours: React.FC = () => {
         restriction_pregnant: isReceptivo ? restrictionPregnant : false,
         restriction_disability: isReceptivo ? restrictionDisability : false,
         restriction_physical: isReceptivo ? restrictionPhysical : false,
+        vehicle_map_type: formData.vehicle_map_type || null,
       };
 
       let tourId: string;
@@ -3445,6 +3455,66 @@ const AgencyTours: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Mapa de Asientos */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Bus className="w-4 h-4 text-blue-600" />
+                    Mapa de Asientos Interactivo
+                    <span className="text-xs font-normal text-gray-400">Opcional</span>
+                  </h4>
+                  <div className={`rounded-xl border-2 p-4 transition-all ${formData.vehicle_map_type ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!formData.vehicle_map_type}
+                        onChange={(e) => setFormData({ ...formData, vehicle_map_type: e.target.checked ? 'sprinter_20' : null })}
+                        className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <div>
+                        <span className={`text-sm font-semibold ${formData.vehicle_map_type ? 'text-blue-800' : 'text-gray-600'}`}>
+                          Activar mapa de asientos para este tour
+                        </span>
+                        <p className="text-xs text-gray-500">Los viajeros podran elegir su asiento al reservar. Aplica para excursiones y tours receptivos.</p>
+                      </div>
+                    </label>
+                    {formData.vehicle_map_type && (
+                      <div className="mt-4 ml-8 space-y-3">
+                        <p className="text-xs font-semibold text-blue-700">Selecciona el tipo de vehiculo:</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          {VEHICLE_OPTIONS.map(opt => {
+                            const capacidad = parseInt(formData.max_travelers || '0');
+                            const mismatch = capacidad > 0 && capacidad !== opt.capacity;
+                            return (
+                              <button
+                                key={opt.type}
+                                type="button"
+                                onClick={() => setFormData({ ...formData, vehicle_map_type: opt.type })}
+                                className={`relative p-4 rounded-xl border-2 text-left transition-all ${
+                                  formData.vehicle_map_type === opt.type
+                                    ? 'border-blue-600 bg-blue-100'
+                                    : 'border-gray-200 bg-white hover:border-blue-300'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Bus className={`w-5 h-5 ${formData.vehicle_map_type === opt.type ? 'text-blue-700' : 'text-gray-500'}`} />
+                                  <span className={`text-sm font-semibold ${formData.vehicle_map_type === opt.type ? 'text-blue-800' : 'text-gray-700'}`}>{opt.label}</span>
+                                </div>
+                                <p className={`text-xs ${formData.vehicle_map_type === opt.type ? 'text-blue-600' : 'text-gray-500'}`}>{opt.description}</p>
+                                {formData.vehicle_map_type === opt.type && mismatch && (
+                                  <div className="mt-2 flex items-start gap-1 text-amber-700 bg-amber-50 rounded-lg p-2">
+                                    <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                    <p className="text-xs">La capacidad configurada ({capacidad}) no coincide con la del vehiculo ({opt.capacity}). Se recomienda actualizarla.</p>
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Idiomas disponibles — solo receptivo */}
                 {tourType === 'receptivo' && (
                   <div className="space-y-3">
@@ -3768,12 +3838,16 @@ const AgencyTours: React.FC = () => {
                 </div>
                 <div>
                   <div className="flex border-b border-gray-100">
-                    {(['info', 'horarios', 'bloqueos', 'calendario'] as const).map(tab => {
+                    {(([
+                      'info', 'horarios', 'bloqueos', 'calendario',
+                      ...((editingTour as any)?.vehicle_map_type ? ['asientos'] : [])
+                    ]) as ('info' | 'horarios' | 'bloqueos' | 'calendario' | 'asientos')[]).map(tab => {
                       const labels: Record<string, string> = {
                         info: 'Resumen',
                         horarios: 'Horarios',
                         bloqueos: 'Bloqueos',
                         calendario: 'Calendario',
+                        asientos: 'Asientos',
                       };
                       return (
                         <button
@@ -3833,7 +3907,38 @@ const AgencyTours: React.FC = () => {
                         }}
                       />
                     )}
+                    {receptivoTab === 'asientos' && (editingTour as any)?.vehicle_map_type && (
+                      <div className="space-y-3">
+                        <p className="text-xs text-gray-500">Gestiona los asientos de este tour receptivo. Selecciona una fecha/slot especifico en el Calendario para ver la disponibilidad por salida, o ve el estado general aqui.</p>
+                        <SeatMapManager
+                          tourId={editingTour.id}
+                          agencyId={editingTour.agency_id}
+                          slotId={null}
+                        />
+                      </div>
+                    )}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {tourType === 'excursion' && editingTour && (editingTour as any)?.vehicle_map_type && (
+              <div className="bg-white rounded-xl shadow-sm border border-blue-100 overflow-hidden">
+                <div className="bg-blue-600 px-5 py-3 flex items-center gap-2">
+                  <div className="bg-white/20 rounded-lg p-1.5">
+                    <Bus className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-semibold text-sm">Mapa de Asientos</h3>
+                    <p className="text-blue-100 text-xs">Gestiona y bloquea asientos para este tour</p>
+                  </div>
+                </div>
+                <div className="p-5">
+                  <SeatMapManager
+                    tourId={editingTour.id}
+                    agencyId={editingTour.agency_id}
+                    slotId={null}
+                  />
                 </div>
               </div>
             )}

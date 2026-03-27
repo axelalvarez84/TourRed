@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { CheckCircle, Calendar, MapPin, Users, DollarSign, ArrowRight, CreditCard, Mail, Wallet, Award, Ticket, Tag } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, Users, DollarSign, ArrowRight, CreditCard, Mail, Wallet, Award, Ticket, Tag, Bus } from 'lucide-react';
 import { supabase, parseDateFromDB } from '../lib/supabase';
 import { Booking, Tour } from '../types';
 import { format } from 'date-fns';
@@ -261,6 +261,22 @@ const BookingSuccessPage: React.FC = () => {
                       <div>
                         <div className="text-sm text-gray-500">Idioma del Tour</div>
                         <div className="font-medium">{booking.selected_language}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {(booking as any).selected_seats && Array.isArray((booking as any).selected_seats) && (booking as any).selected_seats.length > 0 && (
+                    <div className="flex items-start">
+                      <Bus className="h-5 w-5 text-blue-500 mr-3 mt-1" />
+                      <div>
+                        <div className="text-sm text-gray-500">Asientos Asignados</div>
+                        <div className="flex flex-wrap gap-1.5 mt-1">
+                          {[...(booking as any).selected_seats].sort((a: number, b: number) => a - b).map((seat: number) => (
+                            <span key={seat} className="inline-flex items-center justify-center w-8 h-8 bg-blue-600 text-white text-sm font-bold rounded-lg">
+                              {seat}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )}
