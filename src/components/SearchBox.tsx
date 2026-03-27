@@ -43,10 +43,12 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
   const { data: agencies = [] } = useAgencies();
   const { data: departurePoints = [] } = useDeparturePoints();
 
-  const initialAgencyId = initialFilters.agency;
+  const initialAgencyIdRef = useRef(initialFilters.agency);
 
   useEffect(() => {
     if (agencies.length === 0) return;
+    setFilteredAgencies(agencies);
+    const initialAgencyId = initialAgencyIdRef.current;
     if (initialAgencyId) {
       const selectedAgency = agencies.find((a: any) => a.id === initialAgencyId);
       if (selectedAgency) {
@@ -54,21 +56,20 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
         setAgencySearchText(selectedAgency.name);
       }
     }
-    setFilteredAgencies(agencies);
-  }, [agencies, initialAgencyId]);
+  }, [agencies]);
 
   useEffect(() => {
     setFilteredDeparturePoints(departurePoints);
   }, [departurePoints]);
 
   useEffect(() => {
-    if (agencySearchText === '' || agencySearchText === selectedAgencyName) {
-      setFilteredAgencies(agencies);
-    } else {
-      setFilteredAgencies(agencies.filter((ag: any) =>
-        ag.name.toLowerCase().includes(agencySearchText.toLowerCase())
-      ));
-    }
+    setFilteredAgencies(
+      agencySearchText === '' || agencySearchText === selectedAgencyName
+        ? agencies
+        : agencies.filter((ag: any) =>
+            ag.name.toLowerCase().includes(agencySearchText.toLowerCase())
+          )
+    );
   }, [agencySearchText, agencies, selectedAgencyName]);
 
   useEffect(() => {

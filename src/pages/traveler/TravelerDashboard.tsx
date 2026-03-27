@@ -106,8 +106,7 @@ const TravelerDashboard: React.FC = () => {
           )
         `)
         .eq('user_id', user.id)
-        .eq('status', 'confirmed')
-        .order('booking_date', { ascending: false });
+        .eq('status', 'confirmed');
 
       if (bookingsError) throw bookingsError;
 
