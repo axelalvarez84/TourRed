@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 interface Booking {
   id: string;
   tour_id: string;
+  slot_id: string | null;
   booking_date: string;
   status: string;
   total_price: number;
@@ -15,13 +16,18 @@ interface Booking {
     id: string;
     name: string;
     destination: string;
-    start_date: string;
-    end_date: string;
+    start_date: string | null;
+    end_date: string | null;
     image_url: string;
+    tour_type: string;
     agencies: {
       name: string;
     };
   };
+  tour_slots?: {
+    slot_date: string;
+    departure_time: string | null;
+  } | null;
 }
 
 interface SavedTour {
@@ -91,25 +97,40 @@ const TravelerDashboard: React.FC = () => {
             start_date,
             end_date,
             image_url,
+            tour_type,
             agencies (name)
+          ),
+          tour_slots (
+            slot_date,
+            departure_time
           )
         `)
         .eq('user_id', user.id)
         .eq('status', 'confirmed')
-        .gte('tours.start_date', today)
         .order('booking_date', { ascending: false });
 
       if (bookingsError) throw bookingsError;
 
+      const todayDate = new Date(today);
+
       const filteredBookings = (bookingsData || [])
         .filter(booking => {
-          const tourStartDate = new Date(booking.tours.start_date);
-          const todayDate = new Date(today);
-          return tourStartDate >= todayDate;
+          const isReceptivo = booking.tours.tour_type === 'receptivo';
+          if (isReceptivo) {
+            const slotDate = booking.tour_slots?.slot_date;
+            if (!slotDate) return false;
+            return new Date(slotDate) >= todayDate;
+          } else {
+            const startDate = booking.tours.start_date;
+            if (!startDate) return false;
+            return new Date(startDate) >= todayDate;
+          }
         })
         .sort((a, b) => {
-          const dateA = new Date(a.tours.start_date);
-          const dateB = new Date(b.tours.start_date);
+          const isReceptivoA = a.tours.tour_type === 'receptivo';
+          const isReceptivoB = b.tours.tour_type === 'receptivo';
+          const dateA = new Date(isReceptivoA ? (a.tour_slots?.slot_date || a.tours.start_date || '') : (a.tours.start_date || ''));
+          const dateB = new Date(isReceptivoB ? (b.tour_slots?.slot_date || b.tours.start_date || '') : (b.tours.start_date || ''));
           return dateA.getTime() - dateB.getTime();
         })
         .slice(0, 5);
@@ -683,7 +704,11 @@ const TravelerDashboard: React.FC = () => {
                     </div>
                     <div className="flex items-center text-gray-600 text-sm mb-2">
                       <Calendar className="w-4 h-4 mr-1" />
-                      <span>{formatDate(booking.tours.start_date)} - {formatDate(booking.tours.end_date)}</span>
+                      {booking.tours.tour_type === 'receptivo' && booking.tour_slots?.slot_date ? (
+                        <span>{formatDate(booking.tour_slots.slot_date)}{booking.tour_slots.departure_time ? ` a las ${booking.tour_slots.departure_time.substring(0, 5)}` : ''}</span>
+                      ) : (
+                        <span>{booking.tours.start_date ? formatDate(booking.tours.start_date) : ''}{booking.tours.end_date ? ` - ${formatDate(booking.tours.end_date)}` : ''}</span>
+                      )}
                     </div>
                     <p className="text-sm text-gray-500 mb-3">
                       {booking.tours.agencies?.name}
