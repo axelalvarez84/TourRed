@@ -98,13 +98,16 @@ const SeatMapManager: React.FC<SeatMapManagerProps> = ({
         const travelerName = s.bookings?.users
           ? `${s.bookings.users.first_name || ''} ${s.bookings.users.last_name || ''}`.trim()
           : null;
+        const normalizedStatus = s.status === 'bloqueado_agencia' ? 'bloqueado'
+          : s.status === 'reservado_online' ? 'reservado'
+          : 'disponible';
         statusMap[s.seat_number] = {
           number: s.seat_number,
           row: 0,
           col: 0,
           side: 'left',
           type: 'normal',
-          status: s.status,
+          status: normalizedStatus,
           booking_id: s.booking_id,
           block_note: s.block_note,
           traveler_name: travelerName,
@@ -160,20 +163,33 @@ const SeatMapManager: React.FC<SeatMapManagerProps> = ({
     if (!user) return;
     setBlockModal(prev => ({ ...prev, isSubmitting: true }));
     try {
-      const payload = {
+      let deleteQuery = supabase
+        .from('slot_seat_status')
+        .delete()
+        .eq('tour_id', tourId)
+        .eq('seat_number', blockModal.seatNumber);
+
+      if (slotId) {
+        deleteQuery = (deleteQuery as any).eq('slot_id', slotId);
+      } else {
+        deleteQuery = (deleteQuery as any).is('slot_id', null);
+      }
+      await deleteQuery;
+
+      const payload: any = {
         tour_id: tourId,
-        slot_id: slotId || null,
         agency_id: agencyId,
         seat_number: blockModal.seatNumber,
-        status: 'bloqueado',
+        status: 'bloqueado_agencia',
         block_note: blockModal.note || null,
         blocked_by: user.id,
         blocked_at: new Date().toISOString(),
       };
+      if (slotId) payload.slot_id = slotId;
 
       const { error } = await supabase
         .from('slot_seat_status')
-        .upsert(payload, { onConflict: 'tour_id,slot_id,seat_number' });
+        .insert(payload);
 
       if (error) throw error;
       setActionFeedback({ seat: blockModal.seatNumber, message: 'Asiento bloqueado' });
@@ -192,7 +208,7 @@ const SeatMapManager: React.FC<SeatMapManagerProps> = ({
         .delete()
         .eq('tour_id', tourId)
         .eq('seat_number', seatNumber)
-        .eq('status', 'bloqueado');
+        .eq('status', 'bloqueado_agencia');
 
       if (slotId) {
         query = (query as any).eq('slot_id', slotId);
