@@ -1111,6 +1111,194 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         </div>
       )}
 
+      {/* Número de Viajeros */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Número de Viajeros
+        </label>
+        {isLoadingAvailability ? (
+          <div className="flex items-center justify-center py-2 text-gray-500">
+            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary-600 mr-2"></div>
+            <span className="text-sm">Verificando disponibilidad...</span>
+          </div>
+        ) : availableSpots === 0 ? (
+          <div className="bg-red-50 border border-red-200 rounded-md p-3 text-red-800 text-sm">
+            No hay lugares disponibles para este tour en este momento.
+          </div>
+        ) : (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowTravelerSelector(!showTravelerSelector)}
+              className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-md bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            >
+              <div className="flex items-center">
+                <Users className="h-5 w-5 text-gray-400 mr-2" />
+                <span className="text-sm text-gray-700">{getSelectorLabel()}</span>
+              </div>
+              <svg className={`h-5 w-5 text-gray-400 transition-transform ${showTravelerSelector ? 'transform rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {showTravelerSelector && (
+              <div className="absolute z-10 mt-2 w-full bg-white border border-gray-300 rounded-md shadow-lg p-4 space-y-4">
+                {tour.admite_adultos !== false && (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">Adultos</div>
+                      <div className="text-xs text-gray-500">13-59 años &middot; {formatCurrencyMXN(getPrecioPorCategoria('adulto'))}/persona</div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <button
+                        type="button"
+                        onClick={() => handleCountChange('adultos', -1)}
+                        disabled={travelerCounts.adultos === 0}
+                        className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-primary-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <span className="w-8 text-center font-medium">{travelerCounts.adultos}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCountChange('adultos', 1)}
+                        className="w-8 h-8 rounded-full border-2 border-primary-600 bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {tour.admite_ninos !== false && (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">Niños</div>
+                      <div className="text-xs text-gray-500">3-12 años &middot; {formatCurrencyMXN(getPrecioPorCategoria('nino'))}/persona</div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <button
+                        type="button"
+                        onClick={() => handleCountChange('ninos', -1)}
+                        disabled={travelerCounts.ninos === 0}
+                        className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-primary-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <span className="w-8 text-center font-medium">{travelerCounts.ninos}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCountChange('ninos', 1)}
+                        className="w-8 h-8 rounded-full border-2 border-primary-600 bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {tour.admite_infantes !== false && (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">Infantes</div>
+                      <div className="text-xs text-gray-500">0-2 años &middot; {formatCurrencyMXN(getPrecioPorCategoria('infante'))}/persona</div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <button
+                        type="button"
+                        onClick={() => handleCountChange('infantes', -1)}
+                        disabled={travelerCounts.infantes === 0}
+                        className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-primary-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <span className="w-8 text-center font-medium">{travelerCounts.infantes}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCountChange('infantes', 1)}
+                        className="w-8 h-8 rounded-full border-2 border-primary-600 bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {tour.admite_adultos_mayores !== false && (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">Adultos Mayores</div>
+                      <div className="text-xs text-gray-500">60+ con INAPAM &middot; {formatCurrencyMXN(getPrecioPorCategoria('adulto_mayor'))}/persona</div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <button
+                        type="button"
+                        onClick={() => handleCountChange('adultos_mayores', -1)}
+                        disabled={travelerCounts.adultos_mayores === 0}
+                        className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-primary-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <span className="w-8 text-center font-medium">{travelerCounts.adultos_mayores}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCountChange('adultos_mayores', 1)}
+                        className="w-8 h-8 rounded-full border-2 border-primary-600 bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {tour.pet_friendly && (
+                  <div className="flex items-center justify-between border-t pt-3">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">Mascotas</div>
+                      <div className="text-xs text-gray-500">Perro o gato &middot; {getPrecioPorCategoria('mascota') > 0 ? formatCurrencyMXN(getPrecioPorCategoria('mascota')) : 'Gratis'}</div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <button
+                        type="button"
+                        onClick={() => handleCountChange('mascotas', -1)}
+                        disabled={travelerCounts.mascotas === 0}
+                        className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-primary-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <span className="w-8 text-center font-medium">{travelerCounts.mascotas}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCountChange('mascotas', 1)}
+                        className="w-8 h-8 rounded-full border-2 border-primary-600 bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="border-t pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowTravelerSelector(false)}
+                    className="w-full py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 font-medium"
+                  >
+                    Listo
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {availableSpots !== null && (
+              <p className="text-xs text-gray-500 mt-1">
+                {availableSpots} {availableSpots === 1 ? 'lugar disponible' : 'lugares disponibles'}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Mapa de asientos — cuando el tour tiene vehiculo configurado */}
       {hasSeatMap && (
         <div className="mb-4 space-y-3">
@@ -1289,192 +1477,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
       )}
 
       <form onSubmit={handleSubmit}>
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Número de Viajeros
-          </label>
-          {isLoadingAvailability ? (
-            <div className="flex items-center justify-center py-2 text-gray-500">
-              <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary-600 mr-2"></div>
-              <span className="text-sm">Verificando disponibilidad...</span>
-            </div>
-          ) : availableSpots === 0 ? (
-            <div className="bg-red-50 border border-red-200 rounded-md p-3 text-red-800 text-sm">
-              No hay lugares disponibles para este tour en este momento.
-            </div>
-          ) : (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowTravelerSelector(!showTravelerSelector)}
-                className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-md bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              >
-                <div className="flex items-center">
-                  <Users className="h-5 w-5 text-gray-400 mr-2" />
-                  <span className="text-sm text-gray-700">{getSelectorLabel()}</span>
-                </div>
-                <svg className={`h-5 w-5 text-gray-400 transition-transform ${showTravelerSelector ? 'transform rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-
-              {showTravelerSelector && (
-                <div className="absolute z-10 mt-2 w-full bg-white border border-gray-300 rounded-md shadow-lg p-4 space-y-4">
-                  {tour.admite_adultos !== false && (
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">Adultos</div>
-                        <div className="text-xs text-gray-500">13-59 años &middot; {formatCurrencyMXN(getPrecioPorCategoria('adulto'))}/persona</div>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <button
-                          type="button"
-                          onClick={() => handleCountChange('adultos', -1)}
-                          disabled={travelerCounts.adultos === 0}
-                          className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-primary-600 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </button>
-                        <span className="w-8 text-center font-medium">{travelerCounts.adultos}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleCountChange('adultos', 1)}
-                          className="w-8 h-8 rounded-full border-2 border-primary-600 bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {tour.admite_ninos !== false && (
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">Niños</div>
-                        <div className="text-xs text-gray-500">3-12 años &middot; {formatCurrencyMXN(getPrecioPorCategoria('nino'))}/persona</div>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <button
-                          type="button"
-                          onClick={() => handleCountChange('ninos', -1)}
-                          disabled={travelerCounts.ninos === 0}
-                          className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-primary-600 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </button>
-                        <span className="w-8 text-center font-medium">{travelerCounts.ninos}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleCountChange('ninos', 1)}
-                          className="w-8 h-8 rounded-full border-2 border-primary-600 bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {tour.admite_infantes !== false && (
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">Infantes</div>
-                        <div className="text-xs text-gray-500">0-2 años &middot; {formatCurrencyMXN(getPrecioPorCategoria('infante'))}/persona</div>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <button
-                          type="button"
-                          onClick={() => handleCountChange('infantes', -1)}
-                          disabled={travelerCounts.infantes === 0}
-                          className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-primary-600 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </button>
-                        <span className="w-8 text-center font-medium">{travelerCounts.infantes}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleCountChange('infantes', 1)}
-                          className="w-8 h-8 rounded-full border-2 border-primary-600 bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {tour.admite_adultos_mayores !== false && (
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">Adultos Mayores</div>
-                        <div className="text-xs text-gray-500">60+ con INAPAM &middot; {formatCurrencyMXN(getPrecioPorCategoria('adulto_mayor'))}/persona</div>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <button
-                          type="button"
-                          onClick={() => handleCountChange('adultos_mayores', -1)}
-                          disabled={travelerCounts.adultos_mayores === 0}
-                          className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-primary-600 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </button>
-                        <span className="w-8 text-center font-medium">{travelerCounts.adultos_mayores}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleCountChange('adultos_mayores', 1)}
-                          className="w-8 h-8 rounded-full border-2 border-primary-600 bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {tour.pet_friendly && (
-                    <div className="flex items-center justify-between border-t pt-3">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">Mascotas</div>
-                        <div className="text-xs text-gray-500">Perro o gato &middot; {getPrecioPorCategoria('mascota') > 0 ? formatCurrencyMXN(getPrecioPorCategoria('mascota')) : 'Gratis'}</div>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <button
-                          type="button"
-                          onClick={() => handleCountChange('mascotas', -1)}
-                          disabled={travelerCounts.mascotas === 0}
-                          className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-primary-600 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </button>
-                        <span className="w-8 text-center font-medium">{travelerCounts.mascotas}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleCountChange('mascotas', 1)}
-                          className="w-8 h-8 rounded-full border-2 border-primary-600 bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="border-t pt-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowTravelerSelector(false)}
-                      className="w-full py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 font-medium"
-                    >
-                      Listo
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {availableSpots !== null && (
-                <p className="text-xs text-gray-500 mt-1">
-                  {availableSpots} {availableSpots === 1 ? 'lugar disponible' : 'lugares disponibles'}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
 
         {/* Promo Activa Aplicada */}
         {activePromotion && promoResult.isActive && totalTravelers > 0 && (
