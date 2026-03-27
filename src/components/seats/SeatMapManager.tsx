@@ -246,7 +246,9 @@ const SeatMapManager: React.FC<SeatMapManagerProps> = ({
         : baseX + col * colWidth + AISLE_WIDTH;
     };
 
-    const getRowY = (row: number) => PADDING + driverOffset + row * rowHeight;
+    const getRowY = (row: number) => row === 0
+      ? PADDING
+      : PADDING + driverOffset + row * rowHeight;
 
     return (
       <svg width={totalWidth} height={totalHeight} className="block mx-auto">
