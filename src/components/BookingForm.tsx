@@ -956,12 +956,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           slot_id: slotIdForSeats,
           agency_id: tour.agency_id,
           seat_number: seatNum,
-          status: 'reservado',
+          status: 'reservado_online',
           booking_id: data.id,
         }));
-        await supabase
+        const { error: seatError } = await supabase
           .from('slot_seat_status')
           .upsert(seatRecords, { onConflict: 'tour_id,slot_id,seat_number' });
+        if (seatError) {
+          console.error('❌ Error al guardar asientos seleccionados:', seatError);
+          throw new Error('No se pudieron reservar los asientos seleccionados. Por favor intenta de nuevo.');
+        }
       }
 
       navigate(`/booking-travelers/${data.id}`);
