@@ -234,7 +234,10 @@ const SeatMapPicker: React.FC<SeatMapPickerProps> = ({
 
       const statusMap: Record<number, { status: string; booking_id: string | null; block_note: string | null }> = {};
       (statusData || []).forEach((s: any) => {
-        statusMap[s.seat_number] = { status: s.status, booking_id: s.booking_id, block_note: s.block_note };
+        const normalized = s.status === 'bloqueado_agencia' ? 'bloqueado'
+          : s.status === 'reservado_online' ? 'reservado'
+          : s.status;
+        statusMap[s.seat_number] = { status: normalized, booking_id: s.booking_id, block_note: s.block_note };
       });
 
       const combined: SeatWithStatus[] = parsedLayout.seats.map(seat => ({
