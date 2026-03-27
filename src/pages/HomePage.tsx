@@ -9,6 +9,7 @@ import MembershipSection from '../components/MembershipSection';
 import { Tour } from '../types';
 import { getTours } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useTourPromotionsBatch } from '../hooks/useSharedData';
 
 const HomePage: React.FC = () => {
   const [featuredTours, setFeaturedTours] = useState<Tour[]>([]);
@@ -18,19 +19,13 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     const fetchFeaturedTours = async () => {
       try {
-        console.log('🔍 Cargando tours destacados desde la BD...');
-        
         const { data, error } = await getTours({ limit: 4 });
-        
         if (error) {
-          console.error('❌ Error cargando tours destacados:', error);
           setFeaturedTours([]);
         } else {
-          console.log('✅ Tours destacados cargados:', data);
           setFeaturedTours(data || []);
         }
-      } catch (err: any) {
-        console.error('❌ Error en fetchFeaturedTours:', err);
+      } catch {
         setFeaturedTours([]);
       } finally {
         setIsLoading(false);
@@ -39,6 +34,9 @@ const HomePage: React.FC = () => {
 
     fetchFeaturedTours();
   }, []);
+
+  const tourIds = featuredTours.map(t => t.id);
+  const { data: promotionsMap = {} } = useTourPromotionsBatch(tourIds);
 
   return (
     <div>
@@ -107,7 +105,7 @@ const HomePage: React.FC = () => {
           ) : featuredTours.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {featuredTours.map((tour) => (
-                <TourCard key={tour.id} tour={tour} />
+                <TourCard key={tour.id} tour={tour} activePromo={promotionsMap[tour.id] ?? null} />
               ))}
             </div>
           ) : (

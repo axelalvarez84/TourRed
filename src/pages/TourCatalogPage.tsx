@@ -1,14 +1,19 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Filter, MapPin, Calendar, Tag, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
+import { Filter, MapPin, Calendar, Tag, ChevronDown, ChevronUp, ChevronRight, ChevronLeft } from 'lucide-react';
 import SearchBox from '../components/SearchBox';
 import TourCard from '../components/TourCard';
 import { Tour, SearchFilters } from '../types';
 import { getTours, supabase } from '../lib/supabase';
+import { useTourPromotionsBatch } from '../hooks/useSharedData';
+
+const PAGE_SIZE = 20;
 
 const TourCatalogPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [tours, setTours] = useState<Tour[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [visibleFilters, setVisibleFilters] = useState(false);
@@ -36,9 +41,11 @@ const TourCatalogPage: React.FC = () => {
 
   const hasGeoSearch = !!(initialFilters.lat && initialFilters.lng);
 
-  const toggleFilters = () => {
-    setVisibleFilters(!visibleFilters);
-  };
+  const toggleFilters = () => setVisibleFilters(!visibleFilters);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchParams]);
 
   useEffect(() => {
     const fetchTours = async () => {
@@ -47,12 +54,6 @@ const TourCatalogPage: React.FC = () => {
         setError('');
 
         if (hasGeoSearch) {
-          console.log('🌍 Buscando tours por proximidad:', {
-            lat: initialFilters.lat,
-            lng: initialFilters.lng,
-            radius: initialFilters.radius,
-          });
-
           const { data, error } = await supabase.rpc('search_tours_by_departure_radius', {
             search_lat: parseFloat(initialFilters.lat!),
             search_lng: parseFloat(initialFilters.lng!),
@@ -64,12 +65,7 @@ const TourCatalogPage: React.FC = () => {
             limit_results: 100,
           });
 
-          if (error) {
-            console.error('❌ Error en búsqueda por proximidad:', error);
-            throw new Error(error.message);
-          }
-
-          console.log('✅ Tours encontrados por proximidad:', data);
+          if (error) throw new Error(error.message);
 
           const transformedTours = data?.map((row: any) => ({
             id: row.tour_id,
@@ -83,10 +79,7 @@ const TourCatalogPage: React.FC = () => {
             start_date: row.tour_start_date,
             end_date: row.tour_end_date,
             agency_id: row.agency_id,
-            agencies: {
-              id: row.agency_id,
-              name: row.agency_name,
-            },
+            agencies: { id: row.agency_id, name: row.agency_name },
             distance_meters: row.distance_meters,
             nearest_departure_location: row.nearest_departure_location,
             nearest_departure_address: row.nearest_departure_address,
@@ -94,10 +87,10 @@ const TourCatalogPage: React.FC = () => {
           })) || [];
 
           setTours(transformedTours);
+          setTotalCount(transformedTours.length);
         } else {
-          console.log('🔍 Cargando tours desde la BD con filtros:', initialFilters);
-
-          const { data, error } = await getTours({
+          const offset = (currentPage - 1) * PAGE_SIZE;
+          const { data, error, count } = await getTours({
             destination: initialFilters.destination || null,
             category: initialFilters.category || null,
             startDate: initialFilters.startDate || null,
@@ -107,177 +100,112 @@ const TourCatalogPage: React.FC = () => {
             maxPrice: initialFilters.maxPrice || null,
             petFriendly: initialFilters.petFriendly || null,
             departurePoint: initialFilters.departurePoint || null,
+            limit: PAGE_SIZE,
+            offset,
           });
 
-          if (error) {
-            console.error('❌ Error cargando tours:', error);
-            throw new Error(error.message);
-          }
+          if (error) throw new Error(error.message);
 
-          console.log('✅ Tours cargados desde BD:', data);
           setTours(data || []);
+          setTotalCount(count ?? data?.length ?? 0);
         }
       } catch (err: any) {
-        console.error('❌ Error en fetchTours:', err);
         setError(err.message || 'Error al cargar los tours');
         setTours([]);
+        setTotalCount(0);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchTours();
-  }, [searchParams]);
+  }, [searchParams, currentPage]);
 
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('tour_categories')
           .select('id, name, slug')
           .eq('is_active', true)
           .order('name');
-
-        if (error) {
-          console.error('❌ Error cargando categorías:', error);
-          return;
-        }
-
-        if (data) {
-          setCategories(data);
-        }
-      } catch (err: any) {
-        console.error('❌ Error en fetchCategories:', err);
-      }
+        if (data) setCategories(data);
+      } catch {}
     };
-
     fetchCategories();
   }, []);
 
   useEffect(() => {
     const fetchPopularDestinations = async () => {
       try {
-        console.log('🌍 Cargando destinos populares...');
-
-        // Get destinations with tour counts using a simpler query
-        const { data: destinations, error } = await supabase
+        const { data: destinations } = await supabase
           .from('destinations')
           .select('id, name')
           .eq('is_active', true)
           .order('name');
 
-        if (error) {
-          console.error('❌ Error cargando destinos:', error);
-          return;
-        }
+        if (!destinations || destinations.length === 0) return;
 
-        if (!destinations || destinations.length === 0) {
-          console.log('📭 No hay destinos');
-          return;
-        }
-
-        // OPTIMIZED: Get tour counts in ONE query instead of N queries
         const destinationIds = destinations.map(d => d.id);
-        const { data: tourDestinations, error: tdError } = await supabase
+        const { data: tourDestinations } = await supabase
           .from('tour_destinations')
           .select('destination_id')
           .in('destination_id', destinationIds);
 
-        if (tdError) {
-          console.error('❌ Error cargando tour_destinations:', tdError);
-          return;
-        }
-
-        // Count tours per destination in memory (much faster than N queries)
         const countsByDestination = (tourDestinations || []).reduce((acc: Record<string, number>, td: any) => {
           acc[td.destination_id] = (acc[td.destination_id] || 0) + 1;
           return acc;
         }, {});
 
-        const destinationsWithCounts = destinations.map(dest => ({
-          id: dest.id,
-          name: dest.name,
-          tour_count: countsByDestination[dest.id] || 0
-        }));
-
-        // Filter and sort destinations with tours
-        const processedDestinations = destinationsWithCounts
-          .filter(dest => dest.tour_count > 0)
+        const processed = destinations
+          .map(dest => ({ id: dest.id, name: dest.name, tour_count: countsByDestination[dest.id] || 0 }))
+          .filter(d => d.tour_count > 0)
           .sort((a, b) => b.tour_count - a.tour_count)
           .slice(0, 4);
 
-        console.log('✅ Destinos populares procesados:', processedDestinations);
-        setPopularDestinations(processedDestinations);
-
-      } catch (err: any) {
-        console.error('❌ Error en fetchPopularDestinations:', err);
-      }
+        setPopularDestinations(processed);
+      } catch {}
     };
-
     fetchPopularDestinations();
   }, []);
 
   useEffect(() => {
     const fetchPopularDeparturePoints = async () => {
       try {
-        console.log('📍 Cargando puntos de partida populares...');
-
-        const { data: departurePoints, error } = await supabase
+        const { data: departurePoints } = await supabase
           .from('departure_points')
           .select('id, name, city, municipality')
           .eq('is_active', true)
           .order('name');
 
-        if (error) {
-          console.error('❌ Error cargando puntos de partida:', error);
-          return;
-        }
+        if (!departurePoints || departurePoints.length === 0) return;
 
-        if (!departurePoints || departurePoints.length === 0) {
-          console.log('📭 No hay puntos de partida');
-          return;
-        }
-
-        // OPTIMIZED: Get tour counts in ONE query instead of N queries
         const pointIds = departurePoints.map(p => p.id);
-        const { data: tourDeparturePoints, error: tdpError } = await supabase
+        const { data: tourDeparturePoints } = await supabase
           .from('tour_departure_points')
           .select('departure_point_id')
           .in('departure_point_id', pointIds);
 
-        if (tdpError) {
-          console.error('❌ Error cargando tour_departure_points:', tdpError);
-          return;
-        }
-
-        // Count tours per departure point in memory (much faster than N queries)
         const countsByPoint = (tourDeparturePoints || []).reduce((acc: Record<string, number>, tdp: any) => {
           acc[tdp.departure_point_id] = (acc[tdp.departure_point_id] || 0) + 1;
           return acc;
         }, {});
 
-        const pointsWithCounts = departurePoints.map(point => ({
-          id: point.id,
-          name: point.name,
-          city: point.city,
-          municipality: point.municipality,
-          tour_count: countsByPoint[point.id] || 0
-        }));
-
-        // Filter and sort points with tours
-        const processedPoints = pointsWithCounts
-          .filter(point => point.tour_count > 0)
+        const processed = departurePoints
+          .map(point => ({
+            id: point.id,
+            name: point.name,
+            city: point.city,
+            municipality: point.municipality,
+            tour_count: countsByPoint[point.id] || 0,
+          }))
+          .filter(p => p.tour_count > 0)
           .sort((a, b) => b.tour_count - a.tour_count)
           .slice(0, 6);
 
-        console.log('✅ Puntos de partida populares procesados:', processedPoints);
-        setPopularDeparturePoints(processedPoints);
-
-      } catch (err: any) {
-        console.error('❌ Error en fetchPopularDeparturePoints:', err);
-      }
+        setPopularDeparturePoints(processed);
+      } catch {}
     };
-
     fetchPopularDeparturePoints();
   }, []);
 
@@ -289,15 +217,23 @@ const TourCatalogPage: React.FC = () => {
     });
   }, [tours, initialFilters.tourType]);
 
+  const tourIds = filteredTours.map(t => t.id);
+  const { data: promotionsMap = {} } = useTourPromotionsBatch(tourIds);
+
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <div className="bg-blue-50 min-h-screen py-8">
       <div className="container-custom">
         <nav className="flex mb-4" aria-label="Breadcrumb">
           <ol className="inline-flex items-center space-x-1 md:space-x-3">
             <li className="inline-flex items-center">
-              <Link to="/" className="text-gray-500 hover:text-primary-600">
-                Inicio
-              </Link>
+              <Link to="/" className="text-gray-500 hover:text-primary-600">Inicio</Link>
             </li>
             <li>
               <div className="flex items-center">
@@ -320,7 +256,7 @@ const TourCatalogPage: React.FC = () => {
             Destinos en México
           </span>
         </div>
-        
+
         <div className="lg:hidden mb-6">
           <button
             onClick={toggleFilters}
@@ -336,18 +272,17 @@ const TourCatalogPage: React.FC = () => {
               <ChevronDown className="h-5 w-5 text-gray-600" />
             )}
           </button>
-
           {visibleFilters && (
             <div className="mt-4">
               <SearchBox initialFilters={initialFilters} />
             </div>
           )}
         </div>
-        
+
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="hidden lg:block w-full lg:w-1/3 xl:w-1/4">
             <SearchBox initialFilters={initialFilters} />
-            
+
             <div className="bg-white rounded-lg shadow-md p-4 mt-6">
               <h3 className="font-semibold mb-4 text-gray-900">Categorías Populares</h3>
               <div className="space-y-2">
@@ -363,9 +298,7 @@ const TourCatalogPage: React.FC = () => {
                     </a>
                   ))
                 ) : (
-                  <div className="text-gray-500 text-sm text-center py-4">
-                    Cargando categorías...
-                  </div>
+                  <div className="text-gray-500 text-sm text-center py-4">Cargando categorías...</div>
                 )}
               </div>
             </div>
@@ -390,9 +323,7 @@ const TourCatalogPage: React.FC = () => {
                     </a>
                   ))
                 ) : (
-                  <div className="text-gray-500 text-sm text-center py-4">
-                    No hay destinos disponibles aún
-                  </div>
+                  <div className="text-gray-500 text-sm text-center py-4">No hay destinos disponibles aún</div>
                 )}
               </div>
             </div>
@@ -424,14 +355,12 @@ const TourCatalogPage: React.FC = () => {
                     </a>
                   ))
                 ) : (
-                  <div className="text-gray-500 text-sm text-center py-4">
-                    No hay puntos de partida disponibles
-                  </div>
+                  <div className="text-gray-500 text-sm text-center py-4">No hay puntos de partida disponibles</div>
                 )}
               </div>
             </div>
           </div>
-          
+
           <div className="w-full lg:w-2/3 xl:w-3/4">
             {isLoading ? (
               <div className="flex justify-center py-20">
@@ -440,45 +369,31 @@ const TourCatalogPage: React.FC = () => {
             ) : error ? (
               <div className="bg-white rounded-lg shadow-md p-6 text-center">
                 <p className="text-error-600 mb-4 font-semibold">Error: {error}</p>
-                <p className="text-gray-600 mb-6">
-                  No se pudieron cargar los tours desde la base de datos.
-                </p>
-                <button
-                  onClick={() => window.location.reload()}
-                  className="btn btn-primary"
-                >
+                <p className="text-gray-600 mb-6">No se pudieron cargar los tours desde la base de datos.</p>
+                <button onClick={() => window.location.reload()} className="btn btn-primary">
                   Reintentar
                 </button>
               </div>
             ) : filteredTours.length === 0 ? (
               <div className="bg-white rounded-lg shadow-md p-6 text-center">
                 <p className="text-xl mb-4 text-gray-900 font-semibold">
-                  {tours.length === 0
-                    ? 'No hay tours disponibles'
-                    : 'No se encontraron tours que coincidan con tus criterios'
-                  }
+                  {tours.length === 0 ? 'No hay tours disponibles' : 'No se encontraron tours que coincidan con tus criterios'}
                 </p>
                 <p className="text-gray-600 mb-6">
                   {tours.length === 0
                     ? 'Las agencias aún no han publicado tours. ¡Vuelve pronto!'
-                    : 'Intenta ajustar tus filtros o buscar algo diferente.'
-                  }
+                    : 'Intenta ajustar tus filtros o buscar algo diferente.'}
                 </p>
-                <a href="/tours" className="btn btn-primary">
-                  Ver Todos los Tours
-                </a>
+                <a href="/tours" className="btn btn-primary">Ver Todos los Tours</a>
               </div>
             ) : (
               <>
                 <div className="flex justify-between items-center mb-4">
                   <p className="text-gray-600">
-                    {filteredTours.length === 1
-                      ? 'Encontrado 1 tour'
-                      : `Encontrados ${filteredTours.length} tours`
-                    }
-                    {hasGeoSearch && initialFilters.locationName &&
-                      ` cerca de "${initialFilters.locationName}"`
-                    }
+                    {!hasGeoSearch && totalCount > PAGE_SIZE
+                      ? `Mostrando ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, totalCount)} de ${totalCount} tours`
+                      : filteredTours.length === 1 ? 'Encontrado 1 tour' : `Encontrados ${filteredTours.length} tours`}
+                    {hasGeoSearch && initialFilters.locationName && ` cerca de "${initialFilters.locationName}"`}
                     {initialFilters.tourName && ` con nombre "${initialFilters.tourName}"`}
                     {initialFilters.destination && ` para "${initialFilters.destination}"`}
                     {initialFilters.category && ` en ${initialFilters.category}`}
@@ -496,24 +411,60 @@ const TourCatalogPage: React.FC = () => {
                     </select>
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {filteredTours.map((tour) => (
-                    <TourCard key={tour.id} tour={tour} showDistance={hasGeoSearch} />
+                    <TourCard
+                      key={tour.id}
+                      tour={tour}
+                      showDistance={hasGeoSearch}
+                      activePromo={promotionsMap[tour.id] ?? null}
+                    />
                   ))}
                 </div>
-                
-                {/* Pagination placeholder */}
-                {filteredTours.length >= 10 && (
-                  <div className="mt-8 flex justify-center">
-                    <div className="bg-white rounded-lg shadow-md p-4">
-                      <p className="text-gray-600 text-sm">
-                        Mostrando {filteredTours.length} tours.
-                        {tours.length > filteredTours.length &&
-                          ` (${tours.length - filteredTours.length} filtrados)`
-                        }
-                      </p>
-                    </div>
+
+                {!hasGeoSearch && totalPages > 1 && (
+                  <div className="mt-8 flex justify-center items-center gap-2">
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="p-2 rounded-lg border border-gray-300 disabled:opacity-40 hover:bg-white transition-colors"
+                    >
+                      <ChevronLeft className="h-5 w-5 text-gray-600" />
+                    </button>
+
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 2)
+                      .reduce<(number | string)[]>((acc, page, idx, arr) => {
+                        if (idx > 0 && (page as number) - (arr[idx - 1] as number) > 1) acc.push('...');
+                        acc.push(page);
+                        return acc;
+                      }, [])
+                      .map((item, idx) =>
+                        typeof item === 'string' ? (
+                          <span key={`ellipsis-${idx}`} className="px-2 text-gray-400">...</span>
+                        ) : (
+                          <button
+                            key={item}
+                            onClick={() => handlePageChange(item)}
+                            className={`w-10 h-10 rounded-lg border text-sm font-medium transition-colors ${
+                              item === currentPage
+                                ? 'bg-primary-600 border-primary-600 text-white'
+                                : 'border-gray-300 text-gray-700 hover:bg-white'
+                            }`}
+                          >
+                            {item}
+                          </button>
+                        )
+                      )}
+
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="p-2 rounded-lg border border-gray-300 disabled:opacity-40 hover:bg-white transition-colors"
+                    >
+                      <ChevronRight className="h-5 w-5 text-gray-600" />
+                    </button>
                   </div>
                 )}
               </>

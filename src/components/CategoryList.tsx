@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { Mountain, Building, Palmtree, Umbrella as UmbrellaBeach, Bike, Landmark, Tag } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { useTourCategories } from '../hooks/useSharedData';
 
 const iconMap: Record<string, React.ReactNode> = {
   'adventure': <Mountain className="h-6 w-6" />,
@@ -15,36 +15,8 @@ const iconMap: Record<string, React.ReactNode> = {
 };
 
 const CategoryList: React.FC = () => {
-  const [categories, setCategories] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('tour_categories')
-          .select('id, name, slug')
-          .eq('is_active', true)
-          .order('name')
-          .limit(8);
-
-        if (error) {
-          console.error('Error cargando categorías:', error);
-          return;
-        }
-
-        if (data) {
-          setCategories(data);
-        }
-      } catch (err) {
-        console.error('Error en fetchCategories:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCategories();
-  }, []);
+  const { data: categories = [], isLoading: loading } = useTourCategories();
+  const displayCategories = categories.slice(0, 8);
 
   if (loading) {
     return (
@@ -56,7 +28,7 @@ const CategoryList: React.FC = () => {
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-4">
-      {categories.map((category) => (
+      {displayCategories.map((category) => (
         <Link
           key={category.id}
           to={`/tours?category=${category.slug}`}

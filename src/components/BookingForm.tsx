@@ -352,16 +352,23 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           return;
         }
 
-        const servicesWithCapacity = await Promise.all(
-          data.map(async (svc) => {
-            if (svc.max_capacity === null) {
-              return { ...svc, available_capacity: null };
-            }
-            const { data: capData } = await supabase
-              .rpc('get_optional_service_available_capacity', { p_service_id: svc.id });
-            return { ...svc, available_capacity: capData };
-          })
-        );
+        const serviceIdsWithCap = data.filter(s => s.max_capacity !== null).map(s => s.id);
+
+        let capacityMap: Record<string, number | null> = {};
+        if (serviceIdsWithCap.length > 0) {
+          const { data: capData } = await supabase
+            .rpc('get_optional_services_capacity', { p_service_ids: serviceIdsWithCap });
+          if (capData) {
+            capData.forEach((row: any) => {
+              capacityMap[row.service_id] = row.available_capacity;
+            });
+          }
+        }
+
+        const servicesWithCapacity = data.map(svc => ({
+          ...svc,
+          available_capacity: svc.max_capacity === null ? null : (capacityMap[svc.id] ?? null),
+        }));
 
         setOptionalServices(servicesWithCapacity);
       } catch (err) {

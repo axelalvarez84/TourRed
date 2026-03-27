@@ -475,36 +475,41 @@ export const getTours = async (filters: any = {}) => {
 
       query = query.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
 
-      const { data, error } = await query;
-
-      // Filtrar tours de agencias inactivas
-      if (data && filters.includeInactiveAgencies !== true) {
-        const filteredData = data.filter((tour: any) => tour.agencies?.is_active !== false);
-        const finalData = filters.limit ? filteredData.slice(0, filters.limit) : filteredData;
-        return { data: finalData, error };
+      if (filters.limit) {
+        const offset = filters.offset ?? 0;
+        query = (query as any).range(offset, offset + filters.limit - 1);
       }
 
-      return { data, error };
+      const { data, error } = await query;
+
+      if (data && filters.includeInactiveAgencies !== true) {
+        const filteredData = data.filter((tour: any) => tour.agencies?.is_active !== false);
+        return { data: filteredData, error, count: filteredData.length };
+      }
+
+      return { data, error, count: data?.length ?? 0 };
     }
 
-    // OPTIMIZED: Select only needed columns for listings
+    const selectColumns = `
+      id,
+      name,
+      image_url,
+      destination,
+      start_date,
+      end_date,
+      price,
+      max_travelers,
+      is_featured,
+      agency_id,
+      pet_friendly,
+      category,
+      tour_type,
+      agencies(id, name, rating, is_active)
+    `;
+
     let query = supabase
       .from('tours')
-      .select(`
-        id,
-        name,
-        image_url,
-        destination,
-        start_date,
-        end_date,
-        price,
-        max_travelers,
-        is_featured,
-        agency_id,
-        pet_friendly,
-        category,
-        agencies(id, name, rating, is_active)
-      `);
+      .select(selectColumns, filters.limit ? { count: 'exact' } : undefined);
 
     if (filters.includeExpired !== true) {
       const today = formatDateForDB(new Date());
@@ -512,7 +517,7 @@ export const getTours = async (filters: any = {}) => {
     }
 
     if (filters.tourName) {
-      query = query.ilike('title', `%${filters.tourName}%`);
+      query = query.ilike('name', `%${filters.tourName}%`);
     }
 
     if (filters.destination) {
@@ -549,24 +554,23 @@ export const getTours = async (filters: any = {}) => {
       query = query.eq('pet_friendly', false);
     }
 
-    query = query.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
-
-    const { data, error } = await query;
-
-    // Filtrar tours de agencias inactivas (excepto si se solicita explícitamente incluirlas)
-    if (data && filters.includeInactiveAgencies !== true) {
-      const filteredData = data.filter((tour: any) => tour.agencies?.is_active !== false);
-
-      // Aplicar límite después del filtrado si es necesario
-      const finalData = filters.limit ? filteredData.slice(0, filters.limit) : filteredData;
-
-      return { data: finalData, error };
+    if (filters.includeInactiveAgencies !== true) {
+      query = query.eq('agencies.is_active', true);
     }
 
-    return { data, error };
+    query = query.order('is_featured', { ascending: false }).order('created_at', { ascending: false });
+
+    if (filters.limit) {
+      const offset = filters.offset ?? 0;
+      query = (query as any).range(offset, offset + filters.limit - 1);
+    }
+
+    const { data, count, error } = await query;
+
+    return { data: data ?? [], error, count: count ?? data?.length ?? 0 };
   } catch (error: any) {
     console.error('❌ Error en getTours:', error);
-    return { data: null, error };
+    return { data: null, error, count: 0 };
   }
 };
 

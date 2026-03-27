@@ -6,6 +6,15 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { formatCurrency } from '../utils/formatCurrency';
 
+interface TourPromo {
+  promotion_type: string;
+  min_travelers: number;
+  fixed_group_price: number | null;
+  group_discount_percentage: number | null;
+  max_uses: number | null;
+  times_used: number;
+}
+
 interface TourCardProps {
   tour: Tour & {
     distance_meters?: number;
@@ -14,36 +23,13 @@ interface TourCardProps {
   };
   className?: string;
   showDistance?: boolean;
+  activePromo?: TourPromo | null;
 }
 
-const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance = false }) => {
+const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance = false, activePromo = null }) => {
   const { user } = useAuth();
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [activePromo, setActivePromo] = useState<{
-    promotion_type: string;
-    min_travelers: number;
-    fixed_group_price: number | null;
-    group_discount_percentage: number | null;
-    max_uses: number | null;
-    times_used: number;
-  } | null>(null);
-
-  useEffect(() => {
-    const loadPromo = async () => {
-      try {
-        const { data } = await supabase.rpc('get_active_promotion_for_tour', { p_tour_id: tour.id });
-        if (data && data.length > 0) {
-          setActivePromo(data[0]);
-        } else {
-          setActivePromo(null);
-        }
-      } catch {
-        setActivePromo(null);
-      }
-    };
-    loadPromo();
-  }, [tour.id]);
 
   const formatDistance = (meters: number) => {
     const km = meters / 1000;

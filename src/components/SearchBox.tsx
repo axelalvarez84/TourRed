@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Tag, Calendar, Building2, DollarSign, Dog, X, MapPin, FileSearch, RefreshCw } from 'lucide-react';
 import { SearchFilters } from '../types';
-import { supabase } from '../lib/supabase';
+import { useTourCategories, useAgencies, useDeparturePoints } from '../hooks/useSharedData';
 
 interface SearchBoxProps {
   initialFilters?: SearchFilters;
@@ -30,96 +30,52 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
       : null
   );
   const [radius, setRadius] = useState(initialFilters.radius || '5');
-  const [categories, setCategories] = useState<any[]>([]);
-  const [agencies, setAgencies] = useState<any[]>([]);
   const [filteredAgencies, setFilteredAgencies] = useState<any[]>([]);
   const [showAgencyDropdown, setShowAgencyDropdown] = useState(false);
   const [selectedAgencyName, setSelectedAgencyName] = useState('');
-  const [departurePoints, setDeparturePoints] = useState<any[]>([]);
   const [filteredDeparturePoints, setFilteredDeparturePoints] = useState<any[]>([]);
   const [showDeparturePointDropdown, setShowDeparturePointDropdown] = useState(false);
   const agencyInputRef = useRef<HTMLDivElement>(null);
   const departurePointInputRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const loadCategories = async () => {
-      const { data } = await supabase
-        .from('tour_categories')
-        .select('id, name, slug')
-        .eq('is_active', true)
-        .order('name');
-
-      if (data) {
-        setCategories(data);
-      }
-    };
-
-    loadCategories();
-  }, []);
+  const { data: categories = [] } = useTourCategories();
+  const { data: agencies = [] } = useAgencies();
+  const { data: departurePoints = [] } = useDeparturePoints();
 
   useEffect(() => {
-    const loadAgencies = async () => {
-      const { data } = await supabase
-        .from('agencies')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('name');
-
-      if (data) {
-        setAgencies(data);
-        setFilteredAgencies(data);
-
-        if (initialFilters.agency && data.length > 0) {
-          const selectedAgency = data.find(a => a.id === initialFilters.agency);
-          if (selectedAgency) {
-            setSelectedAgencyName(selectedAgency.name);
-            setAgencySearchText(selectedAgency.name);
-          }
-        }
+    setFilteredAgencies(agencies);
+    if (initialFilters.agency && agencies.length > 0) {
+      const selectedAgency = agencies.find((a: any) => a.id === initialFilters.agency);
+      if (selectedAgency) {
+        setSelectedAgencyName(selectedAgency.name);
+        setAgencySearchText(selectedAgency.name);
       }
-    };
+    }
+  }, [agencies, initialFilters.agency]);
 
-    loadAgencies();
-  }, [initialFilters.agency]);
+  useEffect(() => {
+    setFilteredDeparturePoints(departurePoints);
+  }, [departurePoints]);
 
   useEffect(() => {
     if (agencySearchText === '') {
       setFilteredAgencies(agencies);
     } else {
-      const filtered = agencies.filter(ag =>
+      setFilteredAgencies(agencies.filter((ag: any) =>
         ag.name.toLowerCase().includes(agencySearchText.toLowerCase())
-      );
-      setFilteredAgencies(filtered);
+      ));
     }
   }, [agencySearchText, agencies]);
-
-  useEffect(() => {
-    const loadDeparturePoints = async () => {
-      const { data } = await supabase
-        .from('departure_points')
-        .select('id, name, city, municipality')
-        .eq('is_active', true)
-        .order('name');
-
-      if (data) {
-        setDeparturePoints(data);
-        setFilteredDeparturePoints(data);
-      }
-    };
-
-    loadDeparturePoints();
-  }, []);
 
   useEffect(() => {
     if (departurePointSearchText === '') {
       setFilteredDeparturePoints(departurePoints);
     } else {
-      const filtered = departurePoints.filter(dp =>
+      setFilteredDeparturePoints(departurePoints.filter((dp: any) =>
         dp.name.toLowerCase().includes(departurePointSearchText.toLowerCase()) ||
         (dp.city && dp.city.toLowerCase().includes(departurePointSearchText.toLowerCase()))
-      );
-      setFilteredDeparturePoints(filtered);
+      ));
     }
   }, [departurePointSearchText, departurePoints]);
 
