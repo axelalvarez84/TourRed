@@ -1136,8 +1136,16 @@ const AgencyTours: React.FC = () => {
         setReceptivoActionsModal(prev => ({ ...prev, error: 'Debes seleccionar la nueva fecha y hora.' }));
         return;
       }
-      if (newSlotDate <= selectedSlot.slot_date) {
-        setReceptivoActionsModal(prev => ({ ...prev, error: 'La nueva fecha debe ser posterior a la fecha actual del slot.' }));
+      const isSameDate = newSlotDate === selectedSlot.slot_date;
+      const isEarlierDate = newSlotDate < selectedSlot.slot_date;
+      const isSameTime = newSlotTime === selectedSlot.departure_time?.slice(0, 5);
+
+      if (isEarlierDate) {
+        setReceptivoActionsModal(prev => ({ ...prev, error: 'La nueva fecha no puede ser anterior a la fecha actual del slot.' }));
+        return;
+      }
+      if (isSameDate && isSameTime) {
+        setReceptivoActionsModal(prev => ({ ...prev, error: 'Si reagendas al mismo dia, debes seleccionar un horario diferente.' }));
         return;
       }
     }
