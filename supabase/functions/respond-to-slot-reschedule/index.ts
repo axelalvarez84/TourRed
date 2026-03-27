@@ -7,6 +7,74 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+async function handleSeatAssignment(
+  adminClient: any,
+  bookingId: string,
+  targetSlotId: string,
+  tourId: string,
+  originalSeats: number[],
+  travelersCount: number
+): Promise<{ assigned: boolean; needsReselection: boolean }> {
+  if (!originalSeats || originalSeats.length === 0) {
+    return { assigned: false, needsReselection: false };
+  }
+
+  const { data: occupiedSeats } = await adminClient
+    .from("slot_seat_status")
+    .select("seat_number")
+    .eq("tour_id", tourId)
+    .eq("slot_id", targetSlotId)
+    .in("status", ["reservado_online", "bloqueado_agencia"]);
+
+  const occupiedNumbers = new Set((occupiedSeats || []).map((s: any) => s.seat_number));
+  const availableOriginalSeats = originalSeats.filter((n) => !occupiedNumbers.has(n));
+
+  if (availableOriginalSeats.length === travelersCount) {
+    const seatRecords = availableOriginalSeats.map((seatNum) => ({
+      tour_id: tourId,
+      slot_id: targetSlotId,
+      agency_id: null,
+      seat_number: seatNum,
+      status: "reservado_online",
+      booking_id: bookingId,
+    }));
+
+    await adminClient
+      .from("slot_seat_status")
+      .delete()
+      .eq("booking_id", bookingId)
+      .neq("slot_id", targetSlotId);
+
+    await adminClient.from("slot_seat_status").upsert(seatRecords, {
+      onConflict: "tour_id,slot_id,seat_number",
+    });
+
+    await adminClient
+      .from("bookings")
+      .update({ selected_seats: availableOriginalSeats, needs_seat_reselection: false })
+      .eq("id", bookingId);
+
+    return { assigned: true, needsReselection: false };
+  } else {
+    await adminClient
+      .from("slot_seat_status")
+      .delete()
+      .eq("booking_id", bookingId)
+      .neq("slot_id", targetSlotId);
+
+    await adminClient
+      .from("bookings")
+      .update({
+        needs_seat_reselection: true,
+        previous_selected_seats: originalSeats,
+        selected_seats: null,
+      })
+      .eq("id", bookingId);
+
+    return { assigned: false, needsReselection: true };
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -57,7 +125,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: booking, error: bookingError } = await adminClient
       .from("bookings")
-      .select("id, user_id, deposit_amount, toursred_cash_used, tour_id, has_pending_slot_reschedule, slot_reschedule_response")
+      .select("id, user_id, deposit_amount, toursred_cash_used, tour_id, has_pending_slot_reschedule, slot_reschedule_response, selected_seats, travelers_count")
       .eq("id", booking_id)
       .single();
 
@@ -138,20 +206,49 @@ Deno.serve(async (req: Request) => {
 
       const { data: targetSlot } = await adminClient
         .from("tour_slots")
-        .select("slot_date, departure_time")
+        .select("id, slot_date, departure_time")
         .eq("id", rescheduleRequest.target_slot_id)
         .single();
 
+      let seatReselectionNeeded = false;
+
+      if (targetSlot) {
+        const { data: tourData } = await adminClient
+          .from("tours")
+          .select("vehicle_map_type")
+          .eq("id", booking.tour_id)
+          .single();
+
+        const hasSeatMap = !!(tourData?.vehicle_map_type);
+
+        if (hasSeatMap && booking.selected_seats && booking.selected_seats.length > 0) {
+          const seatResult = await handleSeatAssignment(
+            adminClient,
+            booking_id,
+            targetSlot.id,
+            booking.tour_id,
+            booking.selected_seats,
+            booking.travelers_count || booking.selected_seats.length
+          );
+          seatReselectionNeeded = seatResult.needsReselection;
+        }
+      }
+
+      const notifMessage = seatReselectionNeeded
+        ? `Confirmado. Tu reserva fue movida al ${targetSlot?.slot_date} a las ${targetSlot?.departure_time?.substring(0, 5)}. Tus asientos anteriores no estaban disponibles, por favor selecciona nuevos asientos.`
+        : `Confirmado. Tu reserva ha sido movida al ${targetSlot?.slot_date} a las ${targetSlot?.departure_time?.substring(0, 5)}.`;
+
       await adminClient.rpc("create_user_notification", {
         p_user_id: user.id,
-        p_type: "slot_reschedule_accepted",
-        p_title: "Has aceptado el nuevo horario",
-        p_message: `Confirmado. Tu reserva ha sido movida al ${targetSlot?.slot_date} a las ${targetSlot?.departure_time?.substring(0, 5)}.`,
+        p_type: seatReselectionNeeded ? "slot_reschedule_seat_reselection" : "slot_reschedule_accepted",
+        p_title: seatReselectionNeeded ? "Selecciona nuevos asientos" : "Has aceptado el nuevo horario",
+        p_message: notifMessage,
         p_data: {
           booking_id: booking_id,
           request_id: rescheduleRequest.id,
           new_date: targetSlot?.slot_date,
           new_time: targetSlot?.departure_time,
+          needs_seat_reselection: seatReselectionNeeded,
         },
       });
 
@@ -167,45 +264,37 @@ Deno.serve(async (req: Request) => {
           r.response === "accepted" || r.response === "auto_accepted"
         ) || [];
 
+        const acceptedBookingIds: string[] = await adminClient
+          .from("slot_reschedule_responses")
+          .select("booking_id")
+          .eq("request_id", rescheduleRequest.id)
+          .in("response", ["accepted", "auto_accepted"])
+          .then(({ data }: { data: any[] | null }) => (data || []).map((r: any) => r.booking_id));
+
         await adminClient
           .from("bookings")
           .update({
             selected_date: targetSlot.slot_date,
             selected_time: targetSlot.departure_time,
           })
-          .in(
-            "id",
-            await adminClient
-              .from("slot_reschedule_responses")
-              .select("booking_id")
-              .eq("request_id", rescheduleRequest.id)
-              .in("response", ["accepted", "auto_accepted"])
-              .then(({ data }) => (data || []).map((r: any) => r.booking_id))
-          );
-
-        await adminClient
-          .from("tour_slots")
-          .update({ booked_count: adminClient.rpc as any })
-          .eq("id", rescheduleRequest.target_slot_id);
+          .in("id", acceptedBookingIds);
 
         if (acceptedResponses.length > 0) {
           await adminClient.rpc("update_slot_booked_count", {
             p_slot_id: rescheduleRequest.target_slot_id,
             p_increment: acceptedResponses.length,
-          }).catch(() => {
-            adminClient
+          }).catch(async () => {
+            const { data: ts } = await adminClient
               .from("tour_slots")
               .select("booked_count")
               .eq("id", rescheduleRequest.target_slot_id)
-              .single()
-              .then(({ data: ts }) => {
-                if (ts) {
-                  adminClient
-                    .from("tour_slots")
-                    .update({ booked_count: ts.booked_count + acceptedResponses.length })
-                    .eq("id", rescheduleRequest.target_slot_id);
-                }
-              });
+              .single();
+            if (ts) {
+              await adminClient
+                .from("tour_slots")
+                .update({ booked_count: ts.booked_count + acceptedResponses.length })
+                .eq("id", rescheduleRequest.target_slot_id);
+            }
           });
         }
 
@@ -230,7 +319,10 @@ Deno.serve(async (req: Request) => {
           response: "accepted",
           new_date: targetSlot?.slot_date,
           new_time: targetSlot?.departure_time,
-          message: "Has aceptado el nuevo horario. Tu reserva ha sido actualizada.",
+          needs_seat_reselection: seatReselectionNeeded,
+          message: seatReselectionNeeded
+            ? "Has aceptado el nuevo horario. Tus asientos anteriores no estaban disponibles, por favor selecciona nuevos asientos."
+            : "Has aceptado el nuevo horario. Tu reserva ha sido actualizada.",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -312,12 +404,12 @@ Deno.serve(async (req: Request) => {
             .single();
 
           if (targetSlot) {
-            const acceptedBookingIds = await adminClient
+            const acceptedBookingIds: string[] = await adminClient
               .from("slot_reschedule_responses")
               .select("booking_id")
               .eq("request_id", rescheduleRequest.id)
               .in("response", ["accepted", "auto_accepted"])
-              .then(({ data }) => (data || []).map((r: any) => r.booking_id));
+              .then(({ data }: { data: any[] | null }) => (data || []).map((r: any) => r.booking_id));
 
             await adminClient
               .from("bookings")

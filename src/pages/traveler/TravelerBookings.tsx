@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X, CreditCard as Edit, UserCheck, XCircle, CalendarX, Check, Wallet, Lock, UserMinus, Car, Globe } from 'lucide-react';
+import SeatReselectionModal from '../../components/SeatReselectionModal';
 import { useAuth } from '../../context/AuthContext';
 import TravelerCfdiList from '../../components/TravelerCfdiList';
 import { getUserBookings, parseDateFromDB, supabase, calculateCancellationPolicy, processCancellation, calculatePartialCancellationPolicy, processPartialCancellation, PartialCancellationTraveler } from '../../lib/supabase';
@@ -146,6 +147,17 @@ const TravelerBookings: React.FC = () => {
     bookingId: string;
     message: string;
   }>({ open: false, bookingId: '', message: '' });
+  const [seatReselectionModal, setSeatReselectionModal] = useState<{
+    open: boolean;
+    bookingId: string;
+    tourId: string;
+    slotId: string;
+    travelersCount: number;
+    previousSeats: number[];
+    tourName: string;
+    newDate: string;
+    newTime: string;
+  } | null>(null);
 
   const cancellationFormPersistence = useFormPersistence(
     { cancellationReason: cancellationModal.cancellationReason },
@@ -318,9 +330,29 @@ const TravelerBookings: React.FC = () => {
 
       setSlotRescheduleModal(prev => ({ ...prev, isProcessing: false, success: true }));
       await fetchBookings();
-      setTimeout(() => {
-        setSlotRescheduleModal(prev => ({ ...prev, open: false }));
-      }, 3000);
+
+      if (slotRescheduleModal.action === 'accept' && data?.needs_seat_reselection) {
+        const booking = slotRescheduleModal.booking as any;
+        const targetSlot = slotRescheduleModal.slotRescheduleInfo?.slot_reschedule_requests?.tour_slots;
+        setTimeout(() => {
+          setSlotRescheduleModal(prev => ({ ...prev, open: false }));
+          setSeatReselectionModal({
+            open: true,
+            bookingId: booking.id,
+            tourId: booking.tour_id,
+            slotId: slotRescheduleModal.slotRescheduleInfo?.slot_reschedule_requests?.target_slot_id || '',
+            travelersCount: booking.travelers_count || 1,
+            previousSeats: booking.selected_seats || [],
+            tourName: booking.tours?.name || booking.tour_name || '',
+            newDate: targetSlot?.slot_date || data.new_date || '',
+            newTime: targetSlot?.departure_time || data.new_time || '',
+          });
+        }, 1500);
+      } else {
+        setTimeout(() => {
+          setSlotRescheduleModal(prev => ({ ...prev, open: false }));
+        }, 3000);
+      }
     } catch (err: any) {
       setSlotRescheduleModal(prev => ({
         ...prev,
@@ -1680,8 +1712,43 @@ const TravelerBookings: React.FC = () => {
                     </div>
                   )}
 
+                  {/* Seat Reselection Required */}
+                  {(booking as any).needs_seat_reselection && booking.status !== 'cancelled' && (
+                    <div className="mt-4 p-4 bg-amber-50 border-2 border-amber-400 rounded-xl">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="font-semibold text-amber-900 text-sm">Debes seleccionar nuevos asientos</p>
+                          <p className="text-xs text-amber-800 mt-1 mb-3">
+                            Tus asientos anteriores ({((booking as any).previous_selected_seats || []).sort((a: number, b: number) => a - b).join(', ')}) ya no estan disponibles en el nuevo horario. Por favor elige nuevos asientos.
+                          </p>
+                          <button
+                            onClick={() => {
+                              const b = booking as any;
+                              setSeatReselectionModal({
+                                open: true,
+                                bookingId: b.id,
+                                tourId: b.tour_id,
+                                slotId: b.slot_id || '',
+                                travelersCount: b.travelers_count || 1,
+                                previousSeats: b.previous_selected_seats || [],
+                                tourName: b.tours?.name || b.tour_name || '',
+                                newDate: b.selected_date || '',
+                                newTime: b.selected_time || '',
+                              });
+                            }}
+                            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+                          >
+                            <MapPin className="h-4 w-4" />
+                            Seleccionar asientos
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Slot Reschedule Response Status */}
-                  {!(booking as any).has_pending_slot_reschedule && (booking as any).slot_reschedule_response && (
+                  {!(booking as any).has_pending_slot_reschedule && (booking as any).slot_reschedule_response && !(booking as any).needs_seat_reselection && (
                     <div className={`mt-4 p-3 rounded-md border ${
                       (booking as any).slot_reschedule_response === 'accepted' ? 'bg-green-50 border-green-200' :
                       (booking as any).slot_reschedule_response === 'rejected' ? 'bg-red-50 border-red-200' :
@@ -3024,6 +3091,24 @@ const TravelerBookings: React.FC = () => {
         <div className="container mx-auto px-4 pb-8">
           <TravelerCfdiList userId={user.id} />
         </div>
+      )}
+
+      {seatReselectionModal?.open && (
+        <SeatReselectionModal
+          bookingId={seatReselectionModal.bookingId}
+          tourId={seatReselectionModal.tourId}
+          slotId={seatReselectionModal.slotId}
+          travelersCount={seatReselectionModal.travelersCount}
+          previousSeats={seatReselectionModal.previousSeats}
+          tourName={seatReselectionModal.tourName}
+          newDate={seatReselectionModal.newDate}
+          newTime={seatReselectionModal.newTime}
+          onSuccess={() => {
+            setSeatReselectionModal(null);
+            fetchBookings();
+          }}
+          onClose={() => setSeatReselectionModal(null)}
+        />
       )}
     </div>
   );
