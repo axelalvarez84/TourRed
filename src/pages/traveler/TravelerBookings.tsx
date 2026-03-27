@@ -20,6 +20,7 @@ const TravelerBookings: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [highlightedBookingId, setHighlightedBookingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [bookingOptionalServices, setBookingOptionalServices] = useState<Record<string, any[]>>({});
@@ -187,6 +188,21 @@ const TravelerBookings: React.FC = () => {
       }
     }
   }, [searchParams, bookings, isLoading, pendingReschedules]);
+
+  useEffect(() => {
+    const bookingId = searchParams.get('booking');
+    const action = searchParams.get('action');
+    if (bookingId && !action && !isLoading && bookings.length > 0) {
+      setHighlightedBookingId(bookingId);
+      setTimeout(() => {
+        const el = document.getElementById(`booking-${bookingId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+      setTimeout(() => setHighlightedBookingId(null), 3000);
+    }
+  }, [searchParams, bookings, isLoading]);
 
   const fetchBookings = async () => {
     if (!user?.id) return;
@@ -1280,7 +1296,11 @@ const TravelerBookings: React.FC = () => {
       ) : (
         <div className="space-y-6">
           {bookings.map((booking) => (
-            <div key={booking.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div
+              key={booking.id}
+              id={`booking-${booking.id}`}
+              className={`bg-white rounded-lg shadow-md overflow-hidden transition-all duration-700 ${highlightedBookingId === booking.id ? 'ring-4 ring-blue-400 ring-offset-2' : ''}`}
+            >
               <div className="flex flex-col lg:flex-row">
                 {/* Tour Image */}
                 <div className="lg:w-1/3">
