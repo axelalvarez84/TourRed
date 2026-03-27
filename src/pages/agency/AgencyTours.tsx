@@ -1085,16 +1085,17 @@ const AgencyTours: React.FC = () => {
   const handleSelectSlot = async (slot: any) => {
     setReceptivoActionsModal(prev => ({ ...prev, selectedSlot: slot, bookingsInSlot: 0 }));
 
-    const { count } = await supabase
+    const { data: bookingsData } = await supabase
       .from('bookings')
-      .select('*', { count: 'exact', head: true })
+      .select('travelers_count')
       .eq('tour_id', receptivoActionsModal.tour?.id || '')
       .eq('selected_date', slot.slot_date)
       .eq('selected_time', slot.departure_time)
       .in('status', ['confirmed', 'pending'])
       .is('cancelled_at', null);
 
-    setReceptivoActionsModal(prev => ({ ...prev, bookingsInSlot: count || 0 }));
+    const totalTravelers = (bookingsData || []).reduce((sum, b) => sum + (b.travelers_count || 0), 0);
+    setReceptivoActionsModal(prev => ({ ...prev, bookingsInSlot: totalTravelers }));
   };
 
   const handleCloseReceptivoActions = () => {
