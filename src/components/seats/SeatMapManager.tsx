@@ -23,6 +23,7 @@ interface BlockModalState {
   seatNumber: number;
   note: string;
   isSubmitting: boolean;
+  blockAllSlots: boolean;
 }
 
 interface TourSlot {
@@ -47,7 +48,7 @@ const SeatMapManager: React.FC<SeatMapManagerProps> = ({
   const [seatsWithStatus, setSeatsWithStatus] = useState<SeatWithStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [blockModal, setBlockModal] = useState<BlockModalState>({ open: false, seatNumber: 0, note: '', isSubmitting: false });
+  const [blockModal, setBlockModal] = useState<BlockModalState>({ open: false, seatNumber: 0, note: '', isSubmitting: false, blockAllSlots: false });
   const [hoveredSeat, setHoveredSeat] = useState<number | null>(null);
   const [actionFeedback, setActionFeedback] = useState<{ seat: number; message: string } | null>(null);
 
@@ -205,45 +206,80 @@ const SeatMapManager: React.FC<SeatMapManagerProps> = ({
       handleUnblock(seat.number);
       return;
     }
-    setBlockModal({ open: true, seatNumber: seat.number, note: '', isSubmitting: false });
+    setBlockModal({ open: true, seatNumber: seat.number, note: '', isSubmitting: false, blockAllSlots: false });
   };
 
   const handleBlock = async () => {
     if (!user) return;
     setBlockModal(prev => ({ ...prev, isSubmitting: true }));
     try {
-      let deleteQuery = supabase
-        .from('slot_seat_status')
-        .delete()
-        .eq('tour_id', tourId)
-        .eq('seat_number', blockModal.seatNumber);
+      if (isReceptivo && blockModal.blockAllSlots) {
+        const today = new Date().toISOString().split('T')[0];
+        const { data: allSlots } = await supabase
+          .from('tour_slots')
+          .select('id')
+          .eq('tour_id', tourId)
+          .neq('status', 'cancelado')
+          .gte('slot_date', today);
 
-      if (activeSlotId) {
-        deleteQuery = (deleteQuery as any).eq('slot_id', activeSlotId);
+        const slotIds = (allSlots || []).map((s: any) => s.id);
+
+        await supabase
+          .from('slot_seat_status')
+          .delete()
+          .eq('tour_id', tourId)
+          .eq('seat_number', blockModal.seatNumber)
+          .in('slot_id', slotIds.length > 0 ? slotIds : ['_none_']);
+
+        if (slotIds.length > 0) {
+          const payloads = slotIds.map((sid: string) => ({
+            tour_id: tourId,
+            agency_id: agencyId,
+            seat_number: blockModal.seatNumber,
+            status: 'bloqueado_agencia',
+            block_note: blockModal.note || null,
+            blocked_by: user.id,
+            blocked_at: new Date().toISOString(),
+            slot_id: sid,
+          }));
+          const { error } = await supabase.from('slot_seat_status').insert(payloads);
+          if (error) throw error;
+        }
+
+        setActionFeedback({ seat: blockModal.seatNumber, message: `Asiento bloqueado en ${slotIds.length} salidas` });
       } else {
-        deleteQuery = (deleteQuery as any).is('slot_id', null);
+        let deleteQuery = supabase
+          .from('slot_seat_status')
+          .delete()
+          .eq('tour_id', tourId)
+          .eq('seat_number', blockModal.seatNumber);
+
+        if (activeSlotId) {
+          deleteQuery = (deleteQuery as any).eq('slot_id', activeSlotId);
+        } else {
+          deleteQuery = (deleteQuery as any).is('slot_id', null);
+        }
+        await deleteQuery;
+
+        const payload: any = {
+          tour_id: tourId,
+          agency_id: agencyId,
+          seat_number: blockModal.seatNumber,
+          status: 'bloqueado_agencia',
+          block_note: blockModal.note || null,
+          blocked_by: user.id,
+          blocked_at: new Date().toISOString(),
+        };
+        if (activeSlotId) payload.slot_id = activeSlotId;
+
+        const { error } = await supabase.from('slot_seat_status').insert(payload);
+        if (error) throw error;
+
+        setActionFeedback({ seat: blockModal.seatNumber, message: 'Asiento bloqueado' });
       }
-      await deleteQuery;
 
-      const payload: any = {
-        tour_id: tourId,
-        agency_id: agencyId,
-        seat_number: blockModal.seatNumber,
-        status: 'bloqueado_agencia',
-        block_note: blockModal.note || null,
-        blocked_by: user.id,
-        blocked_at: new Date().toISOString(),
-      };
-      if (activeSlotId) payload.slot_id = activeSlotId;
-
-      const { error } = await supabase
-        .from('slot_seat_status')
-        .insert(payload);
-
-      if (error) throw error;
-      setActionFeedback({ seat: blockModal.seatNumber, message: 'Asiento bloqueado' });
-      setTimeout(() => setActionFeedback(null), 2500);
-      setBlockModal({ open: false, seatNumber: 0, note: '', isSubmitting: false });
+      setTimeout(() => setActionFeedback(null), 3000);
+      setBlockModal({ open: false, seatNumber: 0, note: '', isSubmitting: false, blockAllSlots: false });
       await loadData();
     } catch (err: any) {
       setBlockModal(prev => ({ ...prev, isSubmitting: false }));
@@ -577,20 +613,53 @@ const SeatMapManager: React.FC<SeatMapManagerProps> = ({
                 <Lock className="w-5 h-5 text-amber-600" />
                 <h3 className="font-semibold text-gray-800">Bloquear Asiento {blockModal.seatNumber}</h3>
               </div>
-              <button onClick={() => setBlockModal({ open: false, seatNumber: 0, note: '', isSubmitting: false })} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setBlockModal({ open: false, seatNumber: 0, note: '', isSubmitting: false, blockAllSlots: false })} className="text-gray-400 hover:text-gray-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {isReceptivo && selectedSlot && (
-              <div className="flex items-center gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
-                <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>Salida: <strong>{formatSlotDate(selectedSlot.slot_date)}{selectedSlot.departure_time ? ` · ${formatSlotTime(selectedSlot.departure_time)}` : ''}</strong></span>
+            {isReceptivo && (
+              <div className="space-y-2">
+                {selectedSlot && !blockModal.blockAllSlots && (
+                  <div className="flex items-center gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+                    <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>Salida: <strong>{formatSlotDate(selectedSlot.slot_date)}{selectedSlot.departure_time ? ` · ${formatSlotTime(selectedSlot.departure_time)}` : ''}</strong></span>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setBlockModal(prev => ({ ...prev, blockAllSlots: !prev.blockAllSlots }))}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-colors text-left ${
+                    blockModal.blockAllSlots
+                      ? 'border-amber-400 bg-amber-50'
+                      : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                  }`}
+                >
+                  <div className={`w-10 h-6 rounded-full flex items-center transition-colors flex-shrink-0 ${
+                    blockModal.blockAllSlots ? 'bg-amber-500 justify-end' : 'bg-gray-300 justify-start'
+                  } px-0.5`}>
+                    <div className="w-5 h-5 bg-white rounded-full shadow" />
+                  </div>
+                  <div>
+                    <p className={`text-xs font-semibold ${blockModal.blockAllSlots ? 'text-amber-800' : 'text-gray-600'}`}>
+                      Bloquear en todas las salidas futuras
+                    </p>
+                    <p className={`text-xs mt-0.5 ${blockModal.blockAllSlots ? 'text-amber-600' : 'text-gray-400'}`}>
+                      Ideal para el lugar del coordinador
+                    </p>
+                  </div>
+                </button>
               </div>
             )}
 
             <p className="text-sm text-gray-600">
-              Este asiento quedara bloqueado para nuevas reservas online{isReceptivo ? ' en esta salida' : ''}. Util para ventas realizadas fuera de la plataforma.
+              {isReceptivo && blockModal.blockAllSlots
+                ? 'Este asiento quedara bloqueado en todas las salidas futuras de este tour.'
+                : isReceptivo
+                ? 'Este asiento quedara bloqueado en esta salida especifica.'
+                : 'Este asiento quedara bloqueado para nuevas reservas online.'
+              }{' '}Util para ventas realizadas fuera de la plataforma.
             </p>
 
             <div>
@@ -607,7 +676,7 @@ const SeatMapManager: React.FC<SeatMapManagerProps> = ({
 
             <div className="flex gap-3">
               <button
-                onClick={() => setBlockModal({ open: false, seatNumber: 0, note: '', isSubmitting: false })}
+                onClick={() => setBlockModal({ open: false, seatNumber: 0, note: '', isSubmitting: false, blockAllSlots: false })}
                 className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 Cancelar
