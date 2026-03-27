@@ -135,6 +135,11 @@ const AgencyTours: React.FC = () => {
     cancellation_reason: '',
   });
 
+  const [seatMapModal, setSeatMapModal] = useState<{
+    open: boolean;
+    tour: Tour | null;
+  }>({ open: false, tour: null });
+
   const [receptivoActionsModal, setReceptivoActionsModal] = useState<{
     open: boolean;
     tour: Tour | null;
@@ -4866,6 +4871,16 @@ const AgencyTours: React.FC = () => {
                         <Edit className="h-4 w-4" />
                       </button>
                     )}
+                    {(tour as any).vehicle_map_type && (
+                      <button
+                        onClick={() => setSeatMapModal({ open: true, tour })}
+                        className="p-2 text-blue-500 hover:text-blue-700 transition-colors"
+                        title="Gestionar asientos"
+                        disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour}
+                      >
+                        <Bus className="h-4 w-4" />
+                      </button>
+                    )}
                     {canEdit && tour.tour_type === 'receptivo' ? (
                       <>
                         <button
@@ -4938,6 +4953,41 @@ const AgencyTours: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Modal de Gestion de Asientos */}
+      {seatMapModal.open && seatMapModal.tour && resolvedAgencyId && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-blue-600 px-6 py-4 rounded-t-2xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-white/20 rounded-lg p-2">
+                  <Bus className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-white font-bold text-base">{seatMapModal.tour.name}</h2>
+                  <p className="text-blue-100 text-xs">Gestion de asientos — haz click en un asiento para bloquearlo o desbloquearlo</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSeatMapModal({ open: false, tour: null })}
+                className="text-white/80 hover:text-white transition-colors p-1"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
+                <strong>Como funciona:</strong> Los asientos en blanco estan disponibles para reservas online. Haz click en cualquier asiento disponible para bloquearlo (ventas externas). Haz click en un asiento bloqueado para desbloquearlo.
+              </div>
+              <SeatMapManager
+                tourId={seatMapModal.tour.id}
+                agencyId={resolvedAgencyId}
+                slotId={null}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
