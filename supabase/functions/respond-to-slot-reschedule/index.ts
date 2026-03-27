@@ -195,20 +195,23 @@ Deno.serve(async (req: Request) => {
         .update({ response: "accepted", responded_at: now })
         .eq("id", rescheduleResponse.id);
 
+      const { data: targetSlot } = await adminClient
+        .from("tour_slots")
+        .select("id, slot_date, departure_time")
+        .eq("id", rescheduleRequest.target_slot_id)
+        .single();
+
       await adminClient
         .from("bookings")
         .update({
           has_pending_slot_reschedule: false,
           slot_reschedule_response: "accepted",
           slot_reschedule_responded_at: now,
+          selected_date: targetSlot?.slot_date ?? undefined,
+          selected_time: targetSlot?.departure_time ?? undefined,
+          slot_id: targetSlot?.id ?? undefined,
         })
         .eq("id", booking_id);
-
-      const { data: targetSlot } = await adminClient
-        .from("tour_slots")
-        .select("id, slot_date, departure_time")
-        .eq("id", rescheduleRequest.target_slot_id)
-        .single();
 
       let seatReselectionNeeded = false;
 
