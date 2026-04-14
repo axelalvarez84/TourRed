@@ -47,6 +47,8 @@ Deno.serve(async (req: Request) => {
       target_slot_id,
       new_slot_date,
       new_slot_time,
+      new_capacity,
+      new_vehicle_map_type,
     } = body;
 
     if (!slot_id || !tour_id || !reason || !resolution_type) {
@@ -56,7 +58,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    if (!["new_slot", "expand_capacity"].includes(resolution_type)) {
+    if (!["new_slot", "increase_capacity", "existing_slot", "expand_capacity"].includes(resolution_type)) {
       return new Response(JSON.stringify({ success: false, error: "Tipo de resolucion invalido" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -70,7 +72,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    if (resolution_type === "expand_capacity" && !target_slot_id) {
+    if ((resolution_type === "increase_capacity" || resolution_type === "existing_slot" || resolution_type === "expand_capacity") && !target_slot_id) {
       return new Response(JSON.stringify({ success: false, error: "Se requiere el slot destino" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -79,7 +81,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: slot, error: slotError } = await adminClient
       .from("tour_slots")
-      .select("*, tours!inner(id, name, agency_id, agencies!inner(id, user_id, name))")
+      .select("*, tours!inner(id, name, agency_id, vehicle_map_type, agencies!inner(id, user_id, name))")
       .eq("id", slot_id)
       .eq("tour_id", tour_id)
       .single();
@@ -124,7 +126,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: affectedBookings, error: bookingsError } = await adminClient
       .from("bookings")
-      .select("id, user_id, deposit_amount, toursred_cash_used, booking_code")
+      .select("id, user_id, deposit_amount, toursred_cash_used, booking_code, created_at, travelers_count")
       .eq("tour_id", tour_id)
       .eq("selected_date", slot.slot_date)
       .eq("selected_time", slot.departure_time)
@@ -141,11 +143,14 @@ Deno.serve(async (req: Request) => {
     }
 
     let finalTargetSlotId = target_slot_id;
+    let availableSpotsInTarget: number | null = null;
 
     if (resolution_type === "new_slot") {
       const newSlotTime = new_slot_time.includes(":") && new_slot_time.split(":").length === 3
         ? new_slot_time
         : new_slot_time + ":00";
+
+      const slotCapacity = new_capacity ? Number(new_capacity) : slot.capacity;
 
       const { data: newSlot, error: newSlotError } = await adminClient
         .from("tour_slots")
@@ -155,7 +160,7 @@ Deno.serve(async (req: Request) => {
           schedule_id: slot.schedule_id,
           slot_date: new_slot_date,
           departure_time: newSlotTime,
-          capacity: slot.capacity,
+          capacity: slotCapacity,
           booked_count: 0,
           status: "activo",
           is_auto_generated: false,
@@ -167,6 +172,40 @@ Deno.serve(async (req: Request) => {
 
       if (newSlotError || !newSlot) throw new Error("Error creando nuevo slot");
       finalTargetSlotId = newSlot.id;
+      availableSpotsInTarget = slotCapacity;
+
+    } else if (resolution_type === "increase_capacity") {
+      const { data: targetSlot, error: targetSlotError } = await adminClient
+        .from("tour_slots")
+        .select("id, capacity, booked_count")
+        .eq("id", target_slot_id)
+        .single();
+
+      if (targetSlotError || !targetSlot) {
+        return new Response(JSON.stringify({ success: false, error: "Slot destino no encontrado" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const finalCapacity = new_capacity ? Number(new_capacity) : targetSlot.capacity;
+
+      const updatePayload: any = { capacity: finalCapacity, status: "activo" };
+      if (new_vehicle_map_type) {
+        await adminClient
+          .from("tours")
+          .update({ vehicle_map_type: new_vehicle_map_type })
+          .eq("id", tour_id);
+      }
+
+      const { error: updateCapacityError } = await adminClient
+        .from("tour_slots")
+        .update(updatePayload)
+        .eq("id", target_slot_id);
+
+      if (updateCapacityError) throw updateCapacityError;
+
+      availableSpotsInTarget = finalCapacity - targetSlot.booked_count;
 
     } else if (resolution_type === "expand_capacity") {
       const { data: targetSlot, error: targetSlotError } = await adminClient
@@ -182,9 +221,9 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const newCapacity = targetSlot.booked_count + affectedBookings.length + (targetSlot.capacity - targetSlot.booked_count);
-      const minRequired = targetSlot.booked_count + affectedBookings.length;
-      const finalCapacity = Math.max(newCapacity, minRequired);
+      const totalAffectedTravelers = affectedBookings.reduce((sum: number, b: any) => sum + (b.travelers_count || 1), 0);
+      const minRequired = targetSlot.booked_count + totalAffectedTravelers;
+      const finalCapacity = Math.max(targetSlot.capacity, minRequired);
 
       const { error: updateCapacityError } = await adminClient
         .from("tour_slots")
@@ -192,7 +231,27 @@ Deno.serve(async (req: Request) => {
         .eq("id", target_slot_id);
 
       if (updateCapacityError) throw updateCapacityError;
+      availableSpotsInTarget = finalCapacity - targetSlot.booked_count;
+
+    } else if (resolution_type === "existing_slot") {
+      const { data: targetSlot, error: targetSlotError } = await adminClient
+        .from("tour_slots")
+        .select("id, capacity, booked_count")
+        .eq("id", target_slot_id)
+        .single();
+
+      if (targetSlotError || !targetSlot) {
+        return new Response(JSON.stringify({ success: false, error: "Slot destino no encontrado" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      availableSpotsInTarget = targetSlot.capacity - targetSlot.booked_count;
     }
+
+    const totalAffectedTravelers = affectedBookings.reduce((sum: number, b: any) => sum + (b.travelers_count || 1), 0);
+    const capacitySufficient = availableSpotsInTarget === null || availableSpotsInTarget >= totalAffectedTravelers;
 
     const responseDeadline = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
 
@@ -209,6 +268,9 @@ Deno.serve(async (req: Request) => {
         status: "pending_responses",
         affected_bookings_count: affectedBookings.length,
         created_by: user.id,
+        available_spots_in_target: availableSpotsInTarget,
+        new_capacity: new_capacity ? Number(new_capacity) : null,
+        new_vehicle_map_type: new_vehicle_map_type || null,
       })
       .select()
       .single();
@@ -231,6 +293,7 @@ Deno.serve(async (req: Request) => {
       booking_id: booking.id,
       user_id: booking.user_id,
       response: "pending",
+      booking_created_at: booking.created_at,
     }));
 
     const { error: responsesError } = await adminClient
@@ -251,11 +314,16 @@ Deno.serve(async (req: Request) => {
       const newDate = targetSlotData?.slot_date || new_slot_date;
       const newTime = targetSlotData?.departure_time || new_slot_time;
 
+      const baseMessage = `Tu reserva en "${tourName}" ha sido movida. Tienes 12 horas para aceptar o rechazar el nuevo horario: ${newDate} a las ${newTime?.substring(0, 5)}.`;
+      const priorityNote = !capacitySufficient
+        ? " Los cupos se asignan en orden de respuesta — responde pronto para asegurar tu lugar."
+        : "";
+
       await adminClient.rpc("create_user_notification", {
         p_user_id: booking.user_id,
         p_type: "slot_reschedule_pending",
         p_title: "Cambio de horario en tu reserva",
-        p_message: `Tu reserva en "${tourName}" ha sido movida. Tienes 12 horas para aceptar o rechazar el nuevo horario: ${newDate} a las ${newTime?.substring(0, 5)}.`,
+        p_message: baseMessage + priorityNote,
         p_data: {
           request_id: rescheduleRequest.id,
           booking_id: booking.id,
@@ -266,6 +334,7 @@ Deno.serve(async (req: Request) => {
           new_time: newTime,
           response_deadline: responseDeadline,
           resolution_type: resolution_type,
+          capacity_sufficient: capacitySufficient,
         },
       });
 
@@ -285,6 +354,7 @@ Deno.serve(async (req: Request) => {
             new_time: newTime,
             reason: reason,
             response_deadline: responseDeadline,
+            capacity_sufficient: capacitySufficient,
           }),
         }).catch(() => {})
       );
@@ -299,7 +369,11 @@ Deno.serve(async (req: Request) => {
         affected_bookings: affectedBookings.length,
         target_slot_id: finalTargetSlotId,
         response_deadline: responseDeadline,
-        message: `Solicitud de reagendado creada. ${affectedBookings.length} viajero(s) tienen 12 horas para responder.`,
+        available_spots_in_target: availableSpotsInTarget,
+        capacity_sufficient: capacitySufficient,
+        message: capacitySufficient
+          ? `Solicitud de reagendado creada. ${affectedBookings.length} viajero(s) tienen 12 horas para responder.`
+          : `Solicitud de reagendado creada. Los cupos son limitados — los viajeros serán asignados por orden de respuesta.`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

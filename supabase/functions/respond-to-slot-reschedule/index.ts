@@ -29,8 +29,9 @@ async function handleSeatAssignment(
   const occupiedNumbers = new Set((occupiedSeats || []).map((s: any) => s.seat_number));
   const availableOriginalSeats = originalSeats.filter((n) => !occupiedNumbers.has(n));
 
-  if (availableOriginalSeats.length === travelersCount) {
-    const seatRecords = availableOriginalSeats.map((seatNum) => ({
+  if (availableOriginalSeats.length >= travelersCount) {
+    const seatsToUse = availableOriginalSeats.slice(0, travelersCount);
+    const seatRecords = seatsToUse.map((seatNum) => ({
       tour_id: tourId,
       slot_id: targetSlotId,
       agency_id: null,
@@ -51,7 +52,7 @@ async function handleSeatAssignment(
 
     await adminClient
       .from("bookings")
-      .update({ selected_seats: availableOriginalSeats, needs_seat_reselection: false })
+      .update({ selected_seats: seatsToUse, needs_seat_reselection: false })
       .eq("id", bookingId);
 
     return { assigned: true, needsReselection: false };
@@ -73,6 +74,91 @@ async function handleSeatAssignment(
 
     return { assigned: false, needsReselection: true };
   }
+}
+
+async function checkAndFinalizeRequest(
+  adminClient: any,
+  requestId: string,
+  targetSlotId: string,
+  originalSlotId: string,
+  reason: string,
+  now: string
+): Promise<void> {
+  const { data: allResponses } = await adminClient
+    .from("slot_reschedule_responses")
+    .select("response, confirmed_spot, booking_id")
+    .eq("request_id", requestId);
+
+  if (!allResponses) return;
+
+  const stillPending = allResponses.some((r: any) => r.response === "pending");
+  if (stillPending) return;
+
+  const { data: targetSlot } = await adminClient
+    .from("tour_slots")
+    .select("slot_date, departure_time")
+    .eq("id", targetSlotId)
+    .single();
+
+  if (!targetSlot) return;
+
+  const confirmedResponses = allResponses.filter((r: any) => r.confirmed_spot === true);
+  const confirmedBookingIds = confirmedResponses.map((r: any) => r.booking_id);
+
+  if (confirmedBookingIds.length > 0) {
+    await adminClient
+      .from("bookings")
+      .update({
+        selected_date: targetSlot.slot_date,
+        selected_time: targetSlot.departure_time,
+      })
+      .in("id", confirmedBookingIds);
+
+    const { data: confirmedTravelerCounts } = await adminClient
+      .from("bookings")
+      .select("travelers_count")
+      .in("id", confirmedBookingIds);
+
+    const totalConfirmedTravelers = (confirmedTravelerCounts || []).reduce(
+      (sum: number, b: any) => sum + (b.travelers_count || 1),
+      0
+    );
+
+    const { data: currentSlot } = await adminClient
+      .from("tour_slots")
+      .select("booked_count")
+      .eq("id", targetSlotId)
+      .single();
+
+    if (currentSlot) {
+      await adminClient
+        .from("tour_slots")
+        .update({ booked_count: currentSlot.booked_count + totalConfirmedTravelers })
+        .eq("id", targetSlotId);
+    }
+  }
+
+  const noAvailabilityCount = allResponses.filter(
+    (r: any) => r.response === "accepted_no_availability" || r.response === "auto_accepted_no_availability"
+  ).length;
+
+  await adminClient
+    .from("slot_reschedule_requests")
+    .update({
+      status: "completed",
+      completed_at: now,
+      no_availability_count: noAvailabilityCount,
+    })
+    .eq("id", requestId);
+
+  await adminClient
+    .from("tour_slots")
+    .update({
+      status: "cancelado",
+      cancellation_reason: "Reagendado: " + reason,
+      cancelled_at: now,
+    })
+    .eq("id", originalSlotId);
 }
 
 Deno.serve(async (req: Request) => {
@@ -107,7 +193,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json();
-    const { booking_id, response } = body;
+    const { booking_id, response, alternative_slot_id } = body;
 
     if (!booking_id || !response) {
       return new Response(JSON.stringify({ success: false, error: "Faltan campos requeridos" }), {
@@ -116,8 +202,15 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    if (!["accepted", "rejected"].includes(response)) {
+    if (!["accepted", "rejected", "choose_alternative"].includes(response)) {
       return new Response(JSON.stringify({ success: false, error: "Respuesta invalida" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (response === "choose_alternative" && !alternative_slot_id) {
+      return new Response(JSON.stringify({ success: false, error: "Se requiere el slot alternativo" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -150,21 +243,125 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    if (booking.slot_reschedule_response) {
-      return new Response(JSON.stringify({ success: false, error: "Ya respondiste a este reagendado" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const { data: rescheduleResponse, error: responseError } = await adminClient
       .from("slot_reschedule_responses")
-      .select("*, slot_reschedule_requests!inner(id, status, response_deadline, target_slot_id, reason, tour_id, original_slot_id)")
+      .select("*, slot_reschedule_requests!inner(id, status, response_deadline, target_slot_id, reason, tour_id, original_slot_id, available_spots_in_target)")
       .eq("booking_id", booking_id)
       .eq("response", "pending")
       .single();
 
     if (responseError || !rescheduleResponse) {
+      if (response === "choose_alternative" && booking.slot_reschedule_response === "accepted_no_availability") {
+        const { data: existingResponse } = await adminClient
+          .from("slot_reschedule_responses")
+          .select("*, slot_reschedule_requests!inner(id, status, response_deadline, target_slot_id, reason, tour_id, original_slot_id, available_spots_in_target)")
+          .eq("booking_id", booking_id)
+          .eq("response", "accepted_no_availability")
+          .single();
+
+        if (!existingResponse) {
+          return new Response(JSON.stringify({ success: false, error: "No se encontro la solicitud de reagendado" }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const rr = (existingResponse as any).slot_reschedule_requests;
+        const now = new Date().toISOString();
+
+        const { data: altSlot } = await adminClient
+          .from("tour_slots")
+          .select("id, slot_date, departure_time, capacity, booked_count")
+          .eq("id", alternative_slot_id)
+          .single();
+
+        if (!altSlot) {
+          return new Response(JSON.stringify({ success: false, error: "Slot alternativo no encontrado" }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const available = altSlot.capacity - altSlot.booked_count;
+        const travelersCount = booking.travelers_count || 1;
+
+        if (available < travelersCount) {
+          return new Response(JSON.stringify({ success: false, error: "El horario seleccionado ya no tiene suficiente cupo" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        await adminClient
+          .from("slot_reschedule_responses")
+          .update({
+            response: "accepted",
+            confirmed_spot: true,
+            alternative_slot_id: alternative_slot_id,
+            responded_at: now,
+          })
+          .eq("id", existingResponse.id);
+
+        await adminClient
+          .from("bookings")
+          .update({
+            has_pending_slot_reschedule: false,
+            slot_reschedule_response: "accepted",
+            slot_reschedule_responded_at: now,
+            slot_reschedule_alternative_slot_id: alternative_slot_id,
+            selected_date: altSlot.slot_date,
+            selected_time: altSlot.departure_time,
+            slot_id: altSlot.id,
+          })
+          .eq("id", booking_id);
+
+        await adminClient
+          .from("tour_slots")
+          .update({ booked_count: altSlot.booked_count + travelersCount })
+          .eq("id", alternative_slot_id);
+
+        const { data: tourData } = await adminClient
+          .from("tours")
+          .select("vehicle_map_type")
+          .eq("id", booking.tour_id)
+          .single();
+
+        let seatReselectionNeeded = false;
+        if (tourData?.vehicle_map_type && booking.selected_seats && booking.selected_seats.length > 0) {
+          const seatResult = await handleSeatAssignment(
+            adminClient, booking_id, altSlot.id, booking.tour_id,
+            booking.selected_seats, travelersCount
+          );
+          seatReselectionNeeded = seatResult.needsReselection;
+        }
+
+        await adminClient.rpc("create_user_notification", {
+          p_user_id: user.id,
+          p_type: "slot_reschedule_accepted",
+          p_title: "Nuevo horario confirmado",
+          p_message: `Tu reserva ha sido movida al horario alternativo: ${altSlot.slot_date} a las ${altSlot.departure_time?.substring(0, 5)}.`,
+          p_data: {
+            booking_id: booking_id,
+            request_id: rr.id,
+            new_date: altSlot.slot_date,
+            new_time: altSlot.departure_time,
+            needs_seat_reselection: seatReselectionNeeded,
+          },
+        });
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            response: "accepted",
+            new_date: altSlot.slot_date,
+            new_time: altSlot.departure_time,
+            needs_seat_reselection: seatReselectionNeeded,
+            message: "Has confirmado el horario alternativo. Tu reserva ha sido actualizada.",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       return new Response(JSON.stringify({ success: false, error: "No se encontro la solicitud de reagendado" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -190,9 +387,89 @@ Deno.serve(async (req: Request) => {
     const now = new Date().toISOString();
 
     if (response === "accepted") {
+      const availableInTarget: number | null = rescheduleRequest.available_spots_in_target;
+      const travelersCount = booking.travelers_count || 1;
+
+      let confirmedSpot = true;
+      let alternativeSlots: any[] = [];
+
+      if (availableInTarget !== null) {
+        const { data: alreadyConfirmedData } = await adminClient.rpc("get_confirmed_spots_in_reschedule", {
+          p_request_id: rescheduleRequest.id,
+        });
+
+        const alreadyConfirmedTravelers = Number(alreadyConfirmedData || 0);
+        const remainingSpots = availableInTarget - alreadyConfirmedTravelers;
+
+        if (remainingSpots < travelersCount) {
+          confirmedSpot = false;
+
+          const { data: altSlots } = await adminClient.rpc("get_alternative_slots_for_reschedule", {
+            p_tour_id: rescheduleRequest.tour_id,
+            p_original_slot_id: rescheduleRequest.original_slot_id,
+            p_travelers_needed: travelersCount,
+          });
+
+          alternativeSlots = altSlots || [];
+
+          await adminClient
+            .from("slot_reschedule_responses")
+            .update({
+              response: "accepted_no_availability",
+              confirmed_spot: false,
+              responded_at: now,
+            })
+            .eq("id", rescheduleResponse.id);
+
+          await adminClient
+            .from("bookings")
+            .update({
+              has_pending_slot_reschedule: false,
+              slot_reschedule_response: "accepted_no_availability",
+              slot_reschedule_responded_at: now,
+            })
+            .eq("id", booking_id);
+
+          await adminClient.rpc("create_user_notification", {
+            p_user_id: user.id,
+            p_type: "slot_reschedule_pending",
+            p_title: "Sin cupo en el horario propuesto",
+            p_message: `Los cupos del horario propuesto ya fueron asignados a otros viajeros. Puedes elegir un horario alternativo o solicitar reembolso.`,
+            p_data: {
+              booking_id: booking_id,
+              request_id: rescheduleRequest.id,
+              has_alternative_slots: alternativeSlots.length > 0,
+            },
+          });
+
+          await checkAndFinalizeRequest(
+            adminClient,
+            rescheduleRequest.id,
+            rescheduleRequest.target_slot_id,
+            rescheduleRequest.original_slot_id,
+            rescheduleRequest.reason,
+            now
+          );
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              response: "accepted_no_availability",
+              alternative_slots: alternativeSlots,
+              message: "No hay cupo disponible en el horario propuesto. Por favor elige un horario alternativo o solicita reembolso.",
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
       await adminClient
         .from("slot_reschedule_responses")
-        .update({ response: "accepted", responded_at: now })
+        .update({
+          response: "accepted",
+          confirmed_spot: true,
+          responded_at: now,
+        })
         .eq("id", rescheduleResponse.id);
 
       const { data: targetSlot } = await adminClient
@@ -255,66 +532,14 @@ Deno.serve(async (req: Request) => {
         },
       });
 
-      const { data: allResponses } = await adminClient
-        .from("slot_reschedule_responses")
-        .select("response")
-        .eq("request_id", rescheduleRequest.id);
-
-      const stillPending = allResponses?.some((r: any) => r.response === "pending");
-
-      if (!stillPending && targetSlot) {
-        const acceptedResponses = allResponses?.filter((r: any) =>
-          r.response === "accepted" || r.response === "auto_accepted"
-        ) || [];
-
-        const acceptedBookingIds: string[] = await adminClient
-          .from("slot_reschedule_responses")
-          .select("booking_id")
-          .eq("request_id", rescheduleRequest.id)
-          .in("response", ["accepted", "auto_accepted"])
-          .then(({ data }: { data: any[] | null }) => (data || []).map((r: any) => r.booking_id));
-
-        await adminClient
-          .from("bookings")
-          .update({
-            selected_date: targetSlot.slot_date,
-            selected_time: targetSlot.departure_time,
-          })
-          .in("id", acceptedBookingIds);
-
-        if (acceptedResponses.length > 0) {
-          await adminClient.rpc("update_slot_booked_count", {
-            p_slot_id: rescheduleRequest.target_slot_id,
-            p_increment: acceptedResponses.length,
-          }).catch(async () => {
-            const { data: ts } = await adminClient
-              .from("tour_slots")
-              .select("booked_count")
-              .eq("id", rescheduleRequest.target_slot_id)
-              .single();
-            if (ts) {
-              await adminClient
-                .from("tour_slots")
-                .update({ booked_count: ts.booked_count + acceptedResponses.length })
-                .eq("id", rescheduleRequest.target_slot_id);
-            }
-          });
-        }
-
-        await adminClient
-          .from("tour_slots")
-          .update({
-            status: "cancelado",
-            cancellation_reason: "Reagendado: " + rescheduleRequest.reason,
-            cancelled_at: now,
-          })
-          .eq("id", rescheduleRequest.original_slot_id);
-
-        await adminClient
-          .from("slot_reschedule_requests")
-          .update({ status: "completed", completed_at: now })
-          .eq("id", rescheduleRequest.id);
-      }
+      await checkAndFinalizeRequest(
+        adminClient,
+        rescheduleRequest.id,
+        rescheduleRequest.target_slot_id,
+        rescheduleRequest.original_slot_id,
+        rescheduleRequest.reason,
+        now
+      );
 
       return new Response(
         JSON.stringify({
@@ -330,7 +555,7 @@ Deno.serve(async (req: Request) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
 
-    } else {
+    } else if (response === "rejected") {
       const depositAmount = Number(booking.deposit_amount || 0);
       const toursredCashUsed = Number(booking.toursred_cash_used || 0);
       const totalRefund = depositAmount + toursredCashUsed;
@@ -355,6 +580,7 @@ Deno.serve(async (req: Request) => {
         .from("slot_reschedule_responses")
         .update({
           response: "rejected",
+          confirmed_spot: false,
           responded_at: now,
           refund_processed: true,
           refund_amount: totalRefund,
@@ -387,70 +613,14 @@ Deno.serve(async (req: Request) => {
         },
       });
 
-      const { data: allResponses } = await adminClient
-        .from("slot_reschedule_responses")
-        .select("response")
-        .eq("request_id", rescheduleRequest.id);
-
-      const stillPending = allResponses?.some((r: any) => r.response === "pending");
-
-      if (!stillPending) {
-        const acceptedResponses = allResponses?.filter((r: any) =>
-          r.response === "accepted" || r.response === "auto_accepted"
-        ) || [];
-
-        if (acceptedResponses.length > 0) {
-          const { data: targetSlot } = await adminClient
-            .from("tour_slots")
-            .select("slot_date, departure_time")
-            .eq("id", rescheduleRequest.target_slot_id)
-            .single();
-
-          if (targetSlot) {
-            const acceptedBookingIds: string[] = await adminClient
-              .from("slot_reschedule_responses")
-              .select("booking_id")
-              .eq("request_id", rescheduleRequest.id)
-              .in("response", ["accepted", "auto_accepted"])
-              .then(({ data }: { data: any[] | null }) => (data || []).map((r: any) => r.booking_id));
-
-            await adminClient
-              .from("bookings")
-              .update({
-                selected_date: targetSlot.slot_date,
-                selected_time: targetSlot.departure_time,
-              })
-              .in("id", acceptedBookingIds);
-
-            const { data: currentSlot } = await adminClient
-              .from("tour_slots")
-              .select("booked_count")
-              .eq("id", rescheduleRequest.target_slot_id)
-              .single();
-
-            if (currentSlot) {
-              await adminClient
-                .from("tour_slots")
-                .update({ booked_count: currentSlot.booked_count + acceptedResponses.length })
-                .eq("id", rescheduleRequest.target_slot_id);
-            }
-          }
-        }
-
-        await adminClient
-          .from("tour_slots")
-          .update({
-            status: "cancelado",
-            cancellation_reason: "Reagendado: " + rescheduleRequest.reason,
-            cancelled_at: now,
-          })
-          .eq("id", rescheduleRequest.original_slot_id);
-
-        await adminClient
-          .from("slot_reschedule_requests")
-          .update({ status: "completed", completed_at: now })
-          .eq("id", rescheduleRequest.id);
-      }
+      await checkAndFinalizeRequest(
+        adminClient,
+        rescheduleRequest.id,
+        rescheduleRequest.target_slot_id,
+        rescheduleRequest.original_slot_id,
+        rescheduleRequest.reason,
+        now
+      );
 
       return new Response(
         JSON.stringify({
@@ -462,6 +632,12 @@ Deno.serve(async (req: Request) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    return new Response(JSON.stringify({ success: false, error: "Respuesta no procesada" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
   } catch (error: any) {
     console.error("Error:", error);
     return new Response(
