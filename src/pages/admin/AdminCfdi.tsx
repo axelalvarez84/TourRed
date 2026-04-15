@@ -6,6 +6,26 @@ import {
 import { supabase } from '../../lib/supabase';
 import { formatCurrencyMXN } from '../../utils/formatCurrency';
 
+const downloadCfdi = async (cfdiId: string, fileType: 'xml' | 'pdf') => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return;
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/download-cfdi?cfdi_id=${cfdiId}&file_type=${fileType}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${session.access_token}` } });
+  if (!res.ok) return;
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objectUrl;
+  if (fileType === 'pdf') {
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+  } else {
+    a.download = `factura-${cfdiId}.xml`;
+  }
+  a.click();
+  URL.revokeObjectURL(objectUrl);
+};
+
 interface CfdiInvoice {
   id: string;
   invoice_type: 'booking' | 'commission';
@@ -317,27 +337,23 @@ const AdminCfdi: React.FC = () => {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
-                            {inv.xml_url && (
-                              <a
-                                href={inv.xml_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                            {inv.status === 'stamped' && (
+                              <button
+                                onClick={() => downloadCfdi(inv.id, 'xml')}
                                 className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
                                 title="Descargar XML"
                               >
                                 <Download className="h-3.5 w-3.5" />
-                              </a>
+                              </button>
                             )}
-                            {inv.pdf_url && (
-                              <a
-                                href={inv.pdf_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                            {inv.status === 'stamped' && (
+                              <button
+                                onClick={() => downloadCfdi(inv.id, 'pdf')}
                                 className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
                                 title="Ver PDF"
                               >
                                 <ExternalLink className="h-3.5 w-3.5" />
-                              </a>
+                              </button>
                             )}
                             {inv.status === 'stamped' && (
                               <button
