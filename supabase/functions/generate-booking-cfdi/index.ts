@@ -93,13 +93,13 @@ async function facturapiStamp(
         taxes: [{ type: "IVA", rate: 0.16 }],
       },
       quantity: c.cantidad,
-      ...(c.tercero
+      ...(c.tercero && c.tercero.domicilio_fiscal
         ? {
             third_party: {
               tax_id: c.tercero.rfc,
               legal_name: c.tercero.nombre,
               tax_system: c.tercero.regimen_fiscal,
-              address: { zip: c.tercero.domicilio_fiscal },
+              zip: c.tercero.domicilio_fiscal,
             },
           }
         : {}),
@@ -311,12 +311,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Load booking details (split queries to avoid RLS issues on auth.users join)
+    // Load booking details
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")
       .select(`
         id, total_price, deposit_amount, service_charge, user_id, tour_id, booking_code,
-        tours (name, agencies (id, rfc, razon_social, regimen_fiscal, postal_code))
+        tours (name, agency_id)
       `)
       .eq("id", booking_id)
       .maybeSingle();
@@ -326,6 +326,19 @@ Deno.serve(async (req: Request) => {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    const tourData = booking.tours as { name: string; agency_id: string } | null;
+
+    // Load agency data separately to avoid join ambiguity
+    let agencyData: { id: string; rfc?: string; razon_social?: string; regimen_fiscal?: string; postal_code?: string } | null = null;
+    if (tourData?.agency_id) {
+      const { data: agFetch } = await supabase
+        .from("agencies")
+        .select("id, rfc, razon_social, regimen_fiscal, postal_code")
+        .eq("id", tourData.agency_id)
+        .maybeSingle();
+      agencyData = agFetch;
     }
 
     // Load traveler fiscal data separately (users table has RLS on joins)
@@ -374,18 +387,17 @@ Deno.serve(async (req: Request) => {
     const receptorCP = traveler?.codigo_postal_fiscal || "06600";
 
     // Build "a cuenta de terceros" (agency pass-through) — solo aplica al concepto del tour
-    const agency = (booking.tours as { agencies: { id: string; rfc?: string; razon_social?: string; regimen_fiscal?: string; postal_code?: string } }).agencies;
     let terceroAgencia: CfdiTercero | undefined;
-    if (agency?.rfc && agency?.razon_social) {
+    if (agencyData?.rfc && agencyData?.razon_social) {
       terceroAgencia = {
-        rfc: agency.rfc,
-        nombre: agency.razon_social,
-        regimen_fiscal: agency.regimen_fiscal || "612",
-        domicilio_fiscal: agency.postal_code || "06600",
+        rfc: agencyData.rfc,
+        nombre: agencyData.razon_social,
+        regimen_fiscal: agencyData.regimen_fiscal || "612",
+        domicilio_fiscal: agencyData.postal_code || "06600",
       };
     }
 
-    const tourName = (booking.tours as { name: string }).name;
+    const tourName = tourData?.name || "";
     const bookingRef = booking.booking_code || booking.id;
 
     const conceptos: CfdiConcepto[] = [
@@ -428,7 +440,7 @@ Deno.serve(async (req: Request) => {
       .insert({
         invoice_type: "booking",
         booking_id: booking.id,
-        agency_id: agency?.id || null,
+        agency_id: agencyData?.id || null,
         pac_provider: settings.pac_provider,
         serie: settings.cfdi_serie_booking || "A",
         receptor_rfc: receptorRfc,
