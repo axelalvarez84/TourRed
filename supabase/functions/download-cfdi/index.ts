@@ -15,7 +15,7 @@ Deno.serve(async (req: Request) => {
   try {
     const url = new URL(req.url);
     const cfdiId = url.searchParams.get("cfdi_id");
-    const fileType = url.searchParams.get("file_type"); // "xml" or "pdf"
+    const fileType = url.searchParams.get("file_type");
 
     if (!cfdiId || !fileType || !["xml", "pdf"].includes(fileType)) {
       return new Response(JSON.stringify({ error: "cfdi_id y file_type (xml|pdf) son requeridos" }), {
@@ -51,26 +51,20 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { data: userRow } = await supabaseAdmin
-      .from("users")
-      .select("role, agency_id")
-      .eq("id", user.id)
-      .maybeSingle();
+    const [userRowRes, cfdiRes] = await Promise.all([
+      supabaseAdmin.from("users").select("role").eq("id", user.id).maybeSingle(),
+      supabaseAdmin.from("cfdi_invoices").select("id, pac_invoice_id, pac_provider, invoice_type, booking_id, agency_id").eq("id", cfdiId).maybeSingle(),
+    ]);
 
-    const { data: cfdi } = await supabaseAdmin
-      .from("cfdi_invoices")
-      .select("id, pac_invoice_id, pac_provider, invoice_type, booking_id, agency_id")
-      .eq("id", cfdiId)
-      .maybeSingle();
-
-    if (!cfdi) {
+    if (!cfdiRes.data) {
       return new Response(JSON.stringify({ error: "Factura no encontrada" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const role = userRow?.role;
+    const cfdi = cfdiRes.data;
+    const role = userRowRes.data?.role;
     const isAdmin = role === "admin" || role === "super_admin";
     const isAgency = role === "agency";
     const isTraveler = role === "traveler";
@@ -80,7 +74,12 @@ Deno.serve(async (req: Request) => {
     if (isAdmin) {
       hasAccess = true;
     } else if (isAgency) {
-      hasAccess = cfdi.agency_id === userRow?.agency_id;
+      const { data: agency } = await supabaseAdmin
+        .from("agencies")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      hasAccess = !!agency && cfdi.agency_id === agency.id;
     } else if (isTraveler && cfdi.booking_id) {
       const { data: booking } = await supabaseAdmin
         .from("bookings")
@@ -91,7 +90,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!hasAccess) {
-      return new Response(JSON.stringify({ error: "Acceso denegado" }), {
+      return new Response(JSON.stringify({ error: "Acceso denegado", role, cfdi_agency: cfdi.agency_id, cfdi_booking: cfdi.booking_id }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -99,7 +98,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: settings } = await supabaseAdmin
       .from("platform_settings")
-      .select("pac_provider, pac_api_key_encrypted, pac_organization_id")
+      .select("pac_api_key_encrypted, pac_organization_id")
       .maybeSingle();
 
     if (!settings?.pac_api_key_encrypted) {
