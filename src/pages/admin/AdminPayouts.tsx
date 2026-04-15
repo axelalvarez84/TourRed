@@ -823,6 +823,7 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({ isOpen, onClo
                 agency_id: agencyIdToNotify,
                 amount: paymentDetails.totalAmount,
                 net_amount: paymentDetails.totalAmount,
+                platform_commission_amount: paymentDetails.platformCommissionTotal,
                 payment_method: paymentMethod,
                 notes: notes || null,
                 receipt_url: receiptUrl || null,

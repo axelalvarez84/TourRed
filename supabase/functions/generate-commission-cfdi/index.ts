@@ -189,7 +189,7 @@ Deno.serve(async (req: Request) => {
     const { data: payout, error: payoutError } = await supabase
       .from("agency_payouts")
       .select(`
-        id, net_amount, payout_code,
+        id, net_amount, platform_commission_amount, payout_code,
         agencies (id, rfc, razon_social, regimen_fiscal, postal_code)
       `)
       .eq("id", payout_id)
@@ -232,9 +232,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Commission CFDI: ToursRed bills the agency directly (no tercero node)
-    // IVA already included in commission amount
-    const total = Number(payout.net_amount);
+    // Commission CFDI: ToursRed bills the agency for the platform commission
+    // Use platform_commission_amount if available, otherwise fall back to net_amount
+    const total = Number(payout.platform_commission_amount || payout.net_amount);
     const subtotal = Math.round((total / 1.16) * 100) / 100;
     const iva = Math.round((total - subtotal) * 100) / 100;
 
