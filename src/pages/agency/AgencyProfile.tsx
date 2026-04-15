@@ -223,7 +223,7 @@ const AgencyProfile: React.FC = () => {
       setIsEditing(false);
 
       // Recargar datos
-      await fetchAgencyProfile();
+      await fetchAgencyProfile(agency.id);
 
     } catch (err: any) {
       console.error('❌ Error guardando perfil:', err);
