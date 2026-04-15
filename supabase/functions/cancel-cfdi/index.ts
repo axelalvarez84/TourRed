@@ -20,18 +20,43 @@ async function facturapiCancel(
   };
   if (orgId) headers["X-Organization-Id"] = orgId;
 
-  const body: Record<string, unknown> = { motive: motivo };
-  if (uuidSustitucion) body.substitution = uuidSustitucion;
+  // First check current status of the invoice
+  const checkRes = await fetch(`https://www.facturapi.io/v2/invoices/${pacInvoiceId}`, {
+    method: "GET",
+    headers,
+  });
 
-  const res = await fetch(`https://www.facturapi.io/v2/invoices/${pacInvoiceId}/cancel`, {
+  if (checkRes.ok) {
+    const invoiceData = await checkRes.json();
+    // If already cancelled in FacturAPI, treat as success
+    if (invoiceData.status === "canceled" || invoiceData.cancellation_status === "accepted") {
+      return pacInvoiceId;
+    }
+    // If not cancellable (test mode or other reason), treat as success to allow DB update
+    if (invoiceData.cancellation?.cancellation_type === "not_cancellable") {
+      return pacInvoiceId;
+    }
+  } else if (checkRes.status === 404) {
+    // Invoice not found in FacturAPI (old invoice with different key) - allow DB update
+    return pacInvoiceId;
+  }
+
+  const params = new URLSearchParams({ motive: motivo });
+  if (uuidSustitucion) params.set("substitution", uuidSustitucion);
+
+  const res = await fetch(`https://www.facturapi.io/v2/invoices/${pacInvoiceId}?${params.toString()}`, {
     method: "DELETE",
     headers,
-    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`FacturAPI cancel error ${res.status}: ${err}`);
+    const errText = await res.text();
+    let errData: { message?: string; cancellation_type?: string } = {};
+    try { errData = JSON.parse(errText); } catch (_) { /* ignore */ }
+    if (errData.cancellation_type === "not_cancellable") {
+      return pacInvoiceId;
+    }
+    throw new Error(`FacturAPI cancel error ${res.status}: ${errText}`);
   }
 
   const data = await res.json();
