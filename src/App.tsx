@@ -24,6 +24,7 @@ import TravelerWallet from './pages/traveler/TravelerWallet';
 import TravelerPoints from './pages/traveler/TravelerPoints';
 import TravelerCompanions from './pages/traveler/TravelerCompanions';
 import TravelerReferrals from './pages/traveler/TravelerReferrals';
+import TravelerInvoices from './pages/traveler/TravelerInvoices';
 import AgencyDashboard from './pages/agency/AgencyDashboard';
 import AgencyTours from './pages/agency/AgencyTours';
 import AgencyBookings from './pages/agency/AgencyBookings';
@@ -31,6 +32,7 @@ import AgencyProfile from './pages/agency/AgencyProfile';
 import AgencyDestinations from './pages/agency/AgencyDestinations';
 import AgencyDiscountCodes from './pages/agency/AgencyDiscountCodes';
 import AgencyFinancials from './pages/agency/AgencyFinancials';
+import AgencyInvoices from './pages/agency/AgencyInvoices';
 import AgencyStaff from './pages/agency/AgencyStaff';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminAgencies from './pages/admin/AdminAgencies';
@@ -214,6 +216,14 @@ const App: React.FC = () => {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/traveler/invoices"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.TRAVELER]}>
+                <TravelerInvoices />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Agency Routes */}
           <Route
@@ -269,6 +279,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.AGENCY]} staffPermission="canViewFinancials">
                 <AgencyFinancials />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/agency/invoices"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.AGENCY]} staffPermission="canViewFinancials">
+                <AgencyInvoices />
               </ProtectedRoute>
             }
           />

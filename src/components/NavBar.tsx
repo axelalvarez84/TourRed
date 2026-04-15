@@ -200,6 +200,7 @@ const NavBar: React.FC = () => {
     { to: '/traveler/wallet', label: 'ToursRed Cash' },
     { to: '/traveler/points', label: 'ToursRed Points' },
     { to: '/traveler/referrals', label: 'Referidos' },
+    { to: '/traveler/invoices', label: 'Mis Facturas' },
   ];
 
   const getRoleSpecificMenuItems = () => {
@@ -211,6 +212,7 @@ const NavBar: React.FC = () => {
         { to: '/agency/bookings', label: 'Reservas' },
         { to: '/agency/discount-codes', label: 'Codigos Descuento' },
         { to: '/agency/financials', label: 'Finanzas' },
+        { to: '/agency/invoices', label: 'Facturas' },
         { to: '/agency/staff', label: 'Coordinadores' },
       ];
     }

@@ -382,6 +382,26 @@ Deno.serve(async (req) => {
             } catch (emailError) {
               console.error('Error calling booking confirmation function:', emailError);
             }
+
+            EdgeRuntime.waitUntil(
+              (async () => {
+                try {
+                  const { data: cfdiSettings } = await supabase
+                    .from('platform_settings')
+                    .select('pac_provider')
+                    .maybeSingle();
+                  if (cfdiSettings?.pac_provider && cfdiSettings.pac_provider !== 'none') {
+                    await fetch(`${supabaseUrl}/functions/v1/generate-booking-cfdi`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
+                      body: JSON.stringify({ booking_id: bookingId }),
+                    });
+                  }
+                } catch (cfdiErr) {
+                  console.error('Error triggering booking CFDI:', cfdiErr);
+                }
+              })()
+            );
           }
         } else if (paymentStatus === 'unpaid') {
           const { error: bookingError } = await supabase
@@ -723,6 +743,26 @@ Deno.serve(async (req) => {
             } catch (emailError) {
               console.error('Error calling booking confirmation function:', emailError);
             }
+
+            EdgeRuntime.waitUntil(
+              (async () => {
+                try {
+                  const { data: cfdiSettings } = await supabase
+                    .from('platform_settings')
+                    .select('pac_provider')
+                    .maybeSingle();
+                  if (cfdiSettings?.pac_provider && cfdiSettings.pac_provider !== 'none') {
+                    await fetch(`${supabaseUrl}/functions/v1/generate-booking-cfdi`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
+                      body: JSON.stringify({ booking_id: bookingId }),
+                    });
+                  }
+                } catch (cfdiErr) {
+                  console.error('Error triggering booking CFDI (payment_intent):', cfdiErr);
+                }
+              })()
+            );
           }
 
           const { data: existingTransaction } = await supabase

@@ -716,6 +716,29 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({ isOpen, onClo
             receipt_url: receiptUrl
           }
         });
+
+        try {
+          const { data: cfdiSettings } = await supabase
+            .from('platform_settings')
+            .select('pac_provider')
+            .maybeSingle();
+          if (cfdiSettings?.pac_provider && cfdiSettings.pac_provider !== 'none') {
+            const { data: payoutRecord } = await supabase
+              .from('agency_payouts')
+              .select('id')
+              .eq('agency_id', agencyIdToNotify)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (payoutRecord) {
+              supabase.functions.invoke('generate-commission-cfdi', {
+                body: { payout_id: payoutRecord.id }
+              });
+            }
+          }
+        } catch (cfdiErr) {
+          console.error('Error triggering commission CFDI:', cfdiErr);
+        }
       }
 
       onSuccess();
