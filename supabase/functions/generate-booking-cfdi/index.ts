@@ -93,11 +93,18 @@ async function facturapiStamp(
         taxes: [{ type: "IVA", rate: 0.16 }],
       },
       quantity: c.cantidad,
+      ...(request.tercero
+        ? {
+            third_party: {
+              tax_id: request.tercero.rfc,
+              legal_name: request.tercero.nombre,
+              tax_system: request.tercero.regimen_fiscal,
+              address: { zip: request.tercero.domicilio_fiscal },
+            },
+          }
+        : {}),
     })),
   };
-
-  // Nodo ACuentaTerceros: pendiente confirmar nombre exacto del campo en FacturAPI v2
-  // Por ahora se omite para no bloquear el timbrado; se agrega en siguiente iteracion
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${apiKey}`,
