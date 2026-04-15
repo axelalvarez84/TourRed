@@ -16,6 +16,7 @@ interface CfdiConcepto {
   clave_unidad: string;
   descripcion: string;
   valor_unitario: number;
+  tercero?: CfdiTercero;
   impuestos?: {
     traslados?: Array<{
       base: number;
@@ -47,7 +48,6 @@ interface CfdiRequest {
   serie: string;
   receptor: CfdiReceptor;
   conceptos: CfdiConcepto[];
-  tercero?: CfdiTercero;
   payment_form?: string;
 }
 
@@ -93,13 +93,13 @@ async function facturapiStamp(
         taxes: [{ type: "IVA", rate: 0.16 }],
       },
       quantity: c.cantidad,
-      ...(request.tercero
+      ...(c.tercero
         ? {
             third_party: {
-              tax_id: request.tercero.rfc,
-              legal_name: request.tercero.nombre,
-              tax_system: request.tercero.regimen_fiscal,
-              address: { zip: request.tercero.domicilio_fiscal },
+              tax_id: c.tercero.rfc,
+              legal_name: c.tercero.nombre,
+              tax_system: c.tercero.regimen_fiscal,
+              address: { zip: c.tercero.domicilio_fiscal },
             },
           }
         : {}),
@@ -208,21 +208,23 @@ async function zohoBooksStamp(
     reference_number: request.serie,
     date: new Date().toISOString().split("T")[0],
     currency_code: "MXN",
-    line_items: request.conceptos.map((c) => ({
-      name: c.descripcion,
-      description: c.descripcion,
-      quantity: c.cantidad,
-      rate: c.valor_unitario,
-      tax_percentage: 16,
-    })),
+    line_items: request.conceptos.map((c) => {
+      const item: Record<string, unknown> = {
+        name: c.descripcion,
+        description: c.descripcion,
+        quantity: c.cantidad,
+        rate: c.valor_unitario,
+        tax_percentage: 16,
+      };
+      if (c.tercero) {
+        item.cf_tercero_rfc = c.tercero.rfc;
+        item.cf_tercero_nombre = c.tercero.nombre;
+      }
+      return item;
+    }),
     is_inclusive_tax: false,
     notes: sandboxMode ? "[SANDBOX - CFDI de prueba]" : undefined,
   };
-
-  if (request.tercero) {
-    zohoInvoice.cf_tercero_rfc = request.tercero.rfc;
-    zohoInvoice.cf_tercero_nombre = request.tercero.nombre;
-  }
 
   const res = await fetch(`${baseUrl}/invoices?organization_id=${orgId}`, {
     method: "POST",
@@ -348,12 +350,19 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // El CFDI cubre lo efectivamente cobrado por ToursRed: anticipo + cargo por servicio
+    // Montos: concepto del tour (a cuenta de terceros) y cargo por servicio (ingreso directo de ToursRed)
     const depositAmount = Number((booking as any).deposit_amount || booking.total_price);
     const serviceCharge = Number((booking as any).service_charge || 0);
+
+    const subtotalTour = Math.round((depositAmount / 1.16) * 100) / 100;
+    const ivaTour = Math.round((depositAmount - subtotalTour) * 100) / 100;
+
+    const subtotalServicio = serviceCharge > 0 ? Math.round((serviceCharge / 1.16) * 100) / 100 : 0;
+    const ivaServicio = serviceCharge > 0 ? Math.round((serviceCharge - subtotalServicio) * 100) / 100 : 0;
+
+    const subtotal = Math.round((subtotalTour + subtotalServicio) * 100) / 100;
+    const iva = Math.round((ivaTour + ivaServicio) * 100) / 100;
     const total = Math.round((depositAmount + serviceCharge) * 100) / 100;
-    const subtotal = Math.round((total / 1.16) * 100) / 100;
-    const iva = Math.round((total - subtotal) * 100) / 100;
 
     // Build receptor data from separately-fetched traveler
     const traveler = travelerData;
@@ -364,11 +373,11 @@ Deno.serve(async (req: Request) => {
     const receptorUsoCfdi = traveler?.uso_cfdi || "S01";
     const receptorCP = traveler?.codigo_postal_fiscal || "06600";
 
-    // Build "a cuenta de terceros" (agency pass-through)
+    // Build "a cuenta de terceros" (agency pass-through) — solo aplica al concepto del tour
     const agency = (booking.tours as { agencies: { id: string; rfc?: string; razon_social?: string; regimen_fiscal?: string; postal_code?: string } }).agencies;
-    let tercero: CfdiTercero | undefined;
+    let terceroAgencia: CfdiTercero | undefined;
     if (agency?.rfc && agency?.razon_social) {
-      tercero = {
+      terceroAgencia = {
         rfc: agency.rfc,
         nombre: agency.razon_social,
         regimen_fiscal: agency.regimen_fiscal || "612",
@@ -377,6 +386,29 @@ Deno.serve(async (req: Request) => {
     }
 
     const tourName = (booking.tours as { name: string }).name;
+    const bookingRef = booking.booking_code || booking.id;
+
+    const conceptos: CfdiConcepto[] = [
+      {
+        clave_prod_serv: "90121500",
+        cantidad: 1,
+        clave_unidad: "E48",
+        descripcion: `Servicio de viaje: ${tourName} (Reserva ${bookingRef})`,
+        valor_unitario: subtotalTour,
+        tercero: terceroAgencia,
+      },
+    ];
+
+    if (serviceCharge > 0) {
+      conceptos.push({
+        clave_prod_serv: "81141600",
+        cantidad: 1,
+        clave_unidad: "E48",
+        descripcion: `Cargo por servicio de plataforma (Reserva ${bookingRef})`,
+        valor_unitario: subtotalServicio,
+      });
+    }
+
     const cfdiRequest: CfdiRequest = {
       tipo_de_comprobante: "I",
       serie: settings.cfdi_serie_booking || "A",
@@ -387,16 +419,7 @@ Deno.serve(async (req: Request) => {
         regimen_fiscal_receptor: receptorRegimen,
         uso_cfdi: receptorUsoCfdi,
       },
-      conceptos: [
-        {
-          clave_prod_serv: "90121500",
-          cantidad: 1,
-          clave_unidad: "E48",
-          descripcion: `Servicio de viaje: ${tourName} (Reserva ${booking.booking_code || booking.id})`,
-          valor_unitario: subtotal,
-        },
-      ],
-      tercero,
+      conceptos,
     };
 
     // Create pending CFDI record
