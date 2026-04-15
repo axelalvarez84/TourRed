@@ -188,6 +188,28 @@ Deno.serve(async (req: Request) => {
         } catch (emailErr) {
           console.error("Error sending booking confirmation email:", emailErr);
         }
+
+        try {
+          const { data: cfdiSettings } = await supabase
+            .from("platform_settings")
+            .select("pac_provider")
+            .maybeSingle();
+          if (cfdiSettings?.pac_provider && cfdiSettings.pac_provider !== "none") {
+            await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-booking-cfdi`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                },
+                body: JSON.stringify({ booking_id: bookingId }),
+              }
+            );
+          }
+        } catch (cfdiErr) {
+          console.error("Error triggering booking CFDI (mp-brick):", cfdiErr);
+        }
       }
     } else if (bookingId && (payment.status === "in_process" || payment.status === "pending")) {
       await supabase

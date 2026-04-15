@@ -48,6 +48,7 @@ interface CfdiRequest {
   receptor: CfdiReceptor;
   conceptos: CfdiConcepto[];
   tercero?: CfdiTercero;
+  payment_form?: string;
 }
 
 interface CfdiResult {
@@ -72,16 +73,16 @@ async function facturapiStamp(
   const baseUrl = "https://www.facturapi.io/v2";
 
   const body: Record<string, unknown> = {
-    tipo: request.tipo_de_comprobante,
-    serie: request.serie,
-    receptor: {
-      uid: undefined,
+    type: request.tipo_de_comprobante,
+    payment_form: request.payment_form ?? "03",
+    payment_method: "PUE",
+    customer: {
       legal_name: request.receptor.nombre,
       tax_id: request.receptor.rfc,
       tax_system: request.receptor.regimen_fiscal_receptor,
-      zip: request.receptor.domicilio_fiscal_receptor,
-      uso_cfdi: request.receptor.uso_cfdi,
+      address: { zip: request.receptor.domicilio_fiscal_receptor },
     },
+    use: request.receptor.uso_cfdi,
     items: request.conceptos.map((c) => ({
       product: {
         description: c.descripcion,
@@ -89,20 +90,14 @@ async function facturapiStamp(
         unit_key: c.clave_unidad,
         price: c.valor_unitario,
         tax_included: false,
-        taxes: [{ type: "IVA", rate: 0.16, factor: "Tasa", withholding: false }],
+        taxes: [{ type: "IVA", rate: 0.16 }],
       },
       quantity: c.cantidad,
     })),
   };
 
-  if (request.tercero) {
-    body.tercero = {
-      tax_id: request.tercero.rfc,
-      legal_name: request.tercero.nombre,
-      tax_system: request.tercero.regimen_fiscal,
-      zip: request.tercero.domicilio_fiscal,
-    };
-  }
+  // Nodo ACuentaTerceros: pendiente confirmar nombre exacto del campo en FacturAPI v2
+  // Por ahora se omite para no bloquear el timbrado; se agrega en siguiente iteracion
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${apiKey}`,
@@ -307,23 +302,29 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Load booking details
+    // Load booking details (split queries to avoid RLS issues on auth.users join)
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")
       .select(`
-        id, total_price, user_id, tour_id, booking_code,
-        tours (name, agencies (id, rfc, razon_social, regimen_fiscal, postal_code)),
-        users (id, full_name, rfc, razon_social, regimen_fiscal, uso_cfdi, codigo_postal_fiscal)
+        id, total_price, deposit_amount, service_charge, user_id, tour_id, booking_code,
+        tours (name, agencies (id, rfc, razon_social, regimen_fiscal, postal_code))
       `)
       .eq("id", booking_id)
       .maybeSingle();
 
     if (bookingError || !booking) {
-      return new Response(JSON.stringify({ error: "Booking not found" }), {
+      return new Response(JSON.stringify({ error: "Booking not found", detail: bookingError?.message }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Load traveler fiscal data separately (users table has RLS on joins)
+    const { data: travelerData } = await supabase
+      .from("users")
+      .select("id, first_name, last_name, rfc, razon_social, regimen_fiscal, uso_cfdi, codigo_postal_fiscal")
+      .eq("id", booking.user_id)
+      .maybeSingle();
 
     // Load platform settings
     const { data: settings } = await supabase
@@ -340,24 +341,18 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Calculate IVA (price already includes IVA 16%)
-    const total = Number(booking.total_price);
+    // El CFDI cubre lo efectivamente cobrado por ToursRed: anticipo + cargo por servicio
+    const depositAmount = Number((booking as any).deposit_amount || booking.total_price);
+    const serviceCharge = Number((booking as any).service_charge || 0);
+    const total = Math.round((depositAmount + serviceCharge) * 100) / 100;
     const subtotal = Math.round((total / 1.16) * 100) / 100;
     const iva = Math.round((total - subtotal) * 100) / 100;
 
-    // Build receptor data
-    const traveler = booking.users as {
-      id: string;
-      full_name: string;
-      rfc?: string;
-      razon_social?: string;
-      regimen_fiscal?: string;
-      uso_cfdi?: string;
-      codigo_postal_fiscal?: string;
-    };
-
+    // Build receptor data from separately-fetched traveler
+    const traveler = travelerData;
+    const fullName = [traveler?.first_name, traveler?.last_name].filter(Boolean).join(" ").trim() || "PUBLICO EN GENERAL";
     const receptorRfc = traveler?.rfc || "XAXX010101000";
-    const receptorNombre = traveler?.razon_social || traveler?.full_name || "PUBLICO EN GENERAL";
+    const receptorNombre = traveler?.razon_social || fullName;
     const receptorRegimen = traveler?.regimen_fiscal || "616";
     const receptorUsoCfdi = traveler?.uso_cfdi || "S01";
     const receptorCP = traveler?.codigo_postal_fiscal || "06600";
