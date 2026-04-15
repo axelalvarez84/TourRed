@@ -240,14 +240,15 @@ Deno.serve(async (req: Request) => {
 
     const serie = settings.cfdi_serie_commission || "B";
     const facturapiBody = {
-      tipo: "I",
+      type: "I",
       series: serie,
-      receptor: {
+      payment_form: "03",
+      payment_method: "PUE",
+      customer: {
         legal_name: agency.razon_social,
         tax_id: agency.rfc,
         tax_system: agency.regimen_fiscal || "612",
-        zip: agency.postal_code || "06600",
-        uso_cfdi: "G03",
+        address: { zip: agency.postal_code || "06600" },
       },
       items: [
         {
@@ -292,20 +293,22 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Failed to create CFDI record: ${insertError?.message}`);
     }
 
-    const stampBody = {
-      receptor: {
-        rfc: agency.rfc,
-        razon_social: agency.razon_social,
-        regimen_fiscal: agency.regimen_fiscal || "612",
-        postal_code: agency.postal_code || "06600",
-        uso_cfdi: "G03",
-      },
-      conceptos: facturapiBody.items?.map((i: { product: { description: string; price: number } }) => ({
-        descripcion: i.product.description,
-        valor_unitario: i.product.price,
-      })) ?? [],
-      serie,
-    };
+    const stampBody = settings.pac_provider === "facturapi"
+      ? facturapiBody
+      : {
+          receptor: {
+            rfc: agency.rfc,
+            razon_social: agency.razon_social,
+            regimen_fiscal: agency.regimen_fiscal || "612",
+            postal_code: agency.postal_code || "06600",
+            uso_cfdi: "G03",
+          },
+          conceptos: facturapiBody.items?.map((i: { product: { description: string; price: number } }) => ({
+            descripcion: i.product.description,
+            valor_unitario: i.product.price,
+          })) ?? [],
+          serie,
+        };
 
     let cfdiResult: CfdiResult;
     try {

@@ -816,16 +816,25 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({ isOpen, onClo
             .select('pac_provider')
             .maybeSingle();
           if (cfdiSettings?.pac_provider && cfdiSettings.pac_provider !== 'none') {
-            const { data: payoutRecord } = await supabase
+            const payoutCode = `PAY-${Date.now()}`;
+            const { data: newPayout } = await supabase
               .from('agency_payouts')
+              .insert({
+                agency_id: agencyIdToNotify,
+                amount: paymentDetails.totalAmount,
+                net_amount: paymentDetails.totalAmount,
+                payment_method: paymentMethod,
+                notes: notes || null,
+                receipt_url: receiptUrl || null,
+                payout_code: payoutCode,
+                status: 'completed',
+                commission_records_count: paymentDetails.records?.length || 0,
+              })
               .select('id')
-              .eq('agency_id', agencyIdToNotify)
-              .order('created_at', { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            if (payoutRecord) {
+              .single();
+            if (newPayout?.id) {
               supabase.functions.invoke('generate-commission-cfdi', {
-                body: { payout_id: payoutRecord.id }
+                body: { payout_id: newPayout.id }
               });
             }
           }
