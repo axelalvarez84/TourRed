@@ -16,6 +16,7 @@ interface CfdiConcepto {
   clave_unidad: string;
   descripcion: string;
   valor_unitario: number;
+  descuento?: number;
   tercero?: CfdiTercero;
   impuestos?: {
     traslados?: Array<{
@@ -99,6 +100,7 @@ async function facturapiStamp(
         taxes: [{ type: "IVA", rate: 0.16 }],
       },
       quantity: c.cantidad,
+      ...(c.descuento != null && c.descuento > 0 ? { discount: c.descuento } : {}),
       ...(c.tercero && c.tercero.domicilio_fiscal
         ? {
             third_party: {
@@ -222,6 +224,10 @@ async function zohoBooksStamp(
         rate: c.valor_unitario,
         tax_percentage: 16,
       };
+      if (c.descuento != null && c.descuento > 0) {
+        item.discount = c.descuento;
+        item.discount_type = "entity_level";
+      }
       if (c.tercero) {
         item.cf_tercero_rfc = c.tercero.rfc;
         item.cf_tercero_nombre = c.tercero.nombre;
@@ -322,6 +328,7 @@ Deno.serve(async (req: Request) => {
       .from("bookings")
       .select(`
         id, total_price, deposit_amount, service_charge, user_id, tour_id, booking_code,
+        discount_amount, service_charge_discount,
         tours (name, agency_id)
       `)
       .eq("id", booking_id)
@@ -372,16 +379,33 @@ Deno.serve(async (req: Request) => {
     // Montos: concepto del tour (a cuenta de terceros) y cargo por servicio (ingreso directo de ToursRed)
     const depositAmount = Number((booking as any).deposit_amount || booking.total_price);
     const serviceCharge = Number((booking as any).service_charge || 0);
+    const discountAmountRaw = Number((booking as any).discount_amount || 0);
+    const serviceChargeDiscountRaw = Number((booking as any).service_charge_discount || 0);
 
-    const subtotalTour = Math.round((depositAmount / 1.16) * 100) / 100;
-    const ivaTour = Math.round((depositAmount - subtotalTour) * 100) / 100;
+    // Precio bruto sin IVA por concepto (valor_unitario en FacturAPI)
+    const precioTourBruto = Math.round((depositAmount / 1.16) * 100) / 100;
+    const precioServicioBruto = serviceCharge > 0 ? Math.round((serviceCharge / 1.16) * 100) / 100 : 0;
 
-    const subtotalServicio = serviceCharge > 0 ? Math.round((serviceCharge / 1.16) * 100) / 100 : 0;
-    const ivaServicio = serviceCharge > 0 ? Math.round((serviceCharge - subtotalServicio) * 100) / 100 : 0;
+    // Descuento sin IVA por concepto (campo descuento en FacturAPI)
+    // El descuento viene con IVA incluido, lo extraemos igual que el precio
+    const descuentoTour = discountAmountRaw > 0 ? Math.round((discountAmountRaw / 1.16) * 100) / 100 : 0;
+    const descuentoServicio = serviceChargeDiscountRaw > 0 ? Math.round((serviceChargeDiscountRaw / 1.16) * 100) / 100 : 0;
 
-    const subtotal = Math.round((subtotalTour + subtotalServicio) * 100) / 100;
+    // Importe neto por concepto = valor_unitario - descuento (base gravable IVA)
+    const importeNetoTour = Math.round((precioTourBruto - descuentoTour) * 100) / 100;
+    const importeNetoServicio = serviceCharge > 0 ? Math.round((precioServicioBruto - descuentoServicio) * 100) / 100 : 0;
+
+    // IVA calculado sobre el importe neto (correcto SAT: nunca sobre el bruto)
+    const ivaTour = Math.round(importeNetoTour * 0.16 * 100) / 100;
+    const ivaServicio = serviceCharge > 0 ? Math.round(importeNetoServicio * 0.16 * 100) / 100 : 0;
+
+    const subtotal = Math.round((importeNetoTour + importeNetoServicio) * 100) / 100;
     const iva = Math.round((ivaTour + ivaServicio) * 100) / 100;
-    const total = Math.round((depositAmount + serviceCharge) * 100) / 100;
+    const total = Math.round((subtotal + iva) * 100) / 100;
+
+    if (discountAmountRaw > 0 || serviceChargeDiscountRaw > 0) {
+      console.log(`CFDI con descuento: tour -$${discountAmountRaw} MXN, servicio -$${serviceChargeDiscountRaw} MXN, total CFDI $${total} MXN`);
+    }
 
     // Build receptor data from separately-fetched traveler following SAT rules:
     // - Traveler with Mexican RFC: use their own fiscal data
@@ -443,7 +467,8 @@ Deno.serve(async (req: Request) => {
         cantidad: 1,
         clave_unidad: "E48",
         descripcion: `Servicio de viaje: ${tourName} (Reserva ${bookingRef})`,
-        valor_unitario: subtotalTour,
+        valor_unitario: precioTourBruto,
+        ...(descuentoTour > 0 ? { descuento: descuentoTour } : {}),
         tercero: terceroAgencia,
       },
     ];
@@ -454,7 +479,8 @@ Deno.serve(async (req: Request) => {
         cantidad: 1,
         clave_unidad: "E48",
         descripcion: `Cargo por servicio de plataforma (Reserva ${bookingRef})`,
-        valor_unitario: subtotalServicio,
+        valor_unitario: precioServicioBruto,
+        ...(descuentoServicio > 0 ? { descuento: descuentoServicio } : {}),
       });
     }
 
@@ -473,6 +499,9 @@ Deno.serve(async (req: Request) => {
       conceptos,
     };
 
+    // Descuento total consolidado (suma de ambos conceptos, con IVA incluido)
+    const descuentoTotal = Math.round((discountAmountRaw + serviceChargeDiscountRaw) * 100) / 100;
+
     // Create pending CFDI record
     const { data: cfdiRecord, error: insertError } = await supabase
       .from("cfdi_invoices")
@@ -490,6 +519,7 @@ Deno.serve(async (req: Request) => {
         subtotal,
         iva_amount: iva,
         total,
+        ...(descuentoTotal > 0 ? { discount_amount: descuentoTotal } : {}),
         status: "pending",
       })
       .select()

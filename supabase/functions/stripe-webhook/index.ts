@@ -912,29 +912,8 @@ Deno.serve(async (req) => {
                 }
               }
 
-              // Generar CFDI de membresía para alta nueva (fire and forget)
-              if (membershipResult?.id && isNewSubscription) {
-                EdgeRuntime.waitUntil(
-                  (async () => {
-                    try {
-                      const { data: cfdiSettings } = await supabase
-                        .from('platform_settings')
-                        .select('pac_provider')
-                        .maybeSingle();
-                      if (cfdiSettings?.pac_provider && cfdiSettings.pac_provider !== 'none') {
-                        await fetch(`${supabaseUrl}/functions/v1/generate-membership-cfdi`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
-                          body: JSON.stringify({ membership_id: membershipResult.id }),
-                        });
-                        console.log(`CFDI de membresía solicitado para ${membershipResult.id}`);
-                      }
-                    } catch (cfdiErr) {
-                      console.error('Error triggering membership CFDI (new subscription):', cfdiErr);
-                    }
-                  })()
-                );
-              }
+              // El CFDI de alta nueva se genera en invoice.payment_succeeded con billing_reason=subscription_create
+              // para incluir el monto real pagado (con descuento si aplica)
             } catch (emailError) {
               console.error('Error sending membership welcome email:', emailError);
             }
@@ -948,13 +927,13 @@ Deno.serve(async (req) => {
         const invoice = event.data.object;
         const subscriptionId = invoice.subscription;
 
-        if (!subscriptionId || invoice.billing_reason === 'subscription_create') {
-          // Alta nueva: el CFDI ya se genera desde customer.subscription.created
-          console.log(`invoice.payment_succeeded: alta nueva o sin suscripción, omitiendo CFDI de renovación`);
+        if (!subscriptionId) {
+          console.log(`invoice.payment_succeeded: sin suscripción, omitiendo`);
           break;
         }
 
-        console.log(`invoice.payment_succeeded: renovación de suscripción ${subscriptionId}`);
+        const isSubscriptionCreate = invoice.billing_reason === 'subscription_create';
+        console.log(`invoice.payment_succeeded: ${isSubscriptionCreate ? 'alta nueva' : 'renovación'} suscripción ${subscriptionId}, amount_paid: ${invoice.amount_paid}`);
 
         EdgeRuntime.waitUntil(
           (async () => {
@@ -977,14 +956,37 @@ Deno.serve(async (req) => {
                 return;
               }
 
-              await fetch(`${supabaseUrl}/functions/v1/generate-membership-cfdi`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
-                body: JSON.stringify({ membership_id: membership.id, stripe_invoice_id: invoice.id }),
-              });
-              console.log(`CFDI de renovación solicitado para membresía ${membership.id}, invoice ${invoice.id}`);
+              if (isSubscriptionCreate) {
+                // Alta nueva: cancelar el CFDI disparado desde subscription.created (sin monto)
+                // y generar uno nuevo con el monto real pagado (puede incluir descuento de cupón)
+                await supabase
+                  .from('cfdi_invoices')
+                  .delete()
+                  .eq('membership_id', membership.id)
+                  .is('stripe_invoice_id', null)
+                  .eq('status', 'pending');
+
+                await fetch(`${supabaseUrl}/functions/v1/generate-membership-cfdi`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
+                  body: JSON.stringify({
+                    membership_id: membership.id,
+                    stripe_invoice_id: invoice.id,
+                    stripe_amount_paid: invoice.amount_paid,
+                  }),
+                });
+                console.log(`CFDI de alta nueva (con monto real) solicitado para membresía ${membership.id}, invoice ${invoice.id}, amount_paid ${invoice.amount_paid}`);
+              } else {
+                // Renovación: sin descuento, precio regular
+                await fetch(`${supabaseUrl}/functions/v1/generate-membership-cfdi`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
+                  body: JSON.stringify({ membership_id: membership.id, stripe_invoice_id: invoice.id }),
+                });
+                console.log(`CFDI de renovación solicitado para membresía ${membership.id}, invoice ${invoice.id}`);
+              }
             } catch (cfdiErr) {
-              console.error('Error triggering membership renewal CFDI:', cfdiErr);
+              console.error('Error triggering membership CFDI:', cfdiErr);
             }
           })()
         );

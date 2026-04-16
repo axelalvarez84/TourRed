@@ -23,6 +23,7 @@ interface CfdiConcepto {
   clave_unidad: string;
   descripcion: string;
   valor_unitario: number;
+  descuento?: number;
 }
 
 interface CfdiRequest {
@@ -71,6 +72,7 @@ async function facturapiStamp(apiKey: string, organizationId: string, request: C
         taxes: [{ type: "IVA", rate: 0.16 }],
       },
       quantity: c.cantidad,
+      ...(c.descuento != null && c.descuento > 0 ? { discount: c.descuento } : {}),
     })),
   };
 
@@ -154,13 +156,20 @@ async function zohoBooksStamp(
     reference_number: request.serie,
     date: new Date().toISOString().split("T")[0],
     currency_code: "MXN",
-    line_items: request.conceptos.map((c) => ({
-      name: c.descripcion,
-      description: c.descripcion,
-      quantity: c.cantidad,
-      rate: c.valor_unitario,
-      tax_percentage: 16,
-    })),
+    line_items: request.conceptos.map((c) => {
+      const item: Record<string, unknown> = {
+        name: c.descripcion,
+        description: c.descripcion,
+        quantity: c.cantidad,
+        rate: c.valor_unitario,
+        tax_percentage: 16,
+      };
+      if (c.descuento != null && c.descuento > 0) {
+        item.discount = c.descuento;
+        item.discount_type = "entity_level";
+      }
+      return item;
+    }),
     is_inclusive_tax: false,
     notes: sandboxMode ? "[SANDBOX - CFDI de prueba]" : undefined,
   };
@@ -200,7 +209,7 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { membership_id, stripe_invoice_id } = await req.json();
+    const { membership_id, stripe_invoice_id, stripe_amount_paid } = await req.json();
 
     if (!membership_id) {
       return new Response(
@@ -276,15 +285,33 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Determinar precio según plan
+    // Determinar precio según plan (precio bruto de catálogo, siempre sin descuento)
     const isAnnual = membership.plan_type === "annual";
     const membershipPrice = isAnnual
       ? Number(settings.membership_annual_price || 999)
       : Number(settings.membership_monthly_price || 99);
 
-    const subtotal = Math.round((membershipPrice / 1.16) * 100) / 100;
-    const iva = Math.round((membershipPrice - subtotal) * 100) / 100;
-    const total = membershipPrice;
+    // Si se recibe stripe_amount_paid (centavos), calcular el descuento aplicado
+    // Solo aplica al primer pago con cupón; renovaciones no llevan descuento
+    const amountPaidMxn = stripe_amount_paid != null ? Math.round(Number(stripe_amount_paid)) / 100 : null;
+    const hasDiscount = amountPaidMxn != null && amountPaidMxn < membershipPrice - 0.01;
+
+    // Precio bruto sin IVA (valor_unitario en FacturAPI = precio catálogo / 1.16)
+    const precioMembresiaBase = Math.round((membershipPrice / 1.16) * 100) / 100;
+
+    // Descuento sin IVA: descuento_con_iva / 1.16 para que FacturAPI calcule IVA sobre el neto
+    const descuentoConIva = hasDiscount ? Math.round((membershipPrice - amountPaidMxn!) * 100) / 100 : 0;
+    const descuentoBase = descuentoConIva > 0 ? Math.round((descuentoConIva / 1.16) * 100) / 100 : 0;
+
+    // Importe neto = valor_unitario - descuento (base gravable IVA según SAT)
+    const importeNeto = Math.round((precioMembresiaBase - descuentoBase) * 100) / 100;
+    const iva = Math.round(importeNeto * 0.16 * 100) / 100;
+    const subtotal = importeNeto;
+    const total = Math.round((subtotal + iva) * 100) / 100;
+
+    if (hasDiscount) {
+      console.log(`CFDI membresía con descuento: precio catálogo $${membershipPrice}, pagado $${amountPaidMxn}, descuento -$${descuentoConIva} MXN, total CFDI $${total} MXN`);
+    }
 
     // Construir receptor siguiendo las reglas del SAT
     const fullName = [traveler?.first_name, traveler?.last_name].filter(Boolean).join(" ").trim();
@@ -332,7 +359,8 @@ Deno.serve(async (req: Request) => {
       cantidad: 1,
       clave_unidad: "E48",
       descripcion: `Suscripcion ToursRed Plus ${planLabel} - ${periodoStart}`,
-      valor_unitario: subtotal,
+      valor_unitario: precioMembresiaBase,
+      ...(descuentoBase > 0 ? { descuento: descuentoBase } : {}),
     };
 
     const serie = (settings.cfdi_serie_booking || "A") + "M";
@@ -369,6 +397,7 @@ Deno.serve(async (req: Request) => {
         subtotal,
         iva_amount: iva,
         total,
+        ...(descuentoConIva > 0 ? { discount_amount: descuentoConIva } : {}),
         status: "pending",
       })
       .select()
