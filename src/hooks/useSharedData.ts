@@ -64,7 +64,7 @@ export const usePlatformSettings = () =>
 
 export const useTourPromotionsBatch = (tourIds: string[]) =>
   useQuery({
-    queryKey: ['tour_promotions_batch', tourIds.sort().join(',')],
+    queryKey: ['tour_promotions_batch', [...tourIds].sort().join(',')],
     queryFn: async () => {
       if (tourIds.length === 0) return {};
       const { data, error } = await supabase

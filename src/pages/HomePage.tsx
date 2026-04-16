@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Compass, Search, Award, CreditCard, Users, Plane, Globe, Clock, Palmtree, Ship } from 'lucide-react';
 import SearchBox from '../components/SearchBox';
@@ -35,7 +35,7 @@ const HomePage: React.FC = () => {
     fetchFeaturedTours();
   }, []);
 
-  const tourIds = featuredTours.map(t => t.id);
+  const tourIds = useMemo(() => featuredTours.map(t => t.id), [featuredTours]);
   const { data: promotionsMap = {} } = useTourPromotionsBatch(tourIds);
 
   return (
