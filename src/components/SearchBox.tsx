@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Tag, Calendar, Building2, DollarSign, Dog, X, MapPin, FileSearch, RefreshCw } from 'lucide-react';
 import { SearchFilters } from '../types';
@@ -30,10 +30,8 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
       : null
   );
   const [radius, setRadius] = useState(initialFilters.radius || '5');
-  const [filteredAgencies, setFilteredAgencies] = useState<any[]>([]);
   const [showAgencyDropdown, setShowAgencyDropdown] = useState(false);
   const [selectedAgencyName, setSelectedAgencyName] = useState('');
-  const [filteredDeparturePoints, setFilteredDeparturePoints] = useState<any[]>([]);
   const [showDeparturePointDropdown, setShowDeparturePointDropdown] = useState(false);
   const agencyInputRef = useRef<HTMLDivElement>(null);
   const departurePointInputRef = useRef<HTMLDivElement>(null);
@@ -44,10 +42,10 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
   const { data: departurePoints = [] } = useDeparturePoints();
 
   const initialAgencyIdRef = useRef(initialFilters.agency);
+  const agencyInitializedRef = useRef(false);
 
   useEffect(() => {
-    if (agencies.length === 0) return;
-    setFilteredAgencies(agencies);
+    if (agencies.length === 0 || agencyInitializedRef.current) return;
     const initialAgencyId = initialAgencyIdRef.current;
     if (initialAgencyId) {
       const selectedAgency = agencies.find((a: any) => a.id === initialAgencyId);
@@ -56,31 +54,24 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
         setAgencySearchText(selectedAgency.name);
       }
     }
+    agencyInitializedRef.current = true;
   }, [agencies]);
 
-  useEffect(() => {
-    setFilteredDeparturePoints(departurePoints);
-  }, [departurePoints]);
-
-  useEffect(() => {
-    setFilteredAgencies(
-      agencySearchText === '' || agencySearchText === selectedAgencyName
-        ? agencies
-        : agencies.filter((ag: any) =>
-            ag.name.toLowerCase().includes(agencySearchText.toLowerCase())
-          )
+  const filteredAgencies = useMemo(() => {
+    if (agencySearchText === '' || agencySearchText === selectedAgencyName) {
+      return agencies;
+    }
+    return agencies.filter((ag: any) =>
+      ag.name.toLowerCase().includes(agencySearchText.toLowerCase())
     );
   }, [agencySearchText, agencies, selectedAgencyName]);
 
-  useEffect(() => {
-    if (departurePointSearchText === '') {
-      setFilteredDeparturePoints(departurePoints);
-    } else {
-      setFilteredDeparturePoints(departurePoints.filter((dp: any) =>
-        dp.name.toLowerCase().includes(departurePointSearchText.toLowerCase()) ||
-        (dp.city && dp.city.toLowerCase().includes(departurePointSearchText.toLowerCase()))
-      ));
-    }
+  const filteredDeparturePoints = useMemo(() => {
+    if (departurePointSearchText === '') return departurePoints;
+    return departurePoints.filter((dp: any) =>
+      dp.name.toLowerCase().includes(departurePointSearchText.toLowerCase()) ||
+      (dp.city && dp.city.toLowerCase().includes(departurePointSearchText.toLowerCase()))
+    );
   }, [departurePointSearchText, departurePoints]);
 
   useEffect(() => {
