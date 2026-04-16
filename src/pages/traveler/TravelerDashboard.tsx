@@ -100,7 +100,7 @@ const TravelerDashboard: React.FC = () => {
             tour_type,
             agencies (name)
           ),
-          tour_slots (
+          tour_slots!bookings_slot_id_fkey (
             slot_date,
             departure_time
           )
