@@ -85,34 +85,81 @@ const TravelerDashboard: React.FC = () => {
     setIsLoading(true);
     try {
       const today = new Date().toISOString().split('T')[0];
-
-      const { data: bookingsData, error: bookingsError } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          tours!inner (
-            id,
-            name,
-            destination,
-            start_date,
-            end_date,
-            image_url,
-            tour_type,
-            agencies (name)
-          ),
-          tour_slots!bookings_slot_id_fkey (
-            slot_date,
-            departure_time
-          )
-        `)
-        .eq('user_id', user.id)
-        .eq('status', 'confirmed');
-
-      if (bookingsError) throw bookingsError;
-
       const todayDate = new Date(today);
 
-      const filteredBookings = (bookingsData || [])
+      const [
+        bookingsResult,
+        savedResult,
+        membershipResult,
+        walletResult,
+        pointsWalletResult,
+        referralResult,
+      ] = await Promise.all([
+        supabase
+          .from('bookings')
+          .select(`
+            *,
+            tours!inner (
+              id,
+              name,
+              destination,
+              start_date,
+              end_date,
+              image_url,
+              tour_type,
+              agencies (name)
+            ),
+            tour_slots!bookings_slot_id_fkey (
+              slot_date,
+              departure_time
+            )
+          `)
+          .eq('user_id', user.id)
+          .eq('status', 'confirmed'),
+        supabase
+          .from('saved_tours')
+          .select(`
+            *,
+            tours (
+              id,
+              name,
+              destination,
+              start_date,
+              end_date,
+              price,
+              image_url,
+              agencies (name)
+            )
+          `)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(6),
+        supabase
+          .from('memberships')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .maybeSingle(),
+        supabase
+          .from('toursred_cash_wallets')
+          .select('balance')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('toursred_points_wallets')
+          .select('balance, is_active')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('referral_codes')
+          .select('code, successful_referrals_count, max_referrals_allowed')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+      ]);
+
+      if (bookingsResult.error) throw bookingsResult.error;
+
+      const filteredBookings = (bookingsResult.data || [])
         .filter(booking => {
           const isReceptivo = booking.tours.tour_type === 'receptivo';
           if (isReceptivo) {
@@ -136,75 +183,30 @@ const TravelerDashboard: React.FC = () => {
 
       setUpcomingBookings(filteredBookings);
 
-      const { data: savedData, error: savedError } = await supabase
-        .from('saved_tours')
-        .select(`
-          *,
-          tours (
-            id,
-            name,
-            destination,
-            start_date,
-            end_date,
-            price,
-            image_url,
-            agencies (name)
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(6);
+      if (savedResult.error) throw savedResult.error;
+      setSavedTours(savedResult.data || []);
 
-      if (savedError) throw savedError;
-      setSavedTours(savedData || []);
-
-      const { data: membershipData, error: membershipError } = await supabase
-        .from('memberships')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .maybeSingle();
-
-      if (membershipError) {
-        console.error('Error fetching membership:', membershipError);
+      if (membershipResult.error) {
+        console.error('Error fetching membership:', membershipResult.error);
       } else {
-        setMembership(membershipData);
+        setMembership(membershipResult.data);
       }
 
-      const { data: walletData, error: walletError } = await supabase
-        .from('toursred_cash_wallets')
-        .select('balance')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (walletError) {
-        console.error('Error fetching wallet:', walletError);
+      if (walletResult.error) {
+        console.error('Error fetching wallet:', walletResult.error);
       } else {
-        setWalletBalance(walletData?.balance ? Number(walletData.balance) : 0);
+        setWalletBalance(walletResult.data?.balance ? Number(walletResult.data.balance) : 0);
       }
 
-      const { data: pointsWalletData, error: pointsWalletError } = await supabase
-        .from('toursred_points_wallets')
-        .select('balance, is_active')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (pointsWalletError) {
-        console.error('Error fetching points wallet:', pointsWalletError);
+      if (pointsWalletResult.error) {
+        console.error('Error fetching points wallet:', pointsWalletResult.error);
+      } else if (pointsWalletResult.data) {
+        setPointsBalance(pointsWalletResult.data.balance || 0);
       }
 
-      if (pointsWalletData) {
-        setPointsBalance(pointsWalletData.balance || 0);
-      }
+      setPointsWalletActive(membershipResult.data?.status === 'active' || false);
 
-      setPointsWalletActive(membershipData?.status === 'active' || false);
-
-      const { data: referralData } = await supabase
-        .from('referral_codes')
-        .select('code, successful_referrals_count, max_referrals_allowed')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
+      const referralData = referralResult.data;
       if (referralData) {
         setReferralCode(referralData.code);
 
