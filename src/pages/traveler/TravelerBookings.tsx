@@ -211,42 +211,57 @@ const TravelerBookings: React.FC = () => {
       setIsLoading(true);
       setError('');
 
-      console.log('🔍 Cargando reservas para usuario:', user.id);
-
       const { data, error } = await getUserBookings(user.id);
 
       if (error) {
         throw new Error(error.message);
       }
 
-      console.log('✅ Reservas cargadas:', data);
       setBookings(data || []);
 
-      // Load optional services for all bookings
       if (data && data.length > 0) {
         const ids = data.map((b: any) => b.id);
-        const { data: optSvcs } = await supabase
-          .from('booking_optional_services')
-          .select(`
-            *,
-            tour_optional_services(name, is_refundable)
-          `)
-          .in('booking_id', ids);
+        const bookingsWithReschedule = data.filter((b: any) => b.has_pending_reschedule);
+        const bookingsWithSlotReschedule = data.filter((b: any) => b.has_pending_slot_reschedule);
 
-        if (optSvcs) {
+        const [optSvcsResult, , slotReschedulesResult] = await Promise.all([
+          supabase
+            .from('booking_optional_services')
+            .select('*, tour_optional_services(name, is_refundable)')
+            .in('booking_id', ids),
+          loadPendingReschedules(bookingsWithReschedule),
+          bookingsWithSlotReschedule.length > 0
+            ? supabase
+                .from('slot_reschedule_responses')
+                .select(`
+                  booking_id,
+                  slot_reschedule_requests!inner(
+                    id, resolution_type, reason, response_deadline, status,
+                    target_slot_id,
+                    tour_slots!slot_reschedule_requests_target_slot_id_fkey(slot_date, departure_time)
+                  )
+                `)
+                .in('booking_id', bookingsWithSlotReschedule.map((b: any) => b.id))
+                .eq('response', 'pending')
+            : Promise.resolve({ data: [], error: null }),
+        ]);
+
+        if (optSvcsResult.data) {
           const grouped: Record<string, any[]> = {};
-          for (const bos of optSvcs) {
+          for (const bos of optSvcsResult.data) {
             if (!grouped[bos.booking_id]) grouped[bos.booking_id] = [];
             grouped[bos.booking_id].push(bos);
           }
           setBookingOptionalServices(grouped);
         }
-      }
 
-      // Load pending reschedules for bookings that have them
-      if (data && data.length > 0) {
-        await loadPendingReschedules(data);
-        await loadPendingSlotReschedules(data);
+        if (slotReschedulesResult.data && slotReschedulesResult.data.length > 0) {
+          const slotReschedules: { [bookingId: string]: any } = {};
+          for (const row of slotReschedulesResult.data) {
+            slotReschedules[(row as any).booking_id] = row;
+          }
+          setPendingSlotReschedules(slotReschedules);
+        }
       }
 
     } catch (err: any) {
@@ -257,58 +272,24 @@ const TravelerBookings: React.FC = () => {
     }
   };
 
-  const loadPendingReschedules = async (bookingsList: Booking[]) => {
+  const loadPendingReschedules = async (bookingsWithReschedule: Booking[]) => {
+    if (bookingsWithReschedule.length === 0) return;
+
+    const results = await Promise.all(
+      bookingsWithReschedule.map(booking =>
+        supabase.rpc('get_pending_reschedule_for_booking', { p_booking_id: booking.id })
+          .then(({ data, error }) => ({ bookingId: booking.id, data, error }))
+          .catch(err => ({ bookingId: booking.id, data: null, error: err }))
+      )
+    );
+
     const reschedules: { [bookingId: string]: PendingReschedule } = {};
-
-    for (const booking of bookingsList) {
-      if (booking.has_pending_reschedule) {
-        try {
-          const { data, error } = await supabase.rpc('get_pending_reschedule_for_booking', {
-            p_booking_id: booking.id
-          });
-
-          if (!error && data) {
-            reschedules[booking.id] = data;
-          }
-        } catch (err) {
-          console.error(`Error loading reschedule for booking ${booking.id}:`, err);
-        }
+    for (const result of results) {
+      if (!result.error && result.data) {
+        reschedules[result.bookingId] = result.data;
       }
     }
-
     setPendingReschedules(reschedules);
-  };
-
-  const loadPendingSlotReschedules = async (bookingsList: Booking[]) => {
-    const slotReschedules: { [bookingId: string]: any } = {};
-
-    for (const booking of bookingsList) {
-      if ((booking as any).has_pending_slot_reschedule) {
-        try {
-          const { data, error } = await supabase
-            .from('slot_reschedule_responses')
-            .select(`
-              *,
-              slot_reschedule_requests!inner(
-                id, resolution_type, reason, response_deadline, status,
-                target_slot_id,
-                tour_slots!slot_reschedule_requests_target_slot_id_fkey(slot_date, departure_time)
-              )
-            `)
-            .eq('booking_id', booking.id)
-            .eq('response', 'pending')
-            .maybeSingle();
-
-          if (!error && data) {
-            slotReschedules[booking.id] = data;
-          }
-        } catch (err) {
-          console.error(`Error loading slot reschedule for booking ${booking.id}:`, err);
-        }
-      }
-    }
-
-    setPendingSlotReschedules(slotReschedules);
   };
 
   const handleOpenSlotRescheduleModal = (booking: Booking, action: 'accept' | 'reject') => {
