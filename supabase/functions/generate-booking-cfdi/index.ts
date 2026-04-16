@@ -34,6 +34,8 @@ interface CfdiReceptor {
   domicilio_fiscal_receptor: string;
   regimen_fiscal_receptor: string;
   uso_cfdi: string;
+  num_reg_id_trib?: string;
+  residencia_fiscal?: string;
 }
 
 interface CfdiTercero {
@@ -72,16 +74,20 @@ async function facturapiStamp(
 ): Promise<CfdiResult> {
   const baseUrl = "https://www.facturapi.io/v2";
 
+  const customer: Record<string, unknown> = {
+    legal_name: request.receptor.nombre,
+    tax_id: request.receptor.rfc,
+    tax_system: request.receptor.regimen_fiscal_receptor,
+    address: { zip: request.receptor.domicilio_fiscal_receptor },
+  };
+  if (request.receptor.num_reg_id_trib) customer.tax_id_registration = request.receptor.num_reg_id_trib;
+  if (request.receptor.residencia_fiscal) customer.country = request.receptor.residencia_fiscal;
+
   const body: Record<string, unknown> = {
     type: request.tipo_de_comprobante,
     payment_form: request.payment_form ?? "03",
     payment_method: "PUE",
-    customer: {
-      legal_name: request.receptor.nombre,
-      tax_id: request.receptor.rfc,
-      tax_system: request.receptor.regimen_fiscal_receptor,
-      address: { zip: request.receptor.domicilio_fiscal_receptor },
-    },
+    customer,
     use: request.receptor.uso_cfdi,
     items: request.conceptos.map((c) => ({
       product: {
@@ -344,7 +350,7 @@ Deno.serve(async (req: Request) => {
     // Load traveler fiscal data separately (users table has RLS on joins)
     const { data: travelerData } = await supabase
       .from("users")
-      .select("id, first_name, last_name, rfc, razon_social, regimen_fiscal, uso_cfdi, codigo_postal_fiscal")
+      .select("id, first_name, last_name, rfc, razon_social, regimen_fiscal, uso_cfdi, codigo_postal_fiscal, is_foreign_traveler, num_reg_id_trib, residencia_fiscal")
       .eq("id", booking.user_id)
       .maybeSingle();
 
@@ -377,14 +383,45 @@ Deno.serve(async (req: Request) => {
     const iva = Math.round((ivaTour + ivaServicio) * 100) / 100;
     const total = Math.round((depositAmount + serviceCharge) * 100) / 100;
 
-    // Build receptor data from separately-fetched traveler
+    // Build receptor data from separately-fetched traveler following SAT rules:
+    // - Traveler with Mexican RFC: use their own fiscal data
+    // - National traveler without RFC: XAXX010101000, their real name, 616/S01, issuer postal code
+    // - Foreign traveler without RFC: XEXX010101000, their real name, 616/S01, issuer postal code
+    // - Foreign traveler with NumRegIdTrib+ResidenciaFiscal: same as above + add those fields
     const traveler = travelerData;
-    const fullName = [traveler?.first_name, traveler?.last_name].filter(Boolean).join(" ").trim() || "PUBLICO EN GENERAL";
-    const receptorRfc = traveler?.rfc || "XAXX010101000";
-    const receptorNombre = traveler?.razon_social || fullName;
-    const receptorRegimen = traveler?.regimen_fiscal || "616";
-    const receptorUsoCfdi = traveler?.uso_cfdi || "S01";
-    const receptorCP = traveler?.codigo_postal_fiscal || "06600";
+    const fullName = [traveler?.first_name, traveler?.last_name].filter(Boolean).join(" ").trim();
+    const isForeign = traveler?.is_foreign_traveler === true;
+    const issuerPostalCode = agencyData?.postal_code || "06600";
+
+    let receptorRfc: string;
+    let receptorNombre: string;
+    let receptorRegimen: string;
+    let receptorUsoCfdi: string;
+    let receptorCP: string;
+    let receptorNumRegIdTrib: string | undefined;
+    let receptorResidenciaFiscal: string | undefined;
+
+    if (traveler?.rfc && traveler.rfc.length >= 12) {
+      receptorRfc = traveler.rfc;
+      receptorNombre = traveler.razon_social || fullName || traveler.rfc;
+      receptorRegimen = traveler.regimen_fiscal || "616";
+      receptorUsoCfdi = traveler.uso_cfdi || "S01";
+      receptorCP = traveler.codigo_postal_fiscal || issuerPostalCode;
+    } else if (isForeign) {
+      receptorRfc = "XEXX010101000";
+      receptorNombre = fullName || "EXTRANJERO";
+      receptorRegimen = "616";
+      receptorUsoCfdi = "S01";
+      receptorCP = issuerPostalCode;
+      if (traveler?.num_reg_id_trib) receptorNumRegIdTrib = traveler.num_reg_id_trib;
+      if (traveler?.residencia_fiscal) receptorResidenciaFiscal = traveler.residencia_fiscal;
+    } else {
+      receptorRfc = "XAXX010101000";
+      receptorNombre = fullName || "SIN NOMBRE";
+      receptorRegimen = "616";
+      receptorUsoCfdi = "S01";
+      receptorCP = issuerPostalCode;
+    }
 
     // Build "a cuenta de terceros" (agency pass-through) — solo aplica al concepto del tour
     let terceroAgencia: CfdiTercero | undefined;
@@ -430,6 +467,8 @@ Deno.serve(async (req: Request) => {
         domicilio_fiscal_receptor: receptorCP,
         regimen_fiscal_receptor: receptorRegimen,
         uso_cfdi: receptorUsoCfdi,
+        ...(receptorNumRegIdTrib ? { num_reg_id_trib: receptorNumRegIdTrib } : {}),
+        ...(receptorResidenciaFiscal ? { residencia_fiscal: receptorResidenciaFiscal } : {}),
       },
       conceptos,
     };

@@ -33,6 +33,8 @@ interface TravelerProfile {
   regimen_fiscal?: string;
   uso_cfdi?: string;
   codigo_postal_fiscal?: string;
+  num_reg_id_trib?: string;
+  residencia_fiscal?: string;
   booking_count?: number;
   total_spent?: number;
   wallet_balance?: number;
@@ -67,7 +69,9 @@ const TravelerProfile: React.FC = () => {
     razon_social: '',
     regimen_fiscal: '',
     uso_cfdi: '',
-    codigo_postal_fiscal: ''
+    codigo_postal_fiscal: '',
+    num_reg_id_trib: '',
+    residencia_fiscal: ''
   });
 
   useEffect(() => {
@@ -153,7 +157,9 @@ const TravelerProfile: React.FC = () => {
         razon_social: profileData.razon_social || '',
         regimen_fiscal: profileData.regimen_fiscal || '',
         uso_cfdi: profileData.uso_cfdi || '',
-        codigo_postal_fiscal: profileData.codigo_postal_fiscal || ''
+        codigo_postal_fiscal: profileData.codigo_postal_fiscal || '',
+        num_reg_id_trib: profileData.num_reg_id_trib || '',
+        residencia_fiscal: profileData.residencia_fiscal || ''
       });
 
     } catch (err: any) {
@@ -194,6 +200,8 @@ const TravelerProfile: React.FC = () => {
         regimen_fiscal: editForm.regimen_fiscal || null,
         uso_cfdi: editForm.uso_cfdi || null,
         codigo_postal_fiscal: editForm.codigo_postal_fiscal?.trim() || null,
+        num_reg_id_trib: profile?.is_foreign_traveler ? (editForm.num_reg_id_trib?.trim() || null) : null,
+        residencia_fiscal: profile?.is_foreign_traveler ? (editForm.residencia_fiscal?.trim() || null) : null,
         updated_at: new Date().toISOString()
       };
 
@@ -243,7 +251,9 @@ const TravelerProfile: React.FC = () => {
       razon_social: profile.razon_social || '',
       regimen_fiscal: profile.regimen_fiscal || '',
       uso_cfdi: profile.uso_cfdi || '',
-      codigo_postal_fiscal: profile.codigo_postal_fiscal || ''
+      codigo_postal_fiscal: profile.codigo_postal_fiscal || '',
+      num_reg_id_trib: profile.num_reg_id_trib || '',
+      residencia_fiscal: profile.residencia_fiscal || ''
     });
     setIsEditing(false);
     setError('');
@@ -635,75 +645,142 @@ const TravelerProfile: React.FC = () => {
                       <FileText className="h-4 w-4 text-primary-600" />
                       Datos Fiscales (para CFDI)
                     </h4>
-                    <p className="text-xs text-gray-500">Opcional. Si los proporcionas, tus comprobantes fiscales se generarán con estos datos. De lo contrario se usará RFC genérico (XAXX010101000).</p>
+                    <p className="text-xs text-gray-500">
+                      {profile?.is_foreign_traveler
+                        ? 'Para viajeros extranjeros se usará RFC XEXX010101000. Si proporcionas tu número de registro fiscal y país de residencia, podrás deducir el gasto en tu país.'
+                        : 'Opcional. Si los proporcionas, tus comprobantes fiscales se generarán con estos datos. De lo contrario se usará RFC genérico (XAXX010101000) con tu nombre real.'}
+                    </p>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">RFC</label>
-                        <input
-                          type="text"
-                          value={editForm.rfc}
-                          onChange={(e) => setEditForm({...editForm, rfc: e.target.value.toUpperCase()})}
-                          className="input uppercase"
-                          placeholder="Ej: ABCD123456EFG"
-                          maxLength={13}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Razón Social / Nombre Fiscal</label>
-                        <input
-                          type="text"
-                          value={editForm.razon_social}
-                          onChange={(e) => setEditForm({...editForm, razon_social: e.target.value})}
-                          className="input"
-                          placeholder="Como aparece en el SAT"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Régimen Fiscal</label>
-                        <select
-                          value={editForm.regimen_fiscal}
-                          onChange={(e) => setEditForm({...editForm, regimen_fiscal: e.target.value})}
-                          className="input"
-                        >
-                          <option value="">Seleccionar régimen</option>
-                          <option value="605">605 - Sueldos y Salarios</option>
-                          <option value="606">606 - Arrendamiento</option>
-                          <option value="608">608 - Demás ingresos</option>
-                          <option value="611">611 - Ingresos por Dividendos</option>
-                          <option value="612">612 - Personas Físicas con Actividades Empresariales</option>
-                          <option value="614">614 - Ingresos por intereses</option>
-                          <option value="616">616 - Sin obligaciones fiscales</option>
-                          <option value="621">621 - Incorporación Fiscal</option>
-                          <option value="625">625 - Régimen Simplificado de Confianza</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Uso CFDI</label>
-                        <select
-                          value={editForm.uso_cfdi}
-                          onChange={(e) => setEditForm({...editForm, uso_cfdi: e.target.value})}
-                          className="input"
-                        >
-                          <option value="">Seleccionar uso</option>
-                          <option value="S01">S01 - Sin efectos fiscales</option>
-                          <option value="G01">G01 - Adquisición de mercancias</option>
-                          <option value="G03">G03 - Gastos en general</option>
-                          <option value="D01">D01 - Honorarios médicos, dentales y gastos hospitalarios</option>
-                          <option value="D10">D10 - Pagos por servicios educativos</option>
-                        </select>
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Código Postal Fiscal</label>
-                        <input
-                          type="text"
-                          value={editForm.codigo_postal_fiscal}
-                          onChange={(e) => setEditForm({...editForm, codigo_postal_fiscal: e.target.value})}
-                          className="input"
-                          placeholder="Ej: 06700"
-                          maxLength={5}
-                        />
-                      </div>
+                      {!profile?.is_foreign_traveler && (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">RFC</label>
+                            <input
+                              type="text"
+                              value={editForm.rfc}
+                              onChange={(e) => setEditForm({...editForm, rfc: e.target.value.toUpperCase()})}
+                              className="input uppercase"
+                              placeholder="Ej: ABCD123456EFG"
+                              maxLength={13}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Razón Social / Nombre Fiscal</label>
+                            <input
+                              type="text"
+                              value={editForm.razon_social}
+                              onChange={(e) => setEditForm({...editForm, razon_social: e.target.value})}
+                              className="input"
+                              placeholder="Como aparece en el SAT"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Régimen Fiscal</label>
+                            <select
+                              value={editForm.regimen_fiscal}
+                              onChange={(e) => setEditForm({...editForm, regimen_fiscal: e.target.value})}
+                              className="input"
+                            >
+                              <option value="">Seleccionar régimen</option>
+                              <option value="605">605 - Sueldos y Salarios</option>
+                              <option value="606">606 - Arrendamiento</option>
+                              <option value="608">608 - Demás ingresos</option>
+                              <option value="611">611 - Ingresos por Dividendos</option>
+                              <option value="612">612 - Personas Físicas con Actividades Empresariales</option>
+                              <option value="614">614 - Ingresos por intereses</option>
+                              <option value="616">616 - Sin obligaciones fiscales</option>
+                              <option value="621">621 - Incorporación Fiscal</option>
+                              <option value="625">625 - Régimen Simplificado de Confianza</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Uso CFDI</label>
+                            <select
+                              value={editForm.uso_cfdi}
+                              onChange={(e) => setEditForm({...editForm, uso_cfdi: e.target.value})}
+                              className="input"
+                            >
+                              <option value="">Seleccionar uso</option>
+                              <option value="S01">S01 - Sin efectos fiscales</option>
+                              <option value="G01">G01 - Adquisición de mercancias</option>
+                              <option value="G03">G03 - Gastos en general</option>
+                              <option value="D01">D01 - Honorarios médicos, dentales y gastos hospitalarios</option>
+                              <option value="D10">D10 - Pagos por servicios educativos</option>
+                            </select>
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Código Postal Fiscal</label>
+                            <input
+                              type="text"
+                              value={editForm.codigo_postal_fiscal}
+                              onChange={(e) => setEditForm({...editForm, codigo_postal_fiscal: e.target.value})}
+                              className="input"
+                              placeholder="Ej: 06700"
+                              maxLength={5}
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {profile?.is_foreign_traveler && (
+                        <>
+                          <div className="md:col-span-2 p-3 bg-blue-50 rounded-md border border-blue-100">
+                            <p className="text-xs text-blue-700 font-medium">RFC aplicado automaticamente: XEXX010101000</p>
+                            <p className="text-xs text-blue-600 mt-1">Uso CFDI: S01 - Sin efectos fiscales | Regimen: 616 - Sin obligaciones fiscales</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Num. Registro Fiscal (pais de origen)
+                              <span className="text-gray-400 font-normal ml-1">(opcional)</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={editForm.num_reg_id_trib}
+                              onChange={(e) => setEditForm({...editForm, num_reg_id_trib: e.target.value.toUpperCase()})}
+                              className="input uppercase"
+                              placeholder="Ej: 123-45-6789"
+                            />
+                            <p className="text-xs text-gray-400 mt-1">Tu numero de identificacion fiscal en tu pais</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Pais de Residencia Fiscal
+                              <span className="text-gray-400 font-normal ml-1">(opcional)</span>
+                            </label>
+                            <select
+                              value={editForm.residencia_fiscal}
+                              onChange={(e) => setEditForm({...editForm, residencia_fiscal: e.target.value})}
+                              className="input"
+                            >
+                              <option value="">Seleccionar pais</option>
+                              <option value="USA">Estados Unidos (USA)</option>
+                              <option value="CAN">Canada (CAN)</option>
+                              <option value="ESP">Espana (ESP)</option>
+                              <option value="FRA">Francia (FRA)</option>
+                              <option value="DEU">Alemania (DEU)</option>
+                              <option value="GBR">Reino Unido (GBR)</option>
+                              <option value="ITA">Italia (ITA)</option>
+                              <option value="BRA">Brasil (BRA)</option>
+                              <option value="ARG">Argentina (ARG)</option>
+                              <option value="COL">Colombia (COL)</option>
+                              <option value="CHL">Chile (CHL)</option>
+                              <option value="PER">Peru (PER)</option>
+                              <option value="JPN">Japon (JPN)</option>
+                              <option value="CHN">China (CHN)</option>
+                              <option value="AUS">Australia (AUS)</option>
+                              <option value="NLD">Paises Bajos (NLD)</option>
+                              <option value="BEL">Belgica (BEL)</option>
+                              <option value="CHE">Suiza (CHE)</option>
+                              <option value="SWE">Suecia (SWE)</option>
+                              <option value="NOR">Noruega (NOR)</option>
+                            </select>
+                          </div>
+                          <p className="md:col-span-2 text-xs text-gray-500">
+                            Al proporcionar estos datos, el CFDI incluira tu informacion fiscal extranjera para que puedas deducirlo en tu pais de residencia.
+                          </p>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -855,34 +932,59 @@ const TravelerProfile: React.FC = () => {
                         <FileText className="h-4 w-4 text-primary-600" />
                         Datos Fiscales
                       </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-1">RFC</label>
-                          <div className="flex items-center p-3 bg-gray-50 rounded-md">
-                            <FileText className="h-4 w-4 text-gray-400 mr-2" />
-                            <span className="uppercase">{profile.rfc || 'No especificado (se usará XAXX010101000)'}</span>
+                      {profile.is_foreign_traveler ? (
+                        <div className="space-y-3">
+                          <div className="p-3 bg-blue-50 rounded-md border border-blue-100">
+                            <p className="text-xs text-blue-700 font-medium">RFC automatico para extranjeros: XEXX010101000</p>
+                            <p className="text-xs text-blue-600 mt-1">Uso CFDI: S01 - Sin efectos fiscales | Regimen: 616 - Sin obligaciones fiscales</p>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-500 mb-1">Num. Registro Fiscal</label>
+                              <div className="flex items-center p-3 bg-gray-50 rounded-md">
+                                <FileText className="h-4 w-4 text-gray-400 mr-2" />
+                                <span className="uppercase">{profile.num_reg_id_trib || 'No especificado'}</span>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-500 mb-1">Pais de Residencia Fiscal</label>
+                              <div className="flex items-center p-3 bg-gray-50 rounded-md">
+                                <Globe className="h-4 w-4 text-gray-400 mr-2" />
+                                <span>{profile.residencia_fiscal || 'No especificado'}</span>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-1">Razón Social</label>
-                          <div className="flex items-center p-3 bg-gray-50 rounded-md">
-                            <User className="h-4 w-4 text-gray-400 mr-2" />
-                            <span>{profile.razon_social || 'No especificado'}</span>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500 mb-1">RFC</label>
+                            <div className="flex items-center p-3 bg-gray-50 rounded-md">
+                              <FileText className="h-4 w-4 text-gray-400 mr-2" />
+                              <span className="uppercase">{profile.rfc || 'No especificado (se usara XAXX010101000)'}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500 mb-1">Razon Social</label>
+                            <div className="flex items-center p-3 bg-gray-50 rounded-md">
+                              <User className="h-4 w-4 text-gray-400 mr-2" />
+                              <span>{profile.razon_social || 'No especificado'}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500 mb-1">Regimen Fiscal</label>
+                            <div className="flex items-center p-3 bg-gray-50 rounded-md">
+                              <span>{profile.regimen_fiscal || '616 - Sin obligaciones fiscales'}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500 mb-1">Uso CFDI por defecto</label>
+                            <div className="flex items-center p-3 bg-gray-50 rounded-md">
+                              <span>{profile.uso_cfdi || 'S01 - Sin efectos fiscales'}</span>
+                            </div>
                           </div>
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-1">Régimen Fiscal</label>
-                          <div className="flex items-center p-3 bg-gray-50 rounded-md">
-                            <span>{profile.regimen_fiscal || 'No especificado'}</span>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-1">Uso CFDI por defecto</label>
-                          <div className="flex items-center p-3 bg-gray-50 rounded-md">
-                            <span>{profile.uso_cfdi || 'S01 - Sin efectos fiscales'}</span>
-                          </div>
-                        </div>
-                      </div>
+                      )}
                     </div>
 
                     <div>

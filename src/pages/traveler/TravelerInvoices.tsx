@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, ExternalLink, CheckCircle, AlertCircle, Clock, XCircle, RefreshCw, Receipt } from 'lucide-react';
+import { FileText, Download, ExternalLink, CheckCircle, AlertCircle, Clock, XCircle, RefreshCw, Receipt, Star } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { formatCurrencyMXN } from '../../utils/formatCurrency';
@@ -26,6 +26,7 @@ const downloadCfdi = async (cfdiId: string, fileType: 'xml' | 'pdf') => {
 
 interface CfdiInvoice {
   id: string;
+  invoice_type: 'booking' | 'commission' | 'membership';
   uuid_fiscal: string | null;
   folio: string | null;
   serie: string | null;
@@ -38,6 +39,8 @@ interface CfdiInvoice {
   pdf_url: string | null;
   stamped_at: string | null;
   created_at: string;
+  booking_id: string | null;
+  membership_id: string | null;
   bookings?: { booking_code: string | null; tours?: { name: string } | null } | null;
 }
 
@@ -58,27 +61,56 @@ const TravelerInvoices: React.FC = () => {
     if (!user) return;
     setIsLoading(true);
     try {
-      const { data } = await supabase
+      // Facturas de reservas del viajero
+      const { data: bookingInvoices } = await supabase
         .from('cfdi_invoices')
-        .select(`*, bookings(booking_code, tours(name))`)
+        .select(`id, invoice_type, uuid_fiscal, folio, serie, receptor_rfc, subtotal, iva_amount, total, status, xml_url, pdf_url, stamped_at, created_at, booking_id, membership_id, bookings(booking_code, tours(name))`)
         .eq('invoice_type', 'booking')
         .order('created_at', { ascending: false })
         .limit(100);
 
-      if (data) {
-        const mine = await Promise.all(
-          data.map(async (inv) => {
-            if (!inv.booking_id) return null;
+      const bookingMine: CfdiInvoice[] = [];
+      if (bookingInvoices) {
+        await Promise.all(
+          bookingInvoices.map(async (inv) => {
+            if (!inv.booking_id) return;
             const { data: booking } = await supabase
               .from('bookings')
               .select('user_id')
               .eq('id', inv.booking_id)
               .maybeSingle();
-            return booking?.user_id === user.id ? inv : null;
+            if (booking?.user_id === user.id) bookingMine.push(inv as CfdiInvoice);
           })
         );
-        setInvoices(mine.filter(Boolean) as CfdiInvoice[]);
       }
+
+      // Facturas de membresías del viajero
+      const { data: membershipInvoices } = await supabase
+        .from('cfdi_invoices')
+        .select(`id, invoice_type, uuid_fiscal, folio, serie, receptor_rfc, subtotal, iva_amount, total, status, xml_url, pdf_url, stamped_at, created_at, booking_id, membership_id`)
+        .eq('invoice_type', 'membership')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      const membershipMine: CfdiInvoice[] = [];
+      if (membershipInvoices) {
+        await Promise.all(
+          membershipInvoices.map(async (inv) => {
+            if (!inv.membership_id) return;
+            const { data: mem } = await supabase
+              .from('memberships')
+              .select('user_id')
+              .eq('id', inv.membership_id)
+              .maybeSingle();
+            if (mem?.user_id === user.id) membershipMine.push(inv as CfdiInvoice);
+          })
+        );
+      }
+
+      const all = [...bookingMine, ...membershipMine].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      setInvoices(all);
     } finally {
       setIsLoading(false);
     }
@@ -105,7 +137,7 @@ const TravelerInvoices: React.FC = () => {
             Mis Facturas (CFDI)
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Comprobantes fiscales digitales de tus reservas, validos ante el SAT.
+            Comprobantes fiscales digitales de tus reservas y membresias, validos ante el SAT.
           </p>
         </div>
         <button
@@ -158,14 +190,18 @@ const TravelerInvoices: React.FC = () => {
             const booking = inv.bookings as { booking_code: string | null; tours?: { name: string } | null } | null;
             const tourName = booking?.tours?.name;
             const bookingCode = booking?.booking_code;
+            const isMembership = inv.invoice_type === 'membership';
 
             return (
               <div
                 key={inv.id}
                 className="bg-white rounded-xl border border-gray-200 hover:border-primary-200 hover:shadow-sm transition-all p-4 flex items-center gap-4"
               >
-                <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
-                  <FileText className="h-5 w-5 text-primary-600" />
+                <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${isMembership ? 'bg-amber-100' : 'bg-primary-100'}`}>
+                  {isMembership
+                    ? <Star className="h-5 w-5 text-amber-600" />
+                    : <FileText className="h-5 w-5 text-primary-600" />
+                  }
                 </div>
 
                 <div className="flex-1 min-w-0">
@@ -174,6 +210,17 @@ const TravelerInvoices: React.FC = () => {
                       {s.icon}
                       {s.label}
                     </span>
+                    {isMembership && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                        <Star className="h-3 w-3" />
+                        Membresia ToursRed Plus
+                      </span>
+                    )}
+                    {!isMembership && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                        Reserva
+                      </span>
+                    )}
                     {bookingCode && (
                       <span className="text-xs font-mono text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">
                         {bookingCode}
@@ -182,6 +229,9 @@ const TravelerInvoices: React.FC = () => {
                   </div>
                   {tourName && (
                     <div className="text-sm font-semibold text-gray-800 truncate">{tourName}</div>
+                  )}
+                  {isMembership && !tourName && (
+                    <div className="text-sm font-semibold text-gray-800">Suscripcion ToursRed Plus</div>
                   )}
                   {inv.uuid_fiscal && (
                     <div className="text-xs font-mono text-gray-400 truncate mt-0.5">{inv.uuid_fiscal}</div>
