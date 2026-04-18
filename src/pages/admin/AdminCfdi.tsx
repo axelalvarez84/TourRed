@@ -28,7 +28,7 @@ const downloadCfdi = async (cfdiId: string, fileType: 'xml' | 'pdf') => {
 
 interface CfdiInvoice {
   id: string;
-  invoice_type: 'booking' | 'commission';
+  invoice_type: 'booking' | 'commission' | 'membership';
   booking_id: string | null;
   payout_id: string | null;
   agency_id: string | null;
@@ -257,6 +257,7 @@ const AdminCfdi: React.FC = () => {
             <option value="all">Todos los tipos</option>
             <option value="booking">Viajero (Reserva)</option>
             <option value="commission">Comisión (Agencia)</option>
+            <option value="membership">Membresía</option>
           </select>
         </div>
 
@@ -290,8 +291,14 @@ const AdminCfdi: React.FC = () => {
                     return (
                       <tr key={inv.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${inv.invoice_type === 'booking' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-                            {inv.invoice_type === 'booking' ? 'Reserva' : 'Comisión'}
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                            inv.invoice_type === 'booking'
+                              ? 'bg-blue-100 text-blue-700'
+                              : inv.invoice_type === 'membership'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {inv.invoice_type === 'booking' ? 'Reserva' : inv.invoice_type === 'membership' ? 'Membresía' : 'Comisión'}
                           </span>
                           {agencyName && <div className="text-xs text-gray-400 mt-0.5 truncate max-w-24">{agencyName}</div>}
                           {bookingCode && <div className="text-xs text-gray-400">{bookingCode}</div>}
