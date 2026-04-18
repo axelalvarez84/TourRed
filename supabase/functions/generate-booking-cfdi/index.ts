@@ -75,15 +75,18 @@ async function facturapiStamp(
 ): Promise<CfdiResult> {
   const baseUrl = "https://www.facturapi.io/v2";
 
+  const isForeignWithTaxId = request.receptor.rfc === "XEXX010101000" && request.receptor.num_reg_id_trib;
+  const effectiveTaxId = isForeignWithTaxId ? request.receptor.num_reg_id_trib! : request.receptor.rfc;
+
+  const address: Record<string, unknown> = { zip: request.receptor.domicilio_fiscal_receptor };
+  if (request.receptor.residencia_fiscal) address.country = request.receptor.residencia_fiscal;
+
   const customer: Record<string, unknown> = {
     legal_name: request.receptor.nombre,
-    tax_id: request.receptor.rfc,
+    tax_id: effectiveTaxId,
     tax_system: request.receptor.regimen_fiscal_receptor,
-    address: { zip: request.receptor.domicilio_fiscal_receptor },
+    address,
   };
-  const isGenericRfc = request.receptor.rfc === "XAXX010101000" || request.receptor.rfc === "XEXX010101000";
-  if (!isGenericRfc && request.receptor.num_reg_id_trib) customer.tax_id_registration = request.receptor.num_reg_id_trib;
-  if (request.receptor.residencia_fiscal) customer.country = request.receptor.residencia_fiscal;
 
   const body: Record<string, unknown> = {
     type: request.tipo_de_comprobante,
