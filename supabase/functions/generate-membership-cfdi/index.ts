@@ -53,7 +53,8 @@ async function facturapiStamp(apiKey: string, organizationId: string, request: C
     tax_system: request.receptor.regimen_fiscal_receptor,
     address: { zip: request.receptor.domicilio_fiscal_receptor },
   };
-  if (request.receptor.num_reg_id_trib) customer.tax_id_registration = request.receptor.num_reg_id_trib;
+  const isGenericRfc = request.receptor.rfc === "XAXX010101000" || request.receptor.rfc === "XEXX010101000";
+  if (!isGenericRfc && request.receptor.num_reg_id_trib) customer.tax_id_registration = request.receptor.num_reg_id_trib;
   if (request.receptor.residencia_fiscal) customer.country = request.receptor.residencia_fiscal;
 
   const body: Record<string, unknown> = {
@@ -333,13 +334,13 @@ Deno.serve(async (req: Request) => {
       receptorRegimen = traveler.regimen_fiscal || "616";
       receptorUsoCfdi = traveler.uso_cfdi || "S01";
       receptorCP = traveler.codigo_postal_fiscal || issuerPostalCode;
-    } else if (isForeign) {
+    } else if (isForeign && traveler?.num_reg_id_trib) {
       receptorRfc = "XEXX010101000";
       receptorNombre = fullName || "EXTRANJERO";
       receptorRegimen = "616";
       receptorUsoCfdi = "S01";
       receptorCP = issuerPostalCode;
-      if (traveler?.num_reg_id_trib) receptorNumRegIdTrib = traveler.num_reg_id_trib;
+      receptorNumRegIdTrib = traveler.num_reg_id_trib;
       if (traveler?.residencia_fiscal) receptorResidenciaFiscal = traveler.residencia_fiscal;
     } else {
       receptorRfc = "XAXX010101000";

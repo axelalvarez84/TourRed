@@ -945,11 +945,46 @@ Deno.serve(async (req) => {
 
               if (!cfdiSettings?.pac_provider || cfdiSettings.pac_provider === 'none') return;
 
-              const { data: membership } = await supabase
+              let { data: membership } = await supabase
                 .from('memberships')
                 .select('id')
                 .eq('stripe_subscription_id', subscriptionId)
                 .maybeSingle();
+
+              if (!membership?.id && isSubscriptionCreate) {
+                console.log(`Membresía no encontrada aún para subscription ${subscriptionId}, obteniendo datos de Stripe para crear upsert...`);
+                try {
+                  const subscriptionData = await stripe.subscriptions.retrieve(subscriptionId);
+                  const userId = subscriptionData.metadata?.user_id;
+                  if (userId) {
+                    const statusMap: Record<string, string> = {
+                      'incomplete': 'trialing', 'incomplete_expired': 'expired', 'trialing': 'trialing',
+                      'active': 'active', 'past_due': 'past_due', 'canceled': 'cancelled',
+                      'unpaid': 'expired', 'paused': 'past_due'
+                    };
+                    const { data: upsertedMembership } = await supabase
+                      .from('memberships')
+                      .upsert({
+                        user_id: userId,
+                        stripe_customer_id: subscriptionData.customer as string,
+                        stripe_subscription_id: subscriptionData.id,
+                        plan_type: subscriptionData.metadata?.plan_type || 'monthly',
+                        status: statusMap[subscriptionData.status] || 'active',
+                        start_date: new Date((subscriptionData.start_date as number) * 1000).toISOString(),
+                        current_period_start: new Date((subscriptionData as any).current_period_start * 1000).toISOString(),
+                        current_period_end: new Date((subscriptionData as any).current_period_end * 1000).toISOString(),
+                        cancel_at_period_end: subscriptionData.cancel_at_period_end || false,
+                        cancelled_at: subscriptionData.canceled_at ? new Date(subscriptionData.canceled_at * 1000).toISOString() : null,
+                      }, { onConflict: 'stripe_subscription_id' })
+                      .select('id')
+                      .single();
+                    membership = upsertedMembership;
+                    console.log(`Membresía creada desde invoice.payment_succeeded: ${membership?.id}`);
+                  }
+                } catch (subErr) {
+                  console.error('Error obteniendo suscripción de Stripe:', subErr);
+                }
+              }
 
               if (!membership?.id) {
                 console.error(`No se encontró membresía para subscription ${subscriptionId}`);
