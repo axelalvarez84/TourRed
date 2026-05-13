@@ -4,7 +4,7 @@ import {
   Menu, X, User, LogOut, Search, MessageCircle, ChevronDown,
   LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation,
   Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent,
-  DollarSign, Gift, Megaphone, Ticket, BadgePercent, Send, ArrowLeftRight, FileText
+  DollarSign, Gift, Megaphone, Ticket, BadgePercent, Send, ArrowLeftRight, FileText, BookOpen
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import { useAuth } from '../context/AuthContext';
@@ -159,6 +159,7 @@ const NavBar: React.FC = () => {
     const financieroItems: AdminMenuItem[] = [
       { to: '/admin/payouts', label: 'Gestion de Pagos', icon: <DollarSign className="h-4 w-4" /> },
       { to: '/admin/cfdi', label: 'CFDI / Facturacion', icon: <FileText className="h-4 w-4" /> },
+      { to: '/admin/contabilidad', label: 'Contabilidad', icon: <BookOpen className="h-4 w-4" /> },
     ];
     if (isSuperAdmin || permissions?.canManageInquiries)
       financieroItems.push({ to: '/admin/international-inquiries', label: 'Cotizaciones Internac.', icon: <Globe className="h-4 w-4" /> });
