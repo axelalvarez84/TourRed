@@ -234,25 +234,33 @@ const AdminContabilidad: React.FC = () => {
     for (let i = 0; i < records.length; i++) {
       const rec = records[i];
       try {
+        let res: { data: any; error: any };
         if (type === 'agencies') {
-          await supabase.functions.invoke('sync-contact-to-accounting', {
+          res = await supabase.functions.invoke('sync-contact-to-accounting', {
             body: { contact_type: 'agency', contact_id: rec.id },
           });
         } else if (type === 'travelers') {
-          await supabase.functions.invoke('sync-contact-to-accounting', {
+          res = await supabase.functions.invoke('sync-contact-to-accounting', {
             body: { contact_type: 'traveler', contact_id: rec.id },
           });
         } else if (type === 'bookings') {
-          await supabase.functions.invoke('sync-booking-to-accounting', {
+          res = await supabase.functions.invoke('sync-booking-to-accounting', {
             body: { booking_id: rec.id },
           });
-        } else if (type === 'payouts') {
-          await supabase.functions.invoke('sync-payout-to-accounting', {
+        } else {
+          res = await supabase.functions.invoke('sync-payout-to-accounting', {
             body: { payout_id: rec.id },
           });
         }
-        succeeded++;
-      } catch {
+        // Check both invoke-level error and response-body error
+        if (res.error || res.data?.error) {
+          console.error(`Sync error for ${rec.id}:`, res.error || res.data?.error);
+          failed++;
+        } else {
+          succeeded++;
+        }
+      } catch (err) {
+        console.error(`Sync exception for ${rec.id}:`, err);
         failed++;
       }
       setBulkProgress({ type, total: records.length, done: i + 1, succeeded, failed, running: i + 1 < records.length });

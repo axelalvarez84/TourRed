@@ -377,12 +377,27 @@ async function logSync(
 }
 
 async function incrementRetryCount(supabase: ReturnType<typeof createClient>, provider: string, recordType: string, recordId: string) {
-  await supabase
-    .from("accounting_sync_log")
-    .update({ retry_count: supabase.rpc("accounting_sync_log_retry_count_increment" as never) })
-    .eq("provider", provider)
-    .eq("record_type", recordType)
-    .eq("record_id", recordId);
+  await supabase.rpc("increment_accounting_sync_retry_count" as never, {
+    p_provider: provider,
+    p_record_type: recordType,
+    p_record_id: recordId,
+  }).catch(async () => {
+    // Fallback: read current count and increment manually
+    const { data } = await supabase
+      .from("accounting_sync_log")
+      .select("retry_count")
+      .eq("provider", provider)
+      .eq("record_type", recordType)
+      .eq("record_id", recordId)
+      .maybeSingle();
+    const current = (data?.retry_count ?? 0) + 1;
+    await supabase
+      .from("accounting_sync_log")
+      .update({ retry_count: current })
+      .eq("provider", provider)
+      .eq("record_type", recordType)
+      .eq("record_id", recordId);
+  });
 }
 
 // =============================================

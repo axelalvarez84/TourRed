@@ -49,51 +49,49 @@ Deno.serve(async (req: Request) => {
     if (contact_type === "agency") {
       const { data: agency, error } = await supabase
         .from("agencies")
-        .select(`
-          id, rfc, razon_social, regimen_fiscal, postal_code, phone, city, state,
-          users (email, full_name)
-        `)
+        .select("id, name, contact_email, contact_phone, rfc, razon_social, regimen_fiscal, postal_code, city, state, country")
         .eq("id", contact_id)
         .maybeSingle();
 
       if (error || !agency) {
-        return new Response(JSON.stringify({ error: "Agency not found" }), {
+        return new Response(JSON.stringify({ error: "Agency not found", detail: error?.message }), {
           status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const agencyUser = agency.users as { email?: string; full_name?: string };
       contactPayload = {
         id: agency.id,
         type: "agency",
-        name: agency.razon_social || agencyUser?.full_name || "Agencia",
-        email: agencyUser?.email,
-        phone: agency.phone,
+        name: agency.razon_social || agency.name || "Agencia",
+        email: agency.contact_email,
+        phone: agency.contact_phone,
         rfc: agency.rfc,
         razon_social: agency.razon_social,
         regimen_fiscal: agency.regimen_fiscal,
         codigo_postal: agency.postal_code,
         city: agency.city,
         state: agency.state,
-        country: "Mexico",
+        country: agency.country || "Mexico",
       };
     } else {
       const { data: traveler, error } = await supabase
         .from("users")
-        .select("id, full_name, email, rfc, razon_social, regimen_fiscal, uso_cfdi, codigo_postal_fiscal")
+        .select("id, first_name, last_name, email, rfc, razon_social, regimen_fiscal, uso_cfdi, codigo_postal_fiscal")
         .eq("id", contact_id)
         .maybeSingle();
 
       if (error || !traveler) {
-        return new Response(JSON.stringify({ error: "Traveler not found" }), {
+        return new Response(JSON.stringify({ error: "Traveler not found", detail: error?.message }), {
           status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
+      const fullName = [traveler.first_name, traveler.last_name].filter(Boolean).join(" ").trim() || "Viajero";
+
       contactPayload = {
         id: traveler.id,
         type: "traveler",
-        name: traveler.full_name,
+        name: traveler.razon_social || fullName,
         email: traveler.email,
         rfc: traveler.rfc,
         razon_social: traveler.razon_social,
@@ -113,6 +111,13 @@ Deno.serve(async (req: Request) => {
     });
 
     if (result.error) throw new Error(result.error.message);
+
+    // Surface any error returned in the response body from sync-to-accounting
+    if (result.data?.error) {
+      return new Response(JSON.stringify({ error: result.data.error }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     return new Response(
       JSON.stringify({ success: true, ...result.data }),
