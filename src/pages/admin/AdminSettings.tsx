@@ -100,6 +100,7 @@ const AdminSettings: React.FC = () => {
     last_updated?: string;
   } | null>(null);
   const [zohoGrantToken, setZohoGrantToken] = useState('');
+  const [zohoConnectError, setZohoConnectError] = useState('');
   const [isConnectingZoho, setIsConnectingZoho] = useState(false);
   const [isCheckingZoho, setIsCheckingZoho] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -130,20 +131,24 @@ const AdminSettings: React.FC = () => {
 
   const handleConnectZoho = async () => {
     if (!zohoGrantToken.trim()) {
-      setMessage({ type: 'error', text: 'Ingresa el Grant Token de Zoho Self Client' });
+      setZohoConnectError('Ingresa el Grant Token de Zoho Self Client');
       return;
     }
+    setZohoConnectError('');
     setIsConnectingZoho(true);
     try {
       const { data, error } = await supabase.functions.invoke('zoho-oauth-connect', {
         body: { action: 'exchange_grant_token', grant_token: zohoGrantToken.trim() },
       });
-      if (error || !data?.success) throw new Error(error?.message || data?.error || 'Error al conectar con Zoho');
+      if (error || !data?.success) {
+        const detail = data?.detail ? ` (${JSON.stringify(data.detail)})` : '';
+        throw new Error((error?.message || data?.error || 'Error al conectar con Zoho') + detail);
+      }
       setZohoGrantToken('');
       setMessage({ type: 'success', text: 'Zoho Books conectado exitosamente' });
       await checkZohoStatus();
     } catch (err: any) {
-      setMessage({ type: 'error', text: `Error al conectar Zoho: ${err.message}` });
+      setZohoConnectError(err.message);
     } finally {
       setIsConnectingZoho(false);
     }
@@ -1271,23 +1276,31 @@ const AdminSettings: React.FC = () => {
                         <li>Copia el Grant Token generado y pegalo abajo</li>
                       </ol>
                     </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={zohoGrantToken}
-                        onChange={(e) => setZohoGrantToken(e.target.value)}
-                        placeholder="Pega el Grant Token de Zoho Self Client aqui..."
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleConnectZoho}
-                        disabled={isConnectingZoho || !zohoGrantToken.trim()}
-                        className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                      >
-                        {isConnectingZoho ? <Loader className="w-4 h-4 animate-spin" /> : <Link className="w-4 h-4" />}
-                        Conectar
-                      </button>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={zohoGrantToken}
+                          onChange={(e) => { setZohoGrantToken(e.target.value); setZohoConnectError(''); }}
+                          placeholder="Pega el Grant Token de Zoho Self Client aqui..."
+                          className={`flex-1 px-3 py-2 border rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm ${zohoConnectError ? 'border-red-400' : 'border-gray-300'}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleConnectZoho}
+                          disabled={isConnectingZoho || !zohoGrantToken.trim()}
+                          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium whitespace-nowrap"
+                        >
+                          {isConnectingZoho ? <Loader className="w-4 h-4 animate-spin" /> : <Link className="w-4 h-4" />}
+                          {isConnectingZoho ? 'Conectando...' : 'Conectar'}
+                        </button>
+                      </div>
+                      {zohoConnectError && (
+                        <p className="text-xs text-red-600 flex items-start gap-1">
+                          <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                          {zohoConnectError}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ) : (

@@ -91,7 +91,6 @@ Deno.serve(async (req: Request) => {
         client_id: settings.zoho_client_id,
         client_secret: settings.zoho_client_secret,
         grant_type: "authorization_code",
-        redirect_uri: "https://www.zoho.com/books",
       });
 
       const res = await fetch(tokenUrl, { method: "POST", body });
