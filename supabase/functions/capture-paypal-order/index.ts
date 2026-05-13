@@ -127,6 +127,18 @@ async function confirmBooking(supabase: any, bookingId: string, paypalTransactio
       }
     })()
   );
+
+  // Sync booking to accounting system (fire and forget)
+  EdgeRuntime.waitUntil(
+    fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/sync-booking-to-accounting`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      },
+      body: JSON.stringify({ booking_id: bookingId }),
+    }).catch((err) => console.error("Error triggering booking accounting sync (paypal):", err))
+  );
 }
 
 Deno.serve(async (req: Request) => {

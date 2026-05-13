@@ -204,6 +204,19 @@ Deno.serve(async (req: Request) => {
         } catch (cfdiErr) {
           console.error("Error triggering booking CFDI (mercadopago):", cfdiErr);
         }
+
+        // Sync booking to accounting system (fire and forget)
+        fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/sync-booking-to-accounting`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            },
+            body: JSON.stringify({ booking_id: externalReference }),
+          }
+        ).catch((err) => console.error("Error triggering booking accounting sync:", err));
       }
 
       const { data: giftCard } = await supabase

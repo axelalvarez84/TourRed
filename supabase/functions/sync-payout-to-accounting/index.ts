@@ -130,7 +130,7 @@ Deno.serve(async (req: Request) => {
 
     if (billRes.error) throw new Error(`Failed to sync bill: ${billRes.error.message}`);
 
-    if (payout.status === "paid" && payout.paid_at) {
+    if (payout.status === "completed" && (payout.paid_at || payout.created_at)) {
       await supabase.functions.invoke("sync-to-accounting", {
         body: {
           action: "sync_payment",
@@ -140,7 +140,7 @@ Deno.serve(async (req: Request) => {
             contact_external_id: agencyExternalId,
             bill_external_id: billRes.data?.external_entity_id,
             payment_type: "made",
-            date: new Date(payout.paid_at).toISOString().split("T")[0],
+            date: new Date(payout.paid_at || payout.created_at).toISOString().split("T")[0],
             amount: totalPayout,
             currency: "MXN",
             reference: payout.reference_number || payout_id,

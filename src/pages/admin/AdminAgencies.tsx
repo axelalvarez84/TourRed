@@ -259,6 +259,14 @@ const AdminAgencies: React.FC = () => {
           console.error('❌ Error enviando email de aprobación:', emailError);
           console.error('Stack:', emailError.stack);
         }
+
+        // Sync agency contact to accounting system (fire and forget)
+        const agency = agencies.find(a => a.user_id === userId);
+        if (agency) {
+          supabase.functions.invoke('sync-contact-to-accounting', {
+            body: { contact_type: 'agency', contact_id: agency.id },
+          }).catch((err) => console.error('Error syncing agency to accounting:', err));
+        }
       }
 
       setError('');

@@ -400,6 +400,13 @@ Deno.serve(async (req) => {
                 } catch (cfdiErr) {
                   console.error('Error triggering booking CFDI:', cfdiErr);
                 }
+
+                // Sync booking to accounting system (fire and forget)
+                fetch(`${supabaseUrl}/functions/v1/sync-booking-to-accounting`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
+                  body: JSON.stringify({ booking_id: bookingId }),
+                }).catch((err) => console.error('Error triggering booking accounting sync:', err));
               })()
             );
           }

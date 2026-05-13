@@ -834,9 +834,13 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({ isOpen, onClo
               .select('id')
               .single();
             if (newPayout?.id) {
-              supabase.functions.invoke('generate-commission-cfdi', {
+              await supabase.functions.invoke('generate-commission-cfdi', {
                 body: { payout_id: newPayout.id }
               });
+              // Sync payout to accounting system (fire and forget)
+              supabase.functions.invoke('sync-payout-to-accounting', {
+                body: { payout_id: newPayout.id }
+              }).catch((err) => console.error('Error syncing payout to accounting:', err));
             }
           }
         } catch (cfdiErr) {

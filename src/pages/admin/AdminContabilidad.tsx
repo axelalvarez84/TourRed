@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { BookOpen, RefreshCw, AlertCircle, CheckCircle, Clock, SkipForward, Filter, Search, RotateCcw, TrendingUp, Users, FileText, DollarSign, Loader, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  BookOpen, RefreshCw, AlertCircle, CheckCircle, Clock, SkipForward, Search,
+  RotateCcw, TrendingUp, Users, FileText, DollarSign, Loader, ChevronDown,
+  ChevronUp, Upload, Building2, CreditCard, Play
+} from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface SyncLogEntry {
@@ -28,6 +32,15 @@ interface SyncStats {
   bookings_synced: number;
   payouts_synced: number;
   last_sync_at?: string;
+}
+
+interface BulkSyncProgress {
+  type: string;
+  total: number;
+  done: number;
+  succeeded: number;
+  failed: number;
+  running: boolean;
 }
 
 const RECORD_TYPE_LABELS: Record<string, string> = {
@@ -89,6 +102,8 @@ const AdminContabilidad: React.FC = () => {
   const [currentProvider, setCurrentProvider] = useState<string>('none');
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [bulkProgress, setBulkProgress] = useState<BulkSyncProgress | null>(null);
+  const [showBulkPanel, setShowBulkPanel] = useState(false);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -120,6 +135,11 @@ const AdminContabilidad: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
+  const showMessage = (type: 'success' | 'error', text: string) => {
+    setMessage({ type, text });
+    setTimeout(() => setMessage(null), 6000);
+  };
+
   const handleHealthCheck = async () => {
     setIsCheckingHealth(true);
     setHealthStatus(null);
@@ -144,13 +164,12 @@ const AdminContabilidad: React.FC = () => {
         body: { action: 'retry_errors' },
       });
       if (error) throw error;
-      setMessage({ type: 'success', text: `Reintento completado: ${data.succeeded} exitosos, ${data.failed} fallidos de ${data.retried} total` });
+      showMessage('success', `Reintento completado: ${data.succeeded} exitosos, ${data.failed} fallidos de ${data.retried} total`);
       await fetchData();
     } catch (err: any) {
-      setMessage({ type: 'error', text: `Error al reintentar: ${err.message}` });
+      showMessage('error', `Error al reintentar: ${err.message}`);
     } finally {
       setIsRetrying(false);
-      setTimeout(() => setMessage(null), 5000);
     }
   };
 
@@ -163,13 +182,91 @@ const AdminContabilidad: React.FC = () => {
       await supabase.functions.invoke('sync-to-accounting', {
         body: { action, record_type: entry.record_type, record_id: entry.record_id },
       });
-      setMessage({ type: 'success', text: 'Reintento enviado' });
+      showMessage('success', 'Reintento enviado');
       await fetchData();
     } catch (err: any) {
-      setMessage({ type: 'error', text: `Error: ${err.message}` });
-    } finally {
-      setTimeout(() => setMessage(null), 3000);
+      showMessage('error', `Error: ${err.message}`);
     }
+  };
+
+  const handleBulkSync = async (type: 'agencies' | 'travelers' | 'bookings' | 'payouts') => {
+    if (!confirm(`Iniciar sincronizacion masiva de ${BULK_LABELS[type]}? Este proceso puede tardar varios minutos.`)) return;
+
+    let records: { id: string }[] = [];
+
+    if (type === 'agencies') {
+      const { data } = await supabase
+        .from('agencies')
+        .select('id')
+        .eq('is_active', true);
+      records = data || [];
+    } else if (type === 'travelers') {
+      const { data } = await supabase
+        .from('users')
+        .select('id')
+        .eq('role', 'traveler')
+        .not('rfc', 'is', null);
+      records = data || [];
+    } else if (type === 'bookings') {
+      const { data } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('status', 'confirmed');
+      records = data || [];
+    } else if (type === 'payouts') {
+      const { data } = await supabase
+        .from('agency_payouts')
+        .select('id')
+        .eq('status', 'completed');
+      records = data || [];
+    }
+
+    if (records.length === 0) {
+      showMessage('error', 'No se encontraron registros para sincronizar.');
+      return;
+    }
+
+    setBulkProgress({ type, total: records.length, done: 0, succeeded: 0, failed: 0, running: true });
+
+    let succeeded = 0;
+    let failed = 0;
+
+    for (let i = 0; i < records.length; i++) {
+      const rec = records[i];
+      try {
+        if (type === 'agencies') {
+          await supabase.functions.invoke('sync-contact-to-accounting', {
+            body: { contact_type: 'agency', contact_id: rec.id },
+          });
+        } else if (type === 'travelers') {
+          await supabase.functions.invoke('sync-contact-to-accounting', {
+            body: { contact_type: 'traveler', contact_id: rec.id },
+          });
+        } else if (type === 'bookings') {
+          await supabase.functions.invoke('sync-booking-to-accounting', {
+            body: { booking_id: rec.id },
+          });
+        } else if (type === 'payouts') {
+          await supabase.functions.invoke('sync-payout-to-accounting', {
+            body: { payout_id: rec.id },
+          });
+        }
+        succeeded++;
+      } catch {
+        failed++;
+      }
+      setBulkProgress({ type, total: records.length, done: i + 1, succeeded, failed, running: i + 1 < records.length });
+    }
+
+    showMessage('success', `Sincronizacion masiva completada: ${succeeded} exitosos, ${failed} con error de ${records.length} total.`);
+    await fetchData();
+  };
+
+  const BULK_LABELS: Record<string, string> = {
+    agencies: 'Agencias',
+    travelers: 'Viajeros con RFC',
+    bookings: 'Reservas confirmadas',
+    payouts: 'Pagos a agencias',
   };
 
   const filteredLogs = logs.filter((l) => {
@@ -191,15 +288,25 @@ const AdminContabilidad: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
+      {/* Header */}
+      <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Integracion Contable</h1>
           <p className="text-gray-600 mt-1">
             Monitor de sincronizacion con{' '}
-            <span className="font-medium text-primary-700">{PROVIDER_LABELS[currentProvider] || currentProvider}</span>
+            <span className="font-medium text-blue-700">{PROVIDER_LABELS[currentProvider] || currentProvider}</span>
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          {currentProvider !== 'none' && syncEnabled && (
+            <button
+              onClick={() => setShowBulkPanel(!showBulkPanel)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+            >
+              <Upload className="w-4 h-4" />
+              Sincronizacion Masiva
+            </button>
+          )}
           <button
             onClick={handleHealthCheck}
             disabled={isCheckingHealth || currentProvider === 'none'}
@@ -219,6 +326,7 @@ const AdminContabilidad: React.FC = () => {
         </div>
       </div>
 
+      {/* Message */}
       {message && (
         <div className={`mb-4 p-4 rounded-lg flex items-center gap-3 ${message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
           {message.type === 'success' ? <CheckCircle className="w-5 h-5 flex-shrink-0" /> : <AlertCircle className="w-5 h-5 flex-shrink-0" />}
@@ -226,6 +334,7 @@ const AdminContabilidad: React.FC = () => {
         </div>
       )}
 
+      {/* Health status */}
       {healthStatus && (
         <div className={`mb-4 p-4 rounded-lg flex items-center gap-3 ${healthStatus.healthy ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
           {healthStatus.healthy ? <CheckCircle className="w-5 h-5 flex-shrink-0" /> : <AlertCircle className="w-5 h-5 flex-shrink-0" />}
@@ -237,17 +346,93 @@ const AdminContabilidad: React.FC = () => {
         </div>
       )}
 
+      {/* Status bar */}
       <div className="flex items-center gap-3 mb-6 p-4 bg-white rounded-lg border border-gray-200">
-        <div className={`w-3 h-3 rounded-full flex-shrink-0 ${currentProvider === 'none' ? 'bg-gray-300' : syncEnabled ? 'bg-green-500' : 'bg-amber-400'}`} />
-        <div className="text-sm">
+        <div className={`w-3 h-3 rounded-full flex-shrink-0 ${currentProvider === 'none' ? 'bg-gray-300' : syncEnabled ? 'bg-green-500 animate-pulse' : 'bg-amber-400'}`} />
+        <div className="text-sm text-gray-700">
           {currentProvider === 'none'
             ? 'No hay proveedor contable configurado. Ve a Configuracion → Integracion Contable para activar.'
             : syncEnabled
-            ? `Sincronizacion activa con ${PROVIDER_LABELS[currentProvider]}. Los registros se sincronizan automaticamente en tiempo real.`
+            ? `Sincronizacion activa con ${PROVIDER_LABELS[currentProvider]}. Los nuevos registros se sincronizan automaticamente.`
             : `Proveedor ${PROVIDER_LABELS[currentProvider]} configurado pero sincronizacion desactivada. Activa el toggle en Configuracion.`}
         </div>
+        {currentProvider === 'none' && (
+          <a href="/admin/settings#contabilidad" className="ml-auto text-xs text-blue-600 hover:text-blue-700 underline whitespace-nowrap">
+            Ir a Configuracion
+          </a>
+        )}
       </div>
 
+      {/* Bulk sync panel */}
+      {showBulkPanel && (
+        <div className="mb-6 bg-white rounded-lg border border-blue-200 overflow-hidden">
+          <div className="px-5 py-4 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-blue-900 flex items-center gap-2">
+                <Upload className="w-4 h-4" />
+                Sincronizacion Masiva Inicial
+              </h2>
+              <p className="text-xs text-blue-700 mt-0.5">
+                Usa esto para enviar registros existentes a {PROVIDER_LABELS[currentProvider]} por primera vez.
+                Los registros ya sincronizados seran omitidos automaticamente.
+              </p>
+            </div>
+            <button onClick={() => setShowBulkPanel(false)} className="text-blue-400 hover:text-blue-600 text-lg leading-none ml-4">×</button>
+          </div>
+          <div className="p-5">
+            {bulkProgress?.running && (
+              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-center gap-3 mb-2">
+                  <Loader className="w-4 h-4 animate-spin text-amber-600" />
+                  <span className="text-sm font-medium text-amber-800">
+                    Sincronizando {BULK_LABELS[bulkProgress.type]}... ({bulkProgress.done}/{bulkProgress.total})
+                  </span>
+                </div>
+                <div className="w-full bg-amber-200 rounded-full h-2">
+                  <div
+                    className="bg-amber-500 h-2 rounded-full transition-all"
+                    style={{ width: `${(bulkProgress.done / bulkProgress.total) * 100}%` }}
+                  />
+                </div>
+                <div className="flex gap-4 mt-2 text-xs text-amber-700">
+                  <span>{bulkProgress.succeeded} exitosos</span>
+                  <span>{bulkProgress.failed} con error</span>
+                  <span>{bulkProgress.total - bulkProgress.done} restantes</span>
+                </div>
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                { key: 'agencies', icon: <Building2 className="w-5 h-5 text-blue-600" />, label: 'Agencias activas', desc: 'Crea proveedores en Zoho Books por cada agencia aprobada' },
+                { key: 'travelers', icon: <Users className="w-5 h-5 text-green-600" />, label: 'Viajeros con RFC', desc: 'Crea clientes en Zoho Books para viajeros con datos fiscales' },
+                { key: 'bookings', icon: <FileText className="w-5 h-5 text-amber-600" />, label: 'Reservas confirmadas', desc: 'Crea facturas de ingreso por cada reserva pagada' },
+                { key: 'payouts', icon: <CreditCard className="w-5 h-5 text-rose-600" />, label: 'Pagos a agencias', desc: 'Crea facturas de proveedor por cada pago procesado' },
+              ].map(({ key, icon, label, desc }) => (
+                <div key={key} className="flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                  <div className="mt-0.5">{icon}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900">{label}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+                  </div>
+                  <button
+                    onClick={() => handleBulkSync(key as 'agencies' | 'travelers' | 'bookings' | 'payouts')}
+                    disabled={bulkProgress?.running}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-md hover:bg-gray-700 disabled:opacity-40 whitespace-nowrap"
+                  >
+                    <Play className="w-3 h-3" />
+                    Sincronizar
+                  </button>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-3">
+              Nota: Este proceso es seguro de ejecutar multiples veces. Los registros ya sincronizados no se duplican en {PROVIDER_LABELS[currentProvider]}.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Stats */}
       {currentStats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -272,10 +457,10 @@ const AdminContabilidad: React.FC = () => {
               <button
                 onClick={handleRetryErrors}
                 disabled={isRetrying}
-                className="text-xs text-primary-600 hover:text-primary-700 mt-1 flex items-center gap-1"
+                className="text-xs text-blue-600 hover:text-blue-700 mt-1 flex items-center gap-1"
               >
                 <RotateCcw className="w-3 h-3" />
-                Reintentar todos
+                {isRetrying ? 'Reintentando...' : 'Reintentar todos'}
               </button>
             )}
           </div>
@@ -285,17 +470,20 @@ const AdminContabilidad: React.FC = () => {
               <span className="text-sm font-medium text-gray-600">Contactos</span>
             </div>
             <p className="text-2xl font-bold text-gray-900">{currentStats.contacts_synced.toLocaleString()}</p>
+            <p className="text-xs text-gray-400 mt-1">Agencias + viajeros</p>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4">
             <div className="flex items-center gap-2 mb-2">
               <DollarSign className="w-5 h-5 text-amber-500" />
-              <span className="text-sm font-medium text-gray-600">Pagos</span>
+              <span className="text-sm font-medium text-gray-600">Facturas</span>
             </div>
-            <p className="text-2xl font-bold text-gray-900">{currentStats.payouts_synced.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-gray-900">{(currentStats.bookings_synced + currentStats.payouts_synced).toLocaleString()}</p>
+            <p className="text-xs text-gray-400 mt-1">Reservas + pagos</p>
           </div>
         </div>
       )}
 
+      {/* Log table */}
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -311,13 +499,13 @@ const AdminContabilidad: React.FC = () => {
                 placeholder="Buscar..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-primary-500 focus:border-primary-500 w-48"
+                className="pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500 w-48"
               />
             </div>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-primary-500 focus:border-primary-500"
+              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="all">Todos los estados</option>
               <option value="synced">Sincronizados</option>
@@ -328,7 +516,7 @@ const AdminContabilidad: React.FC = () => {
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-primary-500 focus:border-primary-500"
+              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="all">Todos los tipos</option>
               {Object.entries(RECORD_TYPE_LABELS).map(([k, v]) => (
@@ -340,13 +528,20 @@ const AdminContabilidad: React.FC = () => {
 
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <Loader className="w-8 h-8 animate-spin text-primary-600" />
+            <Loader className="w-8 h-8 animate-spin text-blue-600" />
           </div>
         ) : filteredLogs.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-16 text-gray-500">
             <TrendingUp className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-            <p className="font-medium">Sin registros de sincronizacion</p>
-            <p className="text-sm mt-1">Los eventos apareceran aqui una vez que la sincronizacion este activa</p>
+            <p className="font-medium text-gray-700">Sin registros de sincronizacion</p>
+            {currentProvider !== 'none' && syncEnabled ? (
+              <p className="text-sm mt-2 text-gray-500 max-w-sm mx-auto">
+                Los registros apareceran aqui cuando se sincronicen datos.
+                Usa el boton <strong>Sincronizacion Masiva</strong> para cargar datos existentes.
+              </p>
+            ) : (
+              <p className="text-sm mt-1">Configura un proveedor contable y activa la sincronizacion para comenzar.</p>
+            )}
           </div>
         ) : (
           <div className="divide-y divide-gray-100">
@@ -364,7 +559,7 @@ const AdminContabilidad: React.FC = () => {
                     {entry.record_id}
                   </span>
                   {entry.external_entity_id && (
-                    <span className="font-mono text-xs text-primary-600 truncate hidden md:block w-32">
+                    <span className="font-mono text-xs text-blue-600 truncate hidden md:block w-32">
                       → {entry.external_entity_id}
                     </span>
                   )}
@@ -377,13 +572,15 @@ const AdminContabilidad: React.FC = () => {
                   {entry.status === 'error' && (
                     <button
                       onClick={(e) => { e.stopPropagation(); handleRetryOne(entry); }}
-                      className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1 flex-shrink-0"
+                      className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 flex-shrink-0"
                     >
                       <RotateCcw className="w-3 h-3" />
                       Reintentar
                     </button>
                   )}
-                  {expandedRow === entry.id ? <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />}
+                  {expandedRow === entry.id
+                    ? <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    : <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />}
                 </div>
                 {expandedRow === entry.id && (
                   <div className="px-4 pb-3 pt-0 bg-gray-50 text-xs space-y-1.5">
@@ -421,6 +618,32 @@ const AdminContabilidad: React.FC = () => {
             ))}
           </div>
         )}
+      </div>
+
+      {/* How it works */}
+      <div className="mt-6 p-5 bg-gray-50 rounded-lg border border-gray-200">
+        <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <BookOpen className="w-4 h-4" />
+          Que se sincroniza automaticamente
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-600">
+          <div className="flex items-start gap-2">
+            <CheckCircle className="w-3.5 h-3.5 text-green-500 mt-0.5 flex-shrink-0" />
+            <span>Agencias aprobadas → Contactos (Proveedor) en {PROVIDER_LABELS[currentProvider]}</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <CheckCircle className="w-3.5 h-3.5 text-green-500 mt-0.5 flex-shrink-0" />
+            <span>Viajeros con RFC → Contactos (Cliente) en {PROVIDER_LABELS[currentProvider]}</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <CheckCircle className="w-3.5 h-3.5 text-green-500 mt-0.5 flex-shrink-0" />
+            <span>Reservas confirmadas → Facturas de ingreso en {PROVIDER_LABELS[currentProvider]}</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <CheckCircle className="w-3.5 h-3.5 text-green-500 mt-0.5 flex-shrink-0" />
+            <span>Pagos a agencias → Facturas de proveedor + Pagos en {PROVIDER_LABELS[currentProvider]}</span>
+          </div>
+        </div>
       </div>
     </div>
   );
