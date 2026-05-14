@@ -110,12 +110,18 @@ Deno.serve(async (req: Request) => {
       },
     });
 
-    if (result.error) throw new Error(result.error.message);
+    // invoke() throws on network failure but returns result.error for function-level errors
+    if (result.error) {
+      const errMsg = result.error.message || String(result.error);
+      return new Response(JSON.stringify({ error: errMsg }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    // Surface any error returned in the response body from sync-to-accounting
+    // Surface any error returned in the response body from sync-to-accounting (always 200)
     if (result.data?.error) {
       return new Response(JSON.stringify({ error: result.data.error }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
