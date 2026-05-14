@@ -300,21 +300,26 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
       return { external_entity_type: "Contact", external_entity_id: existingLog.external_entity_id };
     }
 
-    // 2) Buscar en Zoho por RFC para recuperar contact_id de un registro ya existente
+    // 2) Buscar en Zoho por nombre de contacto para recuperar contact_id si ya existe
+    // La API de Zoho Books usa contact_name como identificador de unicidad y es el campo
+    // correcto para buscar — search_text solo busca en nombre y notas (no en RFC/tax_reg_no)
     let existingContactId: string | null = null;
 
-    if (contact.rfc) {
-      const rfcSearch = await zhFetch(`/contacts?search_text=${encodeURIComponent(contact.rfc)}`, "GET") as { contacts?: { contact_id: string; tax_reg_no?: string; contact_type?: string }[] };
-      const match = rfcSearch.contacts?.find((c) => c.tax_reg_no === contact.rfc && c.contact_type === contactType);
-      if (match) existingContactId = match.contact_id;
-    }
+    const contactName = (contact.razon_social || contact.name).trim();
+    const nameSearch = await zhFetch(
+      `/contacts?contact_name=${encodeURIComponent(contactName)}&contact_type=${contactType}`,
+      "GET"
+    ) as { contacts?: { contact_id: string; contact_name: string; tax_reg_no?: string }[] };
 
-    // 3) Fallback: buscar en Zoho por nombre exacto
-    if (!existingContactId) {
-      const contactName = (contact.razon_social || contact.name).trim();
-      const nameSearch = await zhFetch(`/contacts?search_text=${encodeURIComponent(contactName)}`, "GET") as { contacts?: { contact_id: string; contact_name: string; contact_type?: string }[] };
-      const match = nameSearch.contacts?.find((c) => c.contact_name.trim().toLowerCase() === contactName.toLowerCase() && c.contact_type === contactType);
-      if (match) existingContactId = match.contact_id;
+    if (nameSearch.contacts && nameSearch.contacts.length > 0) {
+      // Si hay RFC, preferir coincidencia exacta por RFC; si no, tomar el primero por nombre
+      const byRfc = contact.rfc
+        ? nameSearch.contacts.find((c) => c.tax_reg_no === contact.rfc)
+        : null;
+      const byName = nameSearch.contacts.find(
+        (c) => c.contact_name.trim().toLowerCase() === contactName.toLowerCase()
+      );
+      existingContactId = (byRfc ?? byName)?.contact_id ?? null;
     }
 
     if (existingContactId) {
