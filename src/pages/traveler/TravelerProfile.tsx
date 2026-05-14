@@ -178,7 +178,22 @@ const TravelerProfile: React.FC = () => {
       setError('');
       setSuccess('');
 
-      console.log('💾 Guardando cambios del perfil...');
+      // Validar RFC unico antes de guardar
+      const rfcToSave = editForm.rfc?.trim().toUpperCase() || null;
+      if (rfcToSave && rfcToSave !== profile?.rfc?.toUpperCase()) {
+        const { data: rfcExists } = await supabase
+          .from('users')
+          .select('id, first_name, last_name')
+          .eq('role', 'traveler')
+          .eq('rfc', rfcToSave)
+          .neq('id', user.id)
+          .maybeSingle();
+
+        if (rfcExists) {
+          const ownerName = [rfcExists.first_name, rfcExists.last_name].filter(Boolean).join(' ') || 'otro viajero';
+          throw new Error(`El RFC ${rfcToSave} ya está registrado por ${ownerName}. Verifica que el RFC sea correcto.`);
+        }
+      }
 
       const updateData: any = {
         first_name: editForm.first_name?.trim() || null,

@@ -223,8 +223,15 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
       body: body ? JSON.stringify(body) : undefined,
     });
     if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Zoho Books API error ${res.status} ${method} ${path}: ${err}`);
+      const rawText = await res.text();
+      let zohoMessage = rawText;
+      try {
+        const parsed = JSON.parse(rawText);
+        if (parsed.message) zohoMessage = parsed.message;
+      } catch {
+        // no es JSON, usar texto crudo
+      }
+      throw new Error(`Zoho Books: ${zohoMessage}`);
     }
     return res.json();
   }

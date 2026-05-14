@@ -105,11 +105,12 @@ const AdminContabilidad: React.FC = () => {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [bulkProgress, setBulkProgress] = useState<BulkSyncProgress | null>(null);
   const [showBulkPanel, setShowBulkPanel] = useState(false);
+  const [travelersWithRfcCount, setTravelersWithRfcCount] = useState<number | null>(null);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [logsResult, statsResult, settingsResult] = await Promise.all([
+      const [logsResult, statsResult, settingsResult, travelersRfcResult] = await Promise.all([
         supabase
           .from('accounting_sync_log')
           .select('*')
@@ -117,6 +118,7 @@ const AdminContabilidad: React.FC = () => {
           .limit(200),
         supabase.rpc('get_accounting_sync_stats'),
         supabase.from('platform_settings').select('accounting_provider, accounting_sync_enabled').maybeSingle(),
+        supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'traveler').not('rfc', 'is', null),
       ]);
 
       if (logsResult.data) setLogs(logsResult.data);
@@ -125,6 +127,7 @@ const AdminContabilidad: React.FC = () => {
         setCurrentProvider(settingsResult.data.accounting_provider || 'none');
         setSyncEnabled(settingsResult.data.accounting_sync_enabled || false);
       }
+      setTravelersWithRfcCount(travelersRfcResult.count ?? 0);
     } catch (err) {
       console.error('Error fetching accounting data:', err);
     } finally {
@@ -434,7 +437,7 @@ const AdminContabilidad: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
                 { key: 'agencies', icon: <Building2 className="w-5 h-5 text-blue-600" />, label: 'Agencias activas', desc: 'Crea proveedores en Zoho Books por cada agencia aprobada' },
-                { key: 'travelers', icon: <Users className="w-5 h-5 text-green-600" />, label: 'Viajeros con RFC', desc: 'Crea clientes en Zoho Books para viajeros con datos fiscales' },
+                { key: 'travelers', icon: <Users className="w-5 h-5 text-green-600" />, label: 'Viajeros con RFC', desc: `Crea clientes en Zoho Books para viajeros con datos fiscales${travelersWithRfcCount !== null ? ` (${travelersWithRfcCount} viajero${travelersWithRfcCount !== 1 ? 's' : ''} con RFC)` : ''}` },
                 { key: 'bookings', icon: <FileText className="w-5 h-5 text-amber-600" />, label: 'Reservas confirmadas', desc: 'Crea facturas de ingreso por cada reserva pagada' },
                 { key: 'payouts', icon: <CreditCard className="w-5 h-5 text-rose-600" />, label: 'Pagos a agencias', desc: 'Crea facturas de proveedor por cada pago procesado' },
               ].map(({ key, icon, label, desc }) => (
