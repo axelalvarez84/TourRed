@@ -95,6 +95,60 @@ interface AccountingAdapter {
 }
 
 // =============================================
+// ZOHO BOOKS — Mexico tax regime mapper
+// Maps SAT regimen fiscal codes/descriptions to Zoho Books enum values.
+// Zoho allowed values (Mexico edition):
+//   general_legal_person, legal_entities_non_profit, resident_abroad,
+//   production_cooperative_societies, agricultural_livestock,
+//   optional_group_of_companies, coordinated, simplified_trust,
+//   wages_salaries_income, lease, property_disposal_acquisition,
+//   other_income, divident_income, individual_business_professional,
+//   interest_income, income_obtaining_price, no_tax_obligation,
+//   tax_incorporation, income_through_technology_platform
+// =============================================
+function mapRegimenToZoho(regimen: string): string {
+  if (!regimen) return "general_legal_person";
+  const r = regimen.toLowerCase();
+
+  // SAT code prefixes like "601", "612", etc.
+  if (r.startsWith("601") || r.includes("general de ley personas morales")) return "general_legal_person";
+  if (r.startsWith("603") || r.includes("personas morales con fines no lucrativos")) return "legal_entities_non_profit";
+  if (r.startsWith("605") || r.includes("sueldos y salarios")) return "wages_salaries_income";
+  if (r.startsWith("606") || r.includes("arrendamiento")) return "lease";
+  if (r.startsWith("607") || r.includes("enajenación o adquisición de bienes")) return "property_disposal_acquisition";
+  if (r.startsWith("608") || r.includes("demás ingresos")) return "other_income";
+  if (r.startsWith("609") || r.includes("consolidación")) return "optional_group_of_companies";
+  if (r.startsWith("610") || r.includes("residentes en el extranjero")) return "resident_abroad";
+  if (r.startsWith("611") || r.includes("ingresos por dividendos")) return "divident_income";
+  if (r.startsWith("612") || r.includes("personas físicas con actividades empresariales")) return "individual_business_professional";
+  if (r.startsWith("614") || r.includes("ingresos por intereses")) return "interest_income";
+  if (r.startsWith("615") || r.includes("régimen de los ingresos por obtención de premios")) return "income_obtaining_price";
+  if (r.startsWith("616") || r.includes("sin obligaciones fiscales")) return "no_tax_obligation";
+  if (r.startsWith("620") || r.includes("sociedades cooperativas de producción")) return "production_cooperative_societies";
+  if (r.startsWith("621") || r.includes("incorporación fiscal")) return "tax_incorporation";
+  if (r.startsWith("622") || r.includes("actividades agrícolas")) return "agricultural_livestock";
+  if (r.startsWith("623") || r.includes("opcional para grupos de sociedades")) return "optional_group_of_companies";
+  if (r.startsWith("624") || r.includes("coordinados")) return "coordinated";
+  if (r.startsWith("625") || r.includes("plataformas tecnológicas") || r.includes("tecnologicas")) return "income_through_technology_platform";
+  if (r.startsWith("626") || r.includes("simplificado de confianza")) return "simplified_trust";
+
+  // Fallback: if the value is already a valid Zoho enum key, return it as-is
+  const zohoValues = [
+    "general_legal_person", "legal_entities_non_profit", "resident_abroad",
+    "production_cooperative_societies", "agricultural_livestock",
+    "optional_group_of_companies", "coordinated", "simplified_trust",
+    "wages_salaries_income", "lease", "property_disposal_acquisition",
+    "other_income", "divident_income", "individual_business_professional",
+    "interest_income", "income_obtaining_price", "no_tax_obligation",
+    "tax_incorporation", "income_through_technology_platform",
+  ];
+  if (zohoValues.includes(r)) return r;
+
+  // Default for personas morales
+  return "general_legal_person";
+}
+
+// =============================================
 // ZOHO BOOKS ADAPTER
 // =============================================
 
@@ -178,27 +232,50 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
   async function syncContact(contact: StandardContact): Promise<AccountingResult> {
     const contactType = contact.type === "agency" ? "vendor" : "customer";
 
+    // Build contact_persons array — per Zoho Books API v3, email goes here
+    const contactPersons: Record<string, unknown>[] = [];
+    if (contact.email || contact.phone) {
+      contactPersons.push({
+        first_name: contact.name,
+        email: contact.email || undefined,
+        phone: contact.phone || undefined,
+        is_primary_contact: true,
+      });
+    }
+
     const payload: Record<string, unknown> = {
       contact_name: contact.razon_social || contact.name,
       company_name: contact.razon_social || contact.name,
       contact_type: contactType,
-      // Email must go inside contact_persons per Zoho Books API v3
-      contact_persons: contact.email
-        ? [{ email: contact.email, phone: contact.phone, is_primary_contact: true }]
-        : [],
+      contact_persons: contactPersons,
       billing_address: {
-        zip: contact.codigo_postal,
+        address: contact.address || undefined,
+        city: contact.city || undefined,
+        state: contact.state || undefined,
+        zip: contact.codigo_postal || undefined,
         country: contact.country || "Mexico",
-        state: contact.state,
-        city: contact.city,
-        address: contact.address,
       },
     };
 
-    // Mexico-specific standard fields (not custom fields)
-    if (contact.rfc) payload.tax_reg_no = contact.rfc;
-    if (contact.razon_social) payload.legal_name = contact.razon_social;
-    if (contact.regimen_fiscal) payload.tax_regime = contact.regimen_fiscal;
+    // Mexico edition fields — only set when values exist
+    // tax_treatment is required for tax_reg_no to work in Mexico edition
+    // Allowed values: home_country_mexico, border_region_mexico, non_mexico
+    payload.tax_treatment = "home_country_mexico";
+
+    if (contact.rfc) {
+      // Zoho Mexico edition expects the RFC as a string (12 chars for persona fisica, 13 for moral)
+      payload.tax_reg_no = contact.rfc;
+    }
+
+    if (contact.razon_social) {
+      payload.legal_name = contact.razon_social;
+    }
+
+    // tax_regime must be one of Zoho's enum values for Mexico edition.
+    // Map the SAT regimen code/description to Zoho's enum value.
+    if (contact.regimen_fiscal) {
+      payload.tax_regime = mapRegimenToZoho(contact.regimen_fiscal);
+    }
 
     // Check if this contact was already synced before and update instead of create
     const { data: existingLog } = await supabase
@@ -210,7 +287,6 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
       .maybeSingle();
 
     if (existingLog?.external_entity_id) {
-      // Update existing contact in Zoho Books
       const contactId = existingLog.external_entity_id;
       await zhFetch(`/contacts/${contactId}`, "PUT", payload);
       return { external_entity_type: "Contact", external_entity_id: contactId };
