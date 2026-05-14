@@ -177,12 +177,15 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
 
   async function syncContact(contact: StandardContact): Promise<AccountingResult> {
     const contactType = contact.type === "agency" ? "vendor" : "customer";
-    const payload = {
+
+    const payload: Record<string, unknown> = {
       contact_name: contact.razon_social || contact.name,
       company_name: contact.razon_social || contact.name,
       contact_type: contactType,
-      email: contact.email,
-      phone: contact.phone,
+      // Email must go inside contact_persons per Zoho Books API v3
+      contact_persons: contact.email
+        ? [{ email: contact.email, phone: contact.phone, is_primary_contact: true }]
+        : [],
       billing_address: {
         zip: contact.codigo_postal,
         country: contact.country || "Mexico",
@@ -190,9 +193,28 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
         city: contact.city,
         address: contact.address,
       },
-      cf_rfc: contact.rfc,
-      cf_regimen_fiscal: contact.regimen_fiscal,
     };
+
+    // Mexico-specific standard fields (not custom fields)
+    if (contact.rfc) payload.tax_reg_no = contact.rfc;
+    if (contact.razon_social) payload.legal_name = contact.razon_social;
+    if (contact.regimen_fiscal) payload.tax_regime = contact.regimen_fiscal;
+
+    // Check if this contact was already synced before and update instead of create
+    const { data: existingLog } = await supabase
+      .from("accounting_sync_log")
+      .select("external_entity_id")
+      .eq("record_type", contact.type === "agency" ? "contact_agency" : "contact_traveler")
+      .eq("record_id", contact.id)
+      .eq("status", "synced")
+      .maybeSingle();
+
+    if (existingLog?.external_entity_id) {
+      // Update existing contact in Zoho Books
+      const contactId = existingLog.external_entity_id;
+      await zhFetch(`/contacts/${contactId}`, "PUT", payload);
+      return { external_entity_type: "Contact", external_entity_id: contactId };
+    }
 
     const data = await zhFetch("/contacts", "POST", payload) as { contact: { contact_id: string } };
     return { external_entity_type: "Contact", external_entity_id: data.contact.contact_id };
