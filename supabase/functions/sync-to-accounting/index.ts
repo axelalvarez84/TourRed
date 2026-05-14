@@ -669,8 +669,10 @@ Deno.serve(async (req: Request) => {
 
   } catch (err) {
     console.error("sync-to-accounting outer error:", err);
+    // Usar 200 para que supabase.functions.invoke no oculte el mensaje de error
+    // con el genérico "Edge Function returned a non-2xx status code"
     return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
