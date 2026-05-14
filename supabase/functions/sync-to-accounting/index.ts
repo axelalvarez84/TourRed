@@ -307,16 +307,16 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
 
     const contactName = (contact.razon_social || contact.name).trim();
     const nameSearch = await zhFetch(
-      `/contacts?contact_name=${encodeURIComponent(contactName)}&contact_type=${contactType}`,
+      `/contacts?contact_name=${encodeURIComponent(contactName)}`,
       "GET"
-    ) as { contacts?: { contact_id: string; contact_name: string; tax_reg_no?: string }[] };
+    ) as { contacts?: { contact_id: string; contact_name: string; contact_type?: string; tax_reg_no?: string }[] };
 
     if (nameSearch.contacts && nameSearch.contacts.length > 0) {
+      // Filtrar por tipo en cliente (no como query param para evitar errores de Zoho)
+      const candidates = nameSearch.contacts.filter((c) => c.contact_type === contactType);
       // Si hay RFC, preferir coincidencia exacta por RFC; si no, tomar el primero por nombre
-      const byRfc = contact.rfc
-        ? nameSearch.contacts.find((c) => c.tax_reg_no === contact.rfc)
-        : null;
-      const byName = nameSearch.contacts.find(
+      const byRfc = contact.rfc ? candidates.find((c) => c.tax_reg_no === contact.rfc) : null;
+      const byName = candidates.find(
         (c) => c.contact_name.trim().toLowerCase() === contactName.toLowerCase()
       );
       existingContactId = (byRfc ?? byName)?.contact_id ?? null;
