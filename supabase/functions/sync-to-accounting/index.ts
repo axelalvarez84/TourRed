@@ -304,16 +304,16 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
     let existingContactId: string | null = null;
 
     if (contact.rfc) {
-      const rfcSearch = await zhFetch(`/contacts?search_text=${encodeURIComponent(contact.rfc)}&contact_type=${contactType}`, "GET") as { contacts?: { contact_id: string; tax_reg_no?: string }[] };
-      const match = rfcSearch.contacts?.find((c) => c.tax_reg_no === contact.rfc);
+      const rfcSearch = await zhFetch(`/contacts?search_text=${encodeURIComponent(contact.rfc)}`, "GET") as { contacts?: { contact_id: string; tax_reg_no?: string; contact_type?: string }[] };
+      const match = rfcSearch.contacts?.find((c) => c.tax_reg_no === contact.rfc && c.contact_type === contactType);
       if (match) existingContactId = match.contact_id;
     }
 
     // 3) Fallback: buscar en Zoho por nombre exacto
     if (!existingContactId) {
       const contactName = (contact.razon_social || contact.name).trim();
-      const nameSearch = await zhFetch(`/contacts?search_text=${encodeURIComponent(contactName)}&contact_type=${contactType}`, "GET") as { contacts?: { contact_id: string; contact_name: string }[] };
-      const match = nameSearch.contacts?.find((c) => c.contact_name.trim().toLowerCase() === contactName.toLowerCase());
+      const nameSearch = await zhFetch(`/contacts?search_text=${encodeURIComponent(contactName)}`, "GET") as { contacts?: { contact_id: string; contact_name: string; contact_type?: string }[] };
+      const match = nameSearch.contacts?.find((c) => c.contact_name.trim().toLowerCase() === contactName.toLowerCase() && c.contact_type === contactType);
       if (match) existingContactId = match.contact_id;
     }
 
