@@ -513,35 +513,32 @@ Deno.serve(async (req: Request) => {
     }
 
     let result: AccountingResult;
+    let recType = "contact_agency";
+    let payloadSummary: Record<string, unknown> = {};
 
     switch (action) {
       case "sync_contact": {
         if (!payload) throw new Error("payload (StandardContact) is required for sync_contact");
-        await logSync(supabase, provider, record_type || "contact_agency", record_id, "pending", undefined, undefined, { name: payload.name });
-        result = await adapter.syncContact(payload as StandardContact);
-        await logSync(supabase, provider, record_type || "contact_agency", record_id, "synced", result, undefined, { name: payload.name });
+        recType = record_type || "contact_agency";
+        payloadSummary = { name: payload.name, email: payload.email, rfc: payload.rfc };
         break;
       }
       case "sync_invoice": {
         if (!payload) throw new Error("payload (StandardInvoice) is required for sync_invoice");
-        await logSync(supabase, provider, "booking", record_id, "pending", undefined, undefined, { total: payload.total });
-        result = await adapter.syncInvoice(payload as StandardInvoice);
-        await logSync(supabase, provider, "booking", record_id, "synced", result, undefined, { total: payload.total });
+        recType = "booking";
+        payloadSummary = { total: payload.total, reference: payload.reference };
         break;
       }
       case "sync_bill": {
         if (!payload) throw new Error("payload (StandardBill) is required for sync_bill");
-        await logSync(supabase, provider, "payout", record_id, "pending", undefined, undefined, { total: payload.total });
-        result = await adapter.syncBill(payload as StandardBill);
-        await logSync(supabase, provider, "payout", record_id, "synced", result, undefined, { total: payload.total });
+        recType = "payout";
+        payloadSummary = { total: payload.total, reference: payload.reference };
         break;
       }
       case "sync_payment": {
         if (!payload) throw new Error("payload (StandardPayment) is required for sync_payment");
-        const pType = (payload as StandardPayment).payment_type === "received" ? "booking" : "payout";
-        await logSync(supabase, provider, pType, record_id, "pending", undefined, undefined, { amount: payload.amount });
-        result = await adapter.syncPayment(payload as StandardPayment);
-        await logSync(supabase, provider, pType, record_id, "synced", result, undefined, { amount: payload.amount });
+        recType = (payload as StandardPayment).payment_type === "received" ? "booking" : "payout";
+        payloadSummary = { amount: payload.amount };
         break;
       }
       default:
@@ -550,12 +547,45 @@ Deno.serve(async (req: Request) => {
         });
     }
 
+    // Log as pending before attempting sync
+    await logSync(supabase, provider, recType, record_id, "pending", undefined, undefined, payloadSummary);
+
+    try {
+      switch (action) {
+        case "sync_contact":
+          result = await adapter.syncContact(payload as StandardContact);
+          break;
+        case "sync_invoice":
+          result = await adapter.syncInvoice(payload as StandardInvoice);
+          break;
+        case "sync_bill":
+          result = await adapter.syncBill(payload as StandardBill);
+          break;
+        case "sync_payment":
+          result = await adapter.syncPayment(payload as StandardPayment);
+          break;
+        default:
+          result = { external_entity_type: "", external_entity_id: "" };
+      }
+    } catch (syncErr) {
+      const errMsg = String(syncErr);
+      console.error(`sync-to-accounting [${action}] ${record_id} failed:`, errMsg);
+      await incrementRetryCount(supabase, provider, recType, record_id);
+      await logSync(supabase, provider, recType, record_id, "error", undefined, errMsg, payloadSummary);
+      // Return 200 with error so bulk sync can detect it without throwing
+      return new Response(JSON.stringify({ error: errMsg, record_id, record_type: recType }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    await logSync(supabase, provider, recType, record_id, "synced", result, undefined, payloadSummary);
+
     return new Response(JSON.stringify({ success: true, ...result }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   } catch (err) {
-    console.error("sync-to-accounting error:", err);
+    console.error("sync-to-accounting outer error:", err);
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

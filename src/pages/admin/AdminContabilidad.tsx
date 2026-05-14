@@ -41,6 +41,7 @@ interface BulkSyncProgress {
   succeeded: number;
   failed: number;
   running: boolean;
+  errors: { id: string; message: string }[];
 }
 
 const RECORD_TYPE_LABELS: Record<string, string> = {
@@ -226,10 +227,11 @@ const AdminContabilidad: React.FC = () => {
       return;
     }
 
-    setBulkProgress({ type, total: records.length, done: 0, succeeded: 0, failed: 0, running: true });
+    setBulkProgress({ type, total: records.length, done: 0, succeeded: 0, failed: 0, running: true, errors: [] });
 
     let succeeded = 0;
     let failed = 0;
+    const errors: { id: string; message: string }[] = [];
 
     for (let i = 0; i < records.length; i++) {
       const rec = records[i];
@@ -252,22 +254,25 @@ const AdminContabilidad: React.FC = () => {
             body: { payout_id: rec.id },
           });
         }
-        // Check both invoke-level error and response-body error
-        if (res.error || res.data?.error) {
-          console.error(`Sync error for ${rec.id}:`, res.error || res.data?.error);
+        const errMsg = res.error?.message || res.data?.error;
+        if (errMsg) {
+          errors.push({ id: rec.id, message: String(errMsg) });
           failed++;
         } else {
           succeeded++;
         }
-      } catch (err) {
-        console.error(`Sync exception for ${rec.id}:`, err);
+      } catch (err: any) {
+        errors.push({ id: rec.id, message: err?.message || String(err) });
         failed++;
       }
-      setBulkProgress({ type, total: records.length, done: i + 1, succeeded, failed, running: i + 1 < records.length });
+      setBulkProgress({ type, total: records.length, done: i + 1, succeeded, failed, running: i + 1 < records.length, errors: [...errors] });
     }
 
-    showMessage('success', `Sincronizacion masiva completada: ${succeeded} exitosos, ${failed} con error de ${records.length} total.`);
     await fetchData();
+    const msg = failed > 0
+      ? `Completado: ${succeeded} exitosos, ${failed} con error de ${records.length} total.`
+      : `Completado: ${succeeded} de ${records.length} sincronizados correctamente.`;
+    showMessage(failed > 0 ? 'error' : 'success', msg);
   };
 
   const BULK_LABELS: Record<string, string> = {
@@ -388,25 +393,42 @@ const AdminContabilidad: React.FC = () => {
             <button onClick={() => setShowBulkPanel(false)} className="text-blue-400 hover:text-blue-600 text-lg leading-none ml-4">×</button>
           </div>
           <div className="p-5">
-            {bulkProgress?.running && (
-              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            {bulkProgress && (
+              <div className={`mb-4 p-4 rounded-lg border ${bulkProgress.running ? 'bg-amber-50 border-amber-200' : bulkProgress.failed > 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
                 <div className="flex items-center gap-3 mb-2">
-                  <Loader className="w-4 h-4 animate-spin text-amber-600" />
-                  <span className="text-sm font-medium text-amber-800">
-                    Sincronizando {BULK_LABELS[bulkProgress.type]}... ({bulkProgress.done}/{bulkProgress.total})
+                  {bulkProgress.running
+                    ? <Loader className="w-4 h-4 animate-spin text-amber-600 flex-shrink-0" />
+                    : bulkProgress.failed > 0
+                    ? <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                    : <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />}
+                  <span className={`text-sm font-medium ${bulkProgress.running ? 'text-amber-800' : bulkProgress.failed > 0 ? 'text-red-800' : 'text-green-800'}`}>
+                    {bulkProgress.running
+                      ? `Sincronizando ${BULK_LABELS[bulkProgress.type]}... (${bulkProgress.done}/${bulkProgress.total})`
+                      : `${BULK_LABELS[bulkProgress.type]}: ${bulkProgress.succeeded} exitosos, ${bulkProgress.failed} con error`}
                   </span>
                 </div>
-                <div className="w-full bg-amber-200 rounded-full h-2">
+                <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
                   <div
-                    className="bg-amber-500 h-2 rounded-full transition-all"
+                    className={`h-2 rounded-full transition-all ${bulkProgress.running ? 'bg-amber-500' : bulkProgress.failed > 0 ? 'bg-red-500' : 'bg-green-500'}`}
                     style={{ width: `${(bulkProgress.done / bulkProgress.total) * 100}%` }}
                   />
                 </div>
-                <div className="flex gap-4 mt-2 text-xs text-amber-700">
-                  <span>{bulkProgress.succeeded} exitosos</span>
-                  <span>{bulkProgress.failed} con error</span>
-                  <span>{bulkProgress.total - bulkProgress.done} restantes</span>
+                <div className="flex gap-4 text-xs text-gray-600">
+                  <span className="text-green-700 font-medium">{bulkProgress.succeeded} exitosos</span>
+                  {bulkProgress.failed > 0 && <span className="text-red-600 font-medium">{bulkProgress.failed} con error</span>}
+                  {bulkProgress.running && <span>{bulkProgress.total - bulkProgress.done} restantes</span>}
                 </div>
+                {bulkProgress.errors.length > 0 && (
+                  <div className="mt-3 space-y-1 max-h-40 overflow-y-auto">
+                    <p className="text-xs font-semibold text-red-700 mb-1">Detalle de errores:</p>
+                    {bulkProgress.errors.map((e, idx) => (
+                      <div key={idx} className="text-xs bg-red-100 border border-red-200 rounded px-2 py-1 font-mono break-all">
+                        <span className="text-gray-500 mr-2">{e.id.slice(0, 8)}...</span>
+                        <span className="text-red-700">{e.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
