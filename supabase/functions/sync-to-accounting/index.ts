@@ -213,7 +213,8 @@ async function getZohoAccessToken(supabase: ReturnType<typeof createClient>): Pr
 function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId: string): AccountingAdapter {
   async function zhFetch(path: string, method: string, body?: unknown): Promise<unknown> {
     const { token, apiDomain } = await getZohoAccessToken(supabase);
-    const url = `${apiDomain}/books/v3${path}?organization_id=${orgId}`;
+    const separator = path.includes("?") ? "&" : "?";
+    const url = `${apiDomain}/books/v3${path}${separator}organization_id=${orgId}`;
     const res = await fetch(url, {
       method,
       headers: {
