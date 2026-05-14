@@ -284,21 +284,56 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
       payload.tax_regime = mapRegimenToZoho(contact.regimen_fiscal);
     }
 
-    // Check if this contact was already synced before and update instead of create
+    const recordType = contact.type === "agency" ? "contact_agency" : "contact_traveler";
+
+    // 1) Buscar en log local con status synced
     const { data: existingLog } = await supabase
       .from("accounting_sync_log")
       .select("external_entity_id")
-      .eq("record_type", contact.type === "agency" ? "contact_agency" : "contact_traveler")
+      .eq("record_type", recordType)
       .eq("record_id", contact.id)
       .eq("status", "synced")
       .maybeSingle();
 
     if (existingLog?.external_entity_id) {
-      const contactId = existingLog.external_entity_id;
-      await zhFetch(`/contacts/${contactId}`, "PUT", payload);
-      return { external_entity_type: "Contact", external_entity_id: contactId };
+      await zhFetch(`/contacts/${existingLog.external_entity_id}`, "PUT", payload);
+      return { external_entity_type: "Contact", external_entity_id: existingLog.external_entity_id };
     }
 
+    // 2) Buscar en Zoho por RFC para recuperar contact_id de un registro ya existente
+    let existingContactId: string | null = null;
+
+    if (contact.rfc) {
+      const rfcSearch = await zhFetch(`/contacts?search_text=${encodeURIComponent(contact.rfc)}&contact_type=${contactType}`, "GET") as { contacts?: { contact_id: string; tax_reg_no?: string }[] };
+      const match = rfcSearch.contacts?.find((c) => c.tax_reg_no === contact.rfc);
+      if (match) existingContactId = match.contact_id;
+    }
+
+    // 3) Fallback: buscar en Zoho por nombre exacto
+    if (!existingContactId) {
+      const contactName = (contact.razon_social || contact.name).trim();
+      const nameSearch = await zhFetch(`/contacts?search_text=${encodeURIComponent(contactName)}&contact_type=${contactType}`, "GET") as { contacts?: { contact_id: string; contact_name: string }[] };
+      const match = nameSearch.contacts?.find((c) => c.contact_name.trim().toLowerCase() === contactName.toLowerCase());
+      if (match) existingContactId = match.contact_id;
+    }
+
+    if (existingContactId) {
+      // Contacto existe en Zoho pero no estaba en nuestro log — actualizar y guardar ID
+      await zhFetch(`/contacts/${existingContactId}`, "PUT", payload);
+      // Persistir en log local para evitar busquedas futuras
+      await supabase.from("accounting_sync_log").upsert({
+        provider: "zoho_books",
+        record_type: recordType,
+        record_id: contact.id,
+        status: "synced",
+        external_entity_type: "Contact",
+        external_entity_id: existingContactId,
+        synced_at: new Date().toISOString(),
+      }, { onConflict: "provider,record_type,record_id" });
+      return { external_entity_type: "Contact", external_entity_id: existingContactId };
+    }
+
+    // 4) No existe en Zoho — crear nuevo
     const data = await zhFetch("/contacts", "POST", payload) as { contact: { contact_id: string } };
     return { external_entity_type: "Contact", external_entity_id: data.contact.contact_id };
   }
