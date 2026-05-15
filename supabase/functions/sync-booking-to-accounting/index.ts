@@ -41,7 +41,7 @@ Deno.serve(async (req: Request) => {
       .select(`
         id, total_price, service_charge, booking_code, created_at, payment_provider,
         tours (name, agencies (id, rfc, razon_social, regimen_fiscal, postal_code)),
-        users (id, full_name, email, rfc, razon_social, regimen_fiscal, uso_cfdi, codigo_postal_fiscal)
+        users!bookings_user_id_fkey (id, full_name, email, rfc, razon_social, regimen_fiscal, uso_cfdi, codigo_postal_fiscal)
       `)
       .eq("id", booking_id)
       .maybeSingle();
