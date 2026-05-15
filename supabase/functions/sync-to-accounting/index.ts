@@ -41,6 +41,7 @@ interface StandardLineItem {
 
 interface StandardJournal {
   id: string;
+  customer_id?: string;
   date: string;
   reference?: string;
   notes?: string;
@@ -428,6 +429,7 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
         description: journal.notes || "Venta de servicio de viaje",
         debit_or_credit: "debit",
         amount: Math.round(total * 100) / 100,
+        ...(journal.customer_id ? { customer_id: journal.customer_id } : {}),
       },
     ];
 

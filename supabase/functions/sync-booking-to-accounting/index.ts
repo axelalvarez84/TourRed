@@ -144,6 +144,7 @@ Deno.serve(async (req: Request) => {
         record_id: booking_id,
         data: {
           id: booking_id,
+          customer_id: travelerExternalId,
           date: new Date(booking.created_at).toISOString().split("T")[0],
           currency: "MXN",
           reference: booking.booking_code || booking_id,
