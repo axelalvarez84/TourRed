@@ -52,7 +52,7 @@ Deno.serve(async (req: Request) => {
     // Obtener datos del viajero por separado
     const { data: traveler, error: travelerError } = await supabase
       .from("users")
-      .select("id, full_name, email, rfc, razon_social, regimen_fiscal, uso_cfdi, codigo_postal_fiscal")
+      .select("id, first_name, last_name, email, rfc, razon_social, regimen_fiscal, uso_cfdi, codigo_postal_fiscal")
       .eq("id", booking.user_id)
       .maybeSingle();
 
@@ -61,6 +61,8 @@ Deno.serve(async (req: Request) => {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const travelerFullName = `${traveler.first_name || ""} ${traveler.last_name || ""}`.trim() || "Sin nombre";
 
     // Obtener datos del tour y agencia por separado
     const { data: tour, error: tourError } = await supabase
@@ -84,7 +86,7 @@ Deno.serve(async (req: Request) => {
     // En edición México, Zoho requiere RFC para emitir facturas (CFDI).
     // Reservas de viajeros sin RFC se registran como contacto genérico "PUBLICO EN GENERAL".
     const travelerName = traveler.rfc
-      ? (traveler.razon_social || traveler.full_name)
+      ? (traveler.razon_social || travelerFullName)
       : "PUBLICO EN GENERAL";
     const travelerRfc = traveler.rfc || "XAXX010101000";
 
