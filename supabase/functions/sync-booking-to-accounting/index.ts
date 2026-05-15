@@ -41,7 +41,7 @@ Deno.serve(async (req: Request) => {
       .select(`
         id, total_price, service_charge, booking_code, created_at, payment_provider,
         tours (name, agencies (id, rfc, razon_social, regimen_fiscal, postal_code)),
-        users!bookings_user_id_fkey (id, full_name, email, rfc, razon_social, regimen_fiscal, uso_cfdi, codigo_postal_fiscal)
+        traveler:users!bookings_user_id_fkey (id, full_name, email, rfc, razon_social, regimen_fiscal, uso_cfdi, codigo_postal_fiscal)
       `)
       .eq("id", booking_id)
       .maybeSingle();
@@ -52,12 +52,12 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const traveler = booking.users as {
+    const traveler = (booking as any).traveler as {
       id: string; full_name: string; email?: string; rfc?: string;
       razon_social?: string; regimen_fiscal?: string; uso_cfdi?: string; codigo_postal_fiscal?: string;
     };
-    const agency = (booking.tours as { agencies: { id: string; rfc?: string; razon_social?: string } }).agencies;
-    const tourName = (booking.tours as { name: string }).name;
+    const agency = ((booking as any).tours as { agencies: { id: string; rfc?: string; razon_social?: string } }).agencies;
+    const tourName = ((booking as any).tours as { name: string }).name;
 
     // En edición México, Zoho requiere RFC para emitir facturas (CFDI).
     // Reservas de viajeros sin RFC se registran como contacto genérico "PUBLICO EN GENERAL".
