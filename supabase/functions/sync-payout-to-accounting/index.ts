@@ -102,36 +102,22 @@ Deno.serve(async (req: Request) => {
 
     const billRes = await supabase.functions.invoke("sync-to-accounting", {
       body: {
-        action: "sync_bill",
+        action: "sync_expense",
         record_id: payout_id,
         data: {
           id: payout_id,
           vendor_external_id: agencyExternalId,
           date: new Date(payout.created_at).toISOString().split("T")[0],
-          due_date: new Date(payout.created_at).toISOString().split("T")[0],
           currency: "MXN",
           reference: billNumber,
           notes: payout.notes || `Pago a agencia por tours realizados`,
-          line_items: [
-            {
-              description: "Anticipo de tour a agencia (neto descontada comision)",
-              quantity: 1,
-              unit_price: totalPayout,
-              account_key: "comisiones_agencias",
-            },
-            ...(commissionAmount > 0 ? [{
-              description: "Comision plataforma ToursRed (retencion)",
-              quantity: 1,
-              unit_price: commissionAmount,
-              account_key: "comisiones_agencias",
-            }] : []),
-          ],
-          total: grossAmount,
+          amount: grossAmount,
+          account_key: "comisiones_agencias",
         },
       },
     });
 
-    if (billRes.error) throw new Error(`Failed to sync bill: ${billRes.error.message}`);
+    if (billRes.error) throw new Error(`Failed to sync expense: ${billRes.error.message}`);
 
     if (payout.status === "completed" && (payout.payment_date || payout.created_at)) {
       const journalRes = await supabase.functions.invoke("sync-to-accounting", {
@@ -156,7 +142,7 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, bill_external_id: billRes.data?.external_entity_id }),
+      JSON.stringify({ success: true, expense_external_id: billRes.data?.external_entity_id }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 

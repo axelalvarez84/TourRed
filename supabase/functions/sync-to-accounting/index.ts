@@ -87,6 +87,17 @@ interface StandardBill {
   account_key?: string;
 }
 
+interface StandardExpense {
+  id: string;
+  vendor_external_id?: string;
+  date: string;
+  amount: number;
+  currency?: string;
+  reference?: string;
+  notes?: string;
+  account_key?: string;
+}
+
 interface StandardPayment {
   id: string;
   contact_external_id: string;
@@ -111,6 +122,7 @@ interface AccountingAdapter {
   syncJournal(journal: StandardJournal): Promise<AccountingResult>;
   syncInvoice(invoice: StandardInvoice): Promise<AccountingResult>;
   syncBill(bill: StandardBill): Promise<AccountingResult>;
+  syncExpense(expense: StandardExpense): Promise<AccountingResult>;
   syncPayment(payment: StandardPayment): Promise<AccountingResult>;
   healthCheck(): Promise<boolean>;
 }
@@ -616,6 +628,43 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
     return { external_entity_type: "Bill", external_entity_id: data.bill.bill_id };
   }
 
+  async function syncExpense(expense: StandardExpense): Promise<AccountingResult> {
+    const accounts = await resolveAccountIds();
+
+    const accountKeyMap: Record<string, string> = {
+      comisiones_agencias: accounts.commissions,
+      sales: accounts.sales,
+      service: accounts.service,
+      ar: accounts.ar,
+      ap: accounts.ap,
+      bank: accounts.bank,
+    };
+
+    const accountId = expense.account_key
+      ? (accountKeyMap[expense.account_key] ?? expense.account_key)
+      : accounts.commissions;
+
+    const payload: Record<string, unknown> = {
+      account_id: accountId,
+      paid_through_account_id: accounts.bank,
+      date: expense.date,
+      amount: expense.amount,
+      currency_code: expense.currency || "MXN",
+      description: expense.notes,
+    };
+
+    if (expense.vendor_external_id) {
+      payload.vendor_id = expense.vendor_external_id;
+    }
+
+    if (expense.reference) {
+      payload.reference_number = expense.reference.slice(0, 32);
+    }
+
+    const data = await zhFetch("/expenses", "POST", payload) as { expense: { expense_id: string } };
+    return { external_entity_type: "Expense", external_entity_id: data.expense.expense_id };
+  }
+
   async function syncPayment(payment: StandardPayment): Promise<AccountingResult> {
     if (payment.payment_type === "received") {
       const payload = {
@@ -655,7 +704,7 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
     }
   }
 
-  return { syncContact, syncJournal, syncInvoice, syncBill, syncPayment, healthCheck };
+  return { syncContact, syncJournal, syncInvoice, syncBill, syncExpense, syncPayment, healthCheck };
 }
 
 // =============================================
@@ -670,6 +719,7 @@ function createOdooAdapter(_config: { url: string; apiKey: string; database: str
     syncJournal: (_j) => notImplemented("syncJournal"),
     syncInvoice: (_i) => notImplemented("syncInvoice"),
     syncBill: (_b) => notImplemented("syncBill"),
+    syncExpense: (_e) => notImplemented("syncExpense"),
     syncPayment: (_p) => notImplemented("syncPayment"),
     healthCheck: async () => false,
   };
@@ -687,6 +737,7 @@ function createQuickBooksAdapter(_config: { clientId: string; clientSecret: stri
     syncJournal: (_j) => notImplemented("syncJournal"),
     syncInvoice: (_i) => notImplemented("syncInvoice"),
     syncBill: (_b) => notImplemented("syncBill"),
+    syncExpense: (_e) => notImplemented("syncExpense"),
     syncPayment: (_p) => notImplemented("syncPayment"),
     healthCheck: async () => false,
   };
@@ -782,7 +833,7 @@ async function incrementRetryCount(supabase: ReturnType<typeof createClient>, pr
 // =============================================
 // MAIN HANDLER
 // Accepts: { action, record_type, record_id, data }
-// action: "sync_contact" | "sync_invoice" | "sync_bill" | "sync_payment" | "health_check" | "retry_errors"
+// action: "sync_contact" | "sync_invoice" | "sync_bill" | "sync_expense" | "sync_payment" | "health_check" | "retry_errors"
 // =============================================
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -899,6 +950,12 @@ Deno.serve(async (req: Request) => {
         payloadSummary = { total: payload.total, reference: payload.reference };
         break;
       }
+      case "sync_expense": {
+        if (!payload) throw new Error("payload (StandardExpense) is required for sync_expense");
+        recType = "payout";
+        payloadSummary = { amount: payload.amount, reference: payload.reference };
+        break;
+      }
       case "sync_payment": {
         if (!payload) throw new Error("payload (StandardPayment) is required for sync_payment");
         recType = (payload as StandardPayment).payment_type === "received" ? "booking" : "payout";
@@ -950,6 +1007,9 @@ Deno.serve(async (req: Request) => {
           break;
         case "sync_bill":
           result = await adapter.syncBill(payload as StandardBill);
+          break;
+        case "sync_expense":
+          result = await adapter.syncExpense(payload as StandardExpense);
           break;
         case "sync_payment":
           result = await adapter.syncPayment(payload as StandardPayment);
