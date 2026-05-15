@@ -478,10 +478,10 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
     let lineItems: JournalLineItem[];
 
     if (journal.journal_type === "vendor_payment") {
-      // Asiento de egreso directo: pago a agencia sin Bill previa
-      // Debe:  Pagos a Agencias (gasto — registra el costo del pago)
-      // Haber: Banco (sale el efectivo neto pagado a la agencia)
-      // Si hay comisión retenida, el importe del Debe es el bruto y el Haber de Banco es el neto.
+      // Asiento de egreso directo: pago a agencia
+      // Debe:  Pagos a Agencias (gasto)    — importe bruto (neto + comisión)
+      // Haber: Banco                       — importe neto pagado a la agencia
+      // Haber: Cargo por Servicio/Ingresos — comisión retenida por la plataforma
       const netAmount = Math.round((journal.net_amount ?? 0) * 100) / 100;
       const commissionAmount = Math.round((journal.commission_amount ?? 0) * 100) / 100;
       const grossAmount = Math.round((journal.gross_amount ?? netAmount + commissionAmount) * 100) / 100;
@@ -503,7 +503,7 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
 
       if (commissionAmount > 0) {
         lineItems.push({
-          account_id: accounts.commissions,
+          account_id: accounts.service,
           description: "Comision plataforma ToursRed retenida",
           debit_or_credit: "credit",
           amount: commissionAmount,
