@@ -364,7 +364,7 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
   async function resolveAccountIds(): Promise<{ ar: string; sales: string; service: string; iva: string }> {
     if (cachedAccounts) return cachedAccounts;
 
-    const result = await zhFetch("/chartofaccounts?filter_by=AccountType.AccountsReceivable,AccountType.Income,AccountType.OtherLiability", "GET") as {
+    const result = await zhFetch("/chartofaccounts", "GET") as {
       chartofaccounts?: { account_id: string; account_name: string; account_type: string }[];
     };
 
