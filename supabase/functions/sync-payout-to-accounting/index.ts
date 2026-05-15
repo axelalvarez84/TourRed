@@ -21,7 +21,7 @@ Deno.serve(async (req: Request) => {
     const { payout_id } = await req.json();
     if (!payout_id) {
       return new Response(JSON.stringify({ error: "payout_id is required" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -41,20 +41,20 @@ Deno.serve(async (req: Request) => {
       .select(`
         id, amount, commission_amount, net_amount, status, created_at, paid_at, notes, reference_number,
         agencies (id, user_id, rfc, razon_social, regimen_fiscal, postal_code,
-          users (email, full_name))
+          users (email, first_name, last_name))
       `)
       .eq("id", payout_id)
       .maybeSingle();
 
     if (error || !payout) {
       return new Response(JSON.stringify({ error: "Payout not found" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const agency = payout.agencies as {
       id: string; user_id: string; rfc?: string; razon_social?: string; regimen_fiscal?: string; postal_code?: string;
-      users: { email?: string; full_name?: string };
+      users: { email?: string; first_name?: string; last_name?: string };
     };
 
     const { data: existingAgencyLog } = await supabase
@@ -77,7 +77,7 @@ Deno.serve(async (req: Request) => {
           data: {
             id: agency.id,
             type: "agency",
-            name: agency.razon_social || agency.users?.full_name || "Agencia",
+            name: agency.razon_social || `${agency.users?.first_name || ""} ${agency.users?.last_name || ""}`.trim() || "Agencia",
             email: agency.users?.email,
             rfc: agency.rfc,
             razon_social: agency.razon_social,
@@ -158,7 +158,7 @@ Deno.serve(async (req: Request) => {
   } catch (err) {
     console.error("sync-payout-to-accounting error:", err);
     return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
