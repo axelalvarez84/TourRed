@@ -47,8 +47,8 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (error || !booking) {
-      return new Response(JSON.stringify({ error: "Booking not found" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: `Booking not found: ${error?.message || booking_id}` }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
