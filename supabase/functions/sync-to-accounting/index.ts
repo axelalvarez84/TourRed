@@ -576,6 +576,18 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
   }
 
   async function syncBill(bill: StandardBill): Promise<AccountingResult> {
+    const accounts = await resolveAccountIds();
+
+    // Mapeo de account_key semántico → account_id real de Zoho
+    const accountKeyMap: Record<string, string> = {
+      comisiones_agencias: accounts.commissions,
+      sales: accounts.sales,
+      service: accounts.service,
+      ar: accounts.ar,
+      ap: accounts.ap,
+      bank: accounts.bank,
+    };
+
     const payload: Record<string, unknown> = {
       vendor_id: bill.vendor_external_id,
       date: bill.date,
@@ -586,7 +598,9 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
         description: item.description,
         quantity: item.quantity,
         rate: item.unit_price,
-        account_id: item.account_key,
+        account_id: item.account_key
+          ? (accountKeyMap[item.account_key] ?? item.account_key)
+          : accounts.commissions,
       })),
     };
 
