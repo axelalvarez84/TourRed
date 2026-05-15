@@ -576,12 +576,11 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
   }
 
   async function syncBill(bill: StandardBill): Promise<AccountingResult> {
-    const payload = {
+    const payload: Record<string, unknown> = {
       vendor_id: bill.vendor_external_id,
       date: bill.date,
       due_date: bill.due_date,
       currency_code: bill.currency || "MXN",
-      reference_number: bill.reference,
       notes: bill.notes,
       line_items: bill.line_items.map((item) => ({
         description: item.description,
@@ -590,6 +589,13 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
         account_id: item.account_key,
       })),
     };
+
+    // reference_number en Zoho Bills es el numero de factura del proveedor (bill_number).
+    // Solo incluirlo si es corto y alfanumérico simple para evitar el error "Invalid value for bill_number".
+    if (bill.reference) {
+      const safeRef = bill.reference.replace(/[^a-zA-Z0-9\-]/g, "").slice(0, 16);
+      if (safeRef) payload.reference_number = safeRef;
+    }
 
     const data = await zhFetch("/bills", "POST", payload) as { bill: { bill_id: string } };
     return { external_entity_type: "Bill", external_entity_id: data.bill.bill_id };
