@@ -100,49 +100,28 @@ Deno.serve(async (req: Request) => {
     // bill_number es el número de factura proveedor para Zoho Books — evita errores de formato
     const billNumber = (payout as any).bill_number || null;
 
-    const billRes = await supabase.functions.invoke("sync-to-accounting", {
+    const journalRes = await supabase.functions.invoke("sync-to-accounting", {
       body: {
-        action: "sync_expense",
+        action: "sync_journal",
         record_id: payout_id,
         data: {
           id: payout_id,
-          vendor_external_id: agencyExternalId,
-          date: new Date(payout.created_at).toISOString().split("T")[0],
+          journal_type: "vendor_payment",
+          date: new Date(payout.payment_date || payout.created_at).toISOString().split("T")[0],
           currency: "MXN",
-          reference: billNumber,
-          notes: payout.notes || `Pago a agencia por tours realizados`,
-          amount: grossAmount,
-          account_key: "comisiones_agencias",
+          reference,
+          notes: payout.notes || `Pago a agencia - ${reference}`,
+          net_amount: totalPayout,
+          commission_amount: commissionAmount,
+          gross_amount: grossAmount,
         },
       },
     });
 
-    if (billRes.error) throw new Error(`Failed to sync expense: ${billRes.error.message}`);
-
-    if (payout.status === "completed" && (payout.payment_date || payout.created_at)) {
-      const journalRes = await supabase.functions.invoke("sync-to-accounting", {
-        body: {
-          action: "sync_journal",
-          record_id: payout_id,
-          data: {
-            id: payout_id,
-            journal_type: "vendor_payment",
-            date: new Date(payout.payment_date || payout.created_at).toISOString().split("T")[0],
-            currency: "MXN",
-            reference,
-            notes: payout.notes || `Pago a agencia - ${reference}`,
-            net_amount: totalPayout,
-            commission_amount: commissionAmount,
-            gross_amount: grossAmount,
-          },
-        },
-      });
-
-      if (journalRes.error) throw new Error(`Failed to sync journal: ${journalRes.error.message}`);
-    }
+    if (journalRes.error) throw new Error(`Failed to sync journal: ${journalRes.error.message}`);
 
     return new Response(
-      JSON.stringify({ success: true, expense_external_id: billRes.data?.external_entity_id }),
+      JSON.stringify({ success: true, journal_external_id: journalRes.data?.external_entity_id }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 

@@ -441,22 +441,22 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
       a.account_name.toLowerCase().includes("bank")
     );
 
-    // Loguear todas las cuentas disponibles para diagnóstico
-    console.log("ZOHO_ACCOUNTS_AVAILABLE:", JSON.stringify(accounts.map(a => ({ id: a.account_id, name: a.account_name, type: a.account_type }))));
-
-    // Comisiones pagadas a Agencias (gasto retenido)
-    // Busca primero por nombre específico, luego cualquier cuenta de tipo expense como fallback
+    // Pagos a Agencias / Comisiones (gasto por pago a agencia)
+    // Busca por nombre específico; si no existe la cuenta en el plan lanza error descriptivo
     const commissionsAccount = accounts.find((a) =>
-      a.account_name.toLowerCase().includes("comisiones pagadas") ||
+      a.account_name.toLowerCase().includes("pagos a agencias") ||
       a.account_name.toLowerCase().includes("comisiones a agencias") ||
+      a.account_name.toLowerCase().includes("comisiones pagadas") ||
+      (a.account_type === "expense" && a.account_name.toLowerCase().includes("agencia")) ||
       (a.account_type === "expense" && a.account_name.toLowerCase().includes("comision"))
-    ) ?? accounts.find((a) => a.account_type === "expense") ?? serviceAccount;
+    );
 
     if (!arAccount) throw new Error("No se encontró cuenta de Cuentas por Cobrar en el Plan de Cuentas de Zoho Books.");
     if (!salesAccount) throw new Error("No se encontró cuenta de Ventas/Ingresos en el Plan de Cuentas de Zoho Books.");
     if (!ivaAccount) throw new Error("No se encontró cuenta de IVA Trasladado en el Plan de Cuentas de Zoho Books.");
     if (!apAccount) throw new Error("No se encontró cuenta de Cuentas por Pagar en el Plan de Cuentas de Zoho Books.");
     if (!bankAccount) throw new Error("No se encontró cuenta Bancaria en el Plan de Cuentas de Zoho Books.");
+    if (!commissionsAccount) throw new Error("No se encontró cuenta de Pagos a Agencias en el Plan de Cuentas de Zoho Books. Crea una cuenta de tipo Gasto con el nombre 'Pagos a Agencias'.");
 
     cachedAccounts = {
       ar: arAccount.account_id,
@@ -465,7 +465,7 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
       iva: ivaAccount.account_id,
       ap: apAccount.account_id,
       bank: bankAccount.account_id,
-      commissions: commissionsAccount!.account_id,
+      commissions: commissionsAccount.account_id,
     };
 
     return cachedAccounts;
@@ -478,17 +478,17 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
     let lineItems: JournalLineItem[];
 
     if (journal.journal_type === "vendor_payment") {
-      // Asiento de egreso: pago a agencia proveedor
-      // Debe:  Cuentas por Pagar Agencias (se cancela la deuda registrada en la Vendor Bill)
-      // Haber: Banco (sale el efectivo neto pagado)
-      // Haber: Comisiones pagadas a Agencias (comisión retenida por la plataforma)
+      // Asiento de egreso directo: pago a agencia sin Bill previa
+      // Debe:  Pagos a Agencias (gasto — registra el costo del pago)
+      // Haber: Banco (sale el efectivo neto pagado a la agencia)
+      // Si hay comisión retenida, el importe del Debe es el bruto y el Haber de Banco es el neto.
       const netAmount = Math.round((journal.net_amount ?? 0) * 100) / 100;
       const commissionAmount = Math.round((journal.commission_amount ?? 0) * 100) / 100;
       const grossAmount = Math.round((journal.gross_amount ?? netAmount + commissionAmount) * 100) / 100;
 
       lineItems = [
         {
-          account_id: accounts.ap,
+          account_id: accounts.commissions,
           description: journal.notes || "Pago a agencia por tours realizados",
           debit_or_credit: "debit",
           amount: grossAmount,
