@@ -21,7 +21,7 @@ Deno.serve(async (req: Request) => {
     const { booking_id } = await req.json();
     if (!booking_id) {
       return new Response(JSON.stringify({ error: "booking_id is required" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -36,28 +36,50 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { data: booking, error } = await supabase
+    // Query separada para evitar ambiguedad de multiples FK a users
+    const { data: booking, error: bookingError } = await supabase
       .from("bookings")
-      .select(`
-        id, total_price, service_charge, booking_code, created_at, payment_provider,
-        tours (name, agencies (id, rfc, razon_social, regimen_fiscal, postal_code)),
-        traveler:users!bookings_user_id_fkey (id, full_name, email, rfc, razon_social, regimen_fiscal, uso_cfdi, codigo_postal_fiscal)
-      `)
+      .select("id, total_price, service_charge, booking_code, created_at, payment_provider, user_id, tour_id")
       .eq("id", booking_id)
       .maybeSingle();
 
-    if (error || !booking) {
-      return new Response(JSON.stringify({ error: `Booking not found: ${error?.message || booking_id}` }), {
+    if (bookingError || !booking) {
+      return new Response(JSON.stringify({ error: `Booking not found: ${bookingError?.message || booking_id}` }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const traveler = (booking as any).traveler as {
-      id: string; full_name: string; email?: string; rfc?: string;
-      razon_social?: string; regimen_fiscal?: string; uso_cfdi?: string; codigo_postal_fiscal?: string;
-    };
-    const agency = ((booking as any).tours as { agencies: { id: string; rfc?: string; razon_social?: string } }).agencies;
-    const tourName = ((booking as any).tours as { name: string }).name;
+    // Obtener datos del viajero por separado
+    const { data: traveler, error: travelerError } = await supabase
+      .from("users")
+      .select("id, full_name, email, rfc, razon_social, regimen_fiscal, uso_cfdi, codigo_postal_fiscal")
+      .eq("id", booking.user_id)
+      .maybeSingle();
+
+    if (travelerError || !traveler) {
+      return new Response(JSON.stringify({ error: `Traveler not found: ${travelerError?.message || booking.user_id}` }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Obtener datos del tour y agencia por separado
+    const { data: tour, error: tourError } = await supabase
+      .from("tours")
+      .select("name, agency_id")
+      .eq("id", booking.tour_id)
+      .maybeSingle();
+
+    if (tourError || !tour) {
+      return new Response(JSON.stringify({ error: `Tour not found: ${tourError?.message || booking.tour_id}` }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: agency } = await supabase
+      .from("agencies")
+      .select("id, rfc, razon_social, regimen_fiscal, postal_code")
+      .eq("id", tour.agency_id)
+      .maybeSingle();
 
     // En edición México, Zoho requiere RFC para emitir facturas (CFDI).
     // Reservas de viajeros sin RFC se registran como contacto genérico "PUBLICO EN GENERAL".
@@ -106,9 +128,9 @@ Deno.serve(async (req: Request) => {
     }
 
     const total = Number(booking.total_price);
+    const serviceCharge = Number(booking.service_charge ?? 0);
     const subtotal = Math.round((total / 1.16) * 100) / 100;
     const iva = Math.round((total - subtotal) * 100) / 100;
-    const serviceCharge = Number(booking.service_charge ?? 0);
     const tourSubtotal = Math.round(((total - serviceCharge) / 1.16) * 100) / 100;
     const svcSubtotal = serviceCharge > 0
       ? Math.round((serviceCharge / 1.16) * 100) / 100
@@ -125,10 +147,10 @@ Deno.serve(async (req: Request) => {
           due_date: new Date(booking.created_at).toISOString().split("T")[0],
           currency: "MXN",
           reference: booking.booking_code || booking_id,
-          notes: `Reserva de tour: ${tourName}. Agencia: ${agency?.razon_social || ""}`,
+          notes: `Reserva de tour: ${tour.name}. Agencia: ${agency?.razon_social || ""}`,
           line_items: [
             {
-              description: `Servicio de viaje: ${tourName}`,
+              description: `Servicio de viaje: ${tour.name}`,
               quantity: 1,
               unit_price: tourSubtotal,
               tax_percentage: 16,
@@ -157,7 +179,6 @@ Deno.serve(async (req: Request) => {
 
   } catch (err) {
     console.error("sync-booking-to-accounting error:", err);
-    // Retornar 200 con error detallado para que el frontend pueda mostrar el mensaje real
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
