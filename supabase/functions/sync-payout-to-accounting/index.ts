@@ -39,7 +39,7 @@ Deno.serve(async (req: Request) => {
     const { data: payout, error } = await supabase
       .from("agency_payouts")
       .select(`
-        id, amount, commission_amount, net_amount, status, created_at, paid_at, notes, reference_number,
+        id, amount, platform_commission_amount, net_amount, status, created_at, payment_date, notes, payout_code, bank_reference,
         agencies (id, user_id, rfc, razon_social, regimen_fiscal, postal_code,
           users (email, first_name, last_name))
       `)
@@ -94,8 +94,9 @@ Deno.serve(async (req: Request) => {
     if (!agencyExternalId) throw new Error("Could not obtain external contact ID for agency");
 
     const totalPayout = Number(payout.net_amount ?? payout.amount);
-    const commissionAmount = Number(payout.commission_amount ?? 0);
+    const commissionAmount = Number(payout.platform_commission_amount ?? 0);
     const grossAmount = totalPayout + commissionAmount;
+    const reference = payout.payout_code || payout.bank_reference || payout_id;
 
     const billRes = await supabase.functions.invoke("sync-to-accounting", {
       body: {
@@ -107,7 +108,7 @@ Deno.serve(async (req: Request) => {
           date: new Date(payout.created_at).toISOString().split("T")[0],
           due_date: new Date(payout.created_at).toISOString().split("T")[0],
           currency: "MXN",
-          reference: payout.reference_number || payout_id,
+          reference,
           notes: payout.notes || `Pago a agencia por tours realizados`,
           line_items: [
             {
@@ -130,7 +131,7 @@ Deno.serve(async (req: Request) => {
 
     if (billRes.error) throw new Error(`Failed to sync bill: ${billRes.error.message}`);
 
-    if (payout.status === "completed" && (payout.paid_at || payout.created_at)) {
+    if (payout.status === "completed" && (payout.payment_date || payout.created_at)) {
       await supabase.functions.invoke("sync-to-accounting", {
         body: {
           action: "sync_payment",
@@ -140,10 +141,10 @@ Deno.serve(async (req: Request) => {
             contact_external_id: agencyExternalId,
             bill_external_id: billRes.data?.external_entity_id,
             payment_type: "made",
-            date: new Date(payout.paid_at || payout.created_at).toISOString().split("T")[0],
+            date: new Date(payout.payment_date || payout.created_at).toISOString().split("T")[0],
             amount: totalPayout,
             currency: "MXN",
-            reference: payout.reference_number || payout_id,
+            reference,
             bank_account_key: "banco_principal",
           },
         },
