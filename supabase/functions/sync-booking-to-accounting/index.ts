@@ -138,44 +138,29 @@ Deno.serve(async (req: Request) => {
       ? Math.round((serviceCharge / 1.16) * 100) / 100
       : 0;
 
-    const invoiceRes = await supabase.functions.invoke("sync-to-accounting", {
+    const journalRes = await supabase.functions.invoke("sync-to-accounting", {
       body: {
-        action: "sync_invoice",
+        action: "sync_journal",
         record_id: booking_id,
         data: {
           id: booking_id,
-          contact_external_id: travelerExternalId,
           date: new Date(booking.created_at).toISOString().split("T")[0],
-          due_date: new Date(booking.created_at).toISOString().split("T")[0],
           currency: "MXN",
           reference: booking.booking_code || booking_id,
-          notes: `Reserva de tour: ${tour.name}. Agencia: ${agency?.razon_social || ""}`,
-          line_items: [
-            {
-              description: `Servicio de viaje: ${tour.name}`,
-              quantity: 1,
-              unit_price: tourSubtotal,
-              tax_percentage: 16,
-            },
-            ...(svcSubtotal > 0 ? [{
-              description: "Cargo por servicio de plataforma",
-              quantity: 1,
-              unit_price: svcSubtotal,
-              tax_percentage: 16,
-            }] : []),
-          ],
-          subtotal,
-          tax_total: iva,
+          notes: `Reserva: ${tour.name}. Agencia: ${agency?.razon_social || ""}`,
+          tour_subtotal: tourSubtotal,
+          service_subtotal: svcSubtotal,
+          iva_total: iva,
           total,
         },
       },
     });
 
-    if (invoiceRes.error) throw new Error(`Failed to sync invoice: ${invoiceRes.error.message}`);
-    if (invoiceRes.data?.error) throw new Error(`Failed to sync invoice: ${invoiceRes.data.error}`);
+    if (journalRes.error) throw new Error(`Failed to sync journal: ${journalRes.error.message}`);
+    if (journalRes.data?.error) throw new Error(`Failed to sync journal: ${journalRes.data.error}`);
 
     return new Response(
-      JSON.stringify({ success: true, invoice_external_id: invoiceRes.data?.external_entity_id }),
+      JSON.stringify({ success: true, journal_external_id: journalRes.data?.external_entity_id }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 

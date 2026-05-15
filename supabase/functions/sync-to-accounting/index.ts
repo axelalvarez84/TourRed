@@ -39,6 +39,19 @@ interface StandardLineItem {
   account_key?: string;
 }
 
+interface StandardJournal {
+  id: string;
+  date: string;
+  reference?: string;
+  notes?: string;
+  tour_subtotal: number;
+  service_subtotal: number;
+  iva_total: number;
+  total: number;
+  currency?: string;
+}
+
+// Kept for adapter interface compatibility (Odoo/QuickBooks stubs)
 interface StandardInvoice {
   id: string;
   contact_external_id: string;
@@ -88,6 +101,7 @@ interface AccountingResult {
 
 interface AccountingAdapter {
   syncContact(contact: StandardContact): Promise<AccountingResult>;
+  syncJournal(journal: StandardJournal): Promise<AccountingResult>;
   syncInvoice(invoice: StandardInvoice): Promise<AccountingResult>;
   syncBill(bill: StandardBill): Promise<AccountingResult>;
   syncPayment(payment: StandardPayment): Promise<AccountingResult>;
@@ -344,6 +358,124 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
     return { external_entity_type: "Contact", external_entity_id: data.contact.contact_id };
   }
 
+  // Cache de account_ids dentro de la vida de la función para evitar llamadas repetidas
+  let cachedAccounts: { ar: string; sales: string; service: string; iva: string } | null = null;
+
+  async function resolveAccountIds(): Promise<{ ar: string; sales: string; service: string; iva: string }> {
+    if (cachedAccounts) return cachedAccounts;
+
+    const result = await zhFetch("/chartofaccounts?filter_by=AccountType.AccountsReceivable,AccountType.Income,AccountType.OtherLiability", "GET") as {
+      chartofaccounts?: { account_id: string; account_name: string; account_type: string }[];
+    };
+
+    const accounts = result.chartofaccounts ?? [];
+
+    // Buscar Cuentas por Cobrar (AccountsReceivable)
+    const arAccount = accounts.find((a) =>
+      a.account_type === "accounts_receivable" ||
+      a.account_name.toLowerCase().includes("cuentas por cobrar") ||
+      a.account_name.toLowerCase().includes("accounts receivable")
+    );
+
+    // Buscar cuenta de Ventas / Ingresos por Tours
+    const salesAccount = accounts.find((a) =>
+      a.account_name.toLowerCase().includes("ventas") ||
+      a.account_name.toLowerCase().includes("ingresos por tours") ||
+      a.account_name.toLowerCase().includes("sales") ||
+      a.account_type === "income"
+    );
+
+    // Buscar cuenta de Cargo por Servicio / Comisiones de plataforma (preferir nombre específico)
+    const serviceAccount = accounts.find((a) =>
+      a.account_name.toLowerCase().includes("cargo por servicio") ||
+      a.account_name.toLowerCase().includes("comision") ||
+      a.account_name.toLowerCase().includes("plataforma") ||
+      a.account_name.toLowerCase().includes("service fee") ||
+      a.account_name.toLowerCase().includes("service charge")
+    ) ?? salesAccount; // fallback a ventas si no existe cuenta específica
+
+    // Buscar IVA Trasladado / Tax Payable
+    const ivaAccount = accounts.find((a) =>
+      a.account_name.toLowerCase().includes("iva trasladado") ||
+      a.account_name.toLowerCase().includes("iva por pagar") ||
+      a.account_name.toLowerCase().includes("tax payable") ||
+      a.account_name.toLowerCase().includes("impuesto")
+    );
+
+    if (!arAccount) throw new Error("No se encontró cuenta de Cuentas por Cobrar en el Plan de Cuentas de Zoho Books.");
+    if (!salesAccount) throw new Error("No se encontró cuenta de Ventas/Ingresos en el Plan de Cuentas de Zoho Books.");
+    if (!ivaAccount) throw new Error("No se encontró cuenta de IVA Trasladado en el Plan de Cuentas de Zoho Books.");
+
+    cachedAccounts = {
+      ar: arAccount.account_id,
+      sales: salesAccount.account_id,
+      service: serviceAccount!.account_id,
+      iva: ivaAccount.account_id,
+    };
+
+    return cachedAccounts;
+  }
+
+  async function syncJournal(journal: StandardJournal): Promise<AccountingResult> {
+    const accounts = await resolveAccountIds();
+
+    const total = journal.tour_subtotal + journal.service_subtotal + journal.iva_total;
+
+    const lineItems: { account_id: string; description: string; debit_or_credit: string; amount: number }[] = [
+      // Debito: total completo a Cuentas por Cobrar
+      {
+        account_id: accounts.ar,
+        description: journal.notes || "Venta de servicio de viaje",
+        debit_or_credit: "debit",
+        amount: Math.round(total * 100) / 100,
+      },
+    ];
+
+    // Credito: ingresos por tours
+    if (journal.tour_subtotal > 0) {
+      lineItems.push({
+        account_id: accounts.sales,
+        description: "Ingresos por tours",
+        debit_or_credit: "credit",
+        amount: Math.round(journal.tour_subtotal * 100) / 100,
+      });
+    }
+
+    // Credito: cargo por servicio de plataforma (cuenta separada)
+    if (journal.service_subtotal > 0) {
+      lineItems.push({
+        account_id: accounts.service,
+        description: "Cargo por servicio de plataforma",
+        debit_or_credit: "credit",
+        amount: Math.round(journal.service_subtotal * 100) / 100,
+      });
+    }
+
+    // Credito: IVA trasladado
+    if (journal.iva_total > 0) {
+      lineItems.push({
+        account_id: accounts.iva,
+        description: "IVA Trasladado 16%",
+        debit_or_credit: "credit",
+        amount: Math.round(journal.iva_total * 100) / 100,
+      });
+    }
+
+    const payload = {
+      journal_date: journal.date,
+      reference_number: journal.reference,
+      notes: journal.notes,
+      currency_code: journal.currency || "MXN",
+      exchange_rate: 1,
+      status: "published",
+      line_items: lineItems,
+    };
+
+    const data = await zhFetch("/journals", "POST", payload) as { journal: { journal_id: string } };
+    return { external_entity_type: "Journal", external_entity_id: data.journal.journal_id };
+  }
+
+  // syncInvoice conservado para compatibilidad con adaptadores Odoo/QuickBooks
   async function syncInvoice(invoice: StandardInvoice): Promise<AccountingResult> {
     const payload = {
       customer_id: invoice.contact_external_id,
@@ -425,7 +557,7 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
     }
   }
 
-  return { syncContact, syncInvoice, syncBill, syncPayment, healthCheck };
+  return { syncContact, syncJournal, syncInvoice, syncBill, syncPayment, healthCheck };
 }
 
 // =============================================
@@ -437,6 +569,7 @@ function createOdooAdapter(_config: { url: string; apiKey: string; database: str
   }
   return {
     syncContact: (_c) => notImplemented("syncContact"),
+    syncJournal: (_j) => notImplemented("syncJournal"),
     syncInvoice: (_i) => notImplemented("syncInvoice"),
     syncBill: (_b) => notImplemented("syncBill"),
     syncPayment: (_p) => notImplemented("syncPayment"),
@@ -453,6 +586,7 @@ function createQuickBooksAdapter(_config: { clientId: string; clientSecret: stri
   }
   return {
     syncContact: (_c) => notImplemented("syncContact"),
+    syncJournal: (_j) => notImplemented("syncJournal"),
     syncInvoice: (_i) => notImplemented("syncInvoice"),
     syncBill: (_b) => notImplemented("syncBill"),
     syncPayment: (_p) => notImplemented("syncPayment"),
@@ -648,6 +782,12 @@ Deno.serve(async (req: Request) => {
         payloadSummary = { name: payload.name, email: payload.email, rfc: payload.rfc };
         break;
       }
+      case "sync_journal": {
+        if (!payload) throw new Error("payload (StandardJournal) is required for sync_journal");
+        recType = "booking";
+        payloadSummary = { total: payload.total, reference: payload.reference };
+        break;
+      }
       case "sync_invoice": {
         if (!payload) throw new Error("payload (StandardInvoice) is required for sync_invoice");
         recType = "booking";
@@ -679,6 +819,9 @@ Deno.serve(async (req: Request) => {
       switch (action) {
         case "sync_contact":
           result = await adapter.syncContact(payload as StandardContact);
+          break;
+        case "sync_journal":
+          result = await adapter.syncJournal(payload as StandardJournal);
           break;
         case "sync_invoice":
           result = await adapter.syncInvoice(payload as StandardInvoice);
