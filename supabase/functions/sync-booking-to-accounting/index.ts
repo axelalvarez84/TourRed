@@ -59,6 +59,13 @@ Deno.serve(async (req: Request) => {
     const agency = (booking.tours as { agencies: { id: string; rfc?: string; razon_social?: string } }).agencies;
     const tourName = (booking.tours as { name: string }).name;
 
+    // En edición México, Zoho requiere RFC para emitir facturas (CFDI).
+    // Reservas de viajeros sin RFC se registran como contacto genérico "PUBLICO EN GENERAL".
+    const travelerName = traveler.rfc
+      ? (traveler.razon_social || traveler.full_name)
+      : "PUBLICO EN GENERAL";
+    const travelerRfc = traveler.rfc || "XAXX010101000";
+
     const { data: existingTravelerLog } = await supabase
       .from("accounting_sync_log")
       .select("external_entity_id")
@@ -79,10 +86,10 @@ Deno.serve(async (req: Request) => {
           data: {
             id: traveler.id,
             type: "traveler",
-            name: traveler.full_name,
+            name: travelerName,
             email: traveler.email,
-            rfc: traveler.rfc,
-            razon_social: traveler.razon_social,
+            rfc: travelerRfc,
+            razon_social: travelerName,
             regimen_fiscal: traveler.regimen_fiscal,
             codigo_postal: traveler.codigo_postal_fiscal,
           },
@@ -90,6 +97,7 @@ Deno.serve(async (req: Request) => {
       });
 
       if (contactRes.error) throw new Error(`Failed to sync traveler contact: ${contactRes.error.message}`);
+      if (contactRes.data?.error) throw new Error(`Failed to sync traveler contact: ${contactRes.data.error}`);
       travelerExternalId = contactRes.data?.external_entity_id;
     }
 
@@ -101,6 +109,10 @@ Deno.serve(async (req: Request) => {
     const subtotal = Math.round((total / 1.16) * 100) / 100;
     const iva = Math.round((total - subtotal) * 100) / 100;
     const serviceCharge = Number(booking.service_charge ?? 0);
+    const tourSubtotal = Math.round(((total - serviceCharge) / 1.16) * 100) / 100;
+    const svcSubtotal = serviceCharge > 0
+      ? Math.round((serviceCharge / 1.16) * 100) / 100
+      : 0;
 
     const invoiceRes = await supabase.functions.invoke("sync-to-accounting", {
       body: {
@@ -110,6 +122,7 @@ Deno.serve(async (req: Request) => {
           id: booking_id,
           contact_external_id: travelerExternalId,
           date: new Date(booking.created_at).toISOString().split("T")[0],
+          due_date: new Date(booking.created_at).toISOString().split("T")[0],
           currency: "MXN",
           reference: booking.booking_code || booking_id,
           notes: `Reserva de tour: ${tourName}. Agencia: ${agency?.razon_social || ""}`,
@@ -117,16 +130,14 @@ Deno.serve(async (req: Request) => {
             {
               description: `Servicio de viaje: ${tourName}`,
               quantity: 1,
-              unit_price: subtotal - (serviceCharge / 1.16),
+              unit_price: tourSubtotal,
               tax_percentage: 16,
-              account_key: "ingresos_tours",
             },
-            ...(serviceCharge > 0 ? [{
+            ...(svcSubtotal > 0 ? [{
               description: "Cargo por servicio de plataforma",
               quantity: 1,
-              unit_price: Math.round((serviceCharge / 1.16) * 100) / 100,
+              unit_price: svcSubtotal,
               tax_percentage: 16,
-              account_key: "ingresos_cargo_servicio",
             }] : []),
           ],
           subtotal,
@@ -137,6 +148,7 @@ Deno.serve(async (req: Request) => {
     });
 
     if (invoiceRes.error) throw new Error(`Failed to sync invoice: ${invoiceRes.error.message}`);
+    if (invoiceRes.data?.error) throw new Error(`Failed to sync invoice: ${invoiceRes.data.error}`);
 
     return new Response(
       JSON.stringify({ success: true, invoice_external_id: invoiceRes.data?.external_entity_id }),
@@ -145,8 +157,9 @@ Deno.serve(async (req: Request) => {
 
   } catch (err) {
     console.error("sync-booking-to-accounting error:", err);
+    // Retornar 200 con error detallado para que el frontend pueda mostrar el mensaje real
     return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
