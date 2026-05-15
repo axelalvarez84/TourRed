@@ -441,12 +441,16 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
       a.account_name.toLowerCase().includes("bank")
     );
 
+    // Loguear todas las cuentas disponibles para diagnóstico
+    console.log("ZOHO_ACCOUNTS_AVAILABLE:", JSON.stringify(accounts.map(a => ({ id: a.account_id, name: a.account_name, type: a.account_type }))));
+
     // Comisiones pagadas a Agencias (gasto retenido)
+    // Busca primero por nombre específico, luego cualquier cuenta de tipo expense como fallback
     const commissionsAccount = accounts.find((a) =>
       a.account_name.toLowerCase().includes("comisiones pagadas") ||
       a.account_name.toLowerCase().includes("comisiones a agencias") ||
       (a.account_type === "expense" && a.account_name.toLowerCase().includes("comision"))
-    ) ?? serviceAccount;
+    ) ?? accounts.find((a) => a.account_type === "expense") ?? serviceAccount;
 
     if (!arAccount) throw new Error("No se encontró cuenta de Cuentas por Cobrar en el Plan de Cuentas de Zoho Books.");
     if (!salesAccount) throw new Error("No se encontró cuenta de Ventas/Ingresos en el Plan de Cuentas de Zoho Books.");
