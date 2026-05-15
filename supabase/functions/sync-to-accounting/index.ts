@@ -591,10 +591,10 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
     };
 
     // reference_number en Zoho Bills es el numero de factura del proveedor (bill_number).
-    // Solo incluirlo si es corto y alfanumérico simple para evitar el error "Invalid value for bill_number".
+    // Solo incluirlo cuando viene explícito desde bill_number del payout para evitar
+    // el error "Invalid value for bill_number" que Zoho lanza con formatos largos/especiales.
     if (bill.reference) {
-      const safeRef = bill.reference.replace(/[^a-zA-Z0-9\-]/g, "").slice(0, 16);
-      if (safeRef) payload.reference_number = safeRef;
+      payload.reference_number = bill.reference.slice(0, 32);
     }
 
     const data = await zhFetch("/bills", "POST", payload) as { bill: { bill_id: string } };

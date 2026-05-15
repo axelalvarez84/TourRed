@@ -706,6 +706,7 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({ isOpen, onClo
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState<'bank_transfer' | 'check' | 'paypal' | 'mercadopago' | 'other'>('bank_transfer');
+  const [billNumber, setBillNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
@@ -828,6 +829,7 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({ isOpen, onClo
                 notes: notes || null,
                 receipt_url: receiptUrl || null,
                 payout_code: payoutCode,
+                bill_number: billNumber.trim() || null,
                 status: 'completed',
                 commission_records_count: paymentDetails.records?.length || 0,
               })
@@ -920,6 +922,21 @@ const ProcessPaymentModal: React.FC<ProcessPaymentModalProps> = ({ isOpen, onClo
                 <option value="mercadopago">Mercado Pago</option>
                 <option value="other">Otro</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                No. de Factura / Referencia Contable <span className="text-gray-400 font-normal">(opcional)</span>
+              </label>
+              <p className="text-xs text-gray-500 mb-2">Se usará como número de factura proveedor en Zoho Books. Ej: P2, FAC-001.</p>
+              <input
+                type="text"
+                value={billNumber}
+                onChange={(e) => setBillNumber(e.target.value)}
+                placeholder="Ej: P2"
+                maxLength={32}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
 
             <div>

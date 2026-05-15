@@ -39,7 +39,7 @@ Deno.serve(async (req: Request) => {
     const { data: payout, error } = await supabase
       .from("agency_payouts")
       .select(`
-        id, amount, platform_commission_amount, net_amount, status, created_at, payment_date, notes, payout_code, bank_reference,
+        id, amount, platform_commission_amount, net_amount, status, created_at, payment_date, notes, payout_code, bank_reference, bill_number,
         agencies (id, user_id, rfc, razon_social, regimen_fiscal, postal_code,
           users (email, first_name, last_name))
       `)
@@ -97,6 +97,8 @@ Deno.serve(async (req: Request) => {
     const commissionAmount = Number(payout.platform_commission_amount ?? 0);
     const grossAmount = totalPayout + commissionAmount;
     const reference = payout.payout_code || payout.bank_reference || payout_id;
+    // bill_number es el número de factura proveedor para Zoho Books — evita errores de formato
+    const billNumber = (payout as any).bill_number || null;
 
     const billRes = await supabase.functions.invoke("sync-to-accounting", {
       body: {
@@ -108,7 +110,7 @@ Deno.serve(async (req: Request) => {
           date: new Date(payout.created_at).toISOString().split("T")[0],
           due_date: new Date(payout.created_at).toISOString().split("T")[0],
           currency: "MXN",
-          reference,
+          reference: billNumber,
           notes: payout.notes || `Pago a agencia por tours realizados`,
           line_items: [
             {
