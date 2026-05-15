@@ -90,6 +90,26 @@ Deno.serve(async (req: Request) => {
       : "PUBLICO EN GENERAL";
     const travelerRfc = traveler.rfc || "XAXX010101000";
 
+    // Verificar si esta reserva ya fue sincronizada como journal — no duplicar transacciones
+    const { data: existingBookingLog } = await supabase
+      .from("accounting_sync_log")
+      .select("external_entity_id, external_entity_type")
+      .eq("provider", settings.accounting_provider)
+      .eq("record_type", "booking")
+      .eq("record_id", booking_id)
+      .eq("status", "synced")
+      .maybeSingle();
+
+    if (existingBookingLog?.external_entity_id) {
+      return new Response(JSON.stringify({
+        success: true,
+        skipped: true,
+        journal_external_id: existingBookingLog.external_entity_id,
+      }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { data: existingTravelerLog } = await supabase
       .from("accounting_sync_log")
       .select("external_entity_id")

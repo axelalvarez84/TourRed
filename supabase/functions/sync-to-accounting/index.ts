@@ -814,6 +814,29 @@ Deno.serve(async (req: Request) => {
         });
     }
 
+    // Para transacciones (no contactos), verificar si ya fue sincronizada exitosamente
+    if (action !== "sync_contact") {
+      const { data: existingLog } = await supabase
+        .from("accounting_sync_log")
+        .select("external_entity_id, external_entity_type")
+        .eq("provider", provider)
+        .eq("record_type", recType)
+        .eq("record_id", record_id)
+        .eq("status", "synced")
+        .maybeSingle();
+
+      if (existingLog?.external_entity_id) {
+        return new Response(JSON.stringify({
+          success: true,
+          skipped: true,
+          external_entity_id: existingLog.external_entity_id,
+          external_entity_type: existingLog.external_entity_type,
+        }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // Log as pending before attempting sync
     await logSync(supabase, provider, recType, record_id, "pending", undefined, undefined, payloadSummary);
 
