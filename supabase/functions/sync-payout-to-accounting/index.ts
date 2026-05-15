@@ -132,23 +132,25 @@ Deno.serve(async (req: Request) => {
     if (billRes.error) throw new Error(`Failed to sync bill: ${billRes.error.message}`);
 
     if (payout.status === "completed" && (payout.payment_date || payout.created_at)) {
-      await supabase.functions.invoke("sync-to-accounting", {
+      const journalRes = await supabase.functions.invoke("sync-to-accounting", {
         body: {
-          action: "sync_payment",
+          action: "sync_journal",
           record_id: payout_id,
           data: {
             id: payout_id,
-            contact_external_id: agencyExternalId,
-            bill_external_id: billRes.data?.external_entity_id,
-            payment_type: "made",
+            journal_type: "vendor_payment",
             date: new Date(payout.payment_date || payout.created_at).toISOString().split("T")[0],
-            amount: totalPayout,
             currency: "MXN",
             reference,
-            bank_account_key: "banco_principal",
+            notes: payout.notes || `Pago a agencia - ${reference}`,
+            net_amount: totalPayout,
+            commission_amount: commissionAmount,
+            gross_amount: grossAmount,
           },
         },
       });
+
+      if (journalRes.error) throw new Error(`Failed to sync journal: ${journalRes.error.message}`);
     }
 
     return new Response(

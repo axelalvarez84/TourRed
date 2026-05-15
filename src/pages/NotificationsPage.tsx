@@ -170,8 +170,6 @@ const NotificationsPage: React.FC = () => {
         return 'Mensaje Recibido';
       case 'tour_updated':
         return 'Tour Actualizado';
-      case 'system_announcement':
-        return 'Anuncio del Sistema';
       case 'tour_announcement':
         return 'Mensaje de Agencia';
       case 'system_announcement':

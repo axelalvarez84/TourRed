@@ -41,14 +41,20 @@ interface StandardLineItem {
 
 interface StandardJournal {
   id: string;
+  journal_type?: "income" | "vendor_payment"; // income = reservas (default), vendor_payment = pagos a agencias
   customer_id?: string;
   date: string;
   reference?: string;
   notes?: string;
-  tour_subtotal: number;
-  service_subtotal: number;
-  iva_total: number;
-  total: number;
+  // Campos para journal de ingresos (reservas)
+  tour_subtotal?: number;
+  service_subtotal?: number;
+  iva_total?: number;
+  total?: number;
+  // Campos para journal de egreso (pago a proveedor)
+  net_amount?: number;       // monto neto pagado a agencia (sale del banco)
+  commission_amount?: number; // comisión retenida por la plataforma
+  gross_amount?: number;     // monto bruto (net + commission)
   currency?: string;
 }
 
@@ -360,9 +366,15 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
   }
 
   // Cache de account_ids dentro de la vida de la función para evitar llamadas repetidas
-  let cachedAccounts: { ar: string; sales: string; service: string; iva: string } | null = null;
+  let cachedAccounts: {
+    ar: string; sales: string; service: string; iva: string;
+    ap: string; bank: string; commissions: string;
+  } | null = null;
 
-  async function resolveAccountIds(): Promise<{ ar: string; sales: string; service: string; iva: string }> {
+  async function resolveAccountIds(): Promise<{
+    ar: string; sales: string; service: string; iva: string;
+    ap: string; bank: string; commissions: string;
+  }> {
     if (cachedAccounts) return cachedAccounts;
 
     const result = await zhFetch("/chartofaccounts", "GET") as {
@@ -371,14 +383,14 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
 
     const accounts = result.chartofaccounts ?? [];
 
-    // Buscar Cuentas por Cobrar (AccountsReceivable)
+    // Cuentas por Cobrar (ingresos)
     const arAccount = accounts.find((a) =>
       a.account_type === "accounts_receivable" ||
       a.account_name.toLowerCase().includes("cuentas por cobrar") ||
       a.account_name.toLowerCase().includes("accounts receivable")
     );
 
-    // Buscar cuenta de Ventas / Ingresos por Tours
+    // Ventas / Ingresos por Tours
     const salesAccount = accounts.find((a) =>
       a.account_name.toLowerCase().includes("ventas") ||
       a.account_name.toLowerCase().includes("ingresos por tours") ||
@@ -386,16 +398,16 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
       a.account_type === "income"
     );
 
-    // Buscar cuenta de Cargo por Servicio / Comisiones de plataforma (preferir nombre específico)
+    // Cargo por Servicio / Comisiones de plataforma
     const serviceAccount = accounts.find((a) =>
       a.account_name.toLowerCase().includes("cargo por servicio") ||
       a.account_name.toLowerCase().includes("comision") ||
       a.account_name.toLowerCase().includes("plataforma") ||
       a.account_name.toLowerCase().includes("service fee") ||
       a.account_name.toLowerCase().includes("service charge")
-    ) ?? salesAccount; // fallback a ventas si no existe cuenta específica
+    ) ?? salesAccount;
 
-    // Buscar IVA Trasladado / Tax Payable
+    // IVA Trasladado / Tax Payable
     const ivaAccount = accounts.find((a) =>
       a.account_name.toLowerCase().includes("iva trasladado") ||
       a.account_name.toLowerCase().includes("iva por pagar") ||
@@ -403,15 +415,41 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
       a.account_name.toLowerCase().includes("impuesto")
     );
 
+    // Cuentas por Pagar Agencias (egresos — para journal de pago a proveedor)
+    const apAccount = accounts.find((a) =>
+      a.account_type === "accounts_payable" ||
+      a.account_name.toLowerCase().includes("cuentas por pagar") ||
+      a.account_name.toLowerCase().includes("accounts payable")
+    );
+
+    // Banco Principal (sale el efectivo al pagar a agencia)
+    const bankAccount = accounts.find((a) =>
+      a.account_type === "bank" ||
+      a.account_name.toLowerCase().includes("banco") ||
+      a.account_name.toLowerCase().includes("bank")
+    );
+
+    // Comisiones pagadas a Agencias (gasto retenido)
+    const commissionsAccount = accounts.find((a) =>
+      a.account_name.toLowerCase().includes("comisiones pagadas") ||
+      a.account_name.toLowerCase().includes("comisiones a agencias") ||
+      (a.account_type === "expense" && a.account_name.toLowerCase().includes("comision"))
+    ) ?? serviceAccount;
+
     if (!arAccount) throw new Error("No se encontró cuenta de Cuentas por Cobrar en el Plan de Cuentas de Zoho Books.");
     if (!salesAccount) throw new Error("No se encontró cuenta de Ventas/Ingresos en el Plan de Cuentas de Zoho Books.");
     if (!ivaAccount) throw new Error("No se encontró cuenta de IVA Trasladado en el Plan de Cuentas de Zoho Books.");
+    if (!apAccount) throw new Error("No se encontró cuenta de Cuentas por Pagar en el Plan de Cuentas de Zoho Books.");
+    if (!bankAccount) throw new Error("No se encontró cuenta Bancaria en el Plan de Cuentas de Zoho Books.");
 
     cachedAccounts = {
       ar: arAccount.account_id,
       sales: salesAccount.account_id,
       service: serviceAccount!.account_id,
       iva: ivaAccount.account_id,
+      ap: apAccount.account_id,
+      bank: bankAccount.account_id,
+      commissions: commissionsAccount!.account_id,
     };
 
     return cachedAccounts;
@@ -420,47 +458,84 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
   async function syncJournal(journal: StandardJournal): Promise<AccountingResult> {
     const accounts = await resolveAccountIds();
 
-    const total = journal.tour_subtotal + journal.service_subtotal + journal.iva_total;
+    type JournalLineItem = { account_id: string; description: string; debit_or_credit: string; amount: number; customer_id?: string };
+    let lineItems: JournalLineItem[];
 
-    const lineItems: { account_id: string; description: string; debit_or_credit: string; amount: number }[] = [
-      // Debito: total completo a Cuentas por Cobrar
-      {
-        account_id: accounts.ar,
-        description: journal.notes || "Venta de servicio de viaje",
-        debit_or_credit: "debit",
-        amount: Math.round(total * 100) / 100,
-        ...(journal.customer_id ? { customer_id: journal.customer_id } : {}),
-      },
-    ];
+    if (journal.journal_type === "vendor_payment") {
+      // Asiento de egreso: pago a agencia proveedor
+      // Debe:  Cuentas por Pagar Agencias (se cancela la deuda registrada en la Vendor Bill)
+      // Haber: Banco (sale el efectivo neto pagado)
+      // Haber: Comisiones pagadas a Agencias (comisión retenida por la plataforma)
+      const netAmount = Math.round((journal.net_amount ?? 0) * 100) / 100;
+      const commissionAmount = Math.round((journal.commission_amount ?? 0) * 100) / 100;
+      const grossAmount = Math.round((journal.gross_amount ?? netAmount + commissionAmount) * 100) / 100;
 
-    // Credito: ingresos por tours
-    if (journal.tour_subtotal > 0) {
-      lineItems.push({
-        account_id: accounts.sales,
-        description: "Ingresos por tours",
-        debit_or_credit: "credit",
-        amount: Math.round(journal.tour_subtotal * 100) / 100,
-      });
-    }
+      lineItems = [
+        {
+          account_id: accounts.ap,
+          description: journal.notes || "Pago a agencia por tours realizados",
+          debit_or_credit: "debit",
+          amount: grossAmount,
+        },
+        {
+          account_id: accounts.bank,
+          description: "Monto neto pagado a agencia",
+          debit_or_credit: "credit",
+          amount: netAmount,
+        },
+      ];
 
-    // Credito: cargo por servicio de plataforma (cuenta separada)
-    if (journal.service_subtotal > 0) {
-      lineItems.push({
-        account_id: accounts.service,
-        description: "Cargo por servicio de plataforma",
-        debit_or_credit: "credit",
-        amount: Math.round(journal.service_subtotal * 100) / 100,
-      });
-    }
+      if (commissionAmount > 0) {
+        lineItems.push({
+          account_id: accounts.commissions,
+          description: "Comision plataforma ToursRed retenida",
+          debit_or_credit: "credit",
+          amount: commissionAmount,
+        });
+      }
+    } else {
+      // Asiento de ingreso: reserva de viajero (comportamiento original)
+      const tourSubtotal = journal.tour_subtotal ?? 0;
+      const serviceSubtotal = journal.service_subtotal ?? 0;
+      const ivaTotal = journal.iva_total ?? 0;
+      const total = tourSubtotal + serviceSubtotal + ivaTotal;
 
-    // Credito: IVA trasladado
-    if (journal.iva_total > 0) {
-      lineItems.push({
-        account_id: accounts.iva,
-        description: "IVA Trasladado 16%",
-        debit_or_credit: "credit",
-        amount: Math.round(journal.iva_total * 100) / 100,
-      });
+      lineItems = [
+        {
+          account_id: accounts.ar,
+          description: journal.notes || "Venta de servicio de viaje",
+          debit_or_credit: "debit",
+          amount: Math.round(total * 100) / 100,
+          ...(journal.customer_id ? { customer_id: journal.customer_id } : {}),
+        },
+      ];
+
+      if (tourSubtotal > 0) {
+        lineItems.push({
+          account_id: accounts.sales,
+          description: "Ingresos por tours",
+          debit_or_credit: "credit",
+          amount: Math.round(tourSubtotal * 100) / 100,
+        });
+      }
+
+      if (serviceSubtotal > 0) {
+        lineItems.push({
+          account_id: accounts.service,
+          description: "Cargo por servicio de plataforma",
+          debit_or_credit: "credit",
+          amount: Math.round(serviceSubtotal * 100) / 100,
+        });
+      }
+
+      if (ivaTotal > 0) {
+        lineItems.push({
+          account_id: accounts.iva,
+          description: "IVA Trasladado 16%",
+          debit_or_credit: "credit",
+          amount: Math.round(ivaTotal * 100) / 100,
+        });
+      }
     }
 
     const payload = {
@@ -786,8 +861,9 @@ Deno.serve(async (req: Request) => {
       }
       case "sync_journal": {
         if (!payload) throw new Error("payload (StandardJournal) is required for sync_journal");
-        recType = "booking";
-        payloadSummary = { total: payload.total, reference: payload.reference };
+        // vendor_payment journals usan record_type "payout_journal" para no colisionar con journals de reservas
+        recType = payload.journal_type === "vendor_payment" ? "payout_journal" : "booking";
+        payloadSummary = { total: payload.total ?? payload.gross_amount, reference: payload.reference };
         break;
       }
       case "sync_invoice": {
