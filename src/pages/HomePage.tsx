@@ -53,7 +53,7 @@ const HomePage: React.FC = () => {
         </div>
         <div className="relative container-custom py-24 md:py-36">
           <div className="max-w-3xl flex flex-col items-start">
-            <img src="/logo copy.png" alt="ToursRed Logo" className="h-24 w-auto mb-6" />
+            <img src="/Logo_Transparente.jpg" alt="ToursRed Logo" className="h-24 w-auto mb-6" />
             <h1 className="text-4xl md:text-5xl font-bold mb-4 animate-fade-in">
               Descubre Tu Próxima<br />Aventura
             </h1>
