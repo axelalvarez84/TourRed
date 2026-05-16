@@ -143,10 +143,17 @@ const ManualEntryModal: React.FC<Props> = ({ year, month, onClose, onSaved }) =>
     try {
       const entryType: EntryKind = kind === 'egreso' ? 'egreso' : kind === 'ingreso' ? 'ingreso' : 'diario';
 
+      // Generate entry number via DB function
+      const { data: numData, error: numErr } = await supabase
+        .rpc('generate_entry_number', { p_type: entryType, p_year: year, p_month: month });
+      if (numErr) throw numErr;
+      const entryNumber = numData as string;
+
       // Insert header
       const { data: entry, error: entryErr } = await supabase
         .from('accounting_entries')
         .insert({
+          entry_number: entryNumber,
           entry_type: entryType,
           entry_date: date,
           period_year: year,
