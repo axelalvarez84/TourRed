@@ -159,7 +159,8 @@ const NavBar: React.FC = () => {
     const financieroItems: AdminMenuItem[] = [
       { to: '/admin/payouts', label: 'Gestion de Pagos', icon: <DollarSign className="h-4 w-4" /> },
       { to: '/admin/cfdi', label: 'CFDI / Facturacion', icon: <FileText className="h-4 w-4" /> },
-      { to: '/admin/contabilidad', label: 'Contabilidad', icon: <BookOpen className="h-4 w-4" /> },
+      { to: '/admin/contabilidad', label: 'Contabilidad (Sync)', icon: <BookOpen className="h-4 w-4" /> },
+      { to: '/accounting', label: 'Mini ERP Interno', icon: <BookOpen className="h-4 w-4" /> },
     ];
     if (isSuperAdmin || permissions?.canManageInquiries)
       financieroItems.push({ to: '/admin/international-inquiries', label: 'Cotizaciones Internac.', icon: <Globe className="h-4 w-4" /> });
