@@ -890,10 +890,11 @@ function createOdooAdapter(config: { url: string; apiKey: string; database: stri
       const tourSubtotal = Math.round((journal.tour_subtotal ?? 0) * 100) / 100;
       const serviceSubtotal = Math.round((journal.service_subtotal ?? 0) * 100) / 100;
       const ivaTotal = Math.round((journal.iva_total ?? 0) * 100) / 100;
-      const total = Math.round((journal.total ?? tourSubtotal + serviceSubtotal + ivaTotal) * 100) / 100;
+      // Usar la suma exacta de componentes como debito para garantizar balance
+      const creditTotal = Math.round((tourSubtotal + serviceSubtotal + ivaTotal) * 100) / 100;
 
       lineItems = [
-        { account_id: accounts.ar, name: journal.notes || "Reserva de tour", debit: total, credit: 0 },
+        { account_id: accounts.ar, name: journal.notes || "Reserva de tour", debit: creditTotal, credit: 0 },
       ];
       if (tourSubtotal > 0) {
         lineItems.push({ account_id: accounts.sales, name: "Tour / Actividad", debit: 0, credit: tourSubtotal });
