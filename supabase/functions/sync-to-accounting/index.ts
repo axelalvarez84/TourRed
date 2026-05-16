@@ -712,21 +712,281 @@ function createZohoBooksAdapter(supabase: ReturnType<typeof createClient>, orgId
 }
 
 // =============================================
-// ODOO ADAPTER (stub — implement when needed)
+// ODOO ADAPTER — JSON-2 API (Odoo 19+)
+// Docs: https://www.odoo.com/documentation/19.0/developer/reference/external_api.html
 // =============================================
-function createOdooAdapter(_config: { url: string; apiKey: string; database: string }): AccountingAdapter {
-  async function notImplemented(_name: string): Promise<AccountingResult> {
-    throw new Error(`Odoo adapter: ${_name} not yet implemented. See sync-to-accounting/index.ts`);
+function createOdooAdapter(config: { url: string; apiKey: string; database: string }): AccountingAdapter {
+  const baseUrl = config.url.replace(/\/$/, "");
+
+  async function odooFetch(model: string, method: string, body: Record<string, unknown>): Promise<unknown> {
+    const url = `${baseUrl}/json/2/${model}/${method}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `bearer ${config.apiKey}`,
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Odoo-Database": config.database,
+        "User-Agent": "ToursRed/1.0",
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`Odoo ${model}/${method} ${res.status}: ${errBody}`);
+    }
+    return res.json();
   }
-  return {
-    syncContact: (_c) => notImplemented("syncContact"),
-    syncJournal: (_j) => notImplemented("syncJournal"),
-    syncInvoice: (_i) => notImplemented("syncInvoice"),
-    syncBill: (_b) => notImplemented("syncBill"),
-    syncExpense: (_e) => notImplemented("syncExpense"),
-    syncPayment: (_p) => notImplemented("syncPayment"),
-    healthCheck: async () => false,
-  };
+
+  // Cache de IDs de cuentas contables dentro de la vida de la función
+  let cachedOdooAccounts: {
+    ar: number;      // Cuentas por Cobrar (receivable)
+    sales: number;   // Ingresos / Ventas
+    service: number; // Cargos por servicio / ingresos de plataforma
+    iva: number;     // IVA trasladado
+    ap: number;      // Cuentas por Pagar (payable)
+    bank: number;    // Banco / Efectivo
+    commissions: number; // Gasto - Pagos a Agencias
+  } | null = null;
+
+  async function resolveOdooAccountIds() {
+    if (cachedOdooAccounts) return cachedOdooAccounts;
+
+    const accounts = await odooFetch("account.account", "search_read", {
+      domain: [["deprecated", "=", false]],
+      fields: ["id", "code", "name", "account_type"],
+    }) as { id: number; code: string; name: string; account_type: string }[];
+
+    const find = (types: string[], keywords: string[]): number | undefined => {
+      const byType = accounts.filter(a => types.includes(a.account_type));
+      for (const kw of keywords) {
+        const match = byType.find(a =>
+          a.name.toLowerCase().includes(kw.toLowerCase()) ||
+          a.code.toLowerCase().startsWith(kw.toLowerCase())
+        );
+        if (match) return match.id;
+      }
+      return byType[0]?.id;
+    };
+
+    const ar = find(["asset_receivable"], ["cobrar", "receivable", "cliente", "101", "113"]);
+    const sales = find(["income", "income_other"], ["venta", "ingreso", "sales", "revenue", "400", "401"]);
+    const service = find(["income", "income_other"], ["servicio", "cargo", "comision", "service", "platform", "402", "403"]);
+    const iva = find(["liability_current", "tax"], ["iva", "impuesto", "tax", "211"]);
+    const ap = find(["liability_payable"], ["pagar", "payable", "proveedor", "201", "210"]);
+    const bank = find(["asset_cash", "asset_current"], ["banco", "bank", "caja", "efectivo", "cash", "102", "110"]);
+    const commissions = find(["expense"], ["agencia", "pago", "comision", "proveedor", "commission", "600", "601", "602"]);
+
+    const missing = [
+      !ar && "Cuentas por Cobrar (receivable)",
+      !sales && "Ventas/Ingresos (income)",
+      !ap && "Cuentas por Pagar (payable)",
+      !bank && "Banco/Efectivo (asset_cash)",
+      !commissions && "Pagos a Agencias (expense)",
+    ].filter(Boolean);
+
+    if (missing.length > 0) {
+      throw new Error(`Odoo: No se encontraron cuentas contables requeridas: ${missing.join(", ")}`);
+    }
+
+    cachedOdooAccounts = {
+      ar: ar!,
+      sales: sales ?? ar!,
+      service: service ?? (sales ?? ar!),
+      iva: iva ?? ap!,
+      ap: ap!,
+      bank: bank!,
+      commissions: commissions!,
+    };
+    return cachedOdooAccounts;
+  }
+
+  async function syncContact(contact: StandardContact): Promise<AccountingResult> {
+    const isCompany = contact.type === "agency";
+    const payload = {
+      name: contact.razon_social || contact.name,
+      email: contact.email ?? false,
+      phone: contact.phone ?? false,
+      is_company: isCompany,
+      customer_rank: contact.type === "traveler" ? 1 : 0,
+      supplier_rank: contact.type === "agency" ? 1 : 0,
+      vat: contact.rfc ?? false,
+      ref: contact.id,
+      street: contact.address ?? false,
+      city: contact.city ?? false,
+      zip: contact.codigo_postal ?? false,
+      country_id: 157, // México (ID estándar en Odoo con localización MX)
+    };
+
+    // Buscar por referencia interna (ref = nuestro UUID)
+    const existing = await odooFetch("res.partner", "search_read", {
+      domain: [["ref", "=", contact.id]],
+      fields: ["id"],
+      limit: 1,
+    }) as { id: number }[];
+
+    if (existing.length > 0) {
+      await odooFetch("res.partner", "write", {
+        ids: [existing[0].id],
+        ...payload,
+      });
+      return { external_entity_type: "Partner", external_entity_id: String(existing[0].id) };
+    }
+
+    const newId = await odooFetch("res.partner", "create", { ...payload }) as number;
+    return { external_entity_type: "Partner", external_entity_id: String(newId) };
+  }
+
+  async function syncJournal(journal: StandardJournal): Promise<AccountingResult> {
+    const accounts = await resolveOdooAccountIds();
+    const moveDate = journal.date;
+    const ref = journal.reference || journal.id;
+
+    let lineItems: { account_id: number; name: string; debit: number; credit: number }[];
+
+    if (journal.journal_type === "vendor_payment") {
+      const netAmount = Math.round((journal.net_amount ?? 0) * 100) / 100;
+      const commissionAmount = Math.round((journal.commission_amount ?? 0) * 100) / 100;
+      const grossAmount = Math.round((journal.gross_amount ?? netAmount + commissionAmount) * 100) / 100;
+
+      lineItems = [
+        { account_id: accounts.commissions, name: journal.notes || "Pago a agencia por tours realizados", debit: grossAmount, credit: 0 },
+        { account_id: accounts.bank, name: "Monto neto pagado a agencia", debit: 0, credit: netAmount },
+      ];
+      if (commissionAmount > 0) {
+        lineItems.push({ account_id: accounts.service, name: "Comision plataforma ToursRed retenida", debit: 0, credit: commissionAmount });
+      }
+    } else {
+      // income: reserva de tour
+      const tourSubtotal = Math.round((journal.tour_subtotal ?? 0) * 100) / 100;
+      const serviceSubtotal = Math.round((journal.service_subtotal ?? 0) * 100) / 100;
+      const ivaTotal = Math.round((journal.iva_total ?? 0) * 100) / 100;
+      const total = Math.round((journal.total ?? tourSubtotal + serviceSubtotal + ivaTotal) * 100) / 100;
+
+      lineItems = [
+        { account_id: accounts.ar, name: journal.notes || "Reserva de tour", debit: total, credit: 0 },
+      ];
+      if (tourSubtotal > 0) {
+        lineItems.push({ account_id: accounts.sales, name: "Tour / Actividad", debit: 0, credit: tourSubtotal });
+      }
+      if (serviceSubtotal > 0) {
+        lineItems.push({ account_id: accounts.service, name: "Cargo por servicio plataforma", debit: 0, credit: serviceSubtotal });
+      }
+      if (ivaTotal > 0) {
+        lineItems.push({ account_id: accounts.iva, name: "IVA", debit: 0, credit: ivaTotal });
+      }
+    }
+
+    const moveId = await odooFetch("account.move", "create", {
+      move_type: "entry",
+      date: moveDate,
+      ref,
+      narration: journal.notes ?? "",
+      line_ids: lineItems.map(l => [0, 0, {
+        account_id: l.account_id,
+        name: l.name,
+        debit: l.debit,
+        credit: l.credit,
+      }]),
+    }) as number;
+
+    // Confirmar el asiento (pasar a estado "posted")
+    await odooFetch("account.move", "action_post", { ids: [moveId] });
+
+    return { external_entity_type: "JournalEntry", external_entity_id: String(moveId) };
+  }
+
+  async function syncInvoice(invoice: StandardInvoice): Promise<AccountingResult> {
+    const lines = invoice.line_items.map(li => [0, 0, {
+      name: li.description,
+      quantity: li.quantity,
+      price_unit: li.unit_price,
+    }]);
+
+    const moveId = await odooFetch("account.move", "create", {
+      move_type: "out_invoice",
+      partner_id: Number(invoice.contact_external_id),
+      invoice_date: invoice.date,
+      invoice_date_due: invoice.due_date ?? invoice.date,
+      ref: invoice.reference ?? "",
+      narration: invoice.notes ?? "",
+      currency_id: 163, // MXN en Odoo estándar
+      invoice_line_ids: lines,
+    }) as number;
+
+    await odooFetch("account.move", "action_post", { ids: [moveId] });
+    return { external_entity_type: "Invoice", external_entity_id: String(moveId) };
+  }
+
+  async function syncBill(bill: StandardBill): Promise<AccountingResult> {
+    const lines = bill.line_items.map(li => [0, 0, {
+      name: li.description,
+      quantity: li.quantity,
+      price_unit: li.unit_price,
+    }]);
+
+    const moveId = await odooFetch("account.move", "create", {
+      move_type: "in_invoice",
+      partner_id: Number(bill.vendor_external_id),
+      invoice_date: bill.date,
+      invoice_date_due: bill.due_date ?? bill.date,
+      ref: bill.reference ?? "",
+      narration: bill.notes ?? "",
+      currency_id: 163,
+      invoice_line_ids: lines,
+    }) as number;
+
+    await odooFetch("account.move", "action_post", { ids: [moveId] });
+    return { external_entity_type: "Bill", external_entity_id: String(moveId) };
+  }
+
+  async function syncExpense(expense: StandardExpense): Promise<AccountingResult> {
+    const accounts = await resolveOdooAccountIds();
+    const amount = Math.round(expense.amount * 100) / 100;
+
+    const moveId = await odooFetch("account.move", "create", {
+      move_type: "entry",
+      date: expense.date,
+      ref: expense.reference ?? expense.id,
+      narration: expense.notes ?? "",
+      line_ids: [
+        [0, 0, { account_id: accounts.commissions, name: expense.notes || "Gasto", debit: amount, credit: 0 }],
+        [0, 0, { account_id: accounts.bank, name: "Pago efectuado", debit: 0, credit: amount }],
+      ],
+    }) as number;
+
+    await odooFetch("account.move", "action_post", { ids: [moveId] });
+    return { external_entity_type: "Expense", external_entity_id: String(moveId) };
+  }
+
+  async function syncPayment(payment: StandardPayment): Promise<AccountingResult> {
+    const isOutbound = payment.payment_type === "made";
+    const paymentId = await odooFetch("account.payment", "create", {
+      payment_type: isOutbound ? "outbound" : "inbound",
+      partner_type: isOutbound ? "supplier" : "customer",
+      partner_id: Number(payment.contact_external_id),
+      amount: payment.amount,
+      date: payment.date,
+      ref: payment.reference ?? "",
+    }) as number;
+
+    await odooFetch("account.payment", "action_post", { ids: [paymentId] });
+    return { external_entity_type: "Payment", external_entity_id: String(paymentId) };
+  }
+
+  async function healthCheck(): Promise<boolean> {
+    try {
+      await odooFetch("res.users", "search_read", {
+        domain: [["id", "=", 1]],
+        fields: ["name"],
+        limit: 1,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  return { syncContact, syncJournal, syncInvoice, syncBill, syncExpense, syncPayment, healthCheck };
 }
 
 // =============================================
@@ -762,10 +1022,10 @@ async function getAdapter(
       return createZohoBooksAdapter(supabase, settings.zoho_org_id);
 
     case "odoo":
-      if (!settings.odoo_url || !settings.odoo_api_key || !settings.odoo_database) {
-        throw new Error("Odoo credentials (odoo_url, odoo_api_key, odoo_database) not configured.");
+      if (!settings.odoo_url || !settings.odoo_api_key_encrypted || !settings.odoo_database) {
+        throw new Error("Odoo credentials (odoo_url, odoo_api_key_encrypted, odoo_database) not configured.");
       }
-      return createOdooAdapter({ url: settings.odoo_url, apiKey: settings.odoo_api_key, database: settings.odoo_database });
+      return createOdooAdapter({ url: settings.odoo_url, apiKey: settings.odoo_api_key_encrypted, database: settings.odoo_database });
 
     case "quickbooks":
       if (!settings.qb_client_id || !settings.qb_client_secret || !settings.qb_realm_id) {
@@ -860,7 +1120,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: settings } = await supabase
       .from("platform_settings")
-      .select("accounting_provider, accounting_sync_enabled, zoho_org_id, zoho_region, zoho_sandbox_mode")
+      .select("accounting_provider, accounting_sync_enabled, zoho_org_id, zoho_region, zoho_sandbox_mode, odoo_url, odoo_api_key_encrypted, odoo_database")
       .maybeSingle();
 
     if (action === "health_check") {

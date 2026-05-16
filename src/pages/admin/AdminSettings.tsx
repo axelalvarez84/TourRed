@@ -46,6 +46,9 @@ interface PlatformSettings {
   zoho_org_id: string;
   zoho_region: string;
   zoho_sandbox_mode: boolean;
+  odoo_url: string;
+  odoo_api_key_encrypted: string;
+  odoo_database: string;
 }
 
 const AdminSettings: React.FC = () => {
@@ -91,6 +94,9 @@ const AdminSettings: React.FC = () => {
     zoho_org_id: '',
     zoho_region: 'com',
     zoho_sandbox_mode: true,
+    odoo_url: '',
+    odoo_api_key_encrypted: '',
+    odoo_database: '',
   });
   const [zohoStatus, setZohoStatus] = useState<{
     connected: boolean;
@@ -103,6 +109,8 @@ const AdminSettings: React.FC = () => {
   const [zohoConnectError, setZohoConnectError] = useState('');
   const [isConnectingZoho, setIsConnectingZoho] = useState(false);
   const [isCheckingZoho, setIsCheckingZoho] = useState(false);
+  const [odooHealthy, setOdooHealthy] = useState<boolean | null>(null);
+  const [isCheckingOdoo, setIsCheckingOdoo] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{
@@ -151,6 +159,21 @@ const AdminSettings: React.FC = () => {
       setZohoConnectError(err.message);
     } finally {
       setIsConnectingZoho(false);
+    }
+  };
+
+  const handleCheckOdoo = async () => {
+    setIsCheckingOdoo(true);
+    setOdooHealthy(null);
+    try {
+      const { data } = await supabase.functions.invoke('sync-to-accounting', {
+        body: { action: 'health_check' },
+      });
+      setOdooHealthy(data?.healthy === true);
+    } catch {
+      setOdooHealthy(false);
+    } finally {
+      setIsCheckingOdoo(false);
     }
   };
 
@@ -250,6 +273,9 @@ const AdminSettings: React.FC = () => {
             zoho_org_id: platformSettings.zoho_org_id,
             zoho_region: platformSettings.zoho_region,
             zoho_sandbox_mode: platformSettings.zoho_sandbox_mode,
+            odoo_url: platformSettings.odoo_url,
+            odoo_api_key_encrypted: platformSettings.odoo_api_key_encrypted,
+            odoo_database: platformSettings.odoo_database,
             updated_at: new Date().toISOString(),
             updated_by: user?.id
           })
@@ -1117,8 +1143,8 @@ const AdminSettings: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
               >
                 <option value="none">Sin proveedor (desactivado)</option>
-                <option value="zoho_books">Zoho Books (Recomendado)</option>
-                <option value="odoo">Odoo (Proximamente)</option>
+                <option value="zoho_books">Zoho Books</option>
+                <option value="odoo">Odoo (JSON-2 API)</option>
                 <option value="quickbooks">QuickBooks (Proximamente)</option>
                 <option value="contpaqi_cloud">Contpaqi Cloud (Proximamente)</option>
               </select>
@@ -1330,9 +1356,89 @@ const AdminSettings: React.FC = () => {
             </div>
           )}
 
-          {platformSettings.accounting_provider !== 'none' && platformSettings.accounting_provider !== 'zoho_books' && (
+          {platformSettings.accounting_provider === 'odoo' && (
+            <div className="space-y-6">
+              <div className="border border-gray-200 rounded-lg p-5">
+                <h3 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-primary-500" />
+                  Credenciales Odoo (JSON-2 API)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">URL de la Instancia Odoo</label>
+                    <input
+                      type="url"
+                      value={platformSettings.odoo_url}
+                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, odoo_url: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                      placeholder="https://tuempresa.odoo.com"
+                      autoComplete="off"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">URL completa de tu instancia (ej. https://toursred.odoo.com)</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+                    <input
+                      type="password"
+                      value={platformSettings.odoo_api_key_encrypted}
+                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, odoo_api_key_encrypted: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                      placeholder="Bearer token generado en Preferencias → Seguridad"
+                      autoComplete="off"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Preferencias de usuario → Seguridad de la cuenta → Nueva clave API</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de la Base de Datos</label>
+                    <input
+                      type="text"
+                      value={platformSettings.odoo_database}
+                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, odoo_database: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                      placeholder="toursred-test"
+                      autoComplete="off"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">El subdominio de tu URL (ej. "toursred-test" de toursred-test.odoo.com)</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleCheckOdoo}
+                    disabled={isCheckingOdoo || !platformSettings.odoo_url || !platformSettings.odoo_api_key_encrypted}
+                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isCheckingOdoo ? <Loader className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    {isCheckingOdoo ? 'Verificando...' : 'Probar conexion'}
+                  </button>
+                  {odooHealthy !== null && (
+                    <span className={`flex items-center gap-1.5 text-sm font-medium ${odooHealthy ? 'text-green-600' : 'text-red-600'}`}>
+                      {odooHealthy ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                      {odooHealthy ? 'Conexion exitosa' : 'No se pudo conectar — verifica la URL y el API Key'}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-4 text-sm text-blue-800">
+                <p className="font-semibold mb-1">Que se sincroniza automaticamente con Odoo:</p>
+                <ul className="text-xs space-y-1 list-disc ml-4">
+                  <li>Agencias aprobadas → Contactos (Proveedor) en Odoo</li>
+                  <li>Viajeros con datos fiscales → Contactos (Cliente) en Odoo</li>
+                  <li>Reservas confirmadas → Asientos contables de ingreso (account.move)</li>
+                  <li>Pagos a agencias → Asientos de egreso en Odoo</li>
+                </ul>
+                <p className="text-xs mt-2 text-blue-600">
+                  Monitorea el estado de sincronizacion en: Admin → Contabilidad. La API JSON-2 requiere plan Custom en Odoo SaaS.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {platformSettings.accounting_provider !== 'none' && platformSettings.accounting_provider !== 'zoho_books' && platformSettings.accounting_provider !== 'odoo' && (
             <div className="bg-amber-50 border border-amber-200 rounded-md p-4 text-sm text-amber-800">
-              <strong>{platformSettings.accounting_provider === 'odoo' ? 'Odoo' : platformSettings.accounting_provider === 'quickbooks' ? 'QuickBooks' : 'Contpaqi Cloud'}</strong> — La integracion con este proveedor esta en desarrollo.
+              <strong>{platformSettings.accounting_provider === 'quickbooks' ? 'QuickBooks' : 'Contpaqi Cloud'}</strong> — La integracion con este proveedor esta en desarrollo.
               El adaptador existe en el codigo y puede activarse cuando se implementen las credenciales correspondientes.
             </div>
           )}
