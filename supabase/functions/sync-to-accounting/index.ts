@@ -780,7 +780,7 @@ function createOdooAdapter(config: { url: string; apiKey: string; database: stri
     if (cachedOdooAccounts) return cachedOdooAccounts;
 
     const accounts = await odooFetch("account.account", "search_read", {
-      domain: [["deprecated", "=", false]],
+      domain: [],
       fields: ["id", "code", "name", "account_type"],
     }) as { id: number; code: string; name: string; account_type: string }[];
 
