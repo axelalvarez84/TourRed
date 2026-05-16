@@ -827,12 +827,13 @@ function createOdooAdapter(config: { url: string; apiKey: string; database: stri
     if (existing.length > 0) {
       await odooFetch("res.partner", "write", {
         ids: [existing[0].id],
-        ...payload,
+        vals: payload,
       });
       return { external_entity_type: "Partner", external_entity_id: String(existing[0].id) };
     }
 
-    const newId = await odooFetch("res.partner", "create", { ...payload }) as number;
+    const created = await odooFetch("res.partner", "create", { vals_list: [payload] }) as number[];
+    const newId = Array.isArray(created) ? created[0] : created;
     return { external_entity_type: "Partner", external_entity_id: String(newId) };
   }
 
@@ -876,18 +877,21 @@ function createOdooAdapter(config: { url: string; apiKey: string; database: stri
       }
     }
 
-    const moveId = await odooFetch("account.move", "create", {
-      move_type: "entry",
-      date: moveDate,
-      ref,
-      narration: journal.notes ?? "",
-      line_ids: lineItems.map(l => [0, 0, {
-        account_id: l.account_id,
-        name: l.name,
-        debit: l.debit,
-        credit: l.credit,
-      }]),
-    }) as number;
+    const createdMove = await odooFetch("account.move", "create", {
+      vals_list: [{
+        move_type: "entry",
+        date: moveDate,
+        ref,
+        narration: journal.notes ?? "",
+        line_ids: lineItems.map(l => [0, 0, {
+          account_id: l.account_id,
+          name: l.name,
+          debit: l.debit,
+          credit: l.credit,
+        }]),
+      }],
+    }) as number[];
+    const moveId = Array.isArray(createdMove) ? createdMove[0] : createdMove;
 
     // Confirmar el asiento (pasar a estado "posted")
     await odooFetch("account.move", "action_post", { ids: [moveId] });
@@ -902,16 +906,19 @@ function createOdooAdapter(config: { url: string; apiKey: string; database: stri
       price_unit: li.unit_price,
     }]);
 
-    const moveId = await odooFetch("account.move", "create", {
-      move_type: "out_invoice",
-      partner_id: Number(invoice.contact_external_id),
-      invoice_date: invoice.date,
-      invoice_date_due: invoice.due_date ?? invoice.date,
-      ref: invoice.reference ?? "",
-      narration: invoice.notes ?? "",
-      currency_id: 163, // MXN en Odoo estándar
-      invoice_line_ids: lines,
-    }) as number;
+    const createdInvoice = await odooFetch("account.move", "create", {
+      vals_list: [{
+        move_type: "out_invoice",
+        partner_id: Number(invoice.contact_external_id),
+        invoice_date: invoice.date,
+        invoice_date_due: invoice.due_date ?? invoice.date,
+        ref: invoice.reference ?? "",
+        narration: invoice.notes ?? "",
+        currency_id: 163, // MXN en Odoo estándar
+        invoice_line_ids: lines,
+      }],
+    }) as number[];
+    const moveId = Array.isArray(createdInvoice) ? createdInvoice[0] : createdInvoice;
 
     await odooFetch("account.move", "action_post", { ids: [moveId] });
     return { external_entity_type: "Invoice", external_entity_id: String(moveId) };
@@ -924,16 +931,19 @@ function createOdooAdapter(config: { url: string; apiKey: string; database: stri
       price_unit: li.unit_price,
     }]);
 
-    const moveId = await odooFetch("account.move", "create", {
-      move_type: "in_invoice",
-      partner_id: Number(bill.vendor_external_id),
-      invoice_date: bill.date,
-      invoice_date_due: bill.due_date ?? bill.date,
-      ref: bill.reference ?? "",
-      narration: bill.notes ?? "",
-      currency_id: 163,
-      invoice_line_ids: lines,
-    }) as number;
+    const createdBill = await odooFetch("account.move", "create", {
+      vals_list: [{
+        move_type: "in_invoice",
+        partner_id: Number(bill.vendor_external_id),
+        invoice_date: bill.date,
+        invoice_date_due: bill.due_date ?? bill.date,
+        ref: bill.reference ?? "",
+        narration: bill.notes ?? "",
+        currency_id: 163,
+        invoice_line_ids: lines,
+      }],
+    }) as number[];
+    const moveId = Array.isArray(createdBill) ? createdBill[0] : createdBill;
 
     await odooFetch("account.move", "action_post", { ids: [moveId] });
     return { external_entity_type: "Bill", external_entity_id: String(moveId) };
@@ -943,16 +953,19 @@ function createOdooAdapter(config: { url: string; apiKey: string; database: stri
     const accounts = await resolveOdooAccountIds();
     const amount = Math.round(expense.amount * 100) / 100;
 
-    const moveId = await odooFetch("account.move", "create", {
-      move_type: "entry",
-      date: expense.date,
-      ref: expense.reference ?? expense.id,
-      narration: expense.notes ?? "",
-      line_ids: [
-        [0, 0, { account_id: accounts.commissions, name: expense.notes || "Gasto", debit: amount, credit: 0 }],
-        [0, 0, { account_id: accounts.bank, name: "Pago efectuado", debit: 0, credit: amount }],
-      ],
-    }) as number;
+    const createdExpense = await odooFetch("account.move", "create", {
+      vals_list: [{
+        move_type: "entry",
+        date: expense.date,
+        ref: expense.reference ?? expense.id,
+        narration: expense.notes ?? "",
+        line_ids: [
+          [0, 0, { account_id: accounts.commissions, name: expense.notes || "Gasto", debit: amount, credit: 0 }],
+          [0, 0, { account_id: accounts.bank, name: "Pago efectuado", debit: 0, credit: amount }],
+        ],
+      }],
+    }) as number[];
+    const moveId = Array.isArray(createdExpense) ? createdExpense[0] : createdExpense;
 
     await odooFetch("account.move", "action_post", { ids: [moveId] });
     return { external_entity_type: "Expense", external_entity_id: String(moveId) };
@@ -960,14 +973,17 @@ function createOdooAdapter(config: { url: string; apiKey: string; database: stri
 
   async function syncPayment(payment: StandardPayment): Promise<AccountingResult> {
     const isOutbound = payment.payment_type === "made";
-    const paymentId = await odooFetch("account.payment", "create", {
-      payment_type: isOutbound ? "outbound" : "inbound",
-      partner_type: isOutbound ? "supplier" : "customer",
-      partner_id: Number(payment.contact_external_id),
-      amount: payment.amount,
-      date: payment.date,
-      ref: payment.reference ?? "",
-    }) as number;
+    const createdPayment = await odooFetch("account.payment", "create", {
+      vals_list: [{
+        payment_type: isOutbound ? "outbound" : "inbound",
+        partner_type: isOutbound ? "supplier" : "customer",
+        partner_id: Number(payment.contact_external_id),
+        amount: payment.amount,
+        date: payment.date,
+        ref: payment.reference ?? "",
+      }],
+    }) as number[];
+    const paymentId = Array.isArray(createdPayment) ? createdPayment[0] : createdPayment;
 
     await odooFetch("account.payment", "action_post", { ids: [paymentId] });
     return { external_entity_type: "Payment", external_entity_id: String(paymentId) };
