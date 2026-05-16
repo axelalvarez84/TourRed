@@ -1130,8 +1130,8 @@ const AdminSettings: React.FC = () => {
             <h2 className="text-xl font-semibold text-gray-900">Integracion Contable</h2>
           </div>
           <p className="text-sm text-gray-500 mb-6">
-            Sincronizacion en tiempo real con tu sistema contable. Arquitectura modular: cambiar de Zoho Books a Odoo u otro sistema
-            solo requiere configurar el nuevo proveedor aqui — sin modificar el resto de la plataforma.
+            Elige entre el Mini ERP nativo de ToursRed (contabilidad electronica SAT Anexo 24 integrada) o sincroniza con un sistema
+            externo como Zoho Books u Odoo. Cambiar de proveedor no afecta registros previos.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -1143,6 +1143,7 @@ const AdminSettings: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
               >
                 <option value="none">Sin proveedor (desactivado)</option>
+                <option value="internal">Mini ERP Interno (ToursRed)</option>
                 <option value="zoho_books">Zoho Books</option>
                 <option value="odoo">Odoo (JSON-2 API)</option>
                 <option value="quickbooks">QuickBooks (Proximamente)</option>
@@ -1157,7 +1158,7 @@ const AdminSettings: React.FC = () => {
                   type="checkbox"
                   checked={platformSettings.accounting_sync_enabled}
                   onChange={(e) => setPlatformSettings(prev => ({ ...prev, accounting_sync_enabled: e.target.checked }))}
-                  disabled={platformSettings.accounting_provider === 'none'}
+                  disabled={platformSettings.accounting_provider === 'none' || platformSettings.accounting_provider === 'internal'}
                   className="sr-only peer"
                 />
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600 peer-disabled:opacity-50"></div>
@@ -1165,11 +1166,66 @@ const AdminSettings: React.FC = () => {
               <div>
                 <div className="text-sm font-medium text-gray-700">Sincronizacion en Tiempo Real</div>
                 <div className="text-xs text-gray-400">
-                  {platformSettings.accounting_sync_enabled ? 'Activa — reservas, pagos y contactos se sincronizan automaticamente' : 'Inactiva'}
+                  {platformSettings.accounting_provider === 'internal'
+                    ? 'No aplica — el ERP interno genera polizas directamente desde los eventos'
+                    : platformSettings.accounting_sync_enabled
+                      ? 'Activa — reservas, pagos y contactos se sincronizan automaticamente'
+                      : 'Inactiva'}
                 </div>
               </div>
             </div>
           </div>
+
+          {platformSettings.accounting_provider === 'internal' && (
+            <div className="space-y-4">
+              <div className="border border-sky-200 rounded-lg p-5 bg-sky-50/40">
+                <h3 className="text-sm font-semibold text-sky-800 mb-3 flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-sky-600" />
+                  Mini ERP Contable Interno — ToursRed
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div className="bg-white rounded-lg border border-sky-100 p-4">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">RFC Emisor</p>
+                    <p className="text-sm font-mono font-bold text-gray-800">TRG250711JWA</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Regimen RESICO 626</p>
+                  </div>
+                  <div className="bg-white rounded-lg border border-sky-100 p-4">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Catalogo de Cuentas</p>
+                    <p className="text-sm font-medium text-gray-800">SAT Anexo 24</p>
+                    <p className="text-xs text-gray-400 mt-0.5">30+ cuentas pre-configuradas</p>
+                  </div>
+                  <div className="bg-white rounded-lg border border-sky-100 p-4">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Exportacion SAT</p>
+                    <p className="text-sm font-medium text-gray-800">CT · BC · PL en ZIP</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Listo para subir al SAT</p>
+                  </div>
+                </div>
+
+                <a
+                  href="/accounting"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700 transition-colors"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Ir al modulo de Contabilidad
+                </a>
+              </div>
+
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-sm text-emerald-800">
+                <p className="font-semibold mb-2">Que genera automaticamente el ERP interno:</p>
+                <ul className="text-xs space-y-1 list-disc ml-4">
+                  <li>Reservas con pago confirmado → Poliza de ingreso (Anticipo recibido en cuenta 102 Bancos / 208 Anticipos de clientes)</li>
+                  <li>Tours completados → Poliza de devengamiento (comision propia 401 + CxP Agencias 201)</li>
+                  <li>Pagos a agencias → Poliza de egreso (cancela el pasivo 201 y acredita 102 Bancos)</li>
+                  <li>Cargo de servicio → Ingreso inmediato en cuenta 402 al momento del pago</li>
+                </ul>
+                <p className="text-xs mt-2 text-emerald-700 font-medium">
+                  Usa "Generar polizas" en el modulo de Contabilidad para procesar eventos historicos del periodo.
+                </p>
+              </div>
+            </div>
+          )}
 
           {platformSettings.accounting_provider === 'zoho_books' && (
             <div className="space-y-6">
@@ -1436,7 +1492,7 @@ const AdminSettings: React.FC = () => {
             </div>
           )}
 
-          {platformSettings.accounting_provider !== 'none' && platformSettings.accounting_provider !== 'zoho_books' && platformSettings.accounting_provider !== 'odoo' && (
+          {platformSettings.accounting_provider !== 'none' && platformSettings.accounting_provider !== 'internal' && platformSettings.accounting_provider !== 'zoho_books' && platformSettings.accounting_provider !== 'odoo' && (
             <div className="bg-amber-50 border border-amber-200 rounded-md p-4 text-sm text-amber-800">
               <strong>{platformSettings.accounting_provider === 'quickbooks' ? 'QuickBooks' : 'Contpaqi Cloud'}</strong> — La integracion con este proveedor esta en desarrollo.
               El adaptador existe en el codigo y puede activarse cuando se implementen las credenciales correspondientes.
