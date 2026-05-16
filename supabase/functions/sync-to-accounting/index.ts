@@ -737,6 +737,34 @@ function createOdooAdapter(config: { url: string; apiKey: string; database: stri
     return res.json();
   }
 
+  // Cache del ID de México y MXN resueltos dinámicamente
+  let cachedMexicoId: number | null = null;
+  let cachedMxnCurrencyId: number | null = null;
+
+  async function resolveMexicoCountryId(): Promise<number> {
+    if (cachedMexicoId) return cachedMexicoId;
+    const result = await odooFetch("res.country", "search_read", {
+      domain: [["code", "=", "MX"]],
+      fields: ["id"],
+      limit: 1,
+    }) as { id: number }[];
+    if (!result.length) throw new Error("No se encontró México (code=MX) en res.country de Odoo");
+    cachedMexicoId = result[0].id;
+    return cachedMexicoId;
+  }
+
+  async function resolveMxnCurrencyId(): Promise<number> {
+    if (cachedMxnCurrencyId) return cachedMxnCurrencyId;
+    const result = await odooFetch("res.currency", "search_read", {
+      domain: [["name", "=", "MXN"]],
+      fields: ["id"],
+      limit: 1,
+    }) as { id: number }[];
+    if (!result.length) throw new Error("No se encontró la moneda MXN en res.currency de Odoo");
+    cachedMxnCurrencyId = result[0].id;
+    return cachedMxnCurrencyId;
+  }
+
   // Cache de IDs de cuentas contables dentro de la vida de la función
   let cachedOdooAccounts: {
     ar: number;      // Cuentas por Cobrar (receivable)
@@ -802,6 +830,7 @@ function createOdooAdapter(config: { url: string; apiKey: string; database: stri
 
   async function syncContact(contact: StandardContact): Promise<AccountingResult> {
     const isCompany = contact.type === "agency";
+    const mexicoId = await resolveMexicoCountryId();
     const payload = {
       name: contact.razon_social || contact.name,
       email: contact.email ?? false,
@@ -814,7 +843,7 @@ function createOdooAdapter(config: { url: string; apiKey: string; database: stri
       street: contact.address ?? false,
       city: contact.city ?? false,
       zip: contact.codigo_postal ?? false,
-      country_id: 157, // México (ID estándar en Odoo con localización MX)
+      country_id: mexicoId,
     };
 
     // Buscar por referencia interna (ref = nuestro UUID)
@@ -906,6 +935,7 @@ function createOdooAdapter(config: { url: string; apiKey: string; database: stri
       price_unit: li.unit_price,
     }]);
 
+    const mxnId = await resolveMxnCurrencyId();
     const createdInvoice = await odooFetch("account.move", "create", {
       vals_list: [{
         move_type: "out_invoice",
@@ -914,7 +944,7 @@ function createOdooAdapter(config: { url: string; apiKey: string; database: stri
         invoice_date_due: invoice.due_date ?? invoice.date,
         ref: invoice.reference ?? "",
         narration: invoice.notes ?? "",
-        currency_id: 163, // MXN en Odoo estándar
+        currency_id: mxnId,
         invoice_line_ids: lines,
       }],
     }) as number[];
@@ -931,6 +961,7 @@ function createOdooAdapter(config: { url: string; apiKey: string; database: stri
       price_unit: li.unit_price,
     }]);
 
+    const mxnId = await resolveMxnCurrencyId();
     const createdBill = await odooFetch("account.move", "create", {
       vals_list: [{
         move_type: "in_invoice",
@@ -939,7 +970,7 @@ function createOdooAdapter(config: { url: string; apiKey: string; database: stri
         invoice_date_due: bill.due_date ?? bill.date,
         ref: bill.reference ?? "",
         narration: bill.notes ?? "",
-        currency_id: 163,
+        currency_id: mxnId,
         invoice_line_ids: lines,
       }],
     }) as number[];
