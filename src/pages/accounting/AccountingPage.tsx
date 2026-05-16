@@ -4,11 +4,13 @@ import {
   TrendingUp, TrendingDown, DollarSign, Layers, ChevronRight,
   Plus, AlertCircle, CheckCircle, Clock, Search, Calendar,
   BookMarked, ArrowUpRight, ArrowDownLeft, Users, Building2,
-  X, ChevronDown, ChevronUp, Settings, PenLine, Trash2, Send
+  X, ChevronDown, ChevronUp, Settings, PenLine, Trash2, Send,
+  Pencil, ToggleLeft, ToggleRight, Filter
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import ManualEntryModal from '../../components/accounting/ManualEntryModal';
+import AccountCatalogModal from '../../components/accounting/AccountCatalogModal';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -53,6 +55,19 @@ interface IncomeStatementRow {
   name: string;
   account_type: string;
   total_amount: number;
+}
+
+interface AccountBalanceRow {
+  code: string;
+  name: string;
+  account_type: string;
+  nature: string;
+  period_debit: number;
+  period_credit: number;
+  period_balance: number;
+  historic_debit: number;
+  historic_credit: number;
+  historic_balance: number;
 }
 
 interface AccountingEntry {
@@ -154,6 +169,13 @@ const AccountingPage: React.FC = () => {
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [searchAccounts, setSearchAccounts] = useState('');
+  const [catalogTypeFilter, setCatalogTypeFilter] = useState<string>('all');
+  const [showInactive, setShowInactive] = useState(false);
+  const [accountBalances, setAccountBalances] = useState<AccountBalanceRow[]>([]);
+  const [loadingBalances, setLoadingBalances] = useState(false);
+  const [catalogModal, setCatalogModal] = useState<{ open: boolean; account: ChartAccount | null }>({ open: false, account: null });
+  const [deleteConfirm, setDeleteConfirm] = useState<ChartAccount | null>(null);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [entryFilter, setEntryFilter] = useState<'all' | 'ingreso' | 'egreso' | 'diario'>('all');
 
   // Manual entries tab
@@ -180,6 +202,35 @@ const AccountingPage: React.FC = () => {
     setAccounts(data ?? []);
     setLoadingAccounts(false);
   }, []);
+
+  // ── Load account balances for catalog
+  const loadAccountBalances = useCallback(async () => {
+    setLoadingBalances(true);
+    const { data } = await supabase.rpc('get_account_balances_full', { p_year: year, p_month: month });
+    setAccountBalances(data ?? []);
+    setLoadingBalances(false);
+  }, [year, month]);
+
+  const handleDeleteAccount = async (account: ChartAccount) => {
+    setDeletingAccount(true);
+    // Check for movements
+    const { count } = await supabase
+      .from('accounting_entry_lines')
+      .select('id', { count: 'exact', head: true })
+      .eq('account_code', account.code);
+    if ((count ?? 0) > 0) {
+      // Has movements — only deactivate
+      await supabase.from('chart_of_accounts').update({ is_active: false }).eq('id', account.id);
+      showToast('Cuenta desactivada (tiene movimientos registrados)');
+    } else {
+      await supabase.from('chart_of_accounts').delete().eq('id', account.id);
+      showToast('Cuenta eliminada');
+    }
+    setDeleteConfirm(null);
+    setDeletingAccount(false);
+    loadAccounts();
+    loadAccountBalances();
+  };
 
   // ── Load entries for period
   const loadEntries = useCallback(async () => {
@@ -254,7 +305,12 @@ const AccountingPage: React.FC = () => {
     if (activeTab === 'entries') loadEntries();
     else if (activeTab === 'manual') loadManualEntries();
     else if (['overview', 'balance_sheet', 'income'].includes(activeTab)) loadReports();
+    else if (activeTab === 'catalog') loadAccountBalances();
   }, [activeTab, year, month, showCompare, compareYear, compareMonth]);
+
+  useEffect(() => {
+    if (activeTab === 'catalog') loadAccountBalances();
+  }, [year, month]);
 
   // ── Toggle entry detail
   const toggleEntry = async (entryId: string) => {
@@ -339,11 +395,14 @@ const AccountingPage: React.FC = () => {
 
   const filteredEntries = entryFilter === 'all' ? entries : entries.filter(e => e.entry_type === entryFilter);
   const filteredManualEntries = manualFilter === 'all' ? manualEntries : manualEntries.filter(e => e.entry_type === manualFilter);
-  const filteredAccounts = accounts.filter(a =>
-    !searchAccounts ||
-    a.code.toLowerCase().includes(searchAccounts.toLowerCase()) ||
-    a.name.toLowerCase().includes(searchAccounts.toLowerCase())
-  );
+  const filteredAccounts = accounts.filter(a => {
+    if (!showInactive && !a.is_active) return false;
+    if (catalogTypeFilter !== 'all' && a.account_type !== catalogTypeFilter) return false;
+    if (searchAccounts && !a.code.toLowerCase().includes(searchAccounts.toLowerCase()) && !a.name.toLowerCase().includes(searchAccounts.toLowerCase())) return false;
+    return true;
+  });
+
+  const balanceMap = Object.fromEntries(accountBalances.map(b => [b.code, b]));
 
   const yearsOptions = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
 
@@ -955,55 +1014,181 @@ const AccountingPage: React.FC = () => {
         {/* ── CATALOG ── */}
         {activeTab === 'catalog' && (
           <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1 max-w-sm">
+            {/* Toolbar */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Search */}
+              <div className="relative flex-1 min-w-[200px] max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input value={searchAccounts} onChange={e => setSearchAccounts(e.target.value)}
                   placeholder="Buscar por codigo o nombre..."
                   className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-100" />
               </div>
-              <span className="text-sm text-gray-500">{filteredAccounts.length} cuentas</span>
+              {/* Type filter */}
+              <select
+                value={catalogTypeFilter}
+                onChange={e => setCatalogTypeFilter(e.target.value)}
+                className="text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-sky-400 bg-white text-gray-700"
+              >
+                <option value="all">Todos los tipos</option>
+                <option value="activo">Activo</option>
+                <option value="pasivo">Pasivo</option>
+                <option value="capital">Capital</option>
+                <option value="ingreso">Ingreso</option>
+                <option value="gasto">Gasto</option>
+                <option value="costo">Costo</option>
+              </select>
+              {/* Show inactive toggle */}
+              <button
+                onClick={() => setShowInactive(v => !v)}
+                className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border transition-colors ${showInactive ? 'border-sky-300 bg-sky-50 text-sky-700' : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'}`}
+              >
+                <Filter className="w-3.5 h-3.5" />
+                {showInactive ? 'Ocultando inactivas: No' : 'Mostrar inactivas'}
+              </button>
+              <span className="text-sm text-gray-400">{filteredAccounts.length} cuentas</span>
+              <div className="ml-auto">
+                <button
+                  onClick={() => setCatalogModal({ open: true, account: null })}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-sky-600 rounded-lg hover:bg-sky-700 transition-colors shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Nueva cuenta
+                </button>
+              </div>
             </div>
 
             {loadingAccounts ? <LoadingSpinner /> : (
               <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase">
-                      <th className="text-left px-6 py-3">Codigo</th>
-                      <th className="text-left px-6 py-3">Nombre</th>
-                      <th className="text-left px-6 py-3">Tipo</th>
-                      <th className="text-left px-6 py-3">Agrupador SAT</th>
-                      <th className="text-left px-6 py-3">Naturaleza</th>
-                      <th className="text-left px-6 py-3">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredAccounts.map((a, i) => (
-                      <tr key={a.id} className={`${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'} border-b border-gray-50 hover:bg-sky-50/20 transition-colors`}
-                        style={{ paddingLeft: `${(a.level - 1) * 16}px` }}>
-                        <td className="px-6 py-3 font-mono text-xs font-semibold text-sky-700"
-                          style={{ paddingLeft: `${(a.level - 1) * 12 + 24}px` }}>{a.code}</td>
-                        <td className="px-6 py-3 text-gray-700 font-medium">{a.name}</td>
-                        <td className="px-6 py-3"><span className={`text-xs px-2 py-0.5 rounded-full ${typeColor(a.account_type)}`}>{typeLabel(a.account_type)}</span></td>
-                        <td className="px-6 py-3 font-mono text-xs text-gray-400">{a.sat_group_code}</td>
-                        <td className="px-6 py-3 text-xs text-gray-500 capitalize">{a.nature}</td>
-                        <td className="px-6 py-3">
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${a.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-400'}`}>
-                            {a.is_active ? 'Activa' : 'Inactiva'}
-                          </span>
-                          {a.is_system && <span className="ml-1 text-xs text-gray-400">(sistema)</span>}
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[900px]">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase">
+                        <th className="text-left px-4 py-3">Codigo</th>
+                        <th className="text-left px-4 py-3">Nombre</th>
+                        <th className="text-left px-4 py-3">Tipo</th>
+                        <th className="text-left px-4 py-3">Agrupador SAT</th>
+                        <th className="text-left px-4 py-3">Naturaleza</th>
+                        <th className="text-right px-4 py-3">Saldo periodo</th>
+                        <th className="text-right px-4 py-3">Saldo historico</th>
+                        <th className="text-left px-4 py-3">Estado</th>
+                        <th className="text-center px-4 py-3">Acciones</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {filteredAccounts.map((a, i) => {
+                        const bal = balanceMap[a.code];
+                        const periodBal = bal?.period_balance ?? 0;
+                        const historicBal = bal?.historic_balance ?? 0;
+                        return (
+                          <tr key={a.id} className={`${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'} border-b border-gray-50 hover:bg-sky-50/20 transition-colors`}>
+                            <td className="px-4 py-3 font-mono text-xs font-semibold text-sky-700"
+                              style={{ paddingLeft: `${(a.level - 1) * 12 + 16}px` }}>{a.code}</td>
+                            <td className="px-4 py-3 text-gray-700 font-medium">{a.name}</td>
+                            <td className="px-4 py-3"><span className={`text-xs px-2 py-0.5 rounded-full ${typeColor(a.account_type)}`}>{typeLabel(a.account_type)}</span></td>
+                            <td className="px-4 py-3 font-mono text-xs text-gray-400">{a.sat_group_code}</td>
+                            <td className="px-4 py-3 text-xs text-gray-500 capitalize">{a.nature}</td>
+                            <td className="px-4 py-3 text-right font-mono text-xs">
+                              {loadingBalances ? (
+                                <span className="text-gray-300">—</span>
+                              ) : (
+                                <span className={periodBal === 0 ? 'text-gray-400' : periodBal > 0 ? 'text-emerald-600 font-semibold' : 'text-red-500 font-semibold'}>
+                                  {periodBal !== 0 ? fmt(periodBal) : '—'}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono text-xs">
+                              {loadingBalances ? (
+                                <span className="text-gray-300">—</span>
+                              ) : (
+                                <span className={historicBal === 0 ? 'text-gray-400' : historicBal > 0 ? 'text-gray-800 font-semibold' : 'text-red-500 font-semibold'}>
+                                  {historicBal !== 0 ? fmt(historicBal) : '—'}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${a.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-400'}`}>
+                                {a.is_active ? 'Activa' : 'Inactiva'}
+                              </span>
+                              {a.is_system && <span className="ml-1 text-xs text-gray-400">(sistema)</span>}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={() => setCatalogModal({ open: true, account: a })}
+                                  className="p-1.5 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
+                                  title="Editar cuenta"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                {!a.is_system && (
+                                  <button
+                                    onClick={() => setDeleteConfirm(a)}
+                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                    title={a.is_active ? 'Desactivar o eliminar' : 'Eliminar'}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
                 {filteredAccounts.length === 0 && (
                   <p className="text-center text-gray-400 text-sm py-12">Sin cuentas que coincidan.</p>
                 )}
               </div>
             )}
           </div>
+        )}
+
+        {/* ── DELETE ACCOUNT CONFIRM ── */}
+        {deleteConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+                  <Trash2 className="w-5 h-5 text-red-500" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm">Eliminar / Desactivar cuenta</h3>
+                  <p className="text-xs text-gray-400 font-mono">{deleteConfirm.code} — {deleteConfirm.name}</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600 mb-5">
+                Si la cuenta tiene movimientos registrados, sera <strong>desactivada</strong> (no eliminada) para preservar el historial contable.
+                Si no tiene movimientos, sera <strong>eliminada definitivamente</strong>.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => handleDeleteAccount(deleteConfirm)}
+                  disabled={deletingAccount}
+                  className="flex-1 px-3 py-2 text-sm font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+                >
+                  {deletingAccount ? 'Procesando...' : 'Confirmar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── CATALOG MODAL ── */}
+        {catalogModal.open && (
+          <AccountCatalogModal
+            account={catalogModal.account}
+            allAccounts={accounts}
+            onClose={() => setCatalogModal({ open: false, account: null })}
+            onSaved={() => { loadAccounts(); loadAccountBalances(); }}
+          />
         )}
 
       </div>
