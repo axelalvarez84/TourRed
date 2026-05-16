@@ -4,10 +4,11 @@ import {
   TrendingUp, TrendingDown, DollarSign, Layers, ChevronRight,
   Plus, AlertCircle, CheckCircle, Clock, Search, Calendar,
   BookMarked, ArrowUpRight, ArrowDownLeft, Users, Building2,
-  X, ChevronDown, ChevronUp, Settings
+  X, ChevronDown, ChevronUp, Settings, PenLine, Trash2, Send
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import ManualEntryModal from '../../components/accounting/ManualEntryModal';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -115,6 +116,7 @@ function typeColor(t: string): string {
 const TABS = [
   { id: 'overview', label: 'Resumen', icon: BarChart2 },
   { id: 'entries', label: 'Polizas', icon: List },
+  { id: 'manual', label: 'Movimientos', icon: PenLine },
   { id: 'balance_sheet', label: 'Balance General', icon: Layers },
   { id: 'income', label: 'Estado de Resultados', icon: TrendingUp },
   { id: 'catalog', label: 'Catalogo', icon: BookOpen },
@@ -153,6 +155,15 @@ const AccountingPage: React.FC = () => {
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [searchAccounts, setSearchAccounts] = useState('');
   const [entryFilter, setEntryFilter] = useState<'all' | 'ingreso' | 'egreso' | 'diario'>('all');
+
+  // Manual entries tab
+  const [manualEntries, setManualEntries] = useState<AccountingEntry[]>([]);
+  const [loadingManual, setLoadingManual] = useState(false);
+  const [manualFilter, setManualFilter] = useState<'all' | 'ingreso' | 'egreso' | 'diario'>('all');
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -201,12 +212,47 @@ const AccountingPage: React.FC = () => {
     setLoadingReports(false);
   }, [year, month, showCompare, compareYear, compareMonth]);
 
+  // ── Load manual entries
+  const loadManualEntries = useCallback(async () => {
+    setLoadingManual(true);
+    const { data } = await supabase
+      .from('accounting_entries')
+      .select('id, entry_number, entry_type, entry_date, period_year, period_month, description, source_type, is_posted, created_at')
+      .eq('source_type', 'manual')
+      .eq('period_year', year)
+      .eq('period_month', month)
+      .order('entry_date', { ascending: false });
+    setManualEntries(data ?? []);
+    setLoadingManual(false);
+  }, [year, month]);
+
+  const handleConfirmEntry = async (id: string) => {
+    setConfirmingId(id);
+    const { error } = await supabase
+      .from('accounting_entries')
+      .update({ is_posted: true, posted_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) showToast('Error al confirmar el movimiento', false);
+    else { showToast('Movimiento confirmado'); loadManualEntries(); loadReports(); }
+    setConfirmingId(null);
+  };
+
+  const handleDeleteEntry = async (id: string) => {
+    setDeletingId(id);
+    await supabase.from('accounting_entry_lines').delete().eq('entry_id', id);
+    const { error } = await supabase.from('accounting_entries').delete().eq('id', id);
+    if (error) showToast('Error al eliminar el movimiento', false);
+    else { showToast('Movimiento eliminado'); setConfirmDeleteId(null); loadManualEntries(); }
+    setDeletingId(null);
+  };
+
   useEffect(() => {
     loadAccounts();
   }, [loadAccounts]);
 
   useEffect(() => {
     if (activeTab === 'entries') loadEntries();
+    else if (activeTab === 'manual') loadManualEntries();
     else if (['overview', 'balance_sheet', 'income'].includes(activeTab)) loadReports();
   }, [activeTab, year, month, showCompare, compareYear, compareMonth]);
 
@@ -292,6 +338,7 @@ const AccountingPage: React.FC = () => {
   const totalCapital = balanceSheet.filter(r => r.account_type === 'capital').reduce((s, r) => s + Number(r.balance), 0);
 
   const filteredEntries = entryFilter === 'all' ? entries : entries.filter(e => e.entry_type === entryFilter);
+  const filteredManualEntries = manualFilter === 'all' ? manualEntries : manualEntries.filter(e => e.entry_type === manualFilter);
   const filteredAccounts = accounts.filter(a =>
     !searchAccounts ||
     a.code.toLowerCase().includes(searchAccounts.toLowerCase()) ||
@@ -364,6 +411,16 @@ const AccountingPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Manual entry modal */}
+      {showManualModal && (
+        <ManualEntryModal
+          year={year}
+          month={month}
+          onClose={() => setShowManualModal(false)}
+          onSaved={() => { loadManualEntries(); loadReports(); showToast('Movimiento guardado correctamente'); }}
+        />
+      )}
 
       {/* Toast */}
       {toast && (
@@ -712,6 +769,184 @@ const AccountingPage: React.FC = () => {
                 {incomeStatement.length === 0 && (
                   <p className="text-center text-gray-400 text-sm py-12">Sin datos para este periodo.</p>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── MANUAL ENTRIES ── */}
+        {activeTab === 'manual' && (
+          <div className="space-y-4">
+            {/* Toolbar */}
+            <div className="flex flex-wrap gap-3 items-center justify-between">
+              <div className="flex flex-wrap gap-2">
+                {(['all', 'ingreso', 'egreso', 'diario'] as const).map(f => (
+                  <button key={f} onClick={() => setManualFilter(f)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+                      manualFilter === f
+                        ? f === 'ingreso' ? 'bg-emerald-600 text-white border-emerald-600'
+                          : f === 'egreso' ? 'bg-red-500 text-white border-red-500'
+                          : f === 'diario' ? 'bg-sky-600 text-white border-sky-600'
+                          : 'bg-gray-800 text-white border-gray-800'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                    }`}>
+                    {f === 'ingreso' && <ArrowUpRight className="w-3.5 h-3.5" />}
+                    {f === 'egreso' && <ArrowDownLeft className="w-3.5 h-3.5" />}
+                    {f === 'diario' && <BookMarked className="w-3.5 h-3.5" />}
+                    {f === 'all' ? 'Todos' : f.charAt(0).toUpperCase() + f.slice(1)}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-500">{filteredManualEntries.length} movimientos</span>
+                {(isAdmin || isAccountant) && (
+                  <button
+                    onClick={() => setShowManualModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Nuevo movimiento
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {loadingManual ? <LoadingSpinner /> : filteredManualEntries.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
+                <PenLine className="w-12 h-12 text-gray-200 mx-auto mb-4" />
+                <p className="text-gray-500 font-semibold">Sin movimientos manuales en este periodo</p>
+                <p className="text-sm text-gray-400 mt-2 mb-6">Registra ingresos por consultoria, comisiones de mayoristas, gastos operativos, viaticos y mas.</p>
+                {(isAdmin || isAccountant) && (
+                  <button
+                    onClick={() => setShowManualModal(true)}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Agregar primer movimiento
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                {filteredManualEntries.map((e, idx) => (
+                  <div key={e.id} className={`${idx > 0 ? 'border-t border-gray-100' : ''}`}>
+                    <div className="flex items-center gap-3 px-5 py-4">
+                      {/* Type icon */}
+                      <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${
+                        e.entry_type === 'ingreso' ? 'bg-emerald-50' :
+                        e.entry_type === 'egreso' ? 'bg-red-50' : 'bg-sky-50'
+                      }`}>
+                        {entryTypeIcon(e.entry_type)}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-gray-800">{e.entry_number}</p>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            e.entry_type === 'ingreso' ? 'bg-emerald-50 text-emerald-700' :
+                            e.entry_type === 'egreso' ? 'bg-red-50 text-red-700' : 'bg-sky-50 text-sky-700'
+                          }`}>
+                            {e.entry_type}
+                          </span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            e.is_posted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                          }`}>
+                            {e.is_posted ? 'Confirmado' : 'Borrador'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 truncate mt-0.5">{e.description}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{e.entry_date}</p>
+                      </div>
+
+                      {/* Actions */}
+                      {(isAdmin || isAccountant) && (
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {!e.is_posted && (
+                            <>
+                              <button
+                                onClick={() => handleConfirmEntry(e.id)}
+                                disabled={confirmingId === e.id}
+                                title="Confirmar movimiento"
+                                className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50"
+                              >
+                                <Send className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeleteId(e.id)}
+                                title="Eliminar movimiento"
+                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={() => toggleEntry(e.id)}
+                            className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors"
+                            title="Ver partidas"
+                          >
+                            {expandedEntry === e.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Expanded lines */}
+                    {expandedEntry === e.id && (
+                      <div className="px-5 pb-4">
+                        <div className="bg-gray-50 rounded-lg overflow-hidden border border-gray-200">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="bg-gray-100 text-xs text-gray-500 uppercase">
+                                <th className="text-left px-4 py-2">Cuenta</th>
+                                <th className="text-left px-4 py-2">Descripcion</th>
+                                <th className="text-right px-4 py-2">Cargo</th>
+                                <th className="text-right px-4 py-2">Abono</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(entryLines[e.id] ?? []).length === 0 ? (
+                                <tr><td colSpan={4} className="px-4 py-3 text-center text-xs text-gray-400">Cargando partidas...</td></tr>
+                              ) : (entryLines[e.id] ?? []).map((l, li) => (
+                                <tr key={l.id} className={li % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                                  <td className="px-4 py-2 font-mono text-xs text-sky-700">{l.account_code}</td>
+                                  <td className="px-4 py-2 text-gray-600 text-xs">
+                                    {l.description}
+                                    {l.cfdi_uuid && <span className="ml-2 text-gray-400 font-mono">{l.cfdi_uuid.slice(0,8)}…</span>}
+                                  </td>
+                                  <td className="px-4 py-2 text-right font-medium text-gray-800">{l.debit > 0 ? fmt(l.debit) : ''}</td>
+                                  <td className="px-4 py-2 text-right font-medium text-gray-800">{l.credit > 0 ? fmt(l.credit) : ''}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Delete confirm */}
+                    {confirmDeleteId === e.id && (
+                      <div className="mx-5 mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-center gap-3">
+                        <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                        <p className="text-sm text-red-700 flex-1">Eliminar este movimiento y sus partidas. Esta accion no se puede deshacer.</p>
+                        <button
+                          onClick={() => handleDeleteEntry(e.id)}
+                          disabled={deletingId === e.id}
+                          className="px-3 py-1.5 bg-red-500 text-white text-xs font-medium rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors"
+                        >
+                          {deletingId === e.id ? 'Eliminando...' : 'Confirmar'}
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="px-3 py-1.5 bg-white text-gray-600 text-xs font-medium rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
