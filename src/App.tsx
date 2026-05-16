@@ -56,6 +56,7 @@ import AdminTourMessages from './pages/admin/AdminTourMessages';
 import AdminBroadcastMessages from './pages/admin/AdminBroadcastMessages';
 import AdminCfdi from './pages/admin/AdminCfdi';
 import AdminContabilidad from './pages/admin/AdminContabilidad';
+import AccountingPage from './pages/accounting/AccountingPage';
 import MegaTravelPage from './pages/international/MegaTravelPage';
 import NefertariTravelPage from './pages/international/NefertariTravelPage';
 import ExoticcaPage from './pages/international/ExoticcaPage';
@@ -485,6 +486,16 @@ const App: React.FC = () => {
             }
           />
 
+          {/* Accounting module — accessible to admin and accountant */}
+          <Route
+            path="/accounting"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.ACCOUNTANT]}>
+                <AccountingPage />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Redirects based on role */}
           <Route
             path="/profile"
@@ -516,11 +527,12 @@ const ProfileRedirect: React.FC = () => {
 };
 
 const DashboardRedirect: React.FC = () => {
-  const { isAdmin, isAgency, isTraveler, isAgencyStaff } = useAuth();
+  const { isAdmin, isAgency, isTraveler, isAgencyStaff, isAccountant } = useAuth();
 
   if (isAdmin) return <Navigate to="/admin/dashboard" />;
   if (isAgency) return <Navigate to="/agency/dashboard" />;
   if (isAgencyStaff) return <Navigate to="/agency/dashboard" />;
+  if (isAccountant) return <Navigate to="/accounting" />;
   if (isTraveler) return <Navigate to="/traveler/dashboard" />;
 
   return <Navigate to="/login" />;

@@ -1,0 +1,815 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  BookOpen, BarChart2, FileText, List, Download, RefreshCw,
+  TrendingUp, TrendingDown, DollarSign, Layers, ChevronRight,
+  Plus, AlertCircle, CheckCircle, Clock, Search, Calendar,
+  BookMarked, ArrowUpRight, ArrowDownLeft, Users, Building2,
+  X, ChevronDown, ChevronUp, Settings
+} from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
+import NavBar from '../../components/NavBar';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface ChartAccount {
+  id: string;
+  code: string;
+  sat_group_code: string;
+  name: string;
+  account_type: 'activo' | 'pasivo' | 'capital' | 'ingreso' | 'gasto' | 'costo';
+  parent_code: string | null;
+  level: number;
+  nature: 'deudora' | 'acreedora';
+  is_system: boolean;
+  is_active: boolean;
+  description: string;
+}
+
+interface TrialBalanceRow {
+  code: string;
+  name: string;
+  sat_group_code: string;
+  account_type: string;
+  nature: string;
+  opening_debit: number;
+  opening_credit: number;
+  period_debit: number;
+  period_credit: number;
+  closing_debit: number;
+  closing_credit: number;
+}
+
+interface BalanceSheetRow {
+  code: string;
+  name: string;
+  account_type: string;
+  nature: string;
+  balance: number;
+}
+
+interface IncomeStatementRow {
+  code: string;
+  name: string;
+  account_type: string;
+  total_amount: number;
+}
+
+interface AccountingEntry {
+  id: string;
+  entry_number: string;
+  entry_type: 'ingreso' | 'egreso' | 'diario';
+  entry_date: string;
+  period_year: number;
+  period_month: number;
+  description: string;
+  source_type: string | null;
+  is_posted: boolean;
+  created_at: string;
+}
+
+interface EntryLine {
+  id: string;
+  account_code: string;
+  description: string;
+  debit: number;
+  credit: number;
+  cfdi_uuid: string | null;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function fmt(n: number | null | undefined): string {
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n ?? 0);
+}
+
+function typeLabel(t: string): string {
+  const m: Record<string, string> = {
+    activo: 'Activo', pasivo: 'Pasivo', capital: 'Capital',
+    ingreso: 'Ingreso', gasto: 'Gasto', costo: 'Costo',
+  };
+  return m[t] ?? t;
+}
+
+function entryTypeIcon(t: string) {
+  if (t === 'ingreso') return <ArrowUpRight className="w-4 h-4 text-emerald-600" />;
+  if (t === 'egreso') return <ArrowDownLeft className="w-4 h-4 text-red-500" />;
+  return <BookMarked className="w-4 h-4 text-sky-500" />;
+}
+
+function typeColor(t: string): string {
+  const m: Record<string, string> = {
+    activo: 'bg-sky-50 text-sky-700 border border-sky-200',
+    pasivo: 'bg-amber-50 text-amber-700 border border-amber-200',
+    capital: 'bg-violet-50 text-violet-700 border border-violet-200',
+    ingreso: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    gasto: 'bg-red-50 text-red-700 border border-red-200',
+    costo: 'bg-orange-50 text-orange-700 border border-orange-200',
+  };
+  return m[t] ?? 'bg-gray-50 text-gray-700';
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+const TABS = [
+  { id: 'overview', label: 'Resumen', icon: BarChart2 },
+  { id: 'entries', label: 'Polizas', icon: List },
+  { id: 'balance_sheet', label: 'Balance General', icon: Layers },
+  { id: 'income', label: 'Estado de Resultados', icon: TrendingUp },
+  { id: 'catalog', label: 'Catalogo', icon: BookOpen },
+] as const;
+
+type Tab = typeof TABS[number]['id'];
+
+const AccountingPage: React.FC = () => {
+  const { isAdmin, isAccountant, isSuperAdmin } = useAuth();
+  const canExport = isAdmin || isSuperAdmin || isAccountant;
+
+  const now = new Date();
+  const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [compareYear, setCompareYear] = useState(now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear());
+  const [compareMonth, setCompareMonth] = useState(now.getMonth() === 0 ? 12 : now.getMonth());
+  const [showCompare, setShowCompare] = useState(false);
+
+  // Data states
+  const [accounts, setAccounts] = useState<ChartAccount[]>([]);
+  const [trialBalance, setTrialBalance] = useState<TrialBalanceRow[]>([]);
+  const [balanceSheet, setBalanceSheet] = useState<BalanceSheetRow[]>([]);
+  const [compareBalanceSheet, setCompareBalanceSheet] = useState<BalanceSheetRow[]>([]);
+  const [incomeStatement, setIncomeStatement] = useState<IncomeStatementRow[]>([]);
+  const [compareIncome, setCompareIncome] = useState<IncomeStatementRow[]>([]);
+  const [entries, setEntries] = useState<AccountingEntry[]>([]);
+  const [entryLines, setEntryLines] = useState<Record<string, EntryLine[]>>({});
+  const [expandedEntry, setExpandedEntry] = useState<string | null>(null);
+
+  const [loadingEntries, setLoadingEntries] = useState(false);
+  const [loadingReports, setLoadingReports] = useState(false);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [searchAccounts, setSearchAccounts] = useState('');
+  const [entryFilter, setEntryFilter] = useState<'all' | 'ingreso' | 'egreso' | 'diario'>('all');
+
+  const showToast = (msg: string, ok = true) => {
+    setToast({ msg, ok });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  // ── Load accounts
+  const loadAccounts = useCallback(async () => {
+    setLoadingAccounts(true);
+    const { data } = await supabase
+      .from('chart_of_accounts')
+      .select('*')
+      .order('code');
+    setAccounts(data ?? []);
+    setLoadingAccounts(false);
+  }, []);
+
+  // ── Load entries for period
+  const loadEntries = useCallback(async () => {
+    setLoadingEntries(true);
+    const { data } = await supabase
+      .from('accounting_entries')
+      .select('id, entry_number, entry_type, entry_date, period_year, period_month, description, source_type, is_posted, created_at')
+      .eq('period_year', year)
+      .eq('period_month', month)
+      .order('entry_date', { ascending: true });
+    setEntries(data ?? []);
+    setLoadingEntries(false);
+  }, [year, month]);
+
+  // ── Load reports (balance, income, trial)
+  const loadReports = useCallback(async () => {
+    setLoadingReports(true);
+    const [tb, bs, is_, cbs, cis] = await Promise.all([
+      supabase.rpc('get_trial_balance', { p_year: year, p_month: month }),
+      supabase.rpc('get_balance_sheet', { p_year: year, p_month: month }),
+      supabase.rpc('get_income_statement', { p_from_year: year, p_from_month: month, p_to_year: year, p_to_month: month }),
+      showCompare ? supabase.rpc('get_balance_sheet', { p_year: compareYear, p_month: compareMonth }) : Promise.resolve({ data: [] }),
+      showCompare ? supabase.rpc('get_income_statement', { p_from_year: compareYear, p_from_month: compareMonth, p_to_year: compareYear, p_to_month: compareMonth }) : Promise.resolve({ data: [] }),
+    ]);
+    setTrialBalance(tb.data ?? []);
+    setBalanceSheet(bs.data ?? []);
+    setIncomeStatement(is_.data ?? []);
+    setCompareBalanceSheet(cbs.data ?? []);
+    setCompareIncome(cis.data ?? []);
+    setLoadingReports(false);
+  }, [year, month, showCompare, compareYear, compareMonth]);
+
+  useEffect(() => {
+    loadAccounts();
+  }, [loadAccounts]);
+
+  useEffect(() => {
+    if (activeTab === 'entries') loadEntries();
+    else if (['overview', 'balance_sheet', 'income'].includes(activeTab)) loadReports();
+  }, [activeTab, year, month, showCompare, compareYear, compareMonth]);
+
+  // ── Toggle entry detail
+  const toggleEntry = async (entryId: string) => {
+    if (expandedEntry === entryId) {
+      setExpandedEntry(null);
+      return;
+    }
+    setExpandedEntry(entryId);
+    if (!entryLines[entryId]) {
+      const { data } = await supabase
+        .from('accounting_entry_lines')
+        .select('*')
+        .eq('entry_id', entryId)
+        .order('line_number');
+      setEntryLines(prev => ({ ...prev, [entryId]: data ?? [] }));
+    }
+  };
+
+  // ── Generate entries batch
+  const handleGenerate = async () => {
+    setGenerating(true);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const token = session.session?.access_token;
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-accounting-entries`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      const r = json.result;
+      showToast(`Procesadas: ${r.bookings_processed} reservas, ${r.completions_processed} tours completados, ${r.payouts_processed} pagos`);
+      loadEntries();
+      loadReports();
+    } catch (e: any) {
+      showToast(e.message ?? 'Error al generar polizas', false);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // ── Export SAT XML
+  const handleExportSat = async () => {
+    if (!canExport) return;
+    setExporting(true);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const token = session.session?.access_token;
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-sat-xml?year=${year}&month=${month}`;
+      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (!res.ok) {
+        const j = await res.json();
+        throw new Error(j.error);
+      }
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `ContabilidadElectronica_${year}${String(month).padStart(2,'0')}.zip`;
+      a.click();
+      showToast('XMLs descargados correctamente');
+    } catch (e: any) {
+      showToast(e.message ?? 'Error al exportar', false);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // ── Computed summaries for overview
+  const totalIncome = incomeStatement
+    .filter(r => r.account_type === 'ingreso')
+    .reduce((s, r) => s + Number(r.total_amount), 0);
+  const totalExpenses = incomeStatement
+    .filter(r => r.account_type !== 'ingreso')
+    .reduce((s, r) => s + Number(r.total_amount), 0);
+  const netResult = totalIncome - totalExpenses;
+
+  const totalAssets = balanceSheet.filter(r => r.account_type === 'activo').reduce((s, r) => s + Number(r.balance), 0);
+  const totalLiabilities = balanceSheet.filter(r => r.account_type === 'pasivo').reduce((s, r) => s + Number(r.balance), 0);
+  const totalCapital = balanceSheet.filter(r => r.account_type === 'capital').reduce((s, r) => s + Number(r.balance), 0);
+
+  const filteredEntries = entryFilter === 'all' ? entries : entries.filter(e => e.entry_type === entryFilter);
+  const filteredAccounts = accounts.filter(a =>
+    !searchAccounts ||
+    a.code.toLowerCase().includes(searchAccounts.toLowerCase()) ||
+    a.name.toLowerCase().includes(searchAccounts.toLowerCase())
+  );
+
+  const yearsOptions = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <NavBar />
+
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <BookOpen className="w-7 h-7 text-sky-600" />
+                Contabilidad Electronica
+              </h1>
+              <p className="text-sm text-gray-500 mt-0.5">ToursRed — RFC: TRG250711JWA · RESICO 626</p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Period selector */}
+              <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                <Calendar className="w-4 h-4 text-gray-500" />
+                <select value={month} onChange={e => setMonth(Number(e.target.value))}
+                  className="text-sm bg-transparent border-none outline-none text-gray-700 font-medium">
+                  {MONTHS.map((m, i) => <option key={i} value={i+1}>{m}</option>)}
+                </select>
+                <select value={year} onChange={e => setYear(Number(e.target.value))}
+                  className="text-sm bg-transparent border-none outline-none text-gray-700 font-medium">
+                  {yearsOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+
+              {isAdmin && (
+                <button onClick={handleGenerate} disabled={generating}
+                  className="flex items-center gap-2 px-4 py-2 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700 disabled:opacity-60 transition-colors">
+                  <RefreshCw className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} />
+                  {generating ? 'Procesando...' : 'Generar polizas'}
+                </button>
+              )}
+
+              {canExport && (
+                <button onClick={handleExportSat} disabled={exporting}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-60 transition-colors">
+                  <Download className={`w-4 h-4 ${exporting ? 'animate-spin' : ''}`} />
+                  {exporting ? 'Exportando...' : 'Exportar SAT'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-1 mt-6 overflow-x-auto">
+            {TABS.map(tab => {
+              const Icon = tab.icon;
+              const active = activeTab === tab.id;
+              return (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg whitespace-nowrap transition-colors ${
+                    active ? 'bg-sky-50 text-sky-700 border border-sky-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                  }`}>
+                  <Icon className="w-4 h-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-medium ${
+          toast.ok ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+        }`}>
+          {toast.ok ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          {toast.msg}
+        </div>
+      )}
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+
+        {/* ── OVERVIEW ── */}
+        {activeTab === 'overview' && (
+          <div className="space-y-6">
+            {loadingReports ? <LoadingSpinner /> : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <SummaryCard label="Total Ingresos" value={fmt(totalIncome)} icon={<TrendingUp className="w-5 h-5 text-emerald-600" />} color="emerald" />
+                  <SummaryCard label="Total Gastos" value={fmt(totalExpenses)} icon={<TrendingDown className="w-5 h-5 text-red-500" />} color="red" />
+                  <SummaryCard label={netResult >= 0 ? 'Utilidad Neta' : 'Perdida Neta'} value={fmt(Math.abs(netResult))} icon={<DollarSign className={`w-5 h-5 ${netResult >= 0 ? 'text-sky-600' : 'text-red-500'}`} />} color={netResult >= 0 ? 'sky' : 'red'} />
+                  <SummaryCard label="Total Activos" value={fmt(totalAssets)} icon={<Layers className="w-5 h-5 text-amber-600" />} color="amber" />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Income breakdown */}
+                  <div className="bg-white rounded-xl border border-gray-200 p-5">
+                    <h3 className="font-semibold text-gray-800 mb-4">Ingresos del periodo</h3>
+                    {incomeStatement.filter(r => r.account_type === 'ingreso').length === 0 ? (
+                      <p className="text-sm text-gray-400 text-center py-6">Sin movimientos en este periodo</p>
+                    ) : incomeStatement.filter(r => r.account_type === 'ingreso').map(r => (
+                      <div key={r.code} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">{r.name}</p>
+                          <p className="text-xs text-gray-400">{r.code}</p>
+                        </div>
+                        <span className="text-sm font-semibold text-emerald-600">{fmt(r.total_amount)}</span>
+                      </div>
+                    ))}
+                    {totalIncome > 0 && (
+                      <div className="flex justify-between items-center pt-3 mt-1">
+                        <span className="text-sm font-bold text-gray-700">Total</span>
+                        <span className="text-sm font-bold text-emerald-700">{fmt(totalIncome)}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Balance brief */}
+                  <div className="bg-white rounded-xl border border-gray-200 p-5">
+                    <h3 className="font-semibold text-gray-800 mb-4">Posicion patrimonial</h3>
+                    <div className="space-y-3">
+                      <BsLine label="Total Activos" value={fmt(totalAssets)} positive />
+                      <BsLine label="Total Pasivos" value={fmt(totalLiabilities)} />
+                      <BsLine label="Capital Contable" value={fmt(totalCapital + netResult)} positive />
+                      <div className="pt-2 border-t border-gray-100">
+                        <BsLine label="Resultado del ejercicio" value={fmt(netResult)} positive={netResult >= 0} highlight />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Recent entries */}
+                <div className="bg-white rounded-xl border border-gray-200 p-5">
+                  <h3 className="font-semibold text-gray-800 mb-4">Ultimas polizas del periodo</h3>
+                  {entries.length === 0 ? (
+                    <p className="text-sm text-gray-400 text-center py-6">Sin polizas. Usa "Generar polizas" para procesar los eventos del periodo.</p>
+                  ) : entries.slice(-5).reverse().map(e => (
+                    <div key={e.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+                      {entryTypeIcon(e.entry_type)}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-700 truncate">{e.description}</p>
+                        <p className="text-xs text-gray-400">{e.entry_number} · {e.entry_date}</p>
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        e.entry_type === 'ingreso' ? 'bg-emerald-50 text-emerald-700' :
+                        e.entry_type === 'egreso' ? 'bg-red-50 text-red-700' : 'bg-sky-50 text-sky-700'
+                      }`}>{e.entry_type}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── ENTRIES ── */}
+        {activeTab === 'entries' && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-3 items-center justify-between">
+              <div className="flex gap-2">
+                {(['all', 'ingreso', 'egreso', 'diario'] as const).map(f => (
+                  <button key={f} onClick={() => setEntryFilter(f)}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+                      entryFilter === f ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-gray-600 border-gray-200 hover:border-sky-300'
+                    }`}>
+                    {f === 'all' ? 'Todas' : f.charAt(0).toUpperCase() + f.slice(1)}
+                  </button>
+                ))}
+              </div>
+              <span className="text-sm text-gray-500">{filteredEntries.length} polizas</span>
+            </div>
+
+            {loadingEntries ? <LoadingSpinner /> : filteredEntries.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+                <FileText className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 font-medium">Sin polizas para este periodo</p>
+                <p className="text-sm text-gray-400 mt-1">Usa "Generar polizas" para procesar los eventos automaticamente.</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                {filteredEntries.map((e, idx) => (
+                  <div key={e.id} className={`${idx > 0 ? 'border-t border-gray-100' : ''}`}>
+                    <button onClick={() => toggleEntry(e.id)}
+                      className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-gray-50 transition-colors">
+                      {entryTypeIcon(e.entry_type)}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800">{e.entry_number}</p>
+                        <p className="text-xs text-gray-500 truncate mt-0.5">{e.description}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-gray-400">{e.entry_date}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          e.is_posted ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                        }`}>{e.is_posted ? 'Confirmada' : 'Borrador'}</span>
+                        {expandedEntry === e.id ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                      </div>
+                    </button>
+
+                    {expandedEntry === e.id && (
+                      <div className="px-5 pb-4">
+                        <div className="bg-gray-50 rounded-lg overflow-hidden border border-gray-200">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="bg-gray-100 text-xs text-gray-500 uppercase">
+                                <th className="text-left px-4 py-2">Cuenta</th>
+                                <th className="text-left px-4 py-2">Descripcion</th>
+                                <th className="text-right px-4 py-2">Debito</th>
+                                <th className="text-right px-4 py-2">Credito</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(entryLines[e.id] ?? []).map((l, li) => (
+                                <tr key={l.id} className={li % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                                  <td className="px-4 py-2 font-mono text-xs text-sky-700">{l.account_code}</td>
+                                  <td className="px-4 py-2 text-gray-600">{l.description}{l.cfdi_uuid && <span className="ml-2 text-xs text-gray-400 font-mono">{l.cfdi_uuid.slice(0,8)}…</span>}</td>
+                                  <td className="px-4 py-2 text-right font-medium text-gray-800">{l.debit > 0 ? fmt(l.debit) : ''}</td>
+                                  <td className="px-4 py-2 text-right font-medium text-gray-800">{l.credit > 0 ? fmt(l.credit) : ''}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── BALANCE SHEET ── */}
+        {activeTab === 'balance_sheet' && (
+          <div className="space-y-6">
+            {/* Compare toggle */}
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                <input type="checkbox" checked={showCompare} onChange={e => setShowCompare(e.target.checked)}
+                  className="rounded border-gray-300 text-sky-600" />
+                Comparar con otro periodo
+              </label>
+              {showCompare && (
+                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
+                  <select value={compareMonth} onChange={e => setCompareMonth(Number(e.target.value))}
+                    className="text-sm bg-transparent border-none outline-none text-gray-700">
+                    {MONTHS.map((m, i) => <option key={i} value={i+1}>{m}</option>)}
+                  </select>
+                  <select value={compareYear} onChange={e => setCompareYear(Number(e.target.value))}
+                    className="text-sm bg-transparent border-none outline-none text-gray-700">
+                    {yearsOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {loadingReports ? <LoadingSpinner /> : (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+                  <h2 className="text-base font-bold text-gray-800">Balance General — {MONTHS[month-1]} {year}</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">Saldos acumulados al cierre del periodo</p>
+                </div>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase bg-gray-50">
+                      <th className="text-left px-6 py-3">Cuenta</th>
+                      <th className="text-left px-6 py-3">Tipo</th>
+                      <th className="text-right px-6 py-3">{MONTHS[month-1]} {year}</th>
+                      {showCompare && <th className="text-right px-6 py-3">{MONTHS[compareMonth-1]} {compareYear}</th>}
+                      {showCompare && <th className="text-right px-6 py-3">Variacion</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(['activo','pasivo','capital'] as const).map(type => {
+                      const rows = balanceSheet.filter(r => r.account_type === type);
+                      if (rows.length === 0) return null;
+                      const total = rows.reduce((s, r) => s + Number(r.balance), 0);
+                      const cTotal = compareBalanceSheet.filter(r => r.account_type === type).reduce((s, r) => s + Number(r.balance), 0);
+                      return (
+                        <React.Fragment key={type}>
+                          <tr className="bg-gray-50/80">
+                            <td colSpan={showCompare ? 5 : 3} className="px-6 py-2">
+                              <span className={`text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded ${typeColor(type)}`}>{typeLabel(type)}</span>
+                            </td>
+                          </tr>
+                          {rows.map((r, i) => {
+                            const cRow = compareBalanceSheet.find(c => c.code === r.code);
+                            const diff = Number(r.balance) - Number(cRow?.balance ?? 0);
+                            return (
+                              <tr key={r.code} className={`${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'} border-b border-gray-50 hover:bg-sky-50/30 transition-colors`}>
+                                <td className="px-6 py-3">
+                                  <p className="font-medium text-gray-700">{r.name}</p>
+                                  <p className="text-xs text-gray-400 font-mono">{r.code}</p>
+                                </td>
+                                <td className="px-6 py-3"><span className={`text-xs px-2 py-0.5 rounded-full ${typeColor(r.account_type)}`}>{typeLabel(r.account_type)}</span></td>
+                                <td className="px-6 py-3 text-right font-semibold text-gray-800">{fmt(r.balance)}</td>
+                                {showCompare && <td className="px-6 py-3 text-right text-gray-500">{cRow ? fmt(cRow.balance) : '—'}</td>}
+                                {showCompare && <td className={`px-6 py-3 text-right text-xs font-medium ${diff >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{diff >= 0 ? '+' : ''}{fmt(diff)}</td>}
+                              </tr>
+                            );
+                          })}
+                          <tr className="border-b border-gray-200 bg-gray-50">
+                            <td className="px-6 py-2 font-bold text-gray-700" colSpan={2}>Total {typeLabel(type)}</td>
+                            <td className="px-6 py-2 text-right font-bold text-gray-800">{fmt(total)}</td>
+                            {showCompare && <td className="px-6 py-2 text-right font-semibold text-gray-500">{fmt(cTotal)}</td>}
+                            {showCompare && <td className={`px-6 py-2 text-right text-sm font-bold ${total - cTotal >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{total - cTotal >= 0 ? '+' : ''}{fmt(total - cTotal)}</td>}
+                          </tr>
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {balanceSheet.length === 0 && (
+                  <p className="text-center text-gray-400 text-sm py-12">Sin datos para este periodo. Genera polizas primero.</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── INCOME STATEMENT ── */}
+        {activeTab === 'income' && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                <input type="checkbox" checked={showCompare} onChange={e => setShowCompare(e.target.checked)}
+                  className="rounded border-gray-300 text-sky-600" />
+                Comparar con otro periodo
+              </label>
+              {showCompare && (
+                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
+                  <select value={compareMonth} onChange={e => setCompareMonth(Number(e.target.value))}
+                    className="text-sm bg-transparent border-none outline-none text-gray-700">
+                    {MONTHS.map((m, i) => <option key={i} value={i+1}>{m}</option>)}
+                  </select>
+                  <select value={compareYear} onChange={e => setCompareYear(Number(e.target.value))}
+                    className="text-sm bg-transparent border-none outline-none text-gray-700">
+                    {yearsOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {loadingReports ? <LoadingSpinner /> : (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+                  <h2 className="text-base font-bold text-gray-800">Estado de Resultados — {MONTHS[month-1]} {year}</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">Ingresos propios de ToursRed (comisiones + cargo de servicio)</p>
+                </div>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase bg-gray-50">
+                      <th className="text-left px-6 py-3">Cuenta</th>
+                      <th className="text-left px-6 py-3">Tipo</th>
+                      <th className="text-right px-6 py-3">{MONTHS[month-1]} {year}</th>
+                      {showCompare && <th className="text-right px-6 py-3">{MONTHS[compareMonth-1]} {compareYear}</th>}
+                      {showCompare && <th className="text-right px-6 py-3">Variacion</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(['ingreso','costo','gasto'] as const).map(type => {
+                      const rows = incomeStatement.filter(r => r.account_type === type);
+                      if (rows.length === 0) return null;
+                      const total = rows.reduce((s, r) => s + Number(r.total_amount), 0);
+                      const cTotal = compareIncome.filter(r => r.account_type === type).reduce((s, r) => s + Number(r.total_amount), 0);
+                      return (
+                        <React.Fragment key={type}>
+                          <tr className="bg-gray-50/80">
+                            <td colSpan={showCompare ? 5 : 3} className="px-6 py-2">
+                              <span className={`text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded ${typeColor(type)}`}>{typeLabel(type)}</span>
+                            </td>
+                          </tr>
+                          {rows.map((r, i) => {
+                            const cRow = compareIncome.find(c => c.code === r.code);
+                            const diff = Number(r.total_amount) - Number(cRow?.total_amount ?? 0);
+                            return (
+                              <tr key={r.code} className={`${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'} border-b border-gray-50 hover:bg-sky-50/30 transition-colors`}>
+                                <td className="px-6 py-3">
+                                  <p className="font-medium text-gray-700">{r.name}</p>
+                                  <p className="text-xs text-gray-400 font-mono">{r.code}</p>
+                                </td>
+                                <td className="px-6 py-3"><span className={`text-xs px-2 py-0.5 rounded-full ${typeColor(r.account_type)}`}>{typeLabel(r.account_type)}</span></td>
+                                <td className="px-6 py-3 text-right font-semibold text-gray-800">{fmt(r.total_amount)}</td>
+                                {showCompare && <td className="px-6 py-3 text-right text-gray-500">{cRow ? fmt(cRow.total_amount) : '—'}</td>}
+                                {showCompare && <td className={`px-6 py-3 text-right text-xs font-medium ${diff >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{diff >= 0 ? '+' : ''}{fmt(diff)}</td>}
+                              </tr>
+                            );
+                          })}
+                          <tr className="border-b border-gray-200 bg-gray-50">
+                            <td className="px-6 py-2 font-bold text-gray-700" colSpan={2}>Total {typeLabel(type)}</td>
+                            <td className="px-6 py-2 text-right font-bold text-gray-800">{fmt(total)}</td>
+                            {showCompare && <td className="px-6 py-2 text-right font-semibold text-gray-500">{fmt(cTotal)}</td>}
+                            {showCompare && <td className={`px-6 py-2 text-right text-sm font-bold ${total - cTotal >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{total - cTotal >= 0 ? '+' : ''}{fmt(total - cTotal)}</td>}
+                          </tr>
+                        </React.Fragment>
+                      );
+                    })}
+                    {/* Net result row */}
+                    <tr className="bg-gray-900 text-white">
+                      <td className="px-6 py-4 font-bold text-base" colSpan={2}>{netResult >= 0 ? 'Utilidad Neta del Periodo' : 'Perdida Neta del Periodo'}</td>
+                      <td className={`px-6 py-4 text-right font-bold text-base ${netResult >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmt(Math.abs(netResult))}</td>
+                      {showCompare && (() => {
+                        const cIn = compareIncome.filter(r => r.account_type === 'ingreso').reduce((s, r) => s + Number(r.total_amount), 0);
+                        const cEx = compareIncome.filter(r => r.account_type !== 'ingreso').reduce((s, r) => s + Number(r.total_amount), 0);
+                        const cNet = cIn - cEx;
+                        return (
+                          <>
+                            <td className="px-6 py-4 text-right font-semibold text-gray-300">{fmt(Math.abs(cNet))}</td>
+                            <td className={`px-6 py-4 text-right font-bold ${netResult - cNet >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{netResult - cNet >= 0 ? '+' : ''}{fmt(netResult - cNet)}</td>
+                          </>
+                        );
+                      })()}
+                    </tr>
+                  </tbody>
+                </table>
+                {incomeStatement.length === 0 && (
+                  <p className="text-center text-gray-400 text-sm py-12">Sin datos para este periodo.</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── CATALOG ── */}
+        {activeTab === 'catalog' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input value={searchAccounts} onChange={e => setSearchAccounts(e.target.value)}
+                  placeholder="Buscar por codigo o nombre..."
+                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-100" />
+              </div>
+              <span className="text-sm text-gray-500">{filteredAccounts.length} cuentas</span>
+            </div>
+
+            {loadingAccounts ? <LoadingSpinner /> : (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase">
+                      <th className="text-left px-6 py-3">Codigo</th>
+                      <th className="text-left px-6 py-3">Nombre</th>
+                      <th className="text-left px-6 py-3">Tipo</th>
+                      <th className="text-left px-6 py-3">Agrupador SAT</th>
+                      <th className="text-left px-6 py-3">Naturaleza</th>
+                      <th className="text-left px-6 py-3">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAccounts.map((a, i) => (
+                      <tr key={a.id} className={`${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'} border-b border-gray-50 hover:bg-sky-50/20 transition-colors`}
+                        style={{ paddingLeft: `${(a.level - 1) * 16}px` }}>
+                        <td className="px-6 py-3 font-mono text-xs font-semibold text-sky-700"
+                          style={{ paddingLeft: `${(a.level - 1) * 12 + 24}px` }}>{a.code}</td>
+                        <td className="px-6 py-3 text-gray-700 font-medium">{a.name}</td>
+                        <td className="px-6 py-3"><span className={`text-xs px-2 py-0.5 rounded-full ${typeColor(a.account_type)}`}>{typeLabel(a.account_type)}</span></td>
+                        <td className="px-6 py-3 font-mono text-xs text-gray-400">{a.sat_group_code}</td>
+                        <td className="px-6 py-3 text-xs text-gray-500 capitalize">{a.nature}</td>
+                        <td className="px-6 py-3">
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${a.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-400'}`}>
+                            {a.is_active ? 'Activa' : 'Inactiva'}
+                          </span>
+                          {a.is_system && <span className="ml-1 text-xs text-gray-400">(sistema)</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {filteredAccounts.length === 0 && (
+                  <p className="text-center text-gray-400 text-sm py-12">Sin cuentas que coincidan.</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+};
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+const LoadingSpinner: React.FC = () => (
+  <div className="flex items-center justify-center py-16">
+    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-sky-500" />
+  </div>
+);
+
+const SummaryCard: React.FC<{ label: string; value: string; icon: React.ReactNode; color: string }> = ({ label, value, icon, color }) => {
+  const borders: Record<string, string> = {
+    emerald: 'border-emerald-100 bg-emerald-50/40',
+    red: 'border-red-100 bg-red-50/40',
+    sky: 'border-sky-100 bg-sky-50/40',
+    amber: 'border-amber-100 bg-amber-50/40',
+  };
+  return (
+    <div className={`rounded-xl border p-5 ${borders[color] ?? 'border-gray-200 bg-white'}`}>
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm text-gray-500 font-medium">{label}</span>
+        {icon}
+      </div>
+      <p className="text-2xl font-bold text-gray-900">{value}</p>
+    </div>
+  );
+};
+
+const BsLine: React.FC<{ label: string; value: string; positive?: boolean; highlight?: boolean }> = ({ label, value, positive, highlight }) => (
+  <div className={`flex justify-between items-center ${highlight ? 'font-bold' : ''}`}>
+    <span className={`text-sm ${highlight ? 'text-gray-800' : 'text-gray-600'}`}>{label}</span>
+    <span className={`text-sm font-semibold ${highlight ? (positive ? 'text-emerald-600' : 'text-red-500') : 'text-gray-800'}`}>{value}</span>
+  </div>
+);
+
+export default AccountingPage;

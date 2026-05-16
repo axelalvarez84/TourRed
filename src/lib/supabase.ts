@@ -21,6 +21,7 @@ export enum UserRole {
   ADMIN = 'admin',
   AGENCY = 'agency',
   TRAVELER = 'traveler',
+  ACCOUNTANT = 'accountant',
 }
 
 // Date formatting helpers
