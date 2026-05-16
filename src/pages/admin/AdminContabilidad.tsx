@@ -436,8 +436,8 @@ const AdminContabilidad: React.FC = () => {
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
-                { key: 'agencies', icon: <Building2 className="w-5 h-5 text-blue-600" />, label: 'Agencias activas', desc: 'Crea proveedores en Zoho Books por cada agencia aprobada' },
-                { key: 'travelers', icon: <Users className="w-5 h-5 text-green-600" />, label: 'Viajeros con RFC', desc: `Crea clientes en Zoho Books para viajeros con datos fiscales${travelersWithRfcCount !== null ? ` (${travelersWithRfcCount} viajero${travelersWithRfcCount !== 1 ? 's' : ''} con RFC)` : ''}` },
+                { key: 'agencies', icon: <Building2 className="w-5 h-5 text-blue-600" />, label: 'Agencias activas', desc: `Crea proveedores en ${PROVIDER_LABELS[currentProvider] || currentProvider} por cada agencia aprobada` },
+                { key: 'travelers', icon: <Users className="w-5 h-5 text-green-600" />, label: 'Viajeros con RFC', desc: `Crea clientes en ${PROVIDER_LABELS[currentProvider] || currentProvider} para viajeros con datos fiscales${travelersWithRfcCount !== null ? ` (${travelersWithRfcCount} viajero${travelersWithRfcCount !== 1 ? 's' : ''} con RFC)` : ''}` },
                 { key: 'bookings', icon: <FileText className="w-5 h-5 text-amber-600" />, label: 'Reservas confirmadas', desc: 'Crea facturas de ingreso por cada reserva pagada' },
                 { key: 'payouts', icon: <CreditCard className="w-5 h-5 text-rose-600" />, label: 'Pagos a agencias', desc: 'Crea facturas de proveedor por cada pago procesado' },
               ].map(({ key, icon, label, desc }) => (
