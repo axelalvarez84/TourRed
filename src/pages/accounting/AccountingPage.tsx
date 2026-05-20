@@ -246,7 +246,7 @@ const AccountingPage: React.FC = () => {
       .select('id, entry_number, entry_type, entry_date, period_year, period_month, description, source_type, is_posted, created_at')
       .eq('period_year', year)
       .eq('period_month', month)
-      .order('entry_number', { ascending: true });
+      .order('entry_date', { ascending: true });
     setEntries(data ?? []);
     setLoadingEntries(false);
   }, [year, month]);
@@ -309,14 +309,19 @@ const AccountingPage: React.FC = () => {
 
   useEffect(() => {
     if (activeTab === 'entries') loadEntries();
-    else if (activeTab === 'manual') loadManualEntries();
-    else if (['overview', 'balance_sheet', 'income'].includes(activeTab)) loadReports();
-    else if (activeTab === 'catalog') loadAccountBalances();
-  }, [activeTab, year, month, showCompare, compareYear, compareMonth]);
+  }, [activeTab, loadEntries]);
+
+  useEffect(() => {
+    if (activeTab === 'manual') loadManualEntries();
+  }, [activeTab, loadManualEntries]);
+
+  useEffect(() => {
+    if (['overview', 'balance_sheet', 'income'].includes(activeTab)) loadReports();
+  }, [activeTab, loadReports]);
 
   useEffect(() => {
     if (activeTab === 'catalog') loadAccountBalances();
-  }, [year, month]);
+  }, [activeTab, loadAccountBalances]);
 
   // ── Toggle entry detail
   const toggleEntry = async (entryId: string) => {
