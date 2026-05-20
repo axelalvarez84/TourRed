@@ -39,7 +39,7 @@ interface Props {
 
 const PAYMENT_METHODS = [
   { code: '102.01', label: 'Transferencia SPEI', icon: Building2 },
-  { code: '102.02', label: 'Efectivo', icon: Banknote },
+  { code: '101.01', label: 'Efectivo en caja', icon: Banknote },
   { code: '102.03', label: 'Tarjeta (Terminal)', icon: CreditCard },
 ];
 

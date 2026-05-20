@@ -11,6 +11,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import ManualEntryModal from '../../components/accounting/ManualEntryModal';
 import AccountCatalogModal from '../../components/accounting/AccountCatalogModal';
+import AperturaModal from '../../components/accounting/AperturaModal';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -62,6 +63,9 @@ interface AccountBalanceRow {
   name: string;
   account_type: string;
   nature: string;
+  level: number;
+  parent_code: string | null;
+  is_system: boolean;
   period_debit: number;
   period_credit: number;
   period_balance: number;
@@ -73,7 +77,7 @@ interface AccountBalanceRow {
 interface AccountingEntry {
   id: string;
   entry_number: string;
-  entry_type: 'ingreso' | 'egreso' | 'diario';
+  entry_type: 'ingreso' | 'egreso' | 'diario' | 'apertura';
   entry_date: string;
   period_year: number;
   period_month: number;
@@ -111,6 +115,7 @@ function typeLabel(t: string): string {
 function entryTypeIcon(t: string) {
   if (t === 'ingreso') return <ArrowUpRight className="w-4 h-4 text-emerald-600" />;
   if (t === 'egreso') return <ArrowDownLeft className="w-4 h-4 text-red-500" />;
+  if (t === 'apertura') return <BookOpen className="w-4 h-4 text-amber-600" />;
   return <BookMarked className="w-4 h-4 text-sky-500" />;
 }
 
@@ -183,6 +188,7 @@ const AccountingPage: React.FC = () => {
   const [loadingManual, setLoadingManual] = useState(false);
   const [manualFilter, setManualFilter] = useState<'all' | 'ingreso' | 'egreso' | 'diario'>('all');
   const [showManualModal, setShowManualModal] = useState(false);
+  const [showAperturaModal, setShowAperturaModal] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -232,7 +238,7 @@ const AccountingPage: React.FC = () => {
     loadAccountBalances();
   };
 
-  // ── Load entries for period
+  // ── Load entries for period (all sources including manual)
   const loadEntries = useCallback(async () => {
     setLoadingEntries(true);
     const { data } = await supabase
@@ -240,7 +246,7 @@ const AccountingPage: React.FC = () => {
       .select('id, entry_number, entry_type, entry_date, period_year, period_month, description, source_type, is_posted, created_at')
       .eq('period_year', year)
       .eq('period_month', month)
-      .order('entry_date', { ascending: true });
+      .order('entry_number', { ascending: true });
     setEntries(data ?? []);
     setLoadingEntries(false);
   }, [year, month]);
@@ -477,7 +483,17 @@ const AccountingPage: React.FC = () => {
           year={year}
           month={month}
           onClose={() => setShowManualModal(false)}
-          onSaved={() => { loadManualEntries(); loadReports(); showToast('Movimiento guardado correctamente'); }}
+          onSaved={() => { loadManualEntries(); loadEntries(); loadReports(); showToast('Movimiento guardado correctamente'); }}
+        />
+      )}
+
+      {/* Apertura modal */}
+      {showAperturaModal && (
+        <AperturaModal
+          year={year}
+          month={month}
+          onClose={() => setShowAperturaModal(false)}
+          onSaved={() => { loadEntries(); loadManualEntries(); loadReports(); showToast('Poliza de apertura registrada correctamente'); }}
         />
       )}
 
@@ -556,7 +572,7 @@ const AccountingPage: React.FC = () => {
                       </div>
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
                         e.entry_type === 'ingreso' ? 'bg-emerald-50 text-emerald-700' :
-                        e.entry_type === 'egreso' ? 'bg-red-50 text-red-700' : 'bg-sky-50 text-sky-700'
+                        e.entry_type === 'egreso' ? 'bg-red-50 text-red-700' : e.entry_type === 'apertura' ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'
                       }`}>{e.entry_type}</span>
                     </div>
                   ))}
@@ -859,13 +875,22 @@ const AccountingPage: React.FC = () => {
               <div className="flex items-center gap-3">
                 <span className="text-sm text-gray-500">{filteredManualEntries.length} movimientos</span>
                 {(isAdmin || isAccountant) && (
-                  <button
-                    onClick={() => setShowManualModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Nuevo movimiento
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setShowAperturaModal(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 transition-colors"
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      Apertura
+                    </button>
+                    <button
+                      onClick={() => setShowManualModal(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Nuevo movimiento
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -904,7 +929,7 @@ const AccountingPage: React.FC = () => {
                           <p className="text-sm font-semibold text-gray-800">{e.entry_number}</p>
                           <span className={`text-xs px-2 py-0.5 rounded-full ${
                             e.entry_type === 'ingreso' ? 'bg-emerald-50 text-emerald-700' :
-                            e.entry_type === 'egreso' ? 'bg-red-50 text-red-700' : 'bg-sky-50 text-sky-700'
+                            e.entry_type === 'egreso' ? 'bg-red-50 text-red-700' : e.entry_type === 'apertura' ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'
                           }`}>
                             {e.entry_type}
                           </span>
