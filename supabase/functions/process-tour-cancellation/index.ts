@@ -161,6 +161,28 @@ Deno.serve(async (req: Request) => {
           throw new Error("Error actualizando balance");
         }
 
+        // Crear registro de cancelación individual para generar póliza contable
+        const { data: bookingCancellationRecord } = await supabase
+          .from("booking_cancellations")
+          .insert({
+            booking_id: booking.id,
+            cancelled_by_user_id: user.id,
+            cancelled_at: new Date().toISOString(),
+            tour_start_date: tour.start_date,
+            days_before_tour: Math.floor((tourStartDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+            cancellation_policy_type: "100_percent",
+            original_deposit_amount: booking.deposit_amount,
+            original_service_charge: booking.service_charge || 0,
+            refund_amount_to_traveler: refundAmount,
+            amount_to_agency: 0,
+            amount_to_platform: 0,
+            refund_processed: true,
+            cancelled_by_agency: true,
+            cancellation_reason: `Cancelación de tour completo por agencia: ${cancellation_reason.trim()}`
+          })
+          .select()
+          .maybeSingle();
+
         const { error: bookingUpdateError } = await supabase
           .from("bookings")
           .update({
@@ -174,6 +196,18 @@ Deno.serve(async (req: Request) => {
 
         if (bookingUpdateError) {
           throw new Error("Error actualizando reserva");
+        }
+
+        // Generar póliza contable por cada reserva cancelada
+        if (bookingCancellationRecord) {
+          try {
+            await supabase.rpc("create_accounting_entry_for_cancellation", {
+              p_cancellation_id: bookingCancellationRecord.id,
+              p_cancellation_type: "agency_booking"
+            });
+          } catch (accountingError) {
+            console.error("Error generando póliza contable para reserva:", booking.id, accountingError);
+          }
         }
 
         totalRefunded += refundAmount;

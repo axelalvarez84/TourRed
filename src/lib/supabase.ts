@@ -1719,6 +1719,16 @@ export const processCancellation = async (
 
     console.log('📝 Cancelación registrada:', cancellation.id);
 
+    // Generar póliza contable solo cuando hay retención (50% o sin reembolso)
+    if (policy.policyType === '50_percent' || policy.policyType === 'no_refund') {
+      supabase.rpc('create_accounting_entry_for_cancellation', {
+        p_cancellation_id: cancellation.id,
+        p_cancellation_type: 'full'
+      }).then(({ error: accErr }) => {
+        if (accErr) console.error('⚠️ Error generando póliza contable de cancelación:', accErr);
+      });
+    }
+
     const { error: updateBookingError } = await supabase
       .from('bookings')
       .update({
@@ -2030,6 +2040,16 @@ export const processPartialCancellation = async (
       .single();
 
     if (insertError) throw insertError;
+
+    // Generar póliza contable solo cuando hay retención (50% o sin reembolso)
+    if (policy.policyType === '50_percent' || policy.policyType === 'no_refund') {
+      supabase.rpc('create_accounting_entry_for_cancellation', {
+        p_cancellation_id: partialCancellation.id,
+        p_cancellation_type: 'partial'
+      }).then(({ error: accErr }) => {
+        if (accErr) console.error('⚠️ Error generando póliza contable de cancelación parcial:', accErr);
+      });
+    }
 
     // Descontar puntos correspondientes al anticipo de los viajeros cancelados
     // La tasa de puntos es 1 peso pagado = 1 punto ganado (FLOOR del monto)

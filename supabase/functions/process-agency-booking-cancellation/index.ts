@@ -210,6 +210,16 @@ Deno.serve(async (req: Request) => {
       throw new Error("Error actualizando estado de la reserva");
     }
 
+    // Generar póliza contable para la cancelación por agencia (reembolso 100%)
+    try {
+      await supabase.rpc("create_accounting_entry_for_cancellation", {
+        p_cancellation_id: cancellationRecord.id,
+        p_cancellation_type: "agency_booking"
+      });
+    } catch (accountingError) {
+      console.error("Error generando póliza contable de cancelación:", accountingError);
+    }
+
     try {
       await supabase.functions.invoke("send-agency-booking-cancellation-notification-traveler", {
         body: {
