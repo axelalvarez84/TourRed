@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../lib/supabase';
+import TermsAcceptanceGate from './TermsAcceptanceGate';
+import { supabase as supabaseClient } from '../lib/supabase';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -10,7 +12,7 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles, staffPermission }) => {
-  const { user, userRole, isLoading, isEmailVerified, isAgencyStaff, staffInfo } = useAuth();
+  const { user, userRole, isLoading, isEmailVerified, isAgencyStaff, staffInfo, needsTermsAcceptance, markTermsAccepted } = useAuth();
   const [shouldRedirect, setShouldRedirect] = useState(false);
   const redirectTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -68,6 +70,23 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles,
         return <Navigate to="/agency/dashboard" replace />;
       }
     }
+
+    // Show T&C gate for traveler/agency routes if terms need acceptance
+    if (needsTermsAcceptance && (userRole === UserRole.TRAVELER || userRole === UserRole.AGENCY)) {
+      const termsType = userRole === UserRole.AGENCY ? 'agency' : 'traveler';
+      const handleSignOut = async () => {
+        await supabaseClient.auth.signOut();
+        window.location.href = '/login';
+      };
+      return (
+        <TermsAcceptanceGate
+          termsType={termsType}
+          onAccepted={markTermsAccepted}
+          onSignOut={handleSignOut}
+        />
+      );
+    }
+
     return <>{children}</>;
   }
 
@@ -76,6 +95,21 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles,
     if (staffPermission && !staffInfo.permissions[staffPermission]) {
       return <Navigate to="/agency/dashboard" replace />;
     }
+
+    if (needsTermsAcceptance) {
+      const handleSignOut = async () => {
+        await supabaseClient.auth.signOut();
+        window.location.href = '/login';
+      };
+      return (
+        <TermsAcceptanceGate
+          termsType="traveler"
+          onAccepted={markTermsAccepted}
+          onSignOut={handleSignOut}
+        />
+      );
+    }
+
     return <>{children}</>;
   }
 

@@ -64,6 +64,8 @@ interface AuthContextType {
   allStaffInfo: AgencyStaffInfo[];
   activeAgencyId: string | null;
   switchActiveAgency: (agencyId: string) => void;
+  needsTermsAcceptance: boolean;
+  markTermsAccepted: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -83,6 +85,8 @@ const AuthContext = createContext<AuthContextType>({
   allStaffInfo: [],
   activeAgencyId: null,
   switchActiveAgency: () => {},
+  needsTermsAcceptance: false,
+  markTermsAccepted: () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -105,6 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return null;
     }
   });
+  const [needsTermsAcceptance, setNeedsTermsAcceptance] = useState(false);
 
   const initializedUserIdRef = useRef<string | null>(null);
 
@@ -181,6 +186,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // ignore
     }
+  }, []);
+
+  const markTermsAccepted = useCallback(() => {
+    setNeedsTermsAcceptance(false);
   }, []);
 
   const determineUserRole = async (authUser: any, forceRefresh: boolean = false): Promise<{ role: UserRole; emailVerified: boolean }> => {
@@ -323,6 +332,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setPermissions(null);
           setAccountantPermissions(null);
 
+          // Verificar si el viajero necesita aceptar T&C actualizados
+          try {
+            const [profileRes, termsRes] = await Promise.all([
+              supabase.from('users').select('accepted_traveler_terms_version').eq('id', authUser.id).maybeSingle(),
+              supabase.from('terms_versions').select('version_number').eq('terms_type', 'traveler').eq('is_active', true).maybeSingle(),
+            ]);
+            const acceptedVersion = profileRes.data?.accepted_traveler_terms_version ?? null;
+            const activeVersion = termsRes.data?.version_number ?? null;
+            setNeedsTermsAcceptance(activeVersion !== null && acceptedVersion !== activeVersion);
+          } catch {
+            setNeedsTermsAcceptance(false);
+          }
+
           const { count } = await supabase
             .from('agency_staff')
             .select('id', { count: 'exact', head: true })
@@ -346,11 +368,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else {
             setAllStaffInfo([]);
           }
+        } else if (role === UserRole.AGENCY) {
+          setIsSuperAdmin(false);
+          setPermissions(null);
+          setAccountantPermissions(null);
+          setAllStaffInfo([]);
+
+          // Verificar si la agencia necesita aceptar T&C actualizados
+          try {
+            const [profileRes, termsRes] = await Promise.all([
+              supabase.from('users').select('accepted_agency_terms_version').eq('id', authUser.id).maybeSingle(),
+              supabase.from('terms_versions').select('version_number').eq('terms_type', 'agency').eq('is_active', true).maybeSingle(),
+            ]);
+            const acceptedVersion = profileRes.data?.accepted_agency_terms_version ?? null;
+            const activeVersion = termsRes.data?.version_number ?? null;
+            setNeedsTermsAcceptance(activeVersion !== null && acceptedVersion !== activeVersion);
+          } catch {
+            setNeedsTermsAcceptance(false);
+          }
         } else {
           setIsSuperAdmin(false);
           setPermissions(null);
           setAccountantPermissions(null);
           setAllStaffInfo([]);
+          setNeedsTermsAcceptance(false);
         }
       } else {
         setUserRole(null);
@@ -486,7 +527,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     allStaffInfo,
     activeAgencyId,
     switchActiveAgency,
-  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isAccountant, isEmailVerified, isSuperAdmin, permissions, accountantPermissions, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency]);
+    needsTermsAcceptance,
+    markTermsAccepted,
+  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isAccountant, isEmailVerified, isSuperAdmin, permissions, accountantPermissions, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency, needsTermsAcceptance, markTermsAccepted]);
 
   return (
     <AuthContext.Provider value={contextValue}>

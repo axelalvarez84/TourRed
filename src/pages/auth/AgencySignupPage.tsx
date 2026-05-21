@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { signUp, supabase } from '../../lib/supabase';
@@ -11,6 +11,8 @@ const AgencySignupPage: React.FC = () => {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [activeTermsVersion, setActiveTermsVersion] = useState<{ version_number: number; published_at: string } | null>(null);
 
   const searchParams = new URLSearchParams(location.search);
   const redirectUrl = searchParams.get('redirect');
@@ -36,6 +38,12 @@ const AgencySignupPage: React.FC = () => {
     postalCode: '',
     country: 'México'
   });
+
+  useEffect(() => {
+    supabase.rpc('get_active_terms', { p_type: 'agency' }).then(({ data }) => {
+      if (data && data.length > 0) setActiveTermsVersion(data[0]);
+    });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -102,6 +110,23 @@ const AgencySignupPage: React.FC = () => {
       }
 
       console.log('✅ Usuario creado:', { user: data.user, profile: profileData, isExistingUser });
+
+      // Registrar aceptación de T&C de agencia con IP real capturada en el servidor
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/record-terms-acceptance`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ terms_type: 'agency' }),
+          });
+        }
+      } catch (termsErr) {
+        console.error('Error registrando aceptación de T&C de agencia:', termsErr);
+      }
 
       // 2. Update user profile with name
       console.log('👤 Actualizando nombre del usuario...');
@@ -726,10 +751,39 @@ const AgencySignupPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Aceptación explícita de T&C para agencias */}
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={e => setTermsAccepted(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 flex-shrink-0"
+                />
+                <span className="text-sm text-gray-700 leading-relaxed">
+                  He leído y acepto los{' '}
+                  <Link to="/terminos-servicio" target="_blank" className="font-medium text-primary-600 hover:text-primary-500 underline">
+                    Términos y Condiciones para Agencias
+                  </Link>{' '}
+                  y el{' '}
+                  <Link to="/aviso-privacidad" target="_blank" className="font-medium text-primary-600 hover:text-primary-500 underline">
+                    Aviso de Privacidad
+                  </Link>{' '}
+                  de ToursRed
+                  {activeTermsVersion && (
+                    <span className="block text-xs text-gray-400 mt-1">
+                      Versión {activeTermsVersion.version_number} · vigente desde{' '}
+                      {new Date(activeTermsVersion.published_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })}
+                    </span>
+                  )}
+                </span>
+              </label>
+            </div>
+
             <div>
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !termsAccepted}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Creando cuenta...' : 'Registrar Agencia'}

@@ -139,6 +139,8 @@ const NavBar: React.FC = () => {
       contenidoItems.push({ to: '/admin/departure-points', label: 'Puntos de Partida', icon: <Navigation className="h-4 w-4" /> });
     if (isSuperAdmin || permissions?.canManageReviews)
       contenidoItems.push({ to: '/admin/reviews', label: 'Resenas', icon: <Star className="h-4 w-4" /> });
+    if (isSuperAdmin || permissions?.canManageSettings)
+      contenidoItems.push({ to: '/admin/terms', label: 'Terminos y Condiciones', icon: <FileText className="h-4 w-4" /> });
 
     if (contenidoItems.length > 0)
       groups.push({ title: 'Contenido', icon: <MapPin className="h-4 w-4" />, items: contenidoItems });

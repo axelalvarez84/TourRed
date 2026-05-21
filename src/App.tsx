@@ -81,8 +81,10 @@ import GiftCardSuccessPage from './pages/GiftCardSuccessPage';
 import PaymentReturnPage from './pages/PaymentReturnPage';
 import BookingCheckinPage from './pages/BookingCheckinPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import TermsAcceptanceGate from './components/TermsAcceptanceGate';
+import TermsManagementPage from './pages/admin/TermsManagementPage';
 import { useAuth } from './context/AuthContext';
-import { UserRole } from './lib/supabase';
+import { UserRole, supabase } from './lib/supabase';
 
 const App: React.FC = () => {
   const { isLoading } = useAuth();
@@ -486,6 +488,16 @@ const App: React.FC = () => {
             }
           />
 
+          {/* Admin: Términos y Condiciones */}
+          <Route
+            path="/admin/terms"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <TermsManagementPage />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Accounting module — accessible to admin and accountant */}
           <Route
             path="/accounting"
@@ -513,6 +525,28 @@ const App: React.FC = () => {
       <CookieBanner />
     </div>
   );
+};
+
+// Wraps traveler/agency routes to show T&C gate if needed
+const TermsGuard: React.FC<{ termsType: 'traveler' | 'agency'; children: React.ReactNode }> = ({ termsType, children }) => {
+  const { needsTermsAcceptance, markTermsAccepted } = useAuth();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/login';
+  };
+
+  if (needsTermsAcceptance) {
+    return (
+      <TermsAcceptanceGate
+        termsType={termsType}
+        onAccepted={markTermsAccepted}
+        onSignOut={handleSignOut}
+      />
+    );
+  }
+
+  return <>{children}</>;
 };
 
 // Helper components for role-based redirects

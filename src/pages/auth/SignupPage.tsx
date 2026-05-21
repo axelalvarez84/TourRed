@@ -19,6 +19,8 @@ const SignupPage: React.FC = () => {
     referrer_name?: string;
     referrer_id?: string;
   } | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [activeTermsVersion, setActiveTermsVersion] = useState<{ version_number: number; published_at: string } | null>(null);
 
   const searchParams = new URLSearchParams(location.search);
   const redirectUrl = searchParams.get('redirect');
@@ -49,6 +51,12 @@ const SignupPage: React.FC = () => {
       setReferralCode(refCode.toUpperCase());
     }
   }, [refCode]);
+
+  useEffect(() => {
+    supabase.rpc('get_active_terms', { p_type: 'traveler' }).then(({ data }) => {
+      if (data && data.length > 0) setActiveTermsVersion(data[0]);
+    });
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -181,6 +189,23 @@ const SignupPage: React.FC = () => {
       }
 
       console.log('✅ Registro exitoso:', { user: data.user, profile: profileData, isExistingUser });
+
+      // Registrar aceptación de T&C con IP real capturada en el servidor
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/record-terms-acceptance`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ terms_type: 'traveler' }),
+          });
+        }
+      } catch (termsErr) {
+        console.error('Error registrando aceptación de T&C:', termsErr);
+      }
 
       if (referralValidation?.valid && referralValidation.referrer_id && !isExistingUser) {
         try {
@@ -736,10 +761,39 @@ const SignupPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Aceptación explícita de T&C */}
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={e => setTermsAccepted(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 flex-shrink-0"
+                />
+                <span className="text-sm text-gray-700 leading-relaxed">
+                  He leído y acepto los{' '}
+                  <Link to="/terminos-servicio" target="_blank" className="font-medium text-primary-600 hover:text-primary-500 underline">
+                    Términos y Condiciones
+                  </Link>{' '}
+                  y el{' '}
+                  <Link to="/aviso-privacidad" target="_blank" className="font-medium text-primary-600 hover:text-primary-500 underline">
+                    Aviso de Privacidad
+                  </Link>{' '}
+                  de ToursRed
+                  {activeTermsVersion && (
+                    <span className="block text-xs text-gray-400 mt-1">
+                      Versión {activeTermsVersion.version_number} · vigente desde{' '}
+                      {new Date(activeTermsVersion.published_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })}
+                    </span>
+                  )}
+                </span>
+              </label>
+            </div>
+
             <div>
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !termsAccepted}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Creando cuenta...' : 'Registrarse'}
