@@ -819,12 +819,15 @@ Deno.serve(async (req) => {
           'trialing': 'trialing',
           'active': 'active',
           'past_due': 'past_due',
-          'canceled': 'cancelled',
+          // 'canceled' en Stripe significa que Stripe ya la dio de baja, pero el periodo
+          // puede seguir vigente. Se resuelve en 'customer.subscription.deleted'.
+          // Aqui lo mantenemos como 'active' para no cancelar prematuramente.
+          'canceled': 'active',
           'unpaid': 'expired',
           'paused': 'past_due'
         };
 
-        const mappedStatus = statusMap[subscription.status] || 'cancelled';
+        const mappedStatus = statusMap[subscription.status] || 'past_due';
         const isNewSubscription = event.type === 'customer.subscription.created';
 
         const { data: existingMembership } = await supabase
@@ -1041,18 +1044,45 @@ Deno.serve(async (req) => {
 
         console.log(`Subscription deleted: ${subscription.id}`);
 
+        // Verificar si el periodo pagado aun esta vigente.
+        // Las membresias no tienen reembolsos: si el periodo no ha terminado,
+        // se mantiene activa hasta current_period_end en lugar de cancelarse de inmediato.
+        const { data: existingMem } = await supabase
+          .from('memberships')
+          .select('id, current_period_end, status')
+          .eq('stripe_subscription_id', subscription.id)
+          .maybeSingle();
+
+        const periodEnd = existingMem?.current_period_end
+          ? new Date(existingMem.current_period_end)
+          : null;
+        const periodStillActive = periodEnd && periodEnd > new Date();
+
+        const updatePayload = periodStillActive
+          ? {
+              cancel_at_period_end: true,
+              cancelled_at: new Date().toISOString(),
+              // status se mantiene 'active' hasta que expire el periodo
+            }
+          : {
+              status: 'cancelled',
+              cancel_at_period_end: false,
+              cancelled_at: new Date().toISOString(),
+            };
+
         const { error: membershipError } = await supabase
           .from('memberships')
-          .update({
-            status: 'cancelled',
-            cancelled_at: new Date().toISOString(),
-          })
+          .update(updatePayload)
           .eq('stripe_subscription_id', subscription.id);
 
         if (membershipError) {
           console.error(`Error cancelling membership: ${membershipError.message}`);
         } else {
-          console.log(`Successfully cancelled membership ${subscription.id}`);
+          console.log(
+            periodStillActive
+              ? `Membership ${subscription.id} scheduled for end-of-period cancellation (period ends ${periodEnd?.toISOString()})`
+              : `Membership ${subscription.id} cancelled immediately (period already expired)`
+          );
         }
 
         break;
