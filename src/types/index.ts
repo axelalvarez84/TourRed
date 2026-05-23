@@ -750,3 +750,121 @@ export interface PointsTransaction {
   created_at: string;
   booking_code?: string | null;
 }
+
+// ============================================================
+// SERVICE DESK
+// ============================================================
+
+export type SupportTicketStatus = 'sin_atender' | 'en_proceso' | 'escalado' | 'resuelto' | 'cancelado' | 'duplicado';
+export type SupportTicketPriority = 'baja' | 'media' | 'alta' | 'urgente';
+export type SupportTicketType = 'traveler' | 'agency' | 'general';
+export type SupportCommentType = 'interno' | 'respuesta_usuario';
+export type SupportAgentRole = 'super_admin' | 'supervisor' | 'agente' | 'lectura';
+export type SupportHistoryEventType =
+  | 'creacion'
+  | 'cambio_status'
+  | 'cambio_prioridad'
+  | 'asignacion_agente'
+  | 'reasignacion_agente'
+  | 'asignacion_agencia'
+  | 'reasignacion_agencia'
+  | 'comentario_interno'
+  | 'respuesta_usuario'
+  | 'comentario_usuario'
+  | 'cierre';
+
+export interface SupportCategory {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  activa: boolean;
+  created_at: string;
+  updated_at: string;
+  subcategories?: SupportSubcategory[];
+}
+
+export interface SupportSubcategory {
+  id: string;
+  category_id: string;
+  nombre: string;
+  descripcion: string;
+  nomenclatura: string;
+  prioridad_default: SupportTicketPriority;
+  sla_horas: number;
+  aplica_a: string[];
+  permite_adjuntos: boolean;
+  activa: boolean;
+  created_at: string;
+  updated_at: string;
+  category?: SupportCategory;
+}
+
+export interface SupportTicket {
+  id: string;
+  folio: string;
+  tipo: SupportTicketType;
+  category_id: string;
+  subcategory_id: string;
+  prioridad: SupportTicketPriority;
+  status: SupportTicketStatus;
+  user_id: string | null;
+  solicitante_nombre: string;
+  solicitante_email: string;
+  descripcion: string;
+  agente_asignado_id: string | null;
+  agencia_asignada_id: string | null;
+  ticket_relacionado_id: string | null;
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+  category?: SupportCategory;
+  subcategory?: SupportSubcategory;
+  agente?: { id: string; first_name: string; last_name: string; email: string };
+  agencia?: { id: string; name: string };
+  ticket_relacionado?: { id: string; folio: string };
+  comments?: SupportTicketComment[];
+  attachments?: SupportTicketAttachment[];
+  history?: SupportTicketHistoryEvent[];
+}
+
+export interface SupportTicketComment {
+  id: string;
+  ticket_id: string;
+  author_id: string | null;
+  author_name: string;
+  tipo: SupportCommentType;
+  contenido: string;
+  created_at: string;
+}
+
+export interface SupportTicketAttachment {
+  id: string;
+  ticket_id: string;
+  storage_path: string;
+  nombre_archivo: string;
+  mime_type: string;
+  tamano_bytes: number;
+  subido_por_id: string | null;
+  created_at: string;
+}
+
+export interface SupportTicketHistoryEvent {
+  id: string;
+  ticket_id: string;
+  tipo_evento: SupportHistoryEventType;
+  descripcion: string;
+  actor_id: string | null;
+  actor_name: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface SupportAgentPermission {
+  id: string;
+  user_id: string;
+  rol_soporte: SupportAgentRole;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+  user?: { id: string; first_name: string; last_name: string; email: string };
+}

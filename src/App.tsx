@@ -83,6 +83,16 @@ import BookingCheckinPage from './pages/BookingCheckinPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import TermsAcceptanceGate from './components/TermsAcceptanceGate';
 import TermsManagementPage from './pages/admin/TermsManagementPage';
+import SupportLandingPage from './pages/support/SupportLandingPage';
+import SupportGeneralPage from './pages/support/SupportGeneralPage';
+import SupportTravelerPage from './pages/support/SupportTravelerPage';
+import SupportAgencyPage from './pages/support/SupportAgencyPage';
+import TravelerSupportTickets from './pages/traveler/TravelerSupportTickets';
+import AgencySupportTickets from './pages/agency/AgencySupportTickets';
+import AdminServiceDesk from './pages/admin/AdminServiceDesk';
+import AdminTicketDetail from './pages/admin/AdminTicketDetail';
+import AdminSupportCategories from './pages/admin/AdminSupportCategories';
+import AdminSupportAgents from './pages/admin/AdminSupportAgents';
 import { useAuth } from './context/AuthContext';
 import { UserRole, supabase } from './lib/supabase';
 
@@ -494,6 +504,80 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                 <TermsManagementPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admin: Service Desk */}
+          <Route
+            path="/admin/service-desk"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminServiceDesk />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/service-desk/tickets/:id"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminTicketDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/service-desk/categorias"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminSupportCategories />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/service-desk/agentes"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminSupportAgents />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Support public routes */}
+          <Route path="/soporte" element={<SupportLandingPage />} />
+          <Route path="/soporte/general" element={<SupportGeneralPage />} />
+          <Route
+            path="/soporte/viajero"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.TRAVELER]}>
+                <SupportTravelerPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/soporte/agencia"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.AGENCY]}>
+                <SupportAgencyPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Traveler support tickets */}
+          <Route
+            path="/traveler/soporte"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.TRAVELER]}>
+                <TravelerSupportTickets />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Agency support tickets */}
+          <Route
+            path="/agency/soporte"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.AGENCY]}>
+                <AgencySupportTickets />
               </ProtectedRoute>
             }
           />

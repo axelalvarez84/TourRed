@@ -1,11 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import {
-  Menu, X, User, LogOut, Search, MessageCircle, ChevronDown,
-  LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation,
-  Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent,
-  DollarSign, Gift, Megaphone, Ticket, BadgePercent, Send, ArrowLeftRight, FileText, BookOpen
-} from 'lucide-react';
+import { Menu, X, User, LogOut, Search, MessageCircle, ChevronDown, LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation, Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent, DollarSign, Gift, Megaphone, Ticket, BadgePercent, Send, ArrowLeftRight, FileText, BookOpen, Headphones as HeadphonesIcon, TicketCheck } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import { useAuth } from '../context/AuthContext';
 import { signOut, supabase } from '../lib/supabase';
@@ -180,6 +175,16 @@ const NavBar: React.FC = () => {
     if (comunicacionesItems.length > 0)
       groups.push({ title: 'Comunicaciones', icon: <MessageSquare className="h-4 w-4" />, items: comunicacionesItems });
 
+    const serviceDeskItems: AdminMenuItem[] = [];
+    if (isSuperAdmin || permissions?.canManageServiceDesk) {
+      serviceDeskItems.push({ to: '/admin/service-desk', label: 'Tickets', icon: <TicketCheck className="h-4 w-4" /> });
+      serviceDeskItems.push({ to: '/admin/service-desk/categorias', label: 'Categorias', icon: <Tag className="h-4 w-4" /> });
+      serviceDeskItems.push({ to: '/admin/service-desk/agentes', label: 'Agentes', icon: <HeadphonesIcon className="h-4 w-4" /> });
+    }
+
+    if (serviceDeskItems.length > 0)
+      groups.push({ title: 'Service Desk', icon: <HeadphonesIcon className="h-4 w-4" />, items: serviceDeskItems });
+
     return groups;
   };
 
@@ -205,6 +210,7 @@ const NavBar: React.FC = () => {
     { to: '/traveler/points', label: 'ToursRed Points' },
     { to: '/traveler/referrals', label: 'Referidos' },
     { to: '/traveler/invoices', label: 'Mis Facturas' },
+    { to: '/traveler/soporte', label: 'Mis Tickets' },
   ];
 
   const getRoleSpecificMenuItems = () => {
@@ -218,6 +224,7 @@ const NavBar: React.FC = () => {
         { to: '/agency/financials', label: 'Finanzas' },
         { to: '/agency/invoices', label: 'Facturas' },
         { to: '/agency/staff', label: 'Coordinadores' },
+        { to: '/agency/soporte', label: 'Soporte' },
       ];
     }
 
@@ -294,6 +301,10 @@ const NavBar: React.FC = () => {
               </Link>
               <Link to="/gift-cards" className="border-transparent text-gray-500 hover:border-primary-500 hover:text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                 Tarjetas de Regalo
+              </Link>
+              <Link to="/soporte" className="border-transparent text-gray-500 hover:border-primary-500 hover:text-gray-900 inline-flex items-center gap-1 px-1 pt-1 border-b-2 text-sm font-medium">
+                <HeadphonesIcon className="h-4 w-4" />
+                Soporte
               </Link>
 
               {isAdmin && isEmailVerified && (
@@ -622,6 +633,9 @@ const NavBar: React.FC = () => {
             </Link>
             <Link to="/gift-cards" className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium" onClick={toggleMenu}>
               Tarjetas de Regalo
+            </Link>
+            <Link to="/soporte" className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium" onClick={toggleMenu}>
+              Soporte
             </Link>
           </div>
 

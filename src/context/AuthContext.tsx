@@ -18,6 +18,7 @@ export interface AdminPermissions {
   canViewAccounting: boolean;
   canExportSatXml: boolean;
   canManageChartOfAccounts: boolean;
+  canManageServiceDesk: boolean;
 }
 
 export interface AgencyStaffPermissions {
@@ -298,6 +299,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 canViewAccounting: p.can_view_accounting ?? true,
                 canExportSatXml: p.can_export_sat_xml ?? true,
                 canManageChartOfAccounts: p.can_manage_chart_of_accounts ?? false,
+                canManageServiceDesk: p.can_manage_service_desk ?? false,
               });
             } else {
               setPermissions(null);
