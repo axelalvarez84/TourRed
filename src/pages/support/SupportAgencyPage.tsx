@@ -10,7 +10,7 @@ import { useAgencyId } from '../../hooks/useAgencyId';
 const SupportAgencyPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const agencyId = useAgencyId();
+  const { agencyId } = useAgencyId();
   const [categoryId, setCategoryId] = useState('');
   const [subcategoryId, setSubcategoryId] = useState('');
   const [descripcion, setDescripcion] = useState('');

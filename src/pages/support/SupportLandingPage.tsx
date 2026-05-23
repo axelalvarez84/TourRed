@@ -6,10 +6,10 @@ import { UserRole } from '../../lib/supabase';
 
 const SupportLandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, userRole, isEmailVerified } = useAuth();
+  const { user, userRole, isEmailVerified, isAgencyStaff } = useAuth();
 
   const handleTravelerClick = () => {
-    if (user && userRole === UserRole.TRAVELER && isEmailVerified) {
+    if (user && (userRole === UserRole.TRAVELER || userRole === UserRole.AGENCY) && isEmailVerified) {
       navigate('/soporte/viajero');
     } else {
       navigate('/login?redirect=/soporte/viajero');
@@ -17,7 +17,7 @@ const SupportLandingPage: React.FC = () => {
   };
 
   const handleAgencyClick = () => {
-    if (user && userRole === UserRole.AGENCY && isEmailVerified) {
+    if (user && (userRole === UserRole.AGENCY || isAgencyStaff) && isEmailVerified) {
       navigate('/soporte/agencia');
     } else {
       navigate('/login?redirect=/soporte/agencia');

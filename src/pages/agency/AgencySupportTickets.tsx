@@ -13,7 +13,7 @@ type TabType = 'propios' | 'asignados';
 
 const AgencySupportTickets: React.FC = () => {
   const { user } = useAuth();
-  const agencyId = useAgencyId();
+  const { agencyId } = useAgencyId();
   const [tab, setTab] = useState<TabType>('propios');
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,12 +71,15 @@ const AgencySupportTickets: React.FC = () => {
   const submitComment = async () => {
     if (!selectedTicket || !newComment.trim() || !user) return;
     setSubmittingComment(true);
-    const { data: agency } = await supabase
-      .from('agencies')
-      .select('name')
-      .eq('user_id', user.id)
-      .maybeSingle();
-    const authorName = agency?.name ?? user.email;
+    let authorName = user.email as string;
+    if (agencyId) {
+      const { data: agency } = await supabase
+        .from('agencies')
+        .select('name')
+        .eq('id', agencyId)
+        .maybeSingle();
+      if (agency?.name) authorName = agency.name;
+    }
 
     await supabase.from('support_ticket_comments').insert({
       ticket_id: selectedTicket.id,
