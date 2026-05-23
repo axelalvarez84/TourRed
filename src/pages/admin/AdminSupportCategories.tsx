@@ -17,14 +17,14 @@ const PRIORITY_OPTIONS: { value: SupportTicketPriority; label: string }[] = [
   { value: 'urgente', label: 'Urgente' },
 ];
 
-interface CategoryForm { nombre: string; descripcion: string; activa: boolean; }
+interface CategoryForm { nombre: string; descripcion: string; activa: boolean; aplica_a: string[]; }
 interface SubcategoryForm {
   nombre: string; descripcion: string; nomenclatura: string;
   prioridad_default: SupportTicketPriority; sla_horas: number;
   aplica_a: string[]; permite_adjuntos: boolean; activa: boolean;
 }
 
-const INITIAL_CAT: CategoryForm = { nombre: '', descripcion: '', activa: true };
+const INITIAL_CAT: CategoryForm = { nombre: '', descripcion: '', activa: true, aplica_a: ['general', 'traveler', 'agency'] };
 const INITIAL_SUB: SubcategoryForm = {
   nombre: '', descripcion: '', nomenclatura: '', prioridad_default: 'media',
   sla_horas: 24, aplica_a: ['general'], permite_adjuntos: true, activa: true,
@@ -71,12 +71,22 @@ const AdminSupportCategories: React.FC = () => {
   // --- Category CRUD ---
   const openCatModal = (cat?: SupportCategory) => {
     setCatModal({ open: true, editing: cat ?? null });
-    setCatForm(cat ? { nombre: cat.nombre, descripcion: cat.descripcion, activa: cat.activa } : INITIAL_CAT);
+    setCatForm(cat ? { nombre: cat.nombre, descripcion: cat.descripcion, activa: cat.activa, aplica_a: cat.aplica_a ?? ['general', 'traveler', 'agency'] } : INITIAL_CAT);
     setError(null);
+  };
+
+  const toggleCatAplicaA = (value: string) => {
+    setCatForm(prev => ({
+      ...prev,
+      aplica_a: prev.aplica_a.includes(value)
+        ? prev.aplica_a.filter(v => v !== value)
+        : [...prev.aplica_a, value],
+    }));
   };
 
   const saveCat = async () => {
     if (!catForm.nombre.trim()) { setError('El nombre es requerido.'); return; }
+    if (catForm.aplica_a.length === 0) { setError('Selecciona al menos un tipo de aplicacion.'); return; }
     setSaving(true); setError(null);
     if (catModal.editing) {
       await supabase.from('support_categories').update(catForm).eq('id', catModal.editing.id);
@@ -199,8 +209,15 @@ const AdminSupportCategories: React.FC = () => {
                     >
                       {isExpanded ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
                       <div>
-                        <span className="font-semibold text-gray-800">{cat.nombre}</span>
-                        {!cat.activa && <span className="ml-2 text-xs text-gray-400">(inactiva)</span>}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-gray-800">{cat.nombre}</span>
+                          {!cat.activa && <span className="text-xs text-gray-400">(inactiva)</span>}
+                          {(cat.aplica_a ?? []).map(a => (
+                            <span key={a} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+                              {a === 'general' ? 'General' : a === 'traveler' ? 'Viajero' : 'Agencia'}
+                            </span>
+                          ))}
+                        </div>
                         {cat.descripcion && <p className="text-xs text-gray-500 mt-0.5">{cat.descripcion}</p>}
                       </div>
                       <span className="ml-2 text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">
@@ -292,6 +309,22 @@ const AdminSupportCategories: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Descripcion</label>
                 <textarea value={catForm.descripcion} onChange={e => setCatForm(p => ({ ...p, descripcion: e.target.value }))} rows={2} className="input resize-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Aplica a <span className="text-red-500">*</span></label>
+                <div className="flex flex-wrap gap-2">
+                  {APLICA_OPTIONS.map(opt => (
+                    <label key={opt.value} className="flex items-center gap-2 cursor-pointer bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 hover:border-primary-300">
+                      <input
+                        type="checkbox"
+                        checked={catForm.aplica_a.includes(opt.value)}
+                        onChange={() => toggleCatAplicaA(opt.value)}
+                        className="rounded text-primary-600"
+                      />
+                      <span className="text-sm text-gray-700">{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={catForm.activa} onChange={e => setCatForm(p => ({ ...p, activa: e.target.checked }))} className="rounded text-primary-600" />

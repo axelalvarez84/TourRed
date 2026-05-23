@@ -778,6 +778,7 @@ export interface SupportCategory {
   nombre: string;
   descripcion: string;
   activa: boolean;
+  aplica_a: string[];
   created_at: string;
   updated_at: string;
   subcategories?: SupportSubcategory[];
