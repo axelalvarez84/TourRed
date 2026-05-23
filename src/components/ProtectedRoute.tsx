@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../lib/supabase';
 import TermsAcceptanceGate from './TermsAcceptanceGate';
@@ -13,6 +13,7 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles, staffPermission }) => {
   const { user, userRole, isLoading, isEmailVerified, isAgencyStaff, staffInfo, needsTermsAcceptance, markTermsAccepted } = useAuth();
+  const location = useLocation();
   const [shouldRedirect, setShouldRedirect] = useState(false);
   const redirectTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -46,7 +47,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles,
   }
 
   if (!user && shouldRedirect) {
-    return <Navigate to="/login" replace />;
+    const currentPath = location.pathname + location.search;
+    const loginPath = currentPath !== '/' ? `/login?redirect=${encodeURIComponent(currentPath)}` : '/login';
+    return <Navigate to={loginPath} replace />;
   }
 
   if (!user) {
