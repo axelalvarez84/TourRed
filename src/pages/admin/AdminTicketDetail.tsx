@@ -44,9 +44,9 @@ const AdminTicketDetail: React.FC = () => {
   const submittingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchTicket = async () => {
+  const fetchTicket = async (silent = false) => {
     if (!id) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     const [ticketRes, commentsRes, historyRes, attachmentsRes] = await Promise.all([
       supabase.from('support_tickets')
         .select(`
@@ -282,7 +282,7 @@ const AdminTicketDetail: React.FC = () => {
       });
     }
 
-    await fetchTicket();
+    await fetchTicket(true);
     setSaving(false);
   };
 
@@ -290,39 +290,71 @@ const AdminTicketDetail: React.FC = () => {
     if (!ticket || !user || !commentText.trim()) return;
     if (submittingRef.current) return;
     submittingRef.current = true;
+
+    // Capture values immediately before any state changes
+    const text = commentText.trim();
+    const type = commentType;
+    const ticketId = ticket.id;
+    const ticketFolio = ticket.folio;
+    const ticketUserId = ticket.user_id;
+    const ticketSolicitanteNombre = ticket.solicitante_nombre;
+    const ticketSolicitanteEmail = ticket.solicitante_email;
+
+    // Clear textarea immediately to prevent double-click confusion
+    setCommentText('');
     setSaving(true);
+
     const actorName = await getActorName();
 
     await supabase.from('support_ticket_comments').insert({
-      ticket_id: ticket.id,
+      ticket_id: ticketId,
       author_id: user.id,
       author_name: actorName,
-      tipo: commentType,
-      contenido: commentText.trim(),
+      tipo: type,
+      contenido: text,
     });
 
     await supabase.from('support_ticket_history').insert({
-      ticket_id: ticket.id,
-      tipo_evento: commentType === 'interno' ? 'comentario_interno' : 'respuesta_usuario',
-      descripcion: commentText.trim(),
+      ticket_id: ticketId,
+      tipo_evento: type === 'interno' ? 'comentario_interno' : 'respuesta_usuario',
+      descripcion: text,
       actor_id: user.id,
       actor_name: actorName,
     });
 
     // Notify user if it's a response
-    if (commentType === 'respuesta_usuario' && ticket.user_id) {
+    if (type === 'respuesta_usuario' && ticketUserId) {
       await supabase.from('notifications').insert({
-        user_id: ticket.user_id,
+        user_id: ticketUserId,
         type: 'support_ticket_updated',
-        title: `Respuesta en ticket ${ticket.folio}`,
-        message: `Un agente respondio a tu ticket ${ticket.folio}`,
-        data: { ticket_id: ticket.id, folio: ticket.folio },
+        title: `Respuesta en ticket ${ticketFolio}`,
+        message: `Un agente respondio a tu ticket ${ticketFolio}`,
+        data: { ticket_id: ticketId, folio: ticketFolio },
       });
-      await sendUpdateEmail({ mensaje_agente: commentText.trim() });
+
+      // Send email to user
+      try {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        await fetch(`${supabaseUrl}/functions/v1/send-support-ticket-updated`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+          },
+          body: JSON.stringify({
+            folio: ticketFolio,
+            solicitante_nombre: ticketSolicitanteNombre,
+            solicitante_email: ticketSolicitanteEmail,
+            mensaje_agente: text,
+          }),
+        });
+      } catch (err) {
+        console.error('Error sending comment email:', err);
+      }
     }
 
-    setCommentText('');
-    await fetchTicket();
+    await fetchTicket(true);
     setSaving(false);
     submittingRef.current = false;
   };
