@@ -132,7 +132,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Send confirmation email
+    // Send confirmation email to user
     try {
       await fetch(`${supabaseUrl}/functions/v1/send-support-ticket-created`, {
         method: "POST",
@@ -150,7 +150,90 @@ Deno.serve(async (req: Request) => {
         }),
       });
     } catch {
-      // Non-fatal: ticket already created
+      // Non-fatal
+    }
+
+    // Notify support team
+    try {
+      const { data: emailSettings } = await supabase
+        .from("email_settings")
+        .select("smtp_api_key")
+        .maybeSingle();
+
+      if (emailSettings?.smtp_api_key) {
+        const htmlBody = `
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background-color:#f8fafc;font-family:Inter,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+          <tr>
+            <td style="background-color:#1e40af;padding:28px 40px;">
+              <p style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">ToursRed — Nuevo Ticket de Soporte</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:36px 40px;">
+              <div style="background-color:#eff6ff;border-radius:8px;padding:16px 20px;margin-bottom:24px;">
+                <p style="margin:0 0 4px;font-size:12px;font-weight:600;color:#3b82f6;text-transform:uppercase;">Folio</p>
+                <p style="margin:0;font-size:28px;font-weight:800;color:#1e40af;font-family:monospace;">${folioData}</p>
+              </div>
+              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:24px;">
+                <tr><td style="padding:10px 16px;background:#f9fafb;border-bottom:1px solid #e5e7eb;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;">Datos del Solicitante</td></tr>
+                <tr><td style="padding:14px 16px;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="font-size:13px;color:#6b7280;padding-bottom:8px;width:35%;">Nombre:</td>
+                      <td style="font-size:13px;color:#111827;font-weight:500;padding-bottom:8px;">${solicitante_nombre}</td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:13px;color:#6b7280;padding-bottom:8px;">Email:</td>
+                      <td style="font-size:13px;color:#111827;font-weight:500;padding-bottom:8px;">${solicitante_email}</td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:13px;color:#6b7280;padding-bottom:8px;">Categoria:</td>
+                      <td style="font-size:13px;color:#111827;font-weight:500;padding-bottom:8px;">${subcategory.nombre}</td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:13px;color:#6b7280;vertical-align:top;">Descripcion:</td>
+                      <td style="font-size:13px;color:#374151;">${descripcion}</td>
+                    </tr>
+                  </table>
+                </td></tr>
+              </table>
+              <p style="margin:0;font-size:13px;color:#6b7280;">Accede al panel de administracion para atender este ticket.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:#f9fafb;padding:18px 40px;border-top:1px solid #e5e7eb;text-align:center;">
+              <p style="margin:0;font-size:12px;color:#9ca3af;">ToursRed — Panel de Soporte Interno</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+        await fetch("https://api.smtp2go.com/v3/email/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            api_key: emailSettings.smtp_api_key,
+            to: ["soporte@toursred.com.mx"],
+            sender: "soporte@toursred.com.mx",
+            subject: `[Nuevo Ticket] ${folioData} — ${solicitante_nombre}`,
+            text_body: `Nuevo ticket de soporte\n\nFolio: ${folioData}\nSolicitante: ${solicitante_nombre} (${solicitante_email})\nCategoria: ${subcategory.nombre}\n\nDescripcion:\n${descripcion}`,
+            html_body: htmlBody,
+          }),
+        });
+      }
+    } catch {
+      // Non-fatal
     }
 
     return new Response(

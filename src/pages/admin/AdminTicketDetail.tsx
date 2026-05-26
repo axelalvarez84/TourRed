@@ -246,6 +246,34 @@ const AdminTicketDetail: React.FC = () => {
       }
     }
 
+    // Notify assigned agent by email
+    if (agentChanged && newAgentId) {
+      const agent = agents.find(a => a.id === newAgentId);
+      if (agent?.email) {
+        try {
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+          const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+          await fetch(`${supabaseUrl}/functions/v1/send-support-ticket-agent-assigned`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseAnonKey}`,
+            },
+            body: JSON.stringify({
+              folio: ticket.folio,
+              agente_nombre: `${agent.first_name} ${agent.last_name}`,
+              agente_email: agent.email,
+              solicitante_nombre: ticket.solicitante_nombre,
+              categoria: ticket.category?.nombre,
+              descripcion: ticket.descripcion,
+            }),
+          });
+        } catch (err) {
+          console.error('Error sending agent assignment email:', err);
+        }
+      }
+    }
+
     // Send email if status changed or meaningful update
     const hasEmailableChange = updates.status || updates.prioridad || agentChanged;
     if (hasEmailableChange) {
