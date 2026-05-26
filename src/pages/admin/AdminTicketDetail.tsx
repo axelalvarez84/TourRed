@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, User, Building2, Paperclip, Send, Lock, RefreshCw,
@@ -41,6 +41,7 @@ const AdminTicketDetail: React.FC = () => {
   const [commentText, setCommentText] = useState('');
   const [commentType, setCommentType] = useState<'interno' | 'respuesta_usuario'>('respuesta_usuario');
   const [saving, setSaving] = useState(false);
+  const submittingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchTicket = async () => {
@@ -225,6 +226,8 @@ const AdminTicketDetail: React.FC = () => {
 
   const submitComment = async () => {
     if (!ticket || !user || !commentText.trim()) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSaving(true);
     const actorName = await getActorName();
 
@@ -258,6 +261,7 @@ const AdminTicketDetail: React.FC = () => {
     setCommentText('');
     await fetchTicket();
     setSaving(false);
+    submittingRef.current = false;
   };
 
   const getAttachmentUrl = async (path: string) => {
