@@ -103,6 +103,32 @@ const AdminTicketDetail: React.FC = () => {
     return data ? `${data.first_name} ${data.last_name}` : 'Administrador';
   };
 
+  const sendUpdateEmail = async (params: {
+    nuevo_status?: string;
+    mensaje_agente?: string;
+  }) => {
+    if (!ticket) return;
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      await fetch(`${supabaseUrl}/functions/v1/send-support-ticket-updated`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({
+          folio: ticket.folio,
+          solicitante_nombre: ticket.solicitante_nombre,
+          solicitante_email: ticket.solicitante_email,
+          ...params,
+        }),
+      });
+    } catch (err) {
+      console.error('Error sending update email:', err);
+    }
+  };
+
   const saveChanges = async () => {
     if (!ticket || !user) return;
     if (newStatus === 'duplicado' && !relatedTicketId) {
@@ -220,6 +246,14 @@ const AdminTicketDetail: React.FC = () => {
       }
     }
 
+    // Send email if status changed or meaningful update
+    const hasEmailableChange = updates.status || updates.prioridad || agentChanged;
+    if (hasEmailableChange) {
+      await sendUpdateEmail({
+        nuevo_status: updates.status ?? ticket.status,
+      });
+    }
+
     await fetchTicket();
     setSaving(false);
   };
@@ -256,6 +290,7 @@ const AdminTicketDetail: React.FC = () => {
         message: `Un agente respondio a tu ticket ${ticket.folio}`,
         data: { ticket_id: ticket.id, folio: ticket.folio },
       });
+      await sendUpdateEmail({ mensaje_agente: commentText.trim() });
     }
 
     setCommentText('');
