@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, X, Check, CheckCheck, Clock, MessageSquare, Building2 } from 'lucide-react';
+import { Bell, X, Check, CheckCheck, Clock, MessageSquare, Building2, HeadphonesIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase, getUserNotifications, getUnreadNotificationCount, markNotificationAsRead, markAllNotificationsAsRead } from '../lib/supabase';
 import { Notification } from '../types';
@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import { Link, useNavigate } from 'react-router-dom';
 
 const NotificationBell: React.FC = () => {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, role, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -168,6 +168,9 @@ const NotificationBell: React.FC = () => {
         return <Building2 className="h-5 w-5 text-blue-600" />;
       case 'system_announcement':
         return <Bell className="h-5 w-5 text-orange-500" />;
+      case 'support_ticket_created':
+      case 'support_ticket_updated':
+        return <HeadphonesIcon className="h-5 w-5 text-teal-500" />;
       default:
         return <Bell className="h-5 w-5 text-gray-500" />;
     }
@@ -191,8 +194,19 @@ const NotificationBell: React.FC = () => {
       case 'tour_announcement':
       case 'system_announcement':
         return null;
+      case 'support_ticket_created':
+      case 'support_ticket_updated': {
+        const ticketId = data.ticket_id;
+        if (role === 'admin' || role === 'super_admin') {
+          return ticketId ? `/admin/service-desk/tickets/${ticketId}` : '/admin/service-desk';
+        }
+        if (role === 'agency') {
+          return ticketId ? `/agency/soporte?ticket=${ticketId}` : '/agency/soporte';
+        }
+        return ticketId ? `/traveler/soporte?ticket=${ticketId}` : '/traveler/soporte';
+      }
       default:
-        return '#';
+        return null;
     }
   };
 

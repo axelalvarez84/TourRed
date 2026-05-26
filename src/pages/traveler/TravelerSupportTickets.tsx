@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, TicketCheck, Search, RefreshCw, Eye, MessageCircle, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -11,6 +11,7 @@ import TicketTimeline from '../../components/support/TicketTimeline';
 const TravelerSupportTickets: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -32,8 +33,15 @@ const TravelerSupportTickets: React.FC = () => {
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
-    setTickets(data ?? []);
+    const list = data ?? [];
+    setTickets(list);
     setLoading(false);
+
+    const ticketParam = searchParams.get('ticket');
+    if (ticketParam) {
+      const target = list.find(t => t.id === ticketParam);
+      if (target) openTicket(target);
+    }
   };
 
   useEffect(() => { fetchTickets(); }, [user]);
