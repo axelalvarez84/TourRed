@@ -30,6 +30,7 @@ const AdminTicketDetail: React.FC = () => {
   const [agencies, setAgencies] = useState<AgencyOption[]>([]);
   const [allTickets, setAllTickets] = useState<{ id: string; folio: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Action state
   const [newStatus, setNewStatus] = useState<SupportTicketStatus | ''>('');
@@ -51,8 +52,7 @@ const AdminTicketDetail: React.FC = () => {
           *,
           category:support_categories(id, nombre),
           subcategory:support_subcategories(id, nombre, sla_horas),
-          agente:users!support_tickets_agente_asignado_id_fkey(id, first_name, last_name, email),
-          agencia:agencies!support_tickets_agencia_asignada_id_fkey(id, name),
+          agencia:agencies(id, name),
           ticket_relacionado:support_tickets!support_tickets_ticket_relacionado_id_fkey(id, folio)
         `)
         .eq('id', id)
@@ -61,6 +61,10 @@ const AdminTicketDetail: React.FC = () => {
       supabase.from('support_ticket_history').select('*').eq('ticket_id', id).order('created_at'),
       supabase.from('support_ticket_attachments').select('*').eq('ticket_id', id).order('created_at'),
     ]);
+    if (ticketRes.error) {
+      console.error('Ticket fetch error:', ticketRes.error);
+      setFetchError(ticketRes.error.message);
+    }
     setTicket(ticketRes.data);
     setComments(commentsRes.data ?? []);
     setHistory(historyRes.data ?? []);
@@ -263,7 +267,8 @@ const AdminTicketDetail: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-500 mb-4">Ticket no encontrado.</p>
+          <p className="text-gray-500 mb-2">Ticket no encontrado.</p>
+          {fetchError && <p className="text-xs text-red-500 mb-4 max-w-md">{fetchError}</p>}
           <Link to="/admin/service-desk" className="btn btn-primary">Volver al Service Desk</Link>
         </div>
       </div>
