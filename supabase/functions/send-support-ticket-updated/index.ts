@@ -68,8 +68,8 @@ Deno.serve(async (req: Request) => {
         <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
           <tr>
             <td style="background-color:#1e40af;padding:32px 40px;text-align:center;">
-              <p style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">ToursRed</p>
-              <p style="margin:8px 0 0;color:#93c5fd;font-size:14px;">Centro de Soporte</p>
+              <img src="https://huzsedewwzjywcpbkjkm.supabase.co/storage/v1/object/public/images/email-logo.png" alt="ToursRed" style="max-width:180px;height:auto;display:block;margin:0 auto 8px;" />
+              <p style="margin:4px 0 0;color:#93c5fd;font-size:14px;">Centro de Soporte</p>
             </td>
           </tr>
           <tr>
