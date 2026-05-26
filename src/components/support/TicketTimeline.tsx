@@ -54,14 +54,16 @@ function getEventBg(tipo: string) {
 
 const TicketTimeline: React.FC<Props> = ({ history, comments, showInternal = false }) => {
   const items: TimelineItem[] = [
-    ...history.map(h => ({
-      id: h.id,
-      tipo: h.tipo_evento,
-      descripcion: h.descripcion,
-      actor_name: h.actor_name,
-      created_at: h.created_at,
-      isInternal: h.tipo_evento === 'comentario_interno',
-    })),
+    ...history
+      .filter(h => h.tipo_evento !== 'respuesta_usuario' && h.tipo_evento !== 'comentario_interno' && h.tipo_evento !== 'comentario_usuario')
+      .map(h => ({
+        id: h.id,
+        tipo: h.tipo_evento,
+        descripcion: h.descripcion,
+        actor_name: h.actor_name,
+        created_at: h.created_at,
+        isInternal: false,
+      })),
     ...comments
       .filter(c => showInternal || c.tipo === 'respuesta_usuario')
       .map(c => ({
