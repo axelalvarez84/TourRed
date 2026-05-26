@@ -52,8 +52,7 @@ const AdminTicketDetail: React.FC = () => {
           *,
           category:support_categories(id, nombre),
           subcategory:support_subcategories(id, nombre, sla_horas),
-          agencia:agencies(id, name),
-          ticket_relacionado:support_tickets!support_tickets_ticket_relacionado_id_fkey(id, folio)
+          agencia:agencies(id, name)
         `)
         .eq('id', id)
         .maybeSingle(),
@@ -65,16 +64,27 @@ const AdminTicketDetail: React.FC = () => {
       console.error('Ticket fetch error:', ticketRes.error);
       setFetchError(ticketRes.error.message);
     }
-    setTicket(ticketRes.data);
+
+    let ticketData = ticketRes.data;
+    if (ticketData?.ticket_relacionado_id) {
+      const { data: related } = await supabase
+        .from('support_tickets')
+        .select('id, folio')
+        .eq('id', ticketData.ticket_relacionado_id)
+        .maybeSingle();
+      if (related) ticketData = { ...ticketData, ticket_relacionado: related };
+    }
+
+    setTicket(ticketData);
     setComments(commentsRes.data ?? []);
     setHistory(historyRes.data ?? []);
     setAttachments(attachmentsRes.data ?? []);
-    if (ticketRes.data) {
-      setNewStatus(ticketRes.data.status);
-      setNewPriority(ticketRes.data.prioridad);
-      setNewAgentId(ticketRes.data.agente_asignado_id ?? '');
-      setNewAgencyId(ticketRes.data.agencia_asignada_id ?? '');
-      setRelatedTicketId(ticketRes.data.ticket_relacionado_id ?? '');
+    if (ticketData) {
+      setNewStatus(ticketData.status);
+      setNewPriority(ticketData.prioridad);
+      setNewAgentId(ticketData.agente_asignado_id ?? '');
+      setNewAgencyId(ticketData.agencia_asignada_id ?? '');
+      setRelatedTicketId(ticketData.ticket_relacionado_id ?? '');
     }
     setLoading(false);
   };
