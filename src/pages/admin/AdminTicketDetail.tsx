@@ -323,24 +323,26 @@ const AdminTicketDetail: React.FC = () => {
     });
 
     // Notify user if it's a response
-    if (type === 'respuesta_usuario' && ticketUserId) {
-      await supabase.from('notifications').insert({
-        user_id: ticketUserId,
-        type: 'support_ticket_updated',
-        title: `Respuesta en ticket ${ticketFolio}`,
-        message: `Un agente respondio a tu ticket ${ticketFolio}`,
-        data: { ticket_id: ticketId, folio: ticketFolio },
-      });
+    if (type === 'respuesta_usuario') {
+      if (ticketUserId) {
+        await supabase.from('notifications').insert({
+          user_id: ticketUserId,
+          type: 'support_ticket_updated',
+          title: `Respuesta en ticket ${ticketFolio}`,
+          message: `Un agente respondio a tu ticket ${ticketFolio}`,
+          data: { ticket_id: ticketId, folio: ticketFolio },
+        });
+      }
 
-      // Send email to user
-      try {
+      // Always send email when there is a solicitante_email
+      if (ticketSolicitanteEmail) {
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        const supabaseServiceKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
         await fetch(`${supabaseUrl}/functions/v1/send-support-ticket-updated`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseAnonKey}`,
+            'Authorization': `Bearer ${supabaseServiceKey}`,
           },
           body: JSON.stringify({
             folio: ticketFolio,
@@ -348,9 +350,7 @@ const AdminTicketDetail: React.FC = () => {
             solicitante_email: ticketSolicitanteEmail,
             mensaje_agente: text,
           }),
-        });
-      } catch (err) {
-        console.error('Error sending comment email:', err);
+        }).catch(err => console.error('Error sending comment email:', err));
       }
     }
 
