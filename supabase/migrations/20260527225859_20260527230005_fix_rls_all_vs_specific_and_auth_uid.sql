@@ -1,0 +1,401 @@
+/*
+  # Fix Multiple Permissive Policies (ALL vs acción específica) + Auth RLS Initialization Plan
+
+  ## Problema 1 — ALL + acción específica
+  Una política FOR ALL cubre SELECT/INSERT/UPDATE/DELETE. Si existe además una
+  política FOR SELECT (u otra acción específica) para el mismo rol, PostgreSQL
+  detecta dos políticas permisivas para la misma acción → warning.
+
+  ## Problema 2 — Auth RLS Initialization Plan
+  Usar `auth.uid()` directamente en políticas (sin el wrapper `(SELECT auth.uid())`)
+  obliga a PostgreSQL a re-evaluarlo por cada fila en vez de una sola vez.
+
+  ## Solución
+  - Para ALL + específica con condiciones IDÉNTICAS: eliminar la específica redundante
+  - Para ALL + específica con condiciones DISTINTAS: descomponer el ALL en políticas
+    por acción con condiciones unidas por OR
+  - Para auth.uid() directo: reemplazar por (SELECT auth.uid())
+
+  ## Tablas modificadas
+  1.  admin_permissions — ALL (super_admin) + SELECT (admin) → separar ALL en acciones
+  2.  batch_payouts — ALL + SELECT misma condición → eliminar SELECT redundante
+  3.  destination_images — ALL + INSERT redundante → eliminar INSERT
+  4.  destinations — ALL (agency) + DELETE/INSERT/UPDATE (admin) → separar ALL en acciones
+  5.  integration_configs — ALL + SELECT misma condición → eliminar SELECT redundante
+  6.  password_reset_codes — ALL (admin) + INSERT/SELECT/UPDATE (user) → separar ALL
+  7.  payout_schedules — ALL (admin) + INSERT/SELECT/UPDATE (agency) → separar ALL
+  8.  tour_departure_points — ALL (admin) + INSERT/UPDATE/DELETE (agency) → separar ALL
+  9.  cookie_consents — auth.uid() directo → (SELECT auth.uid())
+  10. international_tour_inquiries — auth.uid() directo → (SELECT auth.uid())
+*/
+
+-- ============================================================
+-- 1. admin_permissions
+-- ALL (super_admin) + SELECT (admin propio) → descomponer ALL en acciones con OR
+-- ============================================================
+DROP POLICY IF EXISTS "Super admins can manage all permissions" ON public.admin_permissions;
+DROP POLICY IF EXISTS "Admins can read own permissions" ON public.admin_permissions;
+
+CREATE POLICY "Admins and super admins can view admin permissions"
+  ON public.admin_permissions FOR SELECT
+  TO authenticated
+  USING (
+    user_id = (SELECT auth.uid())
+    OR EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = 'super_admin'
+    )
+  );
+
+CREATE POLICY "Super admins can insert admin permissions"
+  ON public.admin_permissions FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = 'super_admin'
+    )
+  );
+
+CREATE POLICY "Super admins can update admin permissions"
+  ON public.admin_permissions FOR UPDATE
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = 'super_admin'
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = 'super_admin'
+    )
+  );
+
+CREATE POLICY "Super admins can delete admin permissions"
+  ON public.admin_permissions FOR DELETE
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = 'super_admin'
+    )
+  );
+
+-- ============================================================
+-- 2. batch_payouts
+-- ALL + SELECT con idéntica condición → eliminar SELECT redundante
+-- ============================================================
+DROP POLICY IF EXISTS "Admins can view all batch payouts" ON public.batch_payouts;
+
+-- ============================================================
+-- 3. destination_images
+-- ALL (admin+agency) + INSERT (solo admin) → INSERT ya está cubierto por ALL
+-- ============================================================
+DROP POLICY IF EXISTS "Admins can insert destination images" ON public.destination_images;
+
+-- ============================================================
+-- 4. destinations
+-- ALL (agency) + DELETE/INSERT/UPDATE (admin) → descomponer ALL en acciones con OR
+-- ============================================================
+DROP POLICY IF EXISTS "Agencies can manage destinations" ON public.destinations;
+DROP POLICY IF EXISTS "Admins can delete destinations" ON public.destinations;
+DROP POLICY IF EXISTS "Admins can insert destinations" ON public.destinations;
+DROP POLICY IF EXISTS "Admins can update destinations" ON public.destinations;
+
+CREATE POLICY "Agencies and admins can insert destinations"
+  ON public.destinations FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = ANY (ARRAY['admin', 'agency'])
+    )
+  );
+
+CREATE POLICY "Agencies and admins can update destinations"
+  ON public.destinations FOR UPDATE
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = ANY (ARRAY['admin', 'agency'])
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = ANY (ARRAY['admin', 'agency'])
+    )
+  );
+
+CREATE POLICY "Agencies and admins can delete destinations"
+  ON public.destinations FOR DELETE
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = ANY (ARRAY['admin', 'agency'])
+    )
+  );
+
+-- ============================================================
+-- 5. integration_configs
+-- ALL + SELECT con idéntica condición → eliminar SELECT redundante
+-- ============================================================
+DROP POLICY IF EXISTS "Admins can view all integration configs" ON public.integration_configs;
+
+-- ============================================================
+-- 6. password_reset_codes
+-- ALL (admin) + INSERT/SELECT/UPDATE (user) → descomponer ALL en acciones con OR
+-- ============================================================
+DROP POLICY IF EXISTS "Admins can manage all password reset codes" ON public.password_reset_codes;
+DROP POLICY IF EXISTS "Users can create own password reset codes" ON public.password_reset_codes;
+DROP POLICY IF EXISTS "Users can view own password reset codes" ON public.password_reset_codes;
+DROP POLICY IF EXISTS "Users can update own password reset codes" ON public.password_reset_codes;
+
+CREATE POLICY "Users and admins can view password reset codes"
+  ON public.password_reset_codes FOR SELECT
+  TO authenticated
+  USING (
+    user_id = (SELECT auth.uid())
+    OR EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = 'admin'
+    )
+  );
+
+CREATE POLICY "Users and admins can insert password reset codes"
+  ON public.password_reset_codes FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    user_id = (SELECT auth.uid())
+    OR EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = 'admin'
+    )
+  );
+
+CREATE POLICY "Users and admins can update password reset codes"
+  ON public.password_reset_codes FOR UPDATE
+  TO authenticated
+  USING (
+    user_id = (SELECT auth.uid())
+    OR EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = 'admin'
+    )
+  )
+  WITH CHECK (
+    user_id = (SELECT auth.uid())
+    OR EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = 'admin'
+    )
+  );
+
+CREATE POLICY "Admins can delete password reset codes"
+  ON public.password_reset_codes FOR DELETE
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = 'admin'
+    )
+  );
+
+-- ============================================================
+-- 7. payout_schedules
+-- ALL (admin) + INSERT/SELECT/UPDATE (agency) → descomponer ALL en acciones con OR
+-- ============================================================
+DROP POLICY IF EXISTS "Admins can manage all schedules" ON public.payout_schedules;
+DROP POLICY IF EXISTS "Agencies can insert own schedule" ON public.payout_schedules;
+DROP POLICY IF EXISTS "Agencies and admins can view payout schedules" ON public.payout_schedules;
+DROP POLICY IF EXISTS "Agencies can update own schedule" ON public.payout_schedules;
+
+CREATE POLICY "Agencies and admins can view payout schedules"
+  ON public.payout_schedules FOR SELECT
+  TO authenticated
+  USING (
+    agency_id IN (
+      SELECT agencies.id FROM agencies
+      WHERE agencies.user_id = (SELECT auth.uid())
+    )
+    OR EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = ANY (ARRAY['admin', 'super_admin'])
+    )
+  );
+
+CREATE POLICY "Agencies and admins can insert payout schedules"
+  ON public.payout_schedules FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    agency_id IN (
+      SELECT agencies.id FROM agencies
+      WHERE agencies.user_id = (SELECT auth.uid())
+    )
+    OR EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = ANY (ARRAY['admin', 'super_admin'])
+    )
+  );
+
+CREATE POLICY "Agencies and admins can update payout schedules"
+  ON public.payout_schedules FOR UPDATE
+  TO authenticated
+  USING (
+    agency_id IN (
+      SELECT agencies.id FROM agencies
+      WHERE agencies.user_id = (SELECT auth.uid())
+    )
+    OR EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = ANY (ARRAY['admin', 'super_admin'])
+    )
+  )
+  WITH CHECK (
+    agency_id IN (
+      SELECT agencies.id FROM agencies
+      WHERE agencies.user_id = (SELECT auth.uid())
+    )
+    OR EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = ANY (ARRAY['admin', 'super_admin'])
+    )
+  );
+
+CREATE POLICY "Admins can delete payout schedules"
+  ON public.payout_schedules FOR DELETE
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = ANY (ARRAY['admin', 'super_admin'])
+    )
+  );
+
+-- ============================================================
+-- 8. tour_departure_points
+-- ALL (admin) + INSERT/UPDATE/DELETE (agency) → descomponer ALL en acciones con OR
+-- ============================================================
+DROP POLICY IF EXISTS "Admins can manage all tour departure points" ON public.tour_departure_points;
+DROP POLICY IF EXISTS "Agencies can add departure points to their tours" ON public.tour_departure_points;
+DROP POLICY IF EXISTS "Agencies can update their tour departure points" ON public.tour_departure_points;
+DROP POLICY IF EXISTS "Agencies can delete their tour departure points" ON public.tour_departure_points;
+
+CREATE POLICY "Agencies and admins can insert tour departure points"
+  ON public.tour_departure_points FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    tour_id IN (
+      SELECT t.id FROM tours t
+      JOIN agencies a ON t.agency_id = a.id
+      WHERE a.user_id = (SELECT auth.uid())
+    )
+    OR EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = ANY (ARRAY['admin', 'super_admin'])
+    )
+  );
+
+CREATE POLICY "Agencies and admins can update tour departure points"
+  ON public.tour_departure_points FOR UPDATE
+  TO authenticated
+  USING (
+    tour_id IN (
+      SELECT t.id FROM tours t
+      JOIN agencies a ON t.agency_id = a.id
+      WHERE a.user_id = (SELECT auth.uid())
+    )
+    OR EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = ANY (ARRAY['admin', 'super_admin'])
+    )
+  )
+  WITH CHECK (
+    tour_id IN (
+      SELECT t.id FROM tours t
+      JOIN agencies a ON t.agency_id = a.id
+      WHERE a.user_id = (SELECT auth.uid())
+    )
+    OR EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = ANY (ARRAY['admin', 'super_admin'])
+    )
+  );
+
+CREATE POLICY "Agencies and admins can delete tour departure points"
+  ON public.tour_departure_points FOR DELETE
+  TO authenticated
+  USING (
+    tour_id IN (
+      SELECT t.id FROM tours t
+      JOIN agencies a ON t.agency_id = a.id
+      WHERE a.user_id = (SELECT auth.uid())
+    )
+    OR EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = (SELECT auth.uid())
+        AND users.role = ANY (ARRAY['admin', 'super_admin'])
+    )
+  );
+
+-- ============================================================
+-- 9. cookie_consents — Fix auth.uid() directo → (SELECT auth.uid())
+-- ============================================================
+DROP POLICY IF EXISTS "Anyone can record consent" ON public.cookie_consents;
+CREATE POLICY "Anyone can record consent"
+  ON public.cookie_consents FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (
+    (
+      (SELECT auth.uid()) IS NOT NULL
+      AND (
+        user_id = (SELECT auth.uid())
+        OR user_id IS NULL
+      )
+    )
+    OR (
+      (SELECT auth.uid()) IS NULL
+      AND user_id IS NULL
+    )
+  );
+
+-- ============================================================
+-- 10. international_tour_inquiries — Fix auth.uid() directo → (SELECT auth.uid())
+-- ============================================================
+DROP POLICY IF EXISTS "Anyone can submit inquiry" ON public.international_tour_inquiries;
+CREATE POLICY "Anyone can submit inquiry"
+  ON public.international_tour_inquiries FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (
+    status = 'nuevo'
+    AND (
+      user_id IS NULL
+      OR user_id = (SELECT auth.uid())
+    )
+  );
