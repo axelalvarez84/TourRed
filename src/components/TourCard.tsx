@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Star, Users, Building, Heart, Tag, RefreshCw } from 'lucide-react';
+import { MapPin, Calendar, Star, Users, Building, Heart, Tag, RefreshCw, Crown } from 'lucide-react';
 import { Tour } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -162,6 +162,23 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
                : 'Oferta'}
           </div>
         )}
+        {(() => {
+          const today = new Date().toISOString().split('T')[0];
+          const isEnPreventa = !!(
+            tour.preventa_activa &&
+            tour.preventa_inicio && tour.preventa_inicio <= today &&
+            tour.preventa_fin && tour.preventa_fin >= today
+          );
+          if (!isEnPreventa) return null;
+          const badgesCount = (tour.is_featured ? 1 : 0) + (tour.tour_type === 'receptivo' ? 1 : 0) + (activePromo ? 1 : 0);
+          const topOffset = badgesCount === 0 ? 'top-2' : badgesCount === 1 ? 'top-9' : badgesCount === 2 ? 'top-16' : 'top-[5.75rem]';
+          return (
+            <div className={`absolute left-2 ${topOffset} flex items-center gap-1 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm`}>
+              <Crown className="w-2.5 h-2.5" />
+              Preventa
+            </div>
+          );
+        })()}
         {user && (
           <button
             onClick={handleSaveToggle}
@@ -249,9 +266,26 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
         <div className="border-t border-gray-200 pt-3 flex items-center justify-between">
           <div>
             <span className="text-sm text-gray-500">Desde</span>
-            <div className="text-primary-600 font-bold text-xl">${tour.price}</div>
+            {(() => {
+              const today = new Date().toISOString().split('T')[0];
+              const isEnPreventa = !!(tour.preventa_activa && tour.preventa_inicio && tour.preventa_inicio <= today && tour.preventa_fin && tour.preventa_fin >= today);
+              const tieneDescuento = isEnPreventa && tour.preventa_precio_especial && tour.preventa_descuento_valor;
+              if (!tieneDescuento) return <div className="text-primary-600 font-bold text-xl">${tour.price}</div>;
+              const precioBase = tour.preventa_tipo_descuento === 'porcentaje'
+                ? tour.price * (1 - (tour.preventa_descuento_valor ?? 0) / 100)
+                : Math.max(0, tour.price - (tour.preventa_descuento_valor ?? 0));
+              return (
+                <div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-amber-600 font-bold text-xl">${precioBase.toFixed(0)}</span>
+                    <span className="text-gray-400 line-through text-sm">${tour.price}</span>
+                  </div>
+                  <p className="text-xs text-amber-600">Con membresía Plus</p>
+                </div>
+              );
+            })()}
           </div>
-          
+
           <Link to={`/tours/${tour.id}`} className="btn btn-primary">
             Ver Detalles
           </Link>

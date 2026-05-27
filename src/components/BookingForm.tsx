@@ -98,6 +98,26 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [restrictionsAccepted, setRestrictionsAccepted] = useState(false);
 
   const hasRestrictions = isReceptivo && (tour.restriction_pregnant || tour.restriction_disability || tour.restriction_physical);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const isEnPreventa = !!(
+    tour.preventa_activa &&
+    tour.preventa_inicio &&
+    tour.preventa_fin &&
+    new Date(tour.preventa_inicio + 'T00:00:00') <= today &&
+    new Date(tour.preventa_fin + 'T23:59:59') >= today
+  );
+
+  const preventaPrecioBase = (() => {
+    if (!isEnPreventa || !tour.preventa_precio_especial || !tour.preventa_descuento_valor) return tour.price;
+    if (tour.preventa_tipo_descuento === 'porcentaje') {
+      return tour.price * (1 - tour.preventa_descuento_valor / 100);
+    }
+    return Math.max(0, tour.price - tour.preventa_descuento_valor);
+  })();
+
+  const precioEfectivo = isEnPreventa && hasMembership ? preventaPrecioBase : tour.price;
   const pickupZones: any[] = Array.isArray(tour.pickup_zones) ? tour.pickup_zones : [];
   const tourLanguages: any[] = Array.isArray(tour.tour_languages) ? tour.tour_languages : [];
 
@@ -536,22 +556,25 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   // Calcular total de viajeros (sin contar mascotas)
   const totalTravelers = travelerCounts.adultos + travelerCounts.ninos + travelerCounts.infantes + travelerCounts.adultos_mayores;
 
+  const preventaRatio = isEnPreventa && hasMembership && tour.preventa_precio_especial && tour.preventa_descuento_valor
+    ? (tour.preventa_tipo_descuento === 'porcentaje'
+        ? (1 - tour.preventa_descuento_valor / 100)
+        : (tour.price > 0 ? Math.max(0, tour.price - tour.preventa_descuento_valor) / tour.price : 1))
+    : 1;
+
   // Función para obtener precio por categoría o usar precio general
   const getPrecioPorCategoria = (categoria: 'adulto' | 'nino' | 'infante' | 'adulto_mayor' | 'mascota'): number => {
-    switch (categoria) {
-      case 'adulto':
-        return tour.precio_adulto || tour.price;
-      case 'nino':
-        return tour.precio_nino || tour.price;
-      case 'infante':
-        return tour.precio_infante || tour.price;
-      case 'adulto_mayor':
-        return tour.precio_adulto_mayor || tour.price;
-      case 'mascota':
-        return tour.precio_mascota || 0;
-      default:
-        return tour.price;
-    }
+    const base = (() => {
+      switch (categoria) {
+        case 'adulto': return tour.precio_adulto || tour.price;
+        case 'nino': return tour.precio_nino || tour.price;
+        case 'infante': return tour.precio_infante || tour.price;
+        case 'adulto_mayor': return tour.precio_adulto_mayor || tour.price;
+        case 'mascota': return tour.precio_mascota || 0;
+        default: return tour.price;
+      }
+    })();
+    return categoria === 'mascota' ? base : base * preventaRatio;
   };
 
   // Cálculos de precios por categoría
@@ -924,6 +947,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         language_cost_type: isReceptivo && selectedLanguageData ? selectedLanguageData.cost_type : null,
         restrictions_accepted: hasRestrictions ? restrictionsAccepted : false,
         selected_seats: hasSeatMap && selectedSeats.length > 0 ? selectedSeats : null,
+        es_reserva_preventa: isEnPreventa && hasMembership,
       };
 
       console.log('📝 Creando reserva con datos:', bookingData);
@@ -1047,13 +1071,82 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     return parts.join(', ');
   };
 
+  if (isEnPreventa && !isLoadingMembership && !hasMembership) {
+    return (
+      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="bg-gradient-to-r from-amber-500 to-amber-600 p-5 text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 bg-white/20 rounded-full mb-3">
+            <Crown className="w-6 h-6 text-white" />
+          </div>
+          <h3 className="text-lg font-bold text-white mb-1">Periodo de Preventa Exclusiva</h3>
+          <p className="text-amber-100 text-sm">Disponible del {tour.preventa_inicio} al {tour.preventa_fin}</p>
+        </div>
+        <div className="p-6">
+          <div className="text-center mb-5">
+            <p className="text-gray-700 font-medium mb-2">Este tour está en preventa exclusiva para socios</p>
+            <p className="text-gray-500 text-sm">
+              Solo los viajeros con membresía ToursRed Plus activa pueden reservar durante este periodo.
+              Al finalizar la preventa, el tour abrirá al público general.
+            </p>
+          </div>
+          {tour.preventa_precio_especial && tour.preventa_descuento_valor && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-5 text-center">
+              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">Precio especial de preventa</p>
+              <div className="flex items-center justify-center gap-3">
+                <span className="text-2xl font-bold text-amber-700">{formatCurrencyMXN(preventaPrecioBase)}</span>
+                <span className="text-gray-400 line-through text-lg">{formatCurrencyMXN(tour.price)}</span>
+              </div>
+              <p className="text-xs text-amber-600 mt-1">
+                {tour.preventa_tipo_descuento === 'porcentaje'
+                  ? `${tour.preventa_descuento_valor}% de descuento para socios`
+                  : `Ahorra ${formatCurrencyMXN(tour.preventa_descuento_valor)} siendo socio`
+                }
+              </p>
+            </div>
+          )}
+          <Link
+            to="/membresia"
+            className="block w-full text-center bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+          >
+            <Crown className="w-4 h-4 inline mr-2" />
+            Obtener ToursRed Plus
+          </Link>
+          <p className="text-xs text-gray-400 text-center mt-3">
+            ¿Ya eres socio? <Link to="/login" className="text-amber-600 hover:underline">Inicia sesión</Link> para reservar.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <h3 className="text-xl font-semibold mb-4">Reservar Este Tour</h3>
 
+      {isEnPreventa && hasMembership && (
+        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center gap-2.5">
+          <Crown className="w-4 h-4 text-amber-600 flex-shrink-0" />
+          <div className="text-sm">
+            <span className="font-semibold text-amber-800">Reservando en preventa exclusiva</span>
+            {tour.preventa_precio_especial && tour.preventa_descuento_valor && (
+              <span className="text-amber-600 ml-1">
+                — Precio especial para socios activo
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="mb-4">
         <div className="text-sm text-gray-500 mb-1">Precio por persona</div>
-        <div className="text-2xl font-bold text-primary-600">{formatCurrencyMXN(tour.price)}</div>
+        {isEnPreventa && hasMembership && tour.preventa_precio_especial && tour.preventa_descuento_valor ? (
+          <div className="flex items-baseline gap-2">
+            <div className="text-2xl font-bold text-amber-600">{formatCurrencyMXN(preventaPrecioBase)}</div>
+            <div className="text-lg text-gray-400 line-through">{formatCurrencyMXN(tour.price)}</div>
+          </div>
+        ) : (
+          <div className="text-2xl font-bold text-primary-600">{formatCurrencyMXN(tour.price)}</div>
+        )}
         <div className="text-sm text-gray-500 mt-1">
           Depósito: {formatCurrencyMXN(depositAmount)} ({effectiveDepositPercentage}%)
         </div>

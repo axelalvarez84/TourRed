@@ -1101,6 +1101,21 @@ const AgencyBookings: React.FC = () => {
                       </div>
                     </div>
 
+                    {(booking as any).es_reserva_preventa && (
+                      <div className="flex items-center col-span-full bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        <div className="w-4 h-4 mr-2 text-amber-500 flex-shrink-0">★</div>
+                        <div className="flex-1">
+                          <div className="text-xs font-semibold text-amber-800">Reserva de Preventa Exclusiva</div>
+                          {(booking as any).preventa_comision_descuento > 0 && (
+                            <div className="text-xs text-amber-700">
+                              Descuento en comisión aplicado: <strong>-${((booking as any).preventa_comision_descuento || 0).toFixed(2)}</strong>
+                              {' '}(10% sobre comisión base)
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex items-center">
                       <DollarSign className="h-4 w-4 text-gray-400 mr-2" />
                       <div>

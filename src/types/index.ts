@@ -158,6 +158,12 @@ export interface Tour {
   restriction_physical?: boolean;
   name_changes_not_allowed?: boolean;
   cancellation_not_allowed?: boolean;
+  preventa_activa?: boolean;
+  preventa_inicio?: string;
+  preventa_fin?: string;
+  preventa_precio_especial?: boolean;
+  preventa_tipo_descuento?: 'monto' | 'porcentaje';
+  preventa_descuento_valor?: number;
 }
 
 export interface TourSchedule {
@@ -269,6 +275,8 @@ export interface Booking {
   language_extra_cost?: number;
   language_cost_type?: 'por_persona' | 'fijo';
   restrictions_accepted?: boolean;
+  es_reserva_preventa?: boolean;
+  preventa_comision_descuento?: number;
 }
 
 export interface BookingTraveler {
@@ -392,6 +400,7 @@ export interface PaymentBreakdown {
   userPayment: number;
   platformRevenue: number;
   agencyReceives: number;
+  preventaComisionDescuento?: number;
 }
 
 export interface FrequentCompanion {

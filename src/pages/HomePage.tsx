@@ -6,6 +6,7 @@ import CategoryList from '../components/CategoryList';
 import FeaturedDestinations from '../components/FeaturedDestinations';
 import TourCard from '../components/TourCard';
 import MembershipSection from '../components/MembershipSection';
+import PreventasSection from '../components/PreventasSection';
 import { Tour } from '../types';
 import { getTours } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -87,6 +88,9 @@ const HomePage: React.FC = () => {
           <FeaturedDestinations />
         </div>
       </section>
+
+      {/* Preventas Exclusivas */}
+      <PreventasSection />
 
       {/* Featured Tours */}
       <section className="py-12 bg-blue-50">

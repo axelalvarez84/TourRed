@@ -181,6 +181,44 @@ Deno.serve(async (req) => {
           } else {
             console.log(`Successfully updated booking ${bookingId} to paid status`);
 
+            // Apply preventa commission discount (10% on first 10 preventa bookings)
+            try {
+              const { data: bookingForPreventa } = await supabase
+                .from('bookings')
+                .select('es_reserva_preventa, commission_amount, tour_id, agency_id')
+                .eq('id', bookingId)
+                .single();
+
+              if (bookingForPreventa?.es_reserva_preventa) {
+                const preventaCount = await supabase.rpc('get_preventa_bookings_count', { p_tour_id: bookingForPreventa.tour_id });
+                const confirmedCount = preventaCount.data || 0;
+
+                if (confirmedCount <= 10) {
+                  const commissionBase = parseFloat(bookingForPreventa.commission_amount) || 0;
+                  const preventaComisionDescuento = Math.round(commissionBase * 0.10 * 100) / 100;
+                  const newCommission = Math.round((commissionBase - preventaComisionDescuento) * 100) / 100;
+
+                  const { error: preventaUpdateError } = await supabase
+                    .from('bookings')
+                    .update({
+                      commission_amount: newCommission,
+                      preventa_comision_descuento: preventaComisionDescuento,
+                    })
+                    .eq('id', bookingId);
+
+                  if (preventaUpdateError) {
+                    console.error(`Error applying preventa commission discount: ${preventaUpdateError.message}`);
+                  } else {
+                    console.log(`✅ Preventa commission discount applied: -${preventaComisionDescuento} (new commission: ${newCommission})`);
+                  }
+                } else {
+                  console.log(`Preventa booking count (${confirmedCount}) exceeds 10, no commission discount applied`);
+                }
+              }
+            } catch (preventaErr) {
+              console.error('Error processing preventa commission discount:', preventaErr);
+            }
+
             // Deduct ToursRed Cash from wallet if used
             const toursRedCashUsed = parseFloat(session.metadata?.toursred_cash_used || '0');
             if (toursRedCashUsed > 0) {

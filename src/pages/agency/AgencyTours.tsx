@@ -248,6 +248,12 @@ const AgencyTours: React.FC = () => {
     admite_adultos: true,
     admite_adultos_mayores: true,
     vehicle_map_type: null as VehicleMapType | null,
+    preventa_activa: false,
+    preventa_inicio: '',
+    preventa_fin: '',
+    preventa_precio_especial: false,
+    preventa_tipo_descuento: 'porcentaje' as 'monto' | 'porcentaje',
+    preventa_descuento_valor: '',
   });
 
   const VEHICLE_OPTIONS: { type: VehicleMapType; label: string; capacity: number; description: string }[] = [
@@ -493,6 +499,12 @@ const AgencyTours: React.FC = () => {
       admite_ninos: true,
       admite_adultos: true,
       admite_adultos_mayores: true,
+      preventa_activa: false,
+      preventa_inicio: '',
+      preventa_fin: '',
+      preventa_precio_especial: false,
+      preventa_tipo_descuento: 'porcentaje' as 'monto' | 'porcentaje',
+      preventa_descuento_valor: '',
     });
     setSelectedDestinations([]);
     setSearchQuery('');
@@ -621,6 +633,12 @@ const AgencyTours: React.FC = () => {
       admite_adultos: tour.admite_adultos !== undefined ? tour.admite_adultos : true,
       admite_adultos_mayores: tour.admite_adultos_mayores !== undefined ? tour.admite_adultos_mayores : true,
       vehicle_map_type: (tour as any).vehicle_map_type || null,
+      preventa_activa: (tour as any).preventa_activa || false,
+      preventa_inicio: (tour as any).preventa_inicio || '',
+      preventa_fin: (tour as any).preventa_fin || '',
+      preventa_precio_especial: (tour as any).preventa_precio_especial || false,
+      preventa_tipo_descuento: ((tour as any).preventa_tipo_descuento || 'porcentaje') as 'monto' | 'porcentaje',
+      preventa_descuento_valor: (tour as any).preventa_descuento_valor?.toString() || '',
     });
     setSelectedDestinations(selectedDest);
     setIncludes(tour.includes && tour.includes.length > 0 ? tour.includes : ['']);
@@ -1710,6 +1728,13 @@ const AgencyTours: React.FC = () => {
         restriction_disability: isReceptivo ? restrictionDisability : false,
         restriction_physical: isReceptivo ? restrictionPhysical : false,
         vehicle_map_type: formData.vehicle_map_type || null,
+        preventa_activa: formData.preventa_activa,
+        preventa_inicio: formData.preventa_activa && formData.preventa_inicio ? formData.preventa_inicio : null,
+        preventa_fin: formData.preventa_activa && formData.preventa_fin ? formData.preventa_fin : null,
+        preventa_precio_especial: formData.preventa_activa ? formData.preventa_precio_especial : false,
+        preventa_tipo_descuento: (formData.preventa_activa && formData.preventa_precio_especial) ? formData.preventa_tipo_descuento : null,
+        preventa_descuento_valor: (formData.preventa_activa && formData.preventa_precio_especial && formData.preventa_descuento_valor)
+          ? parseFloat(formData.preventa_descuento_valor) : null,
       };
 
       let tourId: string;
@@ -3964,6 +3989,165 @@ const AgencyTours: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* SECCIÓN PREVENTA EXCLUSIVA */}
+            <div className={`bg-white rounded-xl shadow-sm border-2 overflow-hidden transition-all ${
+              formData.preventa_activa ? 'border-amber-400' : 'border-gray-200'
+            }`}>
+              <div className={`px-5 py-4 flex items-center justify-between ${
+                formData.preventa_activa ? 'bg-amber-50' : 'bg-gray-50'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    formData.preventa_activa ? 'bg-amber-500 text-white' : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    <Tag className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className={`font-semibold text-sm ${formData.preventa_activa ? 'text-amber-900' : 'text-gray-700'}`}>
+                      Preventa Exclusiva ToursRed Plus
+                    </h3>
+                    <p className={`text-xs ${formData.preventa_activa ? 'text-amber-700' : 'text-gray-500'}`}>
+                      Ofrece acceso anticipado a socios con membresía activa
+                    </p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.preventa_activa}
+                    onChange={(e) => setFormData({ ...formData, preventa_activa: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                </label>
+              </div>
+
+              {formData.preventa_activa && (
+                <div className="p-5 space-y-5">
+                  {/* Beneficio para la agencia */}
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-amber-800">
+                        <p className="font-semibold mb-1">Beneficio exclusivo para tu agencia</p>
+                        <p>En las primeras <strong>10 reservas realizadas durante la preventa</strong>, ToursRed aplicará un <strong>10% de descuento sobre el monto de comisión</strong> de cada reserva. Este beneficio aplica únicamente durante el periodo de preventa y para las primeras 10 reservas de preventa.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Fechas de preventa */}
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700 mb-3">Periodo de preventa</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Inicio de preventa *</label>
+                        <input
+                          type="date"
+                          value={formData.preventa_inicio}
+                          onChange={(e) => setFormData({ ...formData, preventa_inicio: e.target.value })}
+                          className="input text-sm"
+                          max={formData.preventa_fin || undefined}
+                        />
+                        <p className="text-xs text-gray-400 mt-1">Desde cuándo pueden reservar los socios</p>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Fin de preventa *</label>
+                        <input
+                          type="date"
+                          value={formData.preventa_fin}
+                          onChange={(e) => setFormData({ ...formData, preventa_fin: e.target.value })}
+                          className="input text-sm"
+                          min={formData.preventa_inicio || undefined}
+                          max={formData.start_date || undefined}
+                        />
+                        <p className="text-xs text-gray-400 mt-1">Al terminar, abre al público general</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Precio especial */}
+                  <div className="border-t border-gray-100 pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-700">Precio especial de preventa</p>
+                        <p className="text-xs text-gray-500">Ofrece un descuento exclusivo durante la preventa</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.preventa_precio_especial}
+                          onChange={(e) => setFormData({ ...formData, preventa_precio_especial: e.target.checked })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-10 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                      </label>
+                    </div>
+
+                    {formData.preventa_precio_especial && (
+                      <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                        <div className="flex gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, preventa_tipo_descuento: 'porcentaje' })}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
+                              formData.preventa_tipo_descuento === 'porcentaje'
+                                ? 'border-amber-500 bg-amber-50 text-amber-700'
+                                : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                            }`}
+                          >
+                            <Percent className="w-3.5 h-3.5" />
+                            Porcentaje
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, preventa_tipo_descuento: 'monto' })}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
+                              formData.preventa_tipo_descuento === 'monto'
+                                ? 'border-amber-500 bg-amber-50 text-amber-700'
+                                : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                            }`}
+                          >
+                            <DollarSign className="w-3.5 h-3.5" />
+                            Monto fijo
+                          </button>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            {formData.preventa_tipo_descuento === 'porcentaje' ? 'Porcentaje de descuento (%)' : 'Monto de descuento ($)'}
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              value={formData.preventa_descuento_valor}
+                              onChange={(e) => setFormData({ ...formData, preventa_descuento_valor: e.target.value })}
+                              className="input text-sm pr-12"
+                              placeholder={formData.preventa_tipo_descuento === 'porcentaje' ? 'Ej: 10' : 'Ej: 200'}
+                              min="0"
+                              max={formData.preventa_tipo_descuento === 'porcentaje' ? '100' : undefined}
+                              step="0.01"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">
+                              {formData.preventa_tipo_descuento === 'porcentaje' ? '%' : 'MXN'}
+                            </span>
+                          </div>
+                          {formData.preventa_descuento_valor && formData.price && (
+                            <p className="text-xs text-amber-700 mt-1 font-medium">
+                              Precio de preventa:{' '}
+                              {formData.preventa_tipo_descuento === 'porcentaje'
+                                ? `$${(parseFloat(formData.price) * (1 - parseFloat(formData.preventa_descuento_valor) / 100)).toFixed(2)}`
+                                : `$${Math.max(0, parseFloat(formData.price) - parseFloat(formData.preventa_descuento_valor)).toFixed(2)}`
+                              }{' '}
+                              <span className="text-gray-400 line-through">${parseFloat(formData.price).toFixed(2)}</span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="flex justify-end space-x-4">
               <button

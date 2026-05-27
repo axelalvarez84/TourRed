@@ -94,6 +94,34 @@ async function confirmBooking(supabase: any, bookingId: string, paypalTransactio
     console.error("Error updating booking:", error);
   }
 
+  // Apply preventa commission discount (10% on first 10 preventa bookings)
+  EdgeRuntime.waitUntil(
+    (async () => {
+      try {
+        const { data: bookingForPreventa } = await supabase
+          .from("bookings")
+          .select("es_reserva_preventa, commission_amount, tour_id")
+          .eq("id", bookingId)
+          .single();
+
+        if (bookingForPreventa?.es_reserva_preventa) {
+          const { data: preventaCount } = await supabase.rpc("get_preventa_bookings_count", { p_tour_id: bookingForPreventa.tour_id });
+          if ((preventaCount || 0) <= 10) {
+            const commissionBase = parseFloat(bookingForPreventa.commission_amount) || 0;
+            const preventaComisionDescuento = Math.round(commissionBase * 0.10 * 100) / 100;
+            await supabase.from("bookings").update({
+              commission_amount: Math.round((commissionBase - preventaComisionDescuento) * 100) / 100,
+              preventa_comision_descuento: preventaComisionDescuento,
+            }).eq("id", bookingId);
+            console.log(`✅ Preventa commission discount applied (PayPal): -${preventaComisionDescuento}`);
+          }
+        }
+      } catch (preventaErr) {
+        console.error("Error processing preventa commission discount (PayPal):", preventaErr);
+      }
+    })()
+  );
+
   EdgeRuntime.waitUntil(
     fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-booking-confirmation`, {
       method: "POST",
