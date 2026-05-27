@@ -68,27 +68,6 @@ const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* Categories Section */}
-      <section className="py-12 bg-blue-50">
-        <div className="container-custom">
-          <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center">Explora por Categoría</h2>
-          <CategoryList />
-        </div>
-      </section>
-
-      {/* Featured Destinations */}
-      <section className="py-12 bg-blue-100">
-        <div className="container-custom">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-2xl md:text-3xl font-bold">Destinos Populares</h2>
-            <Link to="/tours" className="text-primary-600 hover:text-primary-700 font-medium flex items-center">
-              Ver todos <Compass className="ml-1 h-4 w-4" />
-            </Link>
-          </div>
-          <FeaturedDestinations />
-        </div>
-      </section>
-
       {/* Preventas Exclusivas */}
       <PreventasSection />
 
@@ -124,6 +103,27 @@ const HomePage: React.FC = () => {
               </Link>
             </div>
           )}
+        </div>
+      </section>
+
+      {/* Categories Section */}
+      <section className="py-12 bg-blue-50">
+        <div className="container-custom">
+          <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center">Explora por Categoría</h2>
+          <CategoryList />
+        </div>
+      </section>
+
+      {/* Featured Destinations */}
+      <section className="py-12 bg-blue-100">
+        <div className="container-custom">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-2xl md:text-3xl font-bold">Destinos Populares</h2>
+            <Link to="/tours" className="text-primary-600 hover:text-primary-700 font-medium flex items-center">
+              Ver todos <Compass className="ml-1 h-4 w-4" />
+            </Link>
+          </div>
+          <FeaturedDestinations />
         </div>
       </section>
 
