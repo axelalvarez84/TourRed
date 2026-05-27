@@ -109,21 +109,18 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
     if (!dateString) return '';
     try {
       const [year, month, day] = dateString.split('-').map(Number);
-      // Create date at midnight UTC
       const date = new Date(Date.UTC(year, month - 1, day));
-      // Format using UTC to avoid timezone conversion
-      const monthName = date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
-      const dayNum = date.toLocaleString('en-US', { day: 'numeric', timeZone: 'UTC' });
-      const yearNum = date.toLocaleString('en-US', { year: 'numeric', timeZone: 'UTC' });
-      return `${monthName} ${dayNum}, ${yearNum}`;
-    } catch (error) {
-      console.error('Error formatting date:', dateString, error);
+      const monthName = date.toLocaleString('es-MX', { month: 'short', timeZone: 'UTC' });
+      const dayNum = date.toLocaleString('es-MX', { day: 'numeric', timeZone: 'UTC' });
+      const yearNum = date.toLocaleString('es-MX', { year: 'numeric', timeZone: 'UTC' });
+      return `${dayNum} ${monthName.replace('.', '')} ${yearNum}`;
+    } catch {
       return dateString;
     }
   };
 
   return (
-    <div className={`bg-blue-100 rounded-lg shadow-md overflow-hidden transition-all hover:shadow-lg group animate-fade-in ${className}`}>
+    <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 group animate-fade-in ${className}`}>
       <div className="relative overflow-hidden aspect-[4/3]">
         <img
           src={tour.image_url || 'https://images.pexels.com/photos/2245436/pexels-photo-2245436.png'}
@@ -263,7 +260,7 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
           </div>
         )}
         
-        <div className="border-t border-gray-200 pt-3 flex items-center justify-between">
+        <div className="border-t border-gray-100 pt-3 flex items-center justify-between">
           <div>
             <span className="text-sm text-gray-500">Desde</span>
             {(() => {

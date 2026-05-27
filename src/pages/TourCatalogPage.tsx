@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { Filter, MapPin, Calendar, Tag, ChevronDown, ChevronUp, ChevronRight, ChevronLeft } from 'lucide-react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { Filter, MapPin, ChevronRight, ChevronLeft, X, SlidersHorizontal, Building2, Search } from 'lucide-react';
 import SearchBox from '../components/SearchBox';
 import TourCard from '../components/TourCard';
 import { Tour, SearchFilters } from '../types';
@@ -11,12 +11,13 @@ const PAGE_SIZE = 20;
 
 const TourCatalogPage: React.FC = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [tours, setTours] = useState<Tour[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [visibleFilters, setVisibleFilters] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [popularDestinations, setPopularDestinations] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [popularDeparturePoints, setPopularDeparturePoints] = useState<any[]>([]);
@@ -41,18 +42,48 @@ const TourCatalogPage: React.FC = () => {
 
   const hasGeoSearch = !!(initialFilters.lat && initialFilters.lng);
 
-  const toggleFilters = () => setVisibleFilters(!visibleFilters);
+  const activeFilterCount = useMemo(() => [
+    initialFilters.tourName, initialFilters.destination, initialFilters.category,
+    initialFilters.startDate, initialFilters.endDate, initialFilters.agency,
+    initialFilters.departurePoint, initialFilters.minPrice, initialFilters.maxPrice,
+    initialFilters.petFriendly, initialFilters.tourType,
+  ].filter(Boolean).length, [initialFilters]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchParams]);
+  const activeFilterPills = useMemo(() => {
+    const pills: { key: string; label: string }[] = [];
+    if (initialFilters.tourName) pills.push({ key: 'tourName', label: `"${initialFilters.tourName}"` });
+    if (initialFilters.destination) pills.push({ key: 'destination', label: `Destino: ${initialFilters.destination}` });
+    if (initialFilters.category) pills.push({ key: 'category', label: `Cat: ${initialFilters.category}` });
+    if (initialFilters.startDate) pills.push({ key: 'startDate', label: `Desde: ${initialFilters.startDate}` });
+    if (initialFilters.endDate) pills.push({ key: 'endDate', label: `Hasta: ${initialFilters.endDate}` });
+    if (initialFilters.agency) pills.push({ key: 'agency', label: 'Agencia seleccionada' });
+    if (initialFilters.departurePoint) pills.push({ key: 'departurePoint', label: `Salida: ${initialFilters.departurePoint}` });
+    if (initialFilters.minPrice) pills.push({ key: 'minPrice', label: `Desde $${initialFilters.minPrice}` });
+    if (initialFilters.maxPrice) pills.push({ key: 'maxPrice', label: `Hasta $${initialFilters.maxPrice}` });
+    if (initialFilters.petFriendly === 'true') pills.push({ key: 'petFriendly', label: 'Pet Friendly' });
+    if (initialFilters.petFriendly === 'false') pills.push({ key: 'petFriendly', label: 'Sin mascotas' });
+    if (initialFilters.tourType === 'excursion') pills.push({ key: 'tourType', label: 'Excursiones' });
+    if (initialFilters.tourType === 'receptivo') pills.push({ key: 'tourType', label: 'Receptivos' });
+    if (initialFilters.locationName) pills.push({ key: 'locationName', label: `Cerca de: ${initialFilters.locationName}` });
+    return pills;
+  }, [initialFilters]);
+
+  const removeFilter = useCallback((key: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete(key);
+    if (key === 'locationName') { params.delete('lat'); params.delete('lng'); params.delete('radius'); }
+    navigate(`/tours?${params.toString()}`);
+  }, [searchParams, navigate]);
+
+  const clearAllFilters = useCallback(() => navigate('/tours'), [navigate]);
+
+  useEffect(() => { setCurrentPage(1); }, [searchParams]);
 
   useEffect(() => {
     const fetchTours = async () => {
       try {
         setIsLoading(true);
         setError('');
-
         if (hasGeoSearch) {
           const { data, error } = await supabase.rpc('search_tours_by_departure_radius', {
             search_lat: parseFloat(initialFilters.lat!),
@@ -64,28 +95,18 @@ const TourCatalogPage: React.FC = () => {
             max_price: initialFilters.maxPrice ? parseFloat(initialFilters.maxPrice) : null,
             limit_results: 100,
           });
-
           if (error) throw new Error(error.message);
-
           const transformedTours = data?.map((row: any) => ({
-            id: row.tour_id,
-            name: row.tour_name,
-            description: row.tour_description,
-            price: row.tour_price,
-            category: row.tour_category,
-            destination: row.tour_destination,
-            image_url: row.tour_image_url,
-            is_featured: row.tour_is_featured,
-            start_date: row.tour_start_date,
-            end_date: row.tour_end_date,
-            agency_id: row.agency_id,
-            agencies: { id: row.agency_id, name: row.agency_name },
+            id: row.tour_id, name: row.tour_name, description: row.tour_description,
+            price: row.tour_price, category: row.tour_category, destination: row.tour_destination,
+            image_url: row.tour_image_url, is_featured: row.tour_is_featured,
+            start_date: row.tour_start_date, end_date: row.tour_end_date,
+            agency_id: row.agency_id, agencies: { id: row.agency_id, name: row.agency_name },
             distance_meters: row.distance_meters,
             nearest_departure_location: row.nearest_departure_location,
             nearest_departure_address: row.nearest_departure_address,
             all_departure_locations: row.all_departure_locations,
           })) || [];
-
           setTours(transformedTours);
           setTotalCount(transformedTours.length);
         } else {
@@ -103,67 +124,36 @@ const TourCatalogPage: React.FC = () => {
             limit: PAGE_SIZE,
             offset,
           });
-
           if (error) throw new Error(error.message);
-
           setTours(data || []);
           setTotalCount(count ?? data?.length ?? 0);
         }
       } catch (err: any) {
         setError(err.message || 'Error al cargar los tours');
-        setTours([]);
-        setTotalCount(0);
+        setTours([]); setTotalCount(0);
       } finally {
         setIsLoading(false);
       }
     };
-
     fetchTours();
   }, [searchParams, currentPage]);
 
   useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const { data } = await supabase
-          .from('tour_categories')
-          .select('id, name, slug')
-          .eq('is_active', true)
-          .order('name');
-        if (data) setCategories(data);
-      } catch {}
-    };
-    fetchCategories();
+    supabase.from('tour_categories').select('id, name, slug').eq('is_active', true).order('name')
+      .then(({ data }) => { if (data) setCategories(data); });
   }, []);
 
   useEffect(() => {
     const fetchPopularDestinations = async () => {
       try {
-        const { data: destinations } = await supabase
-          .from('destinations')
-          .select('id, name')
-          .eq('is_active', true)
-          .order('name');
-
-        if (!destinations || destinations.length === 0) return;
-
-        const destinationIds = destinations.map(d => d.id);
-        const { data: tourDestinations } = await supabase
-          .from('tour_destinations')
-          .select('destination_id')
-          .in('destination_id', destinationIds);
-
-        const countsByDestination = (tourDestinations || []).reduce((acc: Record<string, number>, td: any) => {
-          acc[td.destination_id] = (acc[td.destination_id] || 0) + 1;
-          return acc;
-        }, {});
-
-        const processed = destinations
-          .map(dest => ({ id: dest.id, name: dest.name, tour_count: countsByDestination[dest.id] || 0 }))
-          .filter(d => d.tour_count > 0)
-          .sort((a, b) => b.tour_count - a.tour_count)
-          .slice(0, 4);
-
-        setPopularDestinations(processed);
+        const { data: destinations } = await supabase.from('destinations').select('id, name').eq('is_active', true).order('name');
+        if (!destinations?.length) return;
+        const { data: tourDestinations } = await supabase.from('tour_destinations').select('destination_id').in('destination_id', destinations.map(d => d.id));
+        const counts = (tourDestinations || []).reduce((acc: Record<string, number>, td: any) => { acc[td.destination_id] = (acc[td.destination_id] || 0) + 1; return acc; }, {});
+        setPopularDestinations(
+          destinations.map(d => ({ ...d, tour_count: counts[d.id] || 0 }))
+            .filter(d => d.tour_count > 0).sort((a, b) => b.tour_count - a.tour_count).slice(0, 8)
+        );
       } catch {}
     };
     fetchPopularDestinations();
@@ -172,38 +162,14 @@ const TourCatalogPage: React.FC = () => {
   useEffect(() => {
     const fetchPopularDeparturePoints = async () => {
       try {
-        const { data: departurePoints } = await supabase
-          .from('departure_points')
-          .select('id, name, city, municipality')
-          .eq('is_active', true)
-          .order('name');
-
-        if (!departurePoints || departurePoints.length === 0) return;
-
-        const pointIds = departurePoints.map(p => p.id);
-        const { data: tourDeparturePoints } = await supabase
-          .from('tour_departure_points')
-          .select('departure_point_id')
-          .in('departure_point_id', pointIds);
-
-        const countsByPoint = (tourDeparturePoints || []).reduce((acc: Record<string, number>, tdp: any) => {
-          acc[tdp.departure_point_id] = (acc[tdp.departure_point_id] || 0) + 1;
-          return acc;
-        }, {});
-
-        const processed = departurePoints
-          .map(point => ({
-            id: point.id,
-            name: point.name,
-            city: point.city,
-            municipality: point.municipality,
-            tour_count: countsByPoint[point.id] || 0,
-          }))
-          .filter(p => p.tour_count > 0)
-          .sort((a, b) => b.tour_count - a.tour_count)
-          .slice(0, 6);
-
-        setPopularDeparturePoints(processed);
+        const { data: points } = await supabase.from('departure_points').select('id, name, city, municipality').eq('is_active', true).order('name');
+        if (!points?.length) return;
+        const { data: tourPoints } = await supabase.from('tour_departure_points').select('departure_point_id').in('departure_point_id', points.map(p => p.id));
+        const counts = (tourPoints || []).reduce((acc: Record<string, number>, tp: any) => { acc[tp.departure_point_id] = (acc[tp.departure_point_id] || 0) + 1; return acc; }, {});
+        setPopularDeparturePoints(
+          points.map(p => ({ ...p, tour_count: counts[p.id] || 0 }))
+            .filter(p => p.tour_count > 0).sort((a, b) => b.tour_count - a.tour_count).slice(0, 6)
+        );
       } catch {}
     };
     fetchPopularDeparturePoints();
@@ -211,15 +177,10 @@ const TourCatalogPage: React.FC = () => {
 
   const filteredTours = useMemo(() => {
     if (!initialFilters.tourType) return tours;
-    return tours.filter(t => {
-      const type = (t as any).tour_type || 'excursion';
-      return type === initialFilters.tourType;
-    });
+    return tours.filter(t => ((t as any).tour_type || 'excursion') === initialFilters.tourType);
   }, [tours, initialFilters.tourType]);
 
-  const tourIds = filteredTours.map(t => t.id);
-  const { data: promotionsMap = {} } = useTourPromotionsBatch(tourIds);
-
+  const { data: promotionsMap = {} } = useTourPromotionsBatch(filteredTours.map(t => t.id));
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   const handlePageChange = (page: number) => {
@@ -227,199 +188,212 @@ const TourCatalogPage: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setDrawerOpen(false); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
+  useEffect(() => {
+    document.body.style.overflow = drawerOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [drawerOpen]);
+
   return (
-    <div className="bg-blue-50 min-h-screen py-8">
-      <div className="container-custom">
-        <nav className="flex mb-4" aria-label="Breadcrumb">
-          <ol className="inline-flex items-center space-x-1 md:space-x-3">
-            <li className="inline-flex items-center">
-              <Link to="/" className="text-gray-500 hover:text-primary-600">Inicio</Link>
-            </li>
-            <li>
-              <div className="flex items-center">
-                <ChevronRight className="h-4 w-4 text-gray-400" />
-                <span className="ml-1 text-gray-500">Tours</span>
-              </div>
-            </li>
-            <li aria-current="page">
-              <div className="flex items-center">
-                <ChevronRight className="h-4 w-4 text-gray-400" />
-                <span className="ml-1 font-medium text-gray-900">Tours Nacionales</span>
-              </div>
-            </li>
-          </ol>
-        </nav>
+    <div className="bg-slate-50 min-h-screen">
 
-        <div className="flex items-center gap-3 mb-6">
-          <h1 className="text-3xl font-bold">Tours Nacionales</h1>
-          <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-semibold">
-            Destinos en México
-          </span>
+      {/* Page header */}
+      <div className="bg-white border-b border-gray-100 shadow-sm">
+        <div className="container-custom py-5">
+          <nav className="flex mb-3" aria-label="Breadcrumb">
+            <ol className="inline-flex items-center space-x-1 text-sm">
+              <li><Link to="/" className="text-gray-400 hover:text-primary-600 transition-colors">Inicio</Link></li>
+              <li><ChevronRight className="h-3.5 w-3.5 text-gray-300 mx-1" /></li>
+              <li><span className="text-gray-700">Tours</span></li>
+              <li><ChevronRight className="h-3.5 w-3.5 text-gray-300 mx-1" /></li>
+              <li><span className="text-gray-900 font-medium">Tours Nacionales</span></li>
+            </ol>
+          </nav>
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">Tours Nacionales</h1>
+              <p className="text-gray-500 text-sm mt-1">Descubre los mejores destinos en México</p>
+            </div>
+            <span className="sm:ml-auto px-3 py-1.5 bg-primary-50 text-primary-700 rounded-full text-xs font-semibold border border-primary-100 self-start sm:self-auto whitespace-nowrap">
+              Destinos en México
+            </span>
+          </div>
         </div>
+      </div>
 
-        <div className="lg:hidden mb-6">
-          <button
-            onClick={toggleFilters}
-            className="flex items-center w-full justify-between bg-white p-4 rounded-lg shadow-sm text-gray-900"
-          >
-            <div className="flex items-center">
-              <Filter className="h-5 w-5 text-primary-600 mr-2" />
-              <span className="font-medium">Filtros</span>
-            </div>
-            {visibleFilters ? (
-              <ChevronUp className="h-5 w-5 text-gray-600" />
-            ) : (
-              <ChevronDown className="h-5 w-5 text-gray-600" />
-            )}
-          </button>
-          {visibleFilters && (
-            <div className="mt-4">
-              <SearchBox initialFilters={initialFilters} />
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col lg:flex-row gap-6">
-          <div className="hidden lg:block w-full lg:w-1/3 xl:w-1/4">
-            <SearchBox initialFilters={initialFilters} />
-
-            <div className="bg-white rounded-lg shadow-md p-4 mt-6">
-              <h3 className="font-semibold mb-4 text-gray-900">Categorías Populares</h3>
-              <div className="space-y-2">
-                {categories.length > 0 ? (
-                  categories.map((category) => (
-                    <a
-                      key={category.id}
-                      href={`/tours?category=${category.slug}`}
-                      className="flex items-center text-gray-700 hover:text-primary-600 transition-colors"
-                    >
-                      <Tag className="h-4 w-4 mr-2" />
-                      <span>{category.name}</span>
-                    </a>
-                  ))
-                ) : (
-                  <div className="text-gray-500 text-sm text-center py-4">Cargando categorías...</div>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-md p-4 mt-6">
-              <h3 className="font-semibold mb-4 text-gray-900">Destinos Populares</h3>
-              <div className="space-y-2">
-                {popularDestinations.length > 0 ? (
-                  popularDestinations.map((destination) => (
-                    <a
-                      key={destination.id}
-                      href={`/tours?destination=${encodeURIComponent(destination.name)}`}
-                      className="flex items-center justify-between text-gray-700 hover:text-primary-600 transition-colors"
-                    >
-                      <div className="flex items-center">
-                        <MapPin className="h-4 w-4 mr-2" />
-                        <span>{destination.name}</span>
-                      </div>
-                      <span className="text-xs text-gray-500">
-                        {destination.tour_count} {destination.tour_count === 1 ? 'tour' : 'tours'}
-                      </span>
-                    </a>
-                  ))
-                ) : (
-                  <div className="text-gray-500 text-sm text-center py-4">No hay destinos disponibles aún</div>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-md p-4 mt-6">
-              <h3 className="font-semibold mb-4 text-gray-900">Puntos de Partida Populares</h3>
-              <div className="space-y-2">
-                {popularDeparturePoints.length > 0 ? (
-                  popularDeparturePoints.map((point) => (
-                    <a
-                      key={point.id}
-                      href={`/tours?departurePoint=${encodeURIComponent(point.name)}`}
-                      className="flex items-center justify-between text-gray-700 hover:text-primary-600 transition-colors"
-                    >
-                      <div className="flex items-center min-w-0 flex-1">
-                        <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
-                        <div className="min-w-0">
-                          <div className="truncate">{point.name}</div>
-                          {point.city && (
-                            <div className="text-xs text-gray-500 truncate">
-                              {point.city}{point.municipality ? `, ${point.municipality}` : ''}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
-                        {point.tour_count} {point.tour_count === 1 ? 'tour' : 'tours'}
-                      </span>
-                    </a>
-                  ))
-                ) : (
-                  <div className="text-gray-500 text-sm text-center py-4">No hay puntos de partida disponibles</div>
-                )}
-              </div>
+      {/* Quick categories strip */}
+      {categories.length > 0 && (
+        <div className="bg-white border-b border-gray-100 overflow-x-auto">
+          <div className="container-custom">
+            <div className="flex gap-2 py-3 w-max min-w-full">
+              <a href="/tours" className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold border transition-all ${!initialFilters.category ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300 hover:text-primary-600'}`}>
+                Todos
+              </a>
+              {categories.map((cat: any) => (
+                <a key={cat.id} href={`/tours?category=${cat.slug}`}
+                  className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold border transition-all ${initialFilters.category === cat.slug ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300 hover:text-primary-600'}`}>
+                  {cat.name}
+                </a>
+              ))}
             </div>
           </div>
+        </div>
+      )}
 
-          <div className="w-full lg:w-2/3 xl:w-3/4">
+      <div className="container-custom py-6">
+
+        {/* Active filter pills */}
+        {activeFilterPills.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-5 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Filtros activos:</span>
+            {activeFilterPills.map((pill) => (
+              <span key={pill.key} className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded-full border border-primary-100">
+                {pill.label}
+                <button onClick={() => removeFilter(pill.key)} className="hover:bg-primary-200 rounded-full p-0.5 transition-colors"><X className="w-3 h-3" /></button>
+              </span>
+            ))}
+            <button onClick={clearAllFilters} className="ml-auto text-xs text-gray-400 hover:text-red-500 transition-colors font-medium flex items-center gap-1">
+              <X className="w-3 h-3" /> Limpiar todo
+            </button>
+          </div>
+        )}
+
+        <div className="flex gap-6">
+
+          {/* Sidebar desktop */}
+          <aside className="hidden lg:block w-72 xl:w-80 flex-shrink-0">
+            <div className="sticky top-4 space-y-4">
+              <SearchBox initialFilters={initialFilters} />
+
+              {popularDestinations.length > 0 && (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <MapPin className="w-4 h-4 text-primary-600" />
+                    <h3 className="font-semibold text-gray-900 text-sm">Destinos Populares</h3>
+                  </div>
+                  <div className="space-y-0.5">
+                    {popularDestinations.map((destination) => (
+                      <a key={destination.id} href={`/tours?destination=${encodeURIComponent(destination.name)}`}
+                        className={`flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-colors group ${initialFilters.destination === destination.name ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700 hover:bg-gray-50 hover:text-primary-600'}`}>
+                        <span>{destination.name}</span>
+                        <span className="text-xs text-gray-400 group-hover:text-primary-500 transition-colors">{destination.tour_count}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {popularDeparturePoints.length > 0 && (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Building2 className="w-4 h-4 text-primary-600" />
+                    <h3 className="font-semibold text-gray-900 text-sm">Puntos de Partida</h3>
+                  </div>
+                  <div className="space-y-0.5">
+                    {popularDeparturePoints.map((point) => (
+                      <a key={point.id} href={`/tours?departurePoint=${encodeURIComponent(point.name)}`}
+                        className="flex items-center justify-between px-3 py-2 rounded-xl text-sm text-gray-700 hover:bg-gray-50 hover:text-primary-600 transition-colors group">
+                        <div className="min-w-0 flex-1 mr-2">
+                          <div className="truncate">{point.name}</div>
+                          {point.city && <div className="text-xs text-gray-400 truncate">{point.city}</div>}
+                        </div>
+                        <span className="text-xs text-gray-400 group-hover:text-primary-500 flex-shrink-0">{point.tour_count}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </aside>
+
+          {/* Main content */}
+          <div className="flex-1 min-w-0">
+
+            {/* Toolbar */}
+            <div className="flex items-center gap-3 mb-5 flex-wrap">
+              <button
+                onClick={() => setDrawerOpen(true)}
+                className="lg:hidden flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:border-primary-300 transition-colors shadow-sm relative flex-shrink-0"
+              >
+                <SlidersHorizontal className="w-4 h-4" />
+                Filtros
+                {activeFilterCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-primary-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+
+              <p className="text-sm text-gray-500 flex-1 min-w-0">
+                {isLoading ? (
+                  <span className="inline-block w-32 h-4 bg-gray-200 rounded animate-pulse" />
+                ) : (
+                  <>
+                    {!hasGeoSearch && totalCount > PAGE_SIZE
+                      ? <><span className="font-semibold text-gray-900">{(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, totalCount)}</span> de <span className="font-semibold text-gray-900">{totalCount}</span> tours</>
+                      : <><span className="font-semibold text-gray-900">{filteredTours.length}</span> {filteredTours.length === 1 ? 'tour encontrado' : 'tours encontrados'}</>
+                    }
+                    {hasGeoSearch && initialFilters.locationName && <span className="text-gray-400"> · cerca de "{initialFilters.locationName}"</span>}
+                  </>
+                )}
+              </p>
+
+              <select className="text-xs font-medium text-gray-700 border border-gray-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition shadow-sm flex-shrink-0">
+                <option value="recommended">Recomendados</option>
+                <option value="price-low">Precio: Menor a Mayor</option>
+                <option value="price-high">Precio: Mayor a Menor</option>
+                <option value="rating">Mejor Calificados</option>
+                <option value="newest">Más Recientes</option>
+              </select>
+            </div>
+
+            {/* Results */}
             {isLoading ? (
-              <div className="flex justify-center py-20">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="bg-white rounded-2xl overflow-hidden shadow-sm animate-pulse">
+                    <div className="aspect-[4/3] bg-gray-200" />
+                    <div className="p-4 space-y-3">
+                      <div className="h-4 bg-gray-200 rounded w-3/4" />
+                      <div className="h-3 bg-gray-200 rounded w-1/2" />
+                      <div className="h-3 bg-gray-200 rounded w-2/3" />
+                      <div className="h-9 bg-gray-200 rounded mt-4" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : error ? (
-              <div className="bg-white rounded-lg shadow-md p-6 text-center">
-                <p className="text-error-600 mb-4 font-semibold">Error: {error}</p>
-                <p className="text-gray-600 mb-6">No se pudieron cargar los tours desde la base de datos.</p>
-                <button onClick={() => window.location.reload()} className="btn btn-primary">
-                  Reintentar
-                </button>
+              <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+                <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <X className="w-7 h-7 text-red-400" />
+                </div>
+                <p className="text-gray-900 font-semibold mb-2">Error al cargar los tours</p>
+                <p className="text-gray-500 text-sm mb-6">{error}</p>
+                <button onClick={() => window.location.reload()} className="btn btn-primary">Reintentar</button>
               </div>
             ) : filteredTours.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-md p-6 text-center">
-                <p className="text-xl mb-4 text-gray-900 font-semibold">
-                  {tours.length === 0 ? 'No hay tours disponibles' : 'No se encontraron tours que coincidan con tus criterios'}
+              <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+                <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Search className="w-7 h-7 text-blue-400" />
+                </div>
+                <p className="text-gray-900 font-semibold text-lg mb-2">
+                  {tours.length === 0 ? 'No hay tours disponibles' : 'Sin resultados'}
                 </p>
-                <p className="text-gray-600 mb-6">
-                  {tours.length === 0
-                    ? 'Las agencias aún no han publicado tours. ¡Vuelve pronto!'
-                    : 'Intenta ajustar tus filtros o buscar algo diferente.'}
+                <p className="text-gray-500 text-sm mb-6">
+                  {tours.length === 0 ? 'Las agencias aún no han publicado tours. ¡Vuelve pronto!' : 'Intenta ajustar o limpiar los filtros para ver más opciones.'}
                 </p>
-                <a href="/tours" className="btn btn-primary">Ver Todos los Tours</a>
+                <a href="/tours" className="btn btn-primary">Ver todos los tours</a>
               </div>
             ) : (
               <>
-                <div className="flex justify-between items-center mb-4">
-                  <p className="text-gray-600">
-                    {!hasGeoSearch && totalCount > PAGE_SIZE
-                      ? `Mostrando ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, totalCount)} de ${totalCount} tours`
-                      : filteredTours.length === 1 ? 'Encontrado 1 tour' : `Encontrados ${filteredTours.length} tours`}
-                    {hasGeoSearch && initialFilters.locationName && ` cerca de "${initialFilters.locationName}"`}
-                    {initialFilters.tourName && ` con nombre "${initialFilters.tourName}"`}
-                    {initialFilters.destination && ` para "${initialFilters.destination}"`}
-                    {initialFilters.category && ` en ${initialFilters.category}`}
-                    {initialFilters.tourType === 'receptivo' && ` (solo receptivos)`}
-                    {initialFilters.tourType === 'excursion' && ` (solo excursiones)`}
-                  </p>
-                  <div className="flex items-center">
-                    <span className="text-sm text-gray-600 mr-2">Ordenar por:</span>
-                    <select className="border border-gray-300 rounded-md text-sm p-1 text-gray-900 bg-white">
-                      <option value="recommended">Recomendados</option>
-                      <option value="price-low">Precio: Menor a Mayor</option>
-                      <option value="price-high">Precio: Mayor a Menor</option>
-                      <option value="rating">Mejor Calificados</option>
-                      <option value="newest">Más Recientes</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
                   {filteredTours.map((tour) => (
-                    <TourCard
-                      key={tour.id}
-                      tour={tour}
-                      showDistance={hasGeoSearch}
-                      activePromo={promotionsMap[tour.id] ?? null}
-                    />
+                    <TourCard key={tour.id} tour={tour} showDistance={hasGeoSearch} activePromo={promotionsMap[tour.id] ?? null} />
                   ))}
                 </div>
 
@@ -428,42 +402,39 @@ const TourCatalogPage: React.FC = () => {
                     <button
                       onClick={() => handlePageChange(currentPage - 1)}
                       disabled={currentPage === 1}
-                      className="p-2 rounded-lg border border-gray-300 disabled:opacity-40 hover:bg-white transition-colors"
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 disabled:opacity-40 hover:border-primary-300 hover:text-primary-600 transition-colors"
                     >
-                      <ChevronLeft className="h-5 w-5 text-gray-600" />
+                      <ChevronLeft className="h-4 w-4" />
+                      <span className="hidden sm:inline">Anterior</span>
                     </button>
 
-                    {Array.from({ length: totalPages }, (_, i) => i + 1)
-                      .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 2)
-                      .reduce<(number | string)[]>((acc, page, idx, arr) => {
-                        if (idx > 0 && (page as number) - (arr[idx - 1] as number) > 1) acc.push('...');
-                        acc.push(page);
-                        return acc;
-                      }, [])
-                      .map((item, idx) =>
-                        typeof item === 'string' ? (
-                          <span key={`ellipsis-${idx}`} className="px-2 text-gray-400">...</span>
-                        ) : (
-                          <button
-                            key={item}
-                            onClick={() => handlePageChange(item)}
-                            className={`w-10 h-10 rounded-lg border text-sm font-medium transition-colors ${
-                              item === currentPage
-                                ? 'bg-primary-600 border-primary-600 text-white'
-                                : 'border-gray-300 text-gray-700 hover:bg-white'
-                            }`}
-                          >
-                            {item}
-                          </button>
-                        )
-                      )}
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
+                        .reduce<(number | string)[]>((acc, page, idx, arr) => {
+                          if (idx > 0 && (page as number) - (arr[idx - 1] as number) > 1) acc.push('...');
+                          acc.push(page);
+                          return acc;
+                        }, [])
+                        .map((item, idx) =>
+                          typeof item === 'string' ? (
+                            <span key={`ellipsis-${idx}`} className="px-2 text-gray-400 text-sm">…</span>
+                          ) : (
+                            <button key={item} onClick={() => handlePageChange(item)}
+                              className={`w-9 h-9 rounded-xl text-sm font-semibold transition-colors ${item === currentPage ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:border-primary-300 hover:text-primary-600'}`}>
+                              {item}
+                            </button>
+                          )
+                        )}
+                    </div>
 
                     <button
                       onClick={() => handlePageChange(currentPage + 1)}
                       disabled={currentPage === totalPages}
-                      className="p-2 rounded-lg border border-gray-300 disabled:opacity-40 hover:bg-white transition-colors"
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 disabled:opacity-40 hover:border-primary-300 hover:text-primary-600 transition-colors"
                     >
-                      <ChevronRight className="h-5 w-5 text-gray-600" />
+                      <span className="hidden sm:inline">Siguiente</span>
+                      <ChevronRight className="h-4 w-4" />
                     </button>
                   </div>
                 )}
@@ -472,6 +443,46 @@ const TourCatalogPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Mobile filter drawer */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setDrawerOpen(false)} />
+          <div className="absolute inset-x-0 bottom-0 max-h-[92vh] bg-slate-50 rounded-t-3xl shadow-2xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 bg-white border-b border-gray-100 flex-shrink-0 rounded-t-3xl">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-primary-600" />
+                <span className="font-bold text-gray-900">Filtros</span>
+                {activeFilterCount > 0 && (
+                  <span className="px-2 py-0.5 bg-primary-100 text-primary-700 text-xs font-bold rounded-full">{activeFilterCount}</span>
+                )}
+              </div>
+              <button onClick={() => setDrawerOpen(false)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {popularDestinations.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5" /> Destinos populares
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {popularDestinations.map(d => (
+                      <a key={d.id} href={`/tours?destination=${encodeURIComponent(d.name)}`}
+                        onClick={() => setDrawerOpen(false)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${initialFilters.destination === d.name ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-700 border-gray-200 hover:border-primary-300'}`}>
+                        {d.name}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <SearchBox initialFilters={initialFilters} onClose={() => setDrawerOpen(false)} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

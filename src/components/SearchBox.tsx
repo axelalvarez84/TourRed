@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Tag, Calendar, Building2, DollarSign, Dog, X, MapPin, FileSearch, RefreshCw } from 'lucide-react';
+import { Search, Tag, Calendar, Building2, DollarSign, Dog, X, MapPin, FileSearch, RefreshCw, SlidersHorizontal, RotateCcw } from 'lucide-react';
 import { SearchFilters } from '../types';
 import { useTourCategories, useAgencies, useDeparturePoints } from '../hooks/useSharedData';
 
 interface SearchBoxProps {
   initialFilters?: SearchFilters;
   className?: string;
+  onClose?: () => void;
 }
 
-const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = '' }) => {
+const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = '', onClose }) => {
   const [tourName, setTourName] = useState(initialFilters.tourName || '');
   const [destination, setDestination] = useState(initialFilters.destination || '');
   const [category, setCategory] = useState(initialFilters.category || '');
@@ -23,13 +24,13 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
   const [maxPrice, setMaxPrice] = useState(initialFilters.maxPrice || '');
   const [petFriendly, setPetFriendly] = useState(initialFilters.petFriendly || '');
   const [tourType, setTourType] = useState(initialFilters.tourType || '');
-  const [locationName, setLocationName] = useState(initialFilters.locationName || '');
-  const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | null>(
+  const [locationName] = useState(initialFilters.locationName || '');
+  const [locationCoords] = useState<{ lat: number; lng: number } | null>(
     initialFilters.lat && initialFilters.lng
       ? { lat: parseFloat(initialFilters.lat), lng: parseFloat(initialFilters.lng) }
       : null
   );
-  const [radius, setRadius] = useState(initialFilters.radius || '5');
+  const [radius] = useState(initialFilters.radius || '5');
   const [showAgencyDropdown, setShowAgencyDropdown] = useState(false);
   const [selectedAgencyName, setSelectedAgencyName] = useState('');
   const [showDeparturePointDropdown, setShowDeparturePointDropdown] = useState(false);
@@ -58,9 +59,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
   }, [agencies]);
 
   const filteredAgencies = useMemo(() => {
-    if (agencySearchText === '' || agencySearchText === selectedAgencyName) {
-      return agencies;
-    }
+    if (agencySearchText === '' || agencySearchText === selectedAgencyName) return agencies;
     return agencies.filter((ag: any) =>
       ag.name.toLowerCase().includes(agencySearchText.toLowerCase())
     );
@@ -83,7 +82,6 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
         setShowDeparturePointDropdown(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
@@ -92,7 +90,6 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
     const value = e.target.value;
     setAgencySearchText(value);
     setShowAgencyDropdown(true);
-
     if (value === '') {
       setAgency('');
       setSelectedAgencyName('');
@@ -117,10 +114,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
     const value = e.target.value;
     setDeparturePointSearchText(value);
     setShowDeparturePointDropdown(true);
-
-    if (value === '') {
-      setDeparturePoint('');
-    }
+    if (value === '') setDeparturePoint('');
   };
 
   const handleDeparturePointSelect = (selectedPoint: any) => {
@@ -135,17 +129,27 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
     setShowDeparturePointDropdown(false);
   };
 
-  const handleLocationSelect = (location: {
-    name: string;
-    address: string;
-    coordinates: { lat: number; lng: number };
-  }) => {
-    setLocationCoords(location.coordinates);
+  const handleClearAll = () => {
+    setTourName('');
+    setDestination('');
+    setCategory('');
+    setStartDate('');
+    setEndDate('');
+    setAgency('');
+    setAgencySearchText('');
+    setSelectedAgencyName('');
+    setDeparturePoint('');
+    setDeparturePointSearchText('');
+    setMinPrice('');
+    setMaxPrice('');
+    setPetFriendly('');
+    setTourType('');
   };
+
+  const hasActiveFilters = !!(tourName || destination || category || startDate || endDate || agency || departurePoint || minPrice || maxPrice || petFriendly || tourType);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-
     const queryParams = new URLSearchParams();
     if (tourName) queryParams.set('tourName', tourName);
     if (destination) queryParams.set('destination', destination);
@@ -158,320 +162,303 @@ const SearchBox: React.FC<SearchBoxProps> = ({ initialFilters = {}, className = 
     if (maxPrice) queryParams.set('maxPrice', maxPrice);
     if (petFriendly) queryParams.set('petFriendly', petFriendly);
     if (tourType) queryParams.set('tourType', tourType);
-
     if (locationCoords) {
       queryParams.set('lat', locationCoords.lat.toString());
       queryParams.set('lng', locationCoords.lng.toString());
       queryParams.set('radius', radius);
       if (locationName) queryParams.set('locationName', locationName);
     }
-
     navigate(`/tours?${queryParams.toString()}`);
+    onClose?.();
   };
 
+  const inputBase = 'w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition placeholder-gray-400';
+  const inputWithIcon = 'pl-10 ' + inputBase;
+  const labelClass = 'block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5';
+
   return (
-    <div className={`bg-white rounded-lg shadow-lg p-4 md:p-6 ${className}`}>
-      <form onSubmit={handleSearch}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="relative">
-            <label htmlFor="tourName" className="block text-sm font-medium text-gray-700 mb-1">
-              Nombre del Tour
-            </label>
-            <div className="relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FileSearch className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                id="tourName"
-                value={tourName}
-                onChange={(e) => setTourName(e.target.value)}
-                className="block w-full pl-10 pr-8 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
-                placeholder="Buscar por nombre del tour..."
-              />
-              {tourName && (
-                <button
-                  type="button"
-                  onClick={() => setTourName('')}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                >
-                  <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-                </button>
-              )}
-            </div>
-          </div>
+    <div className={`bg-white rounded-2xl shadow-lg overflow-hidden ${className}`}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal className="w-4 h-4 text-primary-600" />
+          <span className="font-semibold text-gray-900 text-sm">Filtrar Tours</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-primary-600 transition-colors font-medium"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Limpiar todo
+            </button>
+          )}
+          {onClose && (
+            <button type="button" onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+              <X className="w-4 h-4 text-gray-500" />
+            </button>
+          )}
+        </div>
+      </div>
 
-          <div className="relative">
-            <label htmlFor="destination" className="block text-sm font-medium text-gray-700 mb-1">
-              Destino (opcional)
-            </label>
-            <div className="relative rounded-md shadow-sm">
-              <input
-                type="text"
-                id="destination"
-                value={destination}
-                onChange={(e) => setDestination(e.target.value)}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
-                placeholder="¿A dónde quieres ir?"
-              />
-            </div>
-          </div>
+      <form onSubmit={handleSearch} className="p-5 space-y-5">
 
-          <div>
-            <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
-              Fecha de Inicio
-            </label>
-            <div className="relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Calendar className="h-5 w-5 text-gray-400" />
-              </div>
+        {/* Busqueda por nombre */}
+        <div>
+          <label className={labelClass}>Nombre del Tour</label>
+          <div className="relative">
+            <FileSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={tourName}
+              onChange={(e) => setTourName(e.target.value)}
+              className={inputWithIcon}
+              placeholder="Buscar por nombre..."
+            />
+            {tourName && (
+              <button type="button" onClick={() => setTourName('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+                <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Destino */}
+        <div>
+          <label className={labelClass}>Destino</label>
+          <div className="relative">
+            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={destination}
+              onChange={(e) => setDestination(e.target.value)}
+              className={inputWithIcon}
+              placeholder="¿A dónde quieres ir?"
+            />
+            {destination && (
+              <button type="button" onClick={() => setDestination('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+                <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Fechas */}
+        <div>
+          <label className={labelClass}>Fechas</label>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
               <input
                 type="date"
-                id="startDate"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
+                className={inputWithIcon + ' text-xs'}
+                placeholder="Inicio"
               />
             </div>
-          </div>
-
-          <div>
-            <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
-              Fecha de Fin
-            </label>
-            <div className="relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Calendar className="h-5 w-5 text-gray-400" />
-              </div>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
               <input
                 type="date"
-                id="endDate"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
                 min={startDate}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
+                className={inputWithIcon + ' text-xs'}
+                placeholder="Fin"
               />
             </div>
           </div>
+        </div>
 
-          <div ref={agencyInputRef}>
-            <label htmlFor="agency" className="block text-sm font-medium text-gray-700 mb-1">
-              Agencia
-            </label>
+        {/* Rango de precio */}
+        <div>
+          <label className={labelClass}>Rango de Precio</label>
+          <div className="grid grid-cols-2 gap-2">
             <div className="relative">
-              <div className="relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Building2 className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  id="agency"
-                  value={agencySearchText}
-                  onChange={handleAgencyInputChange}
-                  onFocus={() => setShowAgencyDropdown(true)}
-                  className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
-                  placeholder="Buscar agencia..."
-                  autoComplete="off"
-                />
-                {agency && (
-                  <button
-                    type="button"
-                    onClick={handleClearAgency}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  >
-                    <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-                  </button>
-                )}
-              </div>
-
-              {showAgencyDropdown && filteredAgencies.length > 0 && (
-                <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 shadow-xl max-h-60 rounded-md py-1 overflow-auto">
-                  {filteredAgencies.map((ag) => (
-                    <div
-                      key={ag.id}
-                      onClick={() => handleAgencySelect(ag)}
-                      className={`cursor-pointer select-none relative py-3 px-3 hover:bg-blue-50 transition-colors ${
-                        agency === ag.id ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
-                      }`}
-                    >
-                      <span className={`block truncate text-sm ${agency === ag.id ? 'font-semibold' : 'font-normal'}`}>
-                        {ag.name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div ref={departurePointInputRef}>
-            <label htmlFor="departurePoint" className="block text-sm font-medium text-gray-700 mb-1">
-              Punto de Partida
-            </label>
-            <div className="relative">
-              <div className="relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <MapPin className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  id="departurePoint"
-                  value={departurePointSearchText}
-                  onChange={handleDeparturePointInputChange}
-                  onFocus={() => setShowDeparturePointDropdown(true)}
-                  className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
-                  placeholder="Buscar punto de salida..."
-                  autoComplete="off"
-                />
-                {departurePoint && (
-                  <button
-                    type="button"
-                    onClick={handleClearDeparturePoint}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  >
-                    <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-                  </button>
-                )}
-              </div>
-
-              {showDeparturePointDropdown && filteredDeparturePoints.length > 0 && (
-                <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 shadow-xl max-h-60 rounded-md py-1 overflow-auto">
-                  {filteredDeparturePoints.map((point) => (
-                    <div
-                      key={point.id}
-                      onClick={() => handleDeparturePointSelect(point)}
-                      className={`cursor-pointer select-none relative py-3 px-3 hover:bg-blue-50 transition-colors ${
-                        departurePoint === point.name ? 'bg-blue-100 text-blue-900' : 'text-gray-900'
-                      }`}
-                    >
-                      <div className={`block truncate text-sm ${departurePoint === point.name ? 'font-semibold' : 'font-normal'}`}>
-                        {point.name}
-                      </div>
-                      {point.city && (
-                        <div className="text-xs text-gray-500 truncate mt-0.5">
-                          {point.city}{point.municipality ? `, ${point.municipality}` : ''}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="minPrice" className="block text-sm font-medium text-gray-700 mb-1">
-              Precio Mínimo
-            </label>
-            <div className="relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <DollarSign className="h-5 w-5 text-gray-400" />
-              </div>
+              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
               <input
                 type="number"
-                id="minPrice"
                 value={minPrice}
                 onChange={(e) => setMinPrice(e.target.value)}
                 min="0"
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
-                placeholder="0"
+                className={inputWithIcon}
+                placeholder="Mínimo"
               />
             </div>
-          </div>
-
-          <div>
-            <label htmlFor="maxPrice" className="block text-sm font-medium text-gray-700 mb-1">
-              Precio Máximo
-            </label>
-            <div className="relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <DollarSign className="h-5 w-5 text-gray-400" />
-              </div>
+            <div className="relative">
+              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
               <input
                 type="number"
-                id="maxPrice"
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(e.target.value)}
-                min={minPrice || "0"}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
-                placeholder="Sin límite"
+                min={minPrice || '0'}
+                className={inputWithIcon}
+                placeholder="Máximo"
               />
             </div>
           </div>
+        </div>
 
-          <div>
-            <label htmlFor="petFriendly" className="block text-sm font-medium text-gray-700 mb-1">
-              Pet Friendly
-            </label>
-            <div className="relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Dog className="h-5 w-5 text-gray-400" />
-              </div>
-              <select
-                id="petFriendly"
-                value={petFriendly}
-                onChange={(e) => setPetFriendly(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
+        {/* Tipo de Tour — toggles */}
+        <div>
+          <label className={labelClass}>Tipo de Tour</label>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { value: '', label: 'Todos' },
+              { value: 'excursion', label: 'Excursión' },
+              { value: 'receptivo', label: 'Receptivo' },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setTourType(opt.value)}
+                className={`py-2 px-2 rounded-xl text-xs font-semibold border transition-all ${
+                  tourType === opt.value
+                    ? 'bg-primary-600 border-primary-600 text-white shadow-sm'
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-primary-300 hover:text-primary-600'
+                }`}
               >
-                <option value="">Todos los Tours</option>
-                <option value="true">Solo Pet Friendly</option>
-                <option value="false">Sin Mascotas</option>
-              </select>
-            </div>
+                {opt.label}
+              </button>
+            ))}
           </div>
+        </div>
 
-          <div>
-            <label htmlFor="tourType" className="block text-sm font-medium text-gray-700 mb-1">
-              Tipo de Tour
-            </label>
-            <div className="relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <RefreshCw className="h-5 w-5 text-gray-400" />
-              </div>
-              <select
-                id="tourType"
-                value={tourType}
-                onChange={(e) => setTourType(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
+        {/* Pet Friendly — toggles */}
+        <div>
+          <label className={labelClass}>Mascotas</label>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { value: '', label: 'Todos' },
+              { value: 'true', label: '🐾 Pet Friendly' },
+              { value: 'false', label: 'Sin mascotas' },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setPetFriendly(opt.value)}
+                className={`py-2 px-2 rounded-xl text-xs font-semibold border transition-all ${
+                  petFriendly === opt.value
+                    ? 'bg-primary-600 border-primary-600 text-white shadow-sm'
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-primary-300 hover:text-primary-600'
+                }`}
               >
-                <option value="">Todos los Tipos</option>
-                <option value="excursion">Excursiones (fecha fija)</option>
-                <option value="receptivo">Receptivos (bajo demanda)</option>
-              </select>
-            </div>
+                {opt.label}
+              </button>
+            ))}
           </div>
+        </div>
 
-          <div>
-            <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
-              Categoría
-            </label>
-            <div className="relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Tag className="h-5 w-5 text-gray-400" />
-              </div>
-              <select
-                id="category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm text-gray-900 bg-white"
-              >
-                <option value="">Todas las Categorías</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.slug}>
-                    {cat.name}
-                  </option>
+        {/* Categoría */}
+        <div>
+          <label className={labelClass}>Categoría</label>
+          <div className="relative">
+            <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className={inputWithIcon}
+            >
+              <option value="">Todas las Categorías</option>
+              {categories.map((cat: any) => (
+                <option key={cat.id} value={cat.slug}>{cat.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Agencia */}
+        <div ref={agencyInputRef}>
+          <label className={labelClass}>Agencia</label>
+          <div className="relative">
+            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
+            <input
+              type="text"
+              value={agencySearchText}
+              onChange={handleAgencyInputChange}
+              onFocus={() => setShowAgencyDropdown(true)}
+              className={inputWithIcon}
+              placeholder="Buscar agencia..."
+              autoComplete="off"
+            />
+            {agency && (
+              <button type="button" onClick={handleClearAgency} className="absolute right-3 top-1/2 -translate-y-1/2">
+                <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+              </button>
+            )}
+            {showAgencyDropdown && filteredAgencies.length > 0 && (
+              <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 shadow-xl max-h-52 rounded-xl overflow-auto">
+                {filteredAgencies.map((ag: any) => (
+                  <div
+                    key={ag.id}
+                    onClick={() => handleAgencySelect(ag)}
+                    className={`cursor-pointer px-4 py-2.5 text-sm hover:bg-blue-50 transition-colors ${
+                      agency === ag.id ? 'bg-blue-50 font-semibold text-primary-700' : 'text-gray-800'
+                    }`}
+                  >
+                    {ag.name}
+                  </div>
                 ))}
-              </select>
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="mt-4">
-          <button type="submit" className="w-full btn btn-primary py-3 flex items-center justify-center">
-            <Search className="h-5 w-5 mr-2" />
-            Buscar Tours
-          </button>
+        {/* Punto de Partida */}
+        <div ref={departurePointInputRef}>
+          <label className={labelClass}>Punto de Partida</label>
+          <div className="relative">
+            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
+            <input
+              type="text"
+              value={departurePointSearchText}
+              onChange={handleDeparturePointInputChange}
+              onFocus={() => setShowDeparturePointDropdown(true)}
+              className={inputWithIcon}
+              placeholder="Ciudad de salida..."
+              autoComplete="off"
+            />
+            {departurePoint && (
+              <button type="button" onClick={handleClearDeparturePoint} className="absolute right-3 top-1/2 -translate-y-1/2">
+                <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+              </button>
+            )}
+            {showDeparturePointDropdown && filteredDeparturePoints.length > 0 && (
+              <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 shadow-xl max-h-52 rounded-xl overflow-auto">
+                {filteredDeparturePoints.map((point: any) => (
+                  <div
+                    key={point.id}
+                    onClick={() => handleDeparturePointSelect(point)}
+                    className={`cursor-pointer px-4 py-2.5 hover:bg-blue-50 transition-colors ${
+                      departurePoint === point.name ? 'bg-blue-50' : ''
+                    }`}
+                  >
+                    <div className={`text-sm ${departurePoint === point.name ? 'font-semibold text-primary-700' : 'text-gray-800'}`}>
+                      {point.name}
+                    </div>
+                    {point.city && (
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {point.city}{point.municipality ? `, ${point.municipality}` : ''}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Boton buscar */}
+        <button
+          type="submit"
+          className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-semibold py-3 px-4 rounded-xl transition-colors shadow-sm"
+        >
+          <Search className="w-4 h-4" />
+          Buscar Tours
+        </button>
       </form>
     </div>
   );
