@@ -112,6 +112,7 @@ const TourCatalogPage: React.FC = () => {
         } else {
           const offset = (currentPage - 1) * PAGE_SIZE;
           const { data, error, count } = await getTours({
+            tourName: initialFilters.tourName || null,
             destination: initialFilters.destination || null,
             category: initialFilters.category || null,
             startDate: initialFilters.startDate || null,
@@ -121,6 +122,7 @@ const TourCatalogPage: React.FC = () => {
             maxPrice: initialFilters.maxPrice || null,
             petFriendly: initialFilters.petFriendly || null,
             departurePoint: initialFilters.departurePoint || null,
+            tourType: initialFilters.tourType || null,
             limit: PAGE_SIZE,
             offset,
           });
@@ -175,10 +177,7 @@ const TourCatalogPage: React.FC = () => {
     fetchPopularDeparturePoints();
   }, []);
 
-  const filteredTours = useMemo(() => {
-    if (!initialFilters.tourType) return tours;
-    return tours.filter(t => ((t as any).tour_type || 'excursion') === initialFilters.tourType);
-  }, [tours, initialFilters.tourType]);
+  const filteredTours = tours;
 
   const { data: promotionsMap = {} } = useTourPromotionsBatch(filteredTours.map(t => t.id));
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
