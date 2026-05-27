@@ -28,7 +28,7 @@ const FeaturedDestinations: React.FC = () => {
             name,
             main_image_url,
             tour_destinations(
-              tours(id, image_url)
+              tours(id, image_url, end_date, tour_type)
             )
           `)
           .eq('is_active', true)
@@ -47,9 +47,11 @@ const FeaturedDestinations: React.FC = () => {
         }
         
         // Process destinations and count tours
+        const today = new Date().toISOString().split('T')[0];
         const processedDestinations = data
           .map(dest => {
-            const tours = dest.tour_destinations?.map(td => td.tours).filter(Boolean) || [];
+            const tours = (dest.tour_destinations?.map(td => td.tours).filter(Boolean) || [])
+              .filter(tour => tour.tour_type === 'receptivo' || !tour.end_date || tour.end_date >= today);
             return {
               id: dest.id,
               name: dest.name,
