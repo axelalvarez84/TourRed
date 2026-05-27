@@ -877,8 +877,15 @@ const AgencyTours: React.FC = () => {
         admite_adultos_mayores: duplicatingTour.admite_adultos_mayores !== undefined ? duplicatingTour.admite_adultos_mayores : true,
       };
 
+      // Obtener los destinos del tour original para copiarlos
+      const { data: originalDestinations } = await supabase
+        .from('tour_destinations')
+        .select('destination_id')
+        .eq('tour_id', duplicatingTour.id);
+      const destinationIds = (originalDestinations || []).map((d: any) => d.destination_id);
+
       // Crear el nuevo tour
-      const { error } = await createTour(tourData, [], user.id);
+      const { error } = await createTour(tourData, destinationIds, user.id);
       if (error) throw error;
 
       await fetchAgencyTours();
