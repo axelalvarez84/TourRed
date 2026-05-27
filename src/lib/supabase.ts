@@ -575,6 +575,46 @@ export const getTours = async (filters: any = {}) => {
   }
 };
 
+export const getPopularTours = async (limit = 50) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const { data, error } = await supabase
+      .from('tours')
+      .select(`
+        id,
+        name,
+        image_url,
+        destination,
+        start_date,
+        end_date,
+        price,
+        max_travelers,
+        is_featured,
+        agency_id,
+        pet_friendly,
+        category,
+        tour_type,
+        agencies(id, name, rating, is_active),
+        bookings(id)
+      `)
+      .or(`end_date.gte.${today},end_date.is.null`)
+      .eq('agencies.is_active', true)
+      .neq('bookings.status', 'cancelled')
+      .limit(limit);
+
+    if (error) return { data: [], error };
+
+    const withCounts = (data ?? [])
+      .filter((t: any) => t.agencies?.is_active !== false)
+      .map((t: any) => ({ ...t, booking_count: Array.isArray(t.bookings) ? t.bookings.length : 0 }))
+      .sort((a: any, b: any) => b.booking_count - a.booking_count);
+
+    return { data: withCounts, error: null };
+  } catch (error: any) {
+    return { data: [], error };
+  }
+};
+
 export const getTourById = async (id: string) => {
   try {
     const { data, error } = await supabase

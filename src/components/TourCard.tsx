@@ -24,9 +24,10 @@ interface TourCardProps {
   className?: string;
   showDistance?: boolean;
   activePromo?: TourPromo | null;
+  compact?: boolean;
 }
 
-const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance = false, activePromo = null }) => {
+const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance = false, activePromo = null, compact = false }) => {
   const { user } = useAuth();
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -118,6 +119,78 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
       return dateString;
     }
   };
+
+  if (compact) {
+    const today = new Date().toISOString().split('T')[0];
+    const isEnPreventa = !!(tour.preventa_activa && tour.preventa_inicio && tour.preventa_inicio <= today && tour.preventa_fin && tour.preventa_fin >= today);
+    const precioFinal = isEnPreventa && tour.preventa_precio_especial && tour.preventa_descuento_valor
+      ? (tour.preventa_tipo_descuento === 'porcentaje'
+          ? tour.price * (1 - (tour.preventa_descuento_valor ?? 0) / 100)
+          : Math.max(0, tour.price - (tour.preventa_descuento_valor ?? 0)))
+      : null;
+
+    return (
+      <Link
+        to={`/tours/${tour.id}`}
+        className={`group bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col transition-all hover:shadow-md hover:-translate-y-0.5 animate-fade-in ${className}`}
+      >
+        <div className="relative overflow-hidden aspect-[3/4]">
+          <img
+            src={tour.image_url || 'https://images.pexels.com/photos/2245436/pexels-photo-2245436.png'}
+            alt={tour.name}
+            loading="lazy"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+          {/* Badges */}
+          <div className="absolute top-1.5 left-1.5 flex flex-col gap-1">
+            {tour.is_featured && (
+              <span className="bg-accent-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none">Dest.</span>
+            )}
+            {activePromo && (
+              <span className={`text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none flex items-center gap-0.5 ${
+                activePromo.promotion_type === '2x1' ? 'bg-rose-600' : activePromo.promotion_type === '3x2' ? 'bg-orange-500' : 'bg-emerald-600'
+              }`}>
+                <Tag className="w-2 h-2" />
+                {activePromo.promotion_type === '2x1' ? '2x1' : activePromo.promotion_type === '3x2' ? '3x2' : 'Oferta'}
+              </span>
+            )}
+            {isEnPreventa && (
+              <span className="bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none flex items-center gap-0.5">
+                <Crown className="w-2 h-2" />
+                Preventa
+              </span>
+            )}
+          </div>
+          {tour.tour_type === 'receptivo' && (
+            <span className="absolute top-1.5 right-1.5 bg-teal-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none">Recep.</span>
+          )}
+        </div>
+        <div className="p-2.5 flex flex-col flex-1">
+          <h3 className="text-xs font-semibold text-gray-900 line-clamp-2 leading-snug mb-1.5 flex-1">{tour.name}</h3>
+          <div className="flex items-center gap-1 text-gray-500 mb-1.5">
+            <MapPin className="w-3 h-3 flex-shrink-0" />
+            <span className="text-[10px] truncate">{tour.destination}</span>
+          </div>
+          <div className="flex items-center justify-between mt-auto pt-1.5 border-t border-gray-100">
+            <div>
+              {precioFinal ? (
+                <div>
+                  <span className="text-amber-600 font-bold text-sm">${precioFinal.toFixed(0)}</span>
+                  <span className="text-gray-400 line-through text-[10px] ml-1">${tour.price}</span>
+                </div>
+              ) : (
+                <span className="text-primary-600 font-bold text-sm">${tour.price}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-0.5 text-accent-500">
+              <Star className="w-3 h-3 fill-current" />
+              <span className="text-[10px] font-medium">{tour.agencies?.rating?.toFixed(1) || '4.5'}</span>
+            </div>
+          </div>
+        </div>
+      </Link>
+    );
+  }
 
   return (
     <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 group animate-fade-in ${className}`}>

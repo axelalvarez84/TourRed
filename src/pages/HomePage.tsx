@@ -4,40 +4,38 @@ import { Compass, Search, Award, CreditCard, Users, Plane, Globe, Clock, Palmtre
 import SearchBox from '../components/SearchBox';
 import CategoryList from '../components/CategoryList';
 import FeaturedDestinations from '../components/FeaturedDestinations';
-import TourCard from '../components/TourCard';
+import TourGridSection from '../components/TourGridSection';
 import MembershipSection from '../components/MembershipSection';
 import PreventasSection from '../components/PreventasSection';
 import { Tour } from '../types';
-import { getTours } from '../lib/supabase';
+import { getTours, getPopularTours } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useTourPromotionsBatch } from '../hooks/useSharedData';
 
 const HomePage: React.FC = () => {
   const [featuredTours, setFeaturedTours] = useState<Tour[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [popularTours, setPopularTours] = useState<Tour[]>([]);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
+  const [popularLoading, setPopularLoading] = useState(true);
   const { user } = useAuth();
 
   useEffect(() => {
-    const fetchFeaturedTours = async () => {
-      try {
-        const { data, error } = await getTours({ limit: 4 });
-        if (error) {
-          setFeaturedTours([]);
-        } else {
-          setFeaturedTours(data || []);
-        }
-      } catch {
-        setFeaturedTours([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    getTours({ limit: 50 }).then(({ data }) => {
+      setFeaturedTours(data || []);
+      setFeaturedLoading(false);
+    }).catch(() => setFeaturedLoading(false));
 
-    fetchFeaturedTours();
+    getPopularTours(50).then(({ data }) => {
+      setPopularTours((data as Tour[]) || []);
+      setPopularLoading(false);
+    }).catch(() => setPopularLoading(false));
   }, []);
 
-  const tourIds = useMemo(() => featuredTours.map(t => t.id), [featuredTours]);
-  const { data: promotionsMap = {} } = useTourPromotionsBatch(tourIds);
+  const allTourIds = useMemo(
+    () => [...new Set([...featuredTours.map(t => t.id), ...popularTours.map(t => t.id)])],
+    [featuredTours, popularTours]
+  );
+  const { data: promotionsMap = {} } = useTourPromotionsBatch(allTourIds);
 
   return (
     <div>
@@ -72,39 +70,24 @@ const HomePage: React.FC = () => {
       <PreventasSection />
 
       {/* Featured Tours */}
-      <section className="py-12 bg-blue-50">
-        <div className="container-custom">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-2xl md:text-3xl font-bold">Tours Destacados</h2>
-            <Link to="/tours" className="text-primary-600 hover:text-primary-700 font-medium flex items-center">
-              Ver todos <Compass className="ml-1 h-4 w-4" />
-            </Link>
-          </div>
-          
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600"></div>
-            </div>
-          ) : featuredTours.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {featuredTours.map((tour) => (
-                <TourCard key={tour.id} tour={tour} activePromo={promotionsMap[tour.id] ?? null} />
-              ))}
-            </div>
-          ) : (
-            <div className="bg-blue-100 rounded-lg shadow-md p-8 text-center">
-              <h3 className="text-xl font-semibold mb-2">¡Próximamente!</h3>
-              <p className="text-gray-600 mb-4">
-                Las agencias están preparando tours increíbles para ti.
-              </p>
-              <Link to="/agency-signup" className="btn btn-primary">
-                <Users className="mr-2 h-5 w-5" />
-                ¿Eres una agencia? Únete ahora
-              </Link>
-            </div>
-          )}
-        </div>
-      </section>
+      <TourGridSection
+        title="Tours Destacados"
+        subtitle="Seleccionados por nuestro equipo entre las mejores opciones disponibles"
+        tours={featuredTours}
+        isLoading={featuredLoading}
+        promotionsMap={promotionsMap}
+        bgClass="bg-blue-50"
+      />
+
+      {/* Popular Tours */}
+      <TourGridSection
+        title="Tours Más Populares"
+        subtitle="Los tours con más reservas entre nuestros viajeros"
+        tours={popularTours}
+        isLoading={popularLoading}
+        promotionsMap={promotionsMap}
+        bgClass="bg-white"
+      />
 
       {/* Categories Section */}
       <section className="py-12 bg-blue-50">
