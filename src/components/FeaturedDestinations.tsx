@@ -31,7 +31,8 @@ const FeaturedDestinations: React.FC = () => {
               tours(id, image_url)
             )
           `)
-          .limit(8);
+          .eq('is_active', true)
+          .limit(50);
         
         if (error) {
           console.error('❌ Error cargando destinos:', error);
