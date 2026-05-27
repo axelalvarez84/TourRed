@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, MapPin, Calendar, Users, DollarSign, Activity, AlertCircle, CreditCard } from 'lucide-react';
+import { Plus, MapPin, Calendar, Users, DollarSign, Activity, AlertCircle, CreditCard, Crown, Clock, Tag } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAgencyId } from '../../hooks/useAgencyId';
 import { formatCurrency, formatCurrencyMXN } from '../../utils/formatCurrency';
@@ -15,6 +15,15 @@ interface DashboardStats {
   totalRevenue: number;
   pendingPayouts: number;
   recentActivity: any[];
+}
+
+interface PreventaStats {
+  tourId: string;
+  tourName: string;
+  reservasCount: number;
+  ahorroAcumulado: number;
+  diasRestantes: number;
+  beneficioAgotado: boolean;
 }
 
 const AgencyDashboard: React.FC = () => {
@@ -34,6 +43,7 @@ const AgencyDashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [agencyId, setAgencyId] = useState<string | null>(null);
+  const [preventaStats, setPreventaStats] = useState<PreventaStats[]>([]);
 
   useEffect(() => {
     if (hookAgencyId) {
@@ -59,7 +69,7 @@ const AgencyDashboard: React.FC = () => {
         // Tours de la agencia (OPTIMIZED: limit 100)
         supabase
           .from('tours')
-          .select('id, name, destination, price, is_featured, start_date, end_date')
+          .select('id, name, destination, price, is_featured, start_date, end_date, preventa_activa, preventa_inicio, preventa_fin')
           .eq('agency_id', agencyData.id)
           .limit(100),
 
@@ -151,15 +161,50 @@ const AgencyDashboard: React.FC = () => {
         recentActivity
       };
 
-      console.log('✅ Estadísticas calculadas:', dashboardStats);
-      console.log('📊 Detalles de ingresos:', {
-        commissionRecordsCount: commissionRecords.length,
-        processedRecords: commissionRecords.filter(r => r.status === 'processed').length,
-        totalRevenue,
-        pendingPayouts
-      });
-      
       setStats(dashboardStats);
+
+      // Calcular preventas activas hoy
+      const todayStr = new Date().toISOString().split('T')[0];
+      const toursEnPreventa = tours.filter((t: any) =>
+        t.preventa_activa &&
+        t.preventa_inicio && t.preventa_inicio <= todayStr &&
+        t.preventa_fin && t.preventa_fin >= todayStr
+      );
+
+      if (toursEnPreventa.length > 0) {
+        const tourIdsEnPreventa = toursEnPreventa.map((t: any) => t.id);
+        const { data: preventaBookings } = await supabase
+          .from('bookings')
+          .select('tour_id, preventa_comision_descuento')
+          .in('tour_id', tourIdsEnPreventa)
+          .eq('es_reserva_preventa', true)
+          .not('status', 'eq', 'cancelled');
+
+        const statsMap: Record<string, { count: number; ahorro: number }> = {};
+        for (const b of preventaBookings || []) {
+          if (!statsMap[b.tour_id]) statsMap[b.tour_id] = { count: 0, ahorro: 0 };
+          statsMap[b.tour_id].count += 1;
+          statsMap[b.tour_id].ahorro += parseFloat(b.preventa_comision_descuento || 0);
+        }
+
+        const pStats: PreventaStats[] = toursEnPreventa.map((t: any) => {
+          const fin = new Date(t.preventa_fin + 'T23:59:59');
+          const diasRestantes = Math.max(0, Math.ceil((fin.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+          const data = statsMap[t.id] || { count: 0, ahorro: 0 };
+          return {
+            tourId: t.id,
+            tourName: t.name,
+            reservasCount: data.count,
+            ahorroAcumulado: Math.round(data.ahorro * 100) / 100,
+            diasRestantes,
+            beneficioAgotado: data.count >= 10,
+          };
+        });
+
+        setPreventaStats(pStats);
+      } else {
+        setPreventaStats([]);
+      }
       
     } catch (err: any) {
       console.error('❌ Error cargando datos de agencia:', err);
@@ -338,6 +383,106 @@ const AgencyDashboard: React.FC = () => {
                 y tú cobras el saldo restante directamente.
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Preventas Activas */}
+      {preventaStats.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center">
+              <Crown className="w-4 h-4 text-white" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900">Tus Preventas</h2>
+            <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">
+              {preventaStats.length} activa{preventaStats.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {preventaStats.map((ps) => (
+              <div
+                key={ps.tourId}
+                className={`bg-white rounded-xl shadow-sm border-2 p-5 ${
+                  ps.beneficioAgotado ? 'border-gray-200' : 'border-amber-200'
+                }`}
+              >
+                {/* Tour name + badge */}
+                <div className="flex items-start justify-between gap-2 mb-4">
+                  <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2">
+                    {ps.tourName}
+                  </h3>
+                  {ps.beneficioAgotado ? (
+                    <span className="flex-shrink-0 text-xs font-semibold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+                      Agotado
+                    </span>
+                  ) : (
+                    <span className="flex-shrink-0 inline-flex items-center gap-1 text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                      <Crown className="w-3 h-3" />
+                      Activa
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  {/* Reservas en preventa */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-500 font-medium">Reservas en preventa</span>
+                      <span className={`text-sm font-bold ${ps.beneficioAgotado ? 'text-gray-500' : 'text-amber-700'}`}>
+                        {ps.reservasCount} / 10
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-500 ${
+                          ps.beneficioAgotado ? 'bg-gray-400' : 'bg-amber-400'
+                        }`}
+                        style={{ width: `${Math.min(100, (ps.reservasCount / 10) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Beneficio */}
+                  <div className="flex items-center justify-between py-2 border-t border-gray-100">
+                    <div className="flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-gray-400" />
+                      <span className="text-xs text-gray-500">Beneficio aplicado</span>
+                    </div>
+                    <span className={`text-xs font-semibold ${ps.beneficioAgotado ? 'text-gray-400 line-through' : 'text-emerald-700'}`}>
+                      10% descuento en comisión
+                    </span>
+                  </div>
+
+                  {/* Ahorro acumulado */}
+                  <div className="flex items-center justify-between py-2 border-t border-gray-100">
+                    <div className="flex items-center gap-1.5">
+                      <DollarSign className="w-3.5 h-3.5 text-gray-400" />
+                      <span className="text-xs text-gray-500">Ahorro acumulado</span>
+                    </div>
+                    <span className="text-sm font-bold text-emerald-600">
+                      {formatCurrencyMXN(ps.ahorroAcumulado)}
+                    </span>
+                  </div>
+
+                  {/* Tiempo restante */}
+                  <div className="flex items-center justify-between py-2 border-t border-gray-100">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-gray-400" />
+                      <span className="text-xs text-gray-500">Tiempo restante</span>
+                    </div>
+                    <span className={`text-sm font-bold ${
+                      ps.diasRestantes <= 3 ? 'text-red-600' : ps.diasRestantes <= 7 ? 'text-amber-600' : 'text-gray-700'
+                    }`}>
+                      {ps.diasRestantes === 0
+                        ? 'Último día'
+                        : `${ps.diasRestantes} día${ps.diasRestantes !== 1 ? 's' : ''}`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
