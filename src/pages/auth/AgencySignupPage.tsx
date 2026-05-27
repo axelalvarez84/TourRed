@@ -4,6 +4,9 @@ import { Eye, EyeOff } from 'lucide-react';
 import { signUp, supabase } from '../../lib/supabase';
 import { UserRole } from '../../lib/supabase';
 
+const isLeakedPasswordError = (message: string) =>
+  /leaked|pwned|compromised|common password/i.test(message);
+
 const AgencySignupPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -102,6 +105,9 @@ const AgencySignupPage: React.FC = () => {
       const { data, error, profileData, isExistingUser } = await signUp(email, password, UserRole.AGENCY);
       
       if (error) {
+        if (isLeakedPasswordError(error.message)) {
+          throw new Error('Esta contraseña ha sido expuesta en brechas de datos conocidas y no puede usarse. Por favor elige una contraseña diferente y más segura.');
+        }
         throw error;
       }
 

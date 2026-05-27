@@ -100,11 +100,17 @@ Deno.serve(async (req: Request) => {
 
     if (updateError) {
       console.error("Error actualizando contraseña:", updateError);
+      const isLeaked = /leaked|pwned|compromised|common password/i.test(updateError.message ?? "");
       return new Response(
-        JSON.stringify({ success: false, error: "Error al actualizar la contraseña" }),
+        JSON.stringify({
+          success: false,
+          error: isLeaked
+            ? "Esta contraseña ha sido expuesta en brechas de datos conocidas y no puede usarse. Por favor elige una contraseña diferente y más segura."
+            : "Error al actualizar la contraseña",
+        }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 500,
+          status: isLeaked ? 422 : 500,
         }
       );
     }

@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { Lock, Eye, EyeOff, Save, AlertCircle, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
+const isLeakedPasswordError = (message: string) =>
+  /leaked|pwned|compromised|common password/i.test(message);
+
 const ChangePasswordSection: React.FC = () => {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -80,6 +83,9 @@ const ChangePasswordSection: React.FC = () => {
       });
 
       if (updateError) {
+        if (isLeakedPasswordError(updateError.message)) {
+          throw new Error('Esta contraseña ha sido expuesta en brechas de datos conocidas y no puede usarse. Por favor elige una contraseña diferente y más segura.');
+        }
         throw updateError;
       }
 

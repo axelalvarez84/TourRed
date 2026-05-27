@@ -3,6 +3,9 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, CheckCircle, XCircle, Loader } from 'lucide-react';
 import { signUp, supabase, UserRole } from '../../lib/supabase';
 
+const isLeakedPasswordError = (message: string) =>
+  /leaked|pwned|compromised|common password/i.test(message);
+
 const SignupPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -180,6 +183,9 @@ const SignupPage: React.FC = () => {
         }
         if (error.message === 'PASAPORTE_DUPLICADO') {
           throw new Error('Este número de pasaporte ya se encuentra asociado a otra cuenta. Si ya tienes una cuenta, por favor inicia sesión.');
+        }
+        if (isLeakedPasswordError(error.message)) {
+          throw new Error('Esta contraseña ha sido expuesta en brechas de datos conocidas y no puede usarse. Por favor elige una contraseña diferente y más segura.');
         }
         throw error;
       }
