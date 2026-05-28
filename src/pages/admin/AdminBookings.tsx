@@ -4,7 +4,7 @@ import {
   User, Building2, MapPin, Calendar, CreditCard, DollarSign,
   CheckCircle, Clock, XCircle, AlertTriangle, RefreshCw,
   Users, Star, Coins, Shield, FileText, ArrowLeftRight,
-  Phone, Mail, Package, Percent, Hash, Tag, Info, Receipt,
+  Phone, Mail, Package, Percent, Hash, Tag, Info,
   TrendingUp, BarChart2, Activity
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -43,7 +43,6 @@ interface BookingRow {
   payment_intent_id: string | null;
   payment_method: string | null;
   paid_at: string | null;
-  payment_receipt_url: string | null;
   approval_notes: string | null;
   approved_at: string | null;
   is_no_show: boolean;
@@ -217,7 +216,7 @@ export default function AdminBookings() {
           preventa_comision_descuento, es_reserva_preventa,
           travelers_count, count_adultos, count_ninos, count_infantes,
           count_adultos_mayores, count_mascotas,
-          payment_intent_id, payment_method, paid_at, payment_receipt_url,
+          payment_intent_id, payment_method, paid_at,
           approval_notes, approved_at, is_no_show, no_show_marked_at,
           cancelled_at, cancellation_type, cancellation_refund_amount,
           has_pending_reschedule, reschedule_response, original_booking_date,
@@ -754,14 +753,6 @@ const DetailModal: React.FC<{ booking: BookingRow; onClose: () => void }> = ({ b
               <div className="col-span-2">
                 <Field label="Payment Intent ID (Stripe)" value={<span className="font-mono text-xs break-all">{b.payment_intent_id || '—'}</span>} mono />
               </div>
-              {b.payment_receipt_url && (
-                <div className="col-span-2">
-                  <span className="text-xs text-gray-400 uppercase tracking-wide block mb-1">Comprobante de pago</span>
-                  <a href={b.payment_receipt_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-blue-600 hover:underline text-sm">
-                    <Receipt className="h-3.5 w-3.5" /> Ver comprobante
-                  </a>
-                </div>
-              )}
             </div>
           </Section>
 
