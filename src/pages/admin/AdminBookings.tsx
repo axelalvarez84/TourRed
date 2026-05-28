@@ -212,7 +212,8 @@ function AdminBookings() {
       setLoading(true);
       setError(null);
 
-      const { data, error: err } = await supabase
+      // Query principal: solo columnas escalares de bookings, sin joins
+      const { data: rawBookings, error: err } = await supabase
         .from('bookings')
         .select(`
           id, booking_code, user_id, tour_id, agency_id,
@@ -230,31 +231,50 @@ function AdminBookings() {
           toursred_cash_used, points_used, points_earned, used_membership_benefit,
           service_charge_discount, membership_service_fee_saved,
           preventa_comision_descuento, discount_amount, es_reserva_preventa,
-          needs_seat_reselection, selected_seats,
-          users!user_id(
-            first_name, last_name, email, profile_picture_url, phone_number,
-            is_active, curp, rfc, razon_social, regimen_fiscal, uso_cfdi,
-            is_foreign_traveler, passport_number
-          ),
-          tours!tour_id(
-            name, destination, start_date, end_date, image_url, price,
-            deposit_percentage, booking_approval_type, category
-          ),
-          agencies!agency_id(
-            name, logo, contact_email, contact_phone, commission_rate
-          ),
-          commission_records!booking_id(
-            id, agency_commission_rate, agency_commission_amount,
-            service_charge_rate, service_charge_amount,
-            platform_total_revenue, agency_net_amount, status, processed_at
-          )
+          needs_seat_reselection, selected_seats
         `)
         .neq('status', 'draft')
         .order('created_at', { ascending: false });
 
       if (err) throw err;
+      if (!rawBookings || rawBookings.length === 0) {
+        setBookings([]);
+        setStats({ total: 0, pagadas: 0, pendientes: 0, procesando: 0, canceladas: 0, totalRevenue: 0, totalServiceCharges: 0, totalCommissions: 0 });
+        return;
+      }
 
-      const enriched = (data || []) as BookingRow[];
+      // Recopilar IDs unicos para queries de lookup
+      const userIds = [...new Set(rawBookings.map(b => b.user_id).filter(Boolean))];
+      const tourIds = [...new Set(rawBookings.map(b => b.tour_id).filter(Boolean))];
+      const agencyIds = [...new Set(rawBookings.map(b => b.agency_id).filter(Boolean))];
+      const bookingIds = rawBookings.map(b => b.id);
+
+      // Queries paralelos de lookup
+      const [usersRes, toursRes, agenciesRes, commRes] = await Promise.all([
+        supabase.from('users').select('id, first_name, last_name, email, profile_picture_url, phone_number, is_active, curp, rfc, razon_social, regimen_fiscal, uso_cfdi, is_foreign_traveler, passport_number').in('id', userIds),
+        supabase.from('tours').select('id, name, destination, start_date, end_date, image_url, price, deposit_percentage, booking_approval_type, category').in('id', tourIds),
+        supabase.from('agencies').select('id, name, logo, contact_email, contact_phone, commission_rate').in('id', agencyIds),
+        supabase.from('commission_records').select('id, booking_id, agency_commission_rate, agency_commission_amount, service_charge_rate, service_charge_amount, platform_total_revenue, agency_net_amount, status, processed_at').in('booking_id', bookingIds),
+      ]);
+
+      // Mapas para lookup O(1)
+      const usersMap = Object.fromEntries((usersRes.data || []).map(u => [u.id, u]));
+      const toursMap = Object.fromEntries((toursRes.data || []).map(t => [t.id, t]));
+      const agenciesMap = Object.fromEntries((agenciesRes.data || []).map(a => [a.id, a]));
+      const commMap: Record<string, typeof commRes.data> = {};
+      for (const c of (commRes.data || [])) {
+        if (!commMap[c.booking_id]) commMap[c.booking_id] = [];
+        commMap[c.booking_id]!.push(c);
+      }
+
+      // Ensamblar resultado final
+      const enriched: BookingRow[] = rawBookings.map(b => ({
+        ...b,
+        users: usersMap[b.user_id] ?? null,
+        tours: toursMap[b.tour_id] ?? null,
+        agencies: agenciesMap[b.agency_id] ?? null,
+        commission_records: commMap[b.id] ?? null,
+      }));
 
       setBookings(enriched);
 
@@ -865,7 +885,5 @@ const DetailModal: React.FC<{ booking: BookingRow; onClose: () => void }> = ({ b
   );
 };
 
-
-export default AdminBookings
 
 export default AdminBookings
