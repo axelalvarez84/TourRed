@@ -60,27 +60,9 @@ const AdminBookingsCleanup: React.FC = () => {
   const fetchBookings = useCallback(async () => {
     setLoading(true);
     setSelected(new Set());
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - threshold);
 
     const { data, error } = await supabase
-      .from('bookings')
-      .select(`
-        id,
-        booking_code,
-        created_at,
-        status,
-        payment_status,
-        total_price,
-        travelers_count,
-        users:user_id ( name, email ),
-        tours:tour_id ( name ),
-        agencies:agency_id ( name )
-      `)
-      .in('status', ['pending', 'cancelled'])
-      .eq('payment_status', 'pending')
-      .lt('created_at', cutoff.toISOString())
-      .order('created_at', { ascending: true });
+      .rpc('get_garbage_bookings', { threshold_days: threshold });
 
     if (error) {
       console.error('Error fetching garbage bookings:', error);
@@ -89,28 +71,7 @@ const AdminBookingsCleanup: React.FC = () => {
       return;
     }
 
-    const mapped: GarbageBooking[] = (data ?? [])
-      .filter(b => {
-        const validCombo =
-          (b.payment_status === 'pending' && b.status === 'pending') ||
-          (b.payment_status === 'pending' && b.status === 'cancelled');
-        return validCombo;
-      })
-      .map(b => ({
-        id: b.id,
-        booking_code: b.booking_code,
-        created_at: b.created_at,
-        status: b.status,
-        payment_status: b.payment_status,
-        total_price: b.total_price ?? 0,
-        travelers_count: b.travelers_count ?? 0,
-        user_name: (b.users as any)?.name ?? '—',
-        user_email: (b.users as any)?.email ?? '—',
-        tour_name: (b.tours as any)?.name ?? '—',
-        agency_name: (b.agencies as any)?.name ?? '—',
-      }));
-
-    setBookings(mapped);
+    setBookings(data ?? []);
     setLoading(false);
   }, [threshold]);
 
