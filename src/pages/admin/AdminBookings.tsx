@@ -231,19 +231,19 @@ function AdminBookings() {
           service_charge_discount, membership_service_fee_saved,
           preventa_comision_descuento, discount_amount, es_reserva_preventa,
           needs_seat_reselection, selected_seats,
-          users!bookings_user_id_fkey(
+          users!user_id(
             first_name, last_name, email, profile_picture_url, phone_number,
             is_active, curp, rfc, razon_social, regimen_fiscal, uso_cfdi,
             is_foreign_traveler, passport_number
           ),
-          tours!bookings_tour_id_fkey(
+          tours!tour_id(
             name, destination, start_date, end_date, image_url, price,
             deposit_percentage, booking_approval_type, category
           ),
-          agencies!bookings_agency_id_fkey(
+          agencies!agency_id(
             name, logo, contact_email, contact_phone, commission_rate
           ),
-          commission_records!commission_records_booking_id_fkey(
+          commission_records!booking_id(
             id, agency_commission_rate, agency_commission_amount,
             service_charge_rate, service_charge_amount,
             platform_total_revenue, agency_net_amount, status, processed_at
@@ -865,5 +865,7 @@ const DetailModal: React.FC<{ booking: BookingRow; onClose: () => void }> = ({ b
   );
 };
 
+
+export default AdminBookings
 
 export default AdminBookings
