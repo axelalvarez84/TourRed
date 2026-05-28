@@ -502,7 +502,7 @@ function AdminBookings() {
         )}
 
         {/* Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 320px)', minHeight: 300 }}>
           {loading ? (
             <div className="flex items-center justify-center py-24">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
@@ -513,19 +513,13 @@ function AdminBookings() {
               <p className="text-base">No se encontraron reservas</p>
             </div>
           ) : (
-            <>
-              {/* Scrollbar superior sincronizado */}
-              <div
-                ref={topScrollRef}
-                onScroll={onTopScroll}
-                className="overflow-x-scroll [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 [&::-webkit-scrollbar-track]:bg-gray-100"
-                style={{ overflowY: 'hidden', height: 10 }}
-              >
-                <div style={{ width: tableScrollWidth, height: 1 }} />
-              </div>
-            <div ref={tableScrollRef} onScroll={onTableScroll} className="overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 [&::-webkit-scrollbar-track]:bg-gray-100" style={{ overflowX: 'scroll' }}>
+            <div
+              ref={tableScrollRef}
+              onScroll={onTableScroll}
+              className="flex-1 overflow-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-400 [&::-webkit-scrollbar-track]:bg-gray-100"
+            >
               <table className="min-w-full divide-y divide-gray-100 text-sm">
-                <thead className="bg-gray-50">
+                <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
                     <Th col="booking_code" label="Folio" />
                     <Th col="traveler" label="Viajero" />
@@ -615,7 +609,6 @@ function AdminBookings() {
                 </tbody>
               </table>
             </div>
-            </>
           )}
         </div>
 
