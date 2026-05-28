@@ -207,29 +207,7 @@ export default function AdminBookings() {
 
       const { data, error: err } = await supabase
         .from('bookings')
-        .select(`
-          id, booking_code, created_at, updated_at, booking_date, status,
-          payment_status, approval_status, total_price, deposit_amount,
-          service_charge, commission_amount, user_payment, platform_revenue,
-          points_earned, points_used, used_membership_benefit,
-          membership_service_fee_saved, service_charge_discount,
-          preventa_comision_descuento, es_reserva_preventa,
-          travelers_count, count_adultos, count_ninos, count_infantes,
-          count_adultos_mayores, count_mascotas,
-          payment_intent_id, payment_method, paid_at,
-          approval_notes, approved_at, is_no_show, no_show_marked_at,
-          cancelled_at, cancellation_type, cancellation_refund_amount,
-          has_pending_reschedule, reschedule_response, original_booking_date,
-          needs_seat_reselection, confirmation_email_sent,
-          user:user_id(
-            id, first_name, last_name, email, phone_number, profile_picture_url,
-            is_active, curp, rfc, razon_social, regimen_fiscal, uso_cfdi,
-            is_foreign_traveler, passport_number
-          ),
-          tours(id, name, destination, category, price, start_date, end_date, image_url, deposit_percentage, booking_approval_type),
-          agencies(id, name, logo, contact_email, contact_phone, commission_rate),
-          commission_records(agency_commission_rate, agency_commission_amount, service_charge_rate, service_charge_amount, platform_total_revenue, agency_net_amount, status, processed_at)
-        `)
+        .select(`*, user:user_id(*), tours(*), agencies(*), commission_records(*)`)
         .order('created_at', { ascending: false });
 
       if (err) throw err;
