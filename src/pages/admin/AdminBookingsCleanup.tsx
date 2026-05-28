@@ -45,7 +45,7 @@ function getBookingType(reason: string): { label: string; cls: string } {
 function isDeletable(b: GarbageBooking): boolean {
   return (
     b.payment_status === 'pending' ||
-    (b.payment_status === 'processing' && b.payment_method === 'bank_transfer')
+    (b.payment_status === 'processing' && b.payment_method === 'Transferencia Bancaria')
   );
 }
 
@@ -170,7 +170,7 @@ const AdminBookingsCleanup: React.FC = () => {
       .filter(id => safeIds.includes(id));
 
     const transferIds = targetBookings
-      .filter(b => b.payment_status === 'processing' && b.payment_method === 'bank_transfer')
+      .filter(b => b.payment_status === 'processing' && b.payment_method === 'Transferencia Bancaria')
       .map(b => b.id)
       .filter(id => safeIds.includes(id));
 
@@ -193,7 +193,7 @@ const AdminBookingsCleanup: React.FC = () => {
         .delete()
         .in('id', transferIds)
         .eq('payment_status', 'processing')
-        .eq('payment_method', 'bank_transfer');
+        .eq('payment_method', 'Transferencia Bancaria');
       if (!error) totalDeleted += transferIds.length;
       else hasError = true;
     }
