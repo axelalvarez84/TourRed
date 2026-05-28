@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ShoppingBag, Search, X, ChevronDown, ChevronUp, ChevronsUpDown,
   User, Building2, MapPin, Calendar, CreditCard, DollarSign,
@@ -206,6 +206,28 @@ function AdminBookings() {
 
   // Detail modal
   const [selected, setSelected] = useState<BookingRow | null>(null);
+
+  // Scroll horizontal sincronizado (scrollbar arriba y abajo)
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const [tableScrollWidth, setTableScrollWidth] = useState(0);
+
+  useEffect(() => {
+    const tableEl = tableScrollRef.current;
+    if (!tableEl) return;
+    const obs = new ResizeObserver(() => setTableScrollWidth(tableEl.scrollWidth));
+    obs.observe(tableEl);
+    return () => obs.disconnect();
+  }, []);
+
+  const onTopScroll = () => {
+    if (tableScrollRef.current && topScrollRef.current)
+      tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+  };
+  const onTableScroll = () => {
+    if (topScrollRef.current && tableScrollRef.current)
+      topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+  };
 
   const load = useCallback(async () => {
     try {
@@ -491,7 +513,17 @@ function AdminBookings() {
               <p className="text-base">No se encontraron reservas</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+              {/* Scrollbar superior sincronizado */}
+              <div
+                ref={topScrollRef}
+                onScroll={onTopScroll}
+                className="overflow-x-scroll [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 [&::-webkit-scrollbar-track]:bg-gray-100"
+                style={{ overflowY: 'hidden', height: 10 }}
+              >
+                <div style={{ width: tableScrollWidth, height: 1 }} />
+              </div>
+            <div ref={tableScrollRef} onScroll={onTableScroll} className="overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 [&::-webkit-scrollbar-track]:bg-gray-100" style={{ overflowX: 'scroll' }}>
               <table className="min-w-full divide-y divide-gray-100 text-sm">
                 <thead className="bg-gray-50">
                   <tr>
@@ -583,6 +615,7 @@ function AdminBookings() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
 
