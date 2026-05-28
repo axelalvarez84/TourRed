@@ -207,15 +207,14 @@ export default function AdminBookings() {
 
       const { data, error: err } = await supabase
         .from('bookings')
-        .select(`*, user:user_id(*), tours(*), agencies(*), commission_records(*)`)
+        .select(`*, users!bookings_user_id_fkey(*), tours(*), agencies(*), commission_records(*)`)
         .order('created_at', { ascending: false });
 
       if (err) throw err;
 
-      const enriched = ((data || []) as unknown as (Omit<BookingRow, 'users' | 'user_email'> & { user: BookingRow['users'] })[]).map(r => ({
+      const enriched = ((data || []) as unknown as BookingRow[]).map(r => ({
         ...r,
-        users: r.user ?? null,
-        user_email: r.user?.email ?? null,
+        user_email: (r.users as any)?.email ?? null,
       })) as unknown as BookingRow[];
 
       setBookings(enriched);
@@ -232,7 +231,8 @@ export default function AdminBookings() {
         totalCommissions: enriched.filter(b => b.payment_status === 'succeeded').reduce((s, b) => s + Number(b.commission_amount), 0),
       });
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Error desconocido');
+      const msg = e instanceof Error ? e.message : (typeof e === 'object' && e !== null ? JSON.stringify(e) : String(e));
+      setError(msg || 'Error desconocido');
     } finally {
       setLoading(false);
     }
