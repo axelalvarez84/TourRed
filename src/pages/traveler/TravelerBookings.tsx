@@ -1683,7 +1683,8 @@ const TravelerBookings: React.FC = () => {
                         <strong>
                           {booking.reschedule_response === 'accepted' && '✓ Has aceptado la nueva fecha'}
                           {booking.reschedule_response === 'rejected' && '✗ Rechazaste el reagendamiento y recibiste reembolso'}
-                          {booking.reschedule_response === 'auto_accepted' && '↻ La nueva fecha fue aceptada automáticamente'}
+                          {booking.reschedule_response === 'auto_accepted' && '↻ La nueva fecha fue aceptada automaticamente'}
+                          {booking.reschedule_response === 'auto_cancelled' && '✗ Reserva cancelada automaticamente - reembolso procesado en ToursRed Cash'}
                         </strong>
                         {booking.reschedule_responded_at && (
                           <span className="block mt-1 text-xs">
@@ -1741,7 +1742,7 @@ const TravelerBookings: React.FC = () => {
                                   {new Date(deadline).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
                                 </p>
                                 <p className="text-xs text-yellow-800 mt-1">
-                                  Si no respondes antes de ese plazo, el nuevo horario se aceptara automaticamente.
+                                  Si no respondes antes de ese plazo, tu reserva sera cancelada automaticamente con reembolso completo en ToursRed Cash.
                                 </p>
                               </div>
                             )}
@@ -1824,7 +1825,8 @@ const TravelerBookings: React.FC = () => {
                         <strong>
                           {(booking as any).slot_reschedule_response === 'accepted' && '✓ Aceptaste el cambio de horario'}
                           {(booking as any).slot_reschedule_response === 'rejected' && '✗ Rechazaste el cambio de horario y recibiste reembolso'}
-                          {(booking as any).slot_reschedule_response === 'auto_accepted' && '✓ El cambio de horario fue aceptado automaticamente'}
+                          {(booking as any).slot_reschedule_response === 'auto_accepted' && '↻ El cambio de horario fue aceptado automaticamente'}
+                          {(booking as any).slot_reschedule_response === 'auto_cancelled' && '✗ Reserva cancelada automaticamente - reembolso en ToursRed Cash'}
                         </strong>
                       </p>
                     </div>
