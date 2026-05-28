@@ -64,6 +64,7 @@ const AdminAgencies: React.FC = () => {
     first_name: '',
     last_name: ''
   });
+  const [commissionInput, setCommissionInput] = useState('10');
 
   useEffect(() => {
     fetchAgencies();
@@ -388,6 +389,9 @@ const AdminAgencies: React.FC = () => {
       first_name: agency.users?.first_name || '',
       last_name: agency.users?.last_name || ''
     });
+    const rate = agency.commission_rate || 0.10;
+    const pct = rate * 100;
+    setCommissionInput(Number.isInteger(pct) ? String(pct) : pct.toFixed(1));
     setSelectedAgency(agency);
     setIsEditingAgency(true);
   };
@@ -917,13 +921,30 @@ const AdminAgencies: React.FC = () => {
                       </label>
                       <div className="relative">
                         <input
-                          type="number"
-                          value={(editForm.commission_rate * 100).toFixed(1)}
-                          onChange={(e) => setEditForm({...editForm, commission_rate: parseFloat(e.target.value) / 100})}
+                          type="text"
+                          inputMode="decimal"
+                          value={commissionInput}
+                          placeholder="Ej: 10"
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (/^(\d{0,2}(\.\d{0,1})?)?$/.test(val)) {
+                              setCommissionInput(val);
+                            }
+                          }}
+                          onFocus={(e) => e.target.select()}
+                          onBlur={() => {
+                            const parsed = parseFloat(commissionInput);
+                            if (isNaN(parsed) || commissionInput === '') {
+                              const prev = editForm.commission_rate * 100;
+                              const display = Number.isInteger(prev) ? String(prev) : prev.toFixed(1);
+                              setCommissionInput(display);
+                            } else {
+                              const clamped = Math.min(50, Math.max(0, parsed));
+                              setCommissionInput(Number.isInteger(clamped) ? String(clamped) : clamped.toFixed(1));
+                              setEditForm({ ...editForm, commission_rate: clamped / 100 });
+                            }
+                          }}
                           className="input pr-8"
-                          min="0"
-                          max="50"
-                          step="0.1"
                           required
                         />
                         <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
@@ -931,7 +952,7 @@ const AdminAgencies: React.FC = () => {
                         </div>
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
-                        Porcentaje que cobra la plataforma por cada reserva
+                        Porcentaje que cobra la plataforma por cada reserva (0–50%)
                       </p>
                     </div>
 
