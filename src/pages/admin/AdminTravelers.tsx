@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { User, Mail, Phone, Calendar, MapPin, Shield, ShieldOff, CreditCard as Edit2, Star, ShoppingBag, X, DollarSign, CreditCard, Crown, TrendingUp, Users, ArrowUpDown, ArrowUp, ArrowDown, Wallet } from 'lucide-react';
+import { User, Mail, Phone, Calendar, MapPin, Shield, ShieldOff, CreditCard as Edit2, Star, ShoppingBag, X, DollarSign, CreditCard, Crown, TrendingUp, Users, ArrowUpDown, ArrowUp, ArrowDown, Wallet, FileText, ChevronLeft, Building, Hash, Tag, MapPin as MapPinIcon, Receipt } from 'lucide-react';
 import { formatCurrencyMXN } from '../../utils/formatCurrency';
 
 interface Traveler {
@@ -31,6 +31,22 @@ interface Traveler {
   curp: string | null;
   passport_number: string | null;
   is_foreign_traveler: boolean;
+  rfc: string | null;
+  razon_social: string | null;
+  regimen_fiscal: string | null;
+  uso_cfdi: string | null;
+  codigo_postal_fiscal: string | null;
+}
+
+interface BookingHistory {
+  id: string;
+  booking_code: string | null;
+  created_at: string;
+  payment_status: string;
+  total_price: number;
+  service_charge: number;
+  tours: { name: string } | null;
+  agencies: { name: string } | null;
 }
 
 interface SummaryStats {
@@ -63,6 +79,9 @@ export default function AdminTravelers() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [showBookingHistory, setShowBookingHistory] = useState(false);
+  const [bookingHistory, setBookingHistory] = useState<BookingHistory[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   useEffect(() => {
     loadTravelersAndStats();
@@ -175,6 +194,42 @@ export default function AdminTravelers() {
   const handleEditTraveler = (traveler: Traveler) => {
     setSelectedTraveler(traveler);
     setShowEditModal(true);
+    setShowBookingHistory(false);
+    setBookingHistory([]);
+  };
+
+  const loadBookingHistory = async (userId: string) => {
+    setLoadingHistory(true);
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+          id,
+          booking_code,
+          created_at,
+          payment_status,
+          total_price,
+          service_charge,
+          tours(name),
+          agencies(name)
+        `)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setBookingHistory((data || []) as unknown as BookingHistory[]);
+    } catch (err) {
+      console.error('Error cargando historial:', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const handleOpenBookingHistory = () => {
+    if (selectedTraveler) {
+      setShowBookingHistory(true);
+      loadBookingHistory(selectedTraveler.id);
+    }
   };
 
   const handleSort = (column: string) => {
@@ -613,7 +668,20 @@ export default function AdminTravelers() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-900">Perfil del Viajero</h2>
+              <div className="flex items-center gap-3">
+                {showBookingHistory && (
+                  <button
+                    onClick={() => setShowBookingHistory(false)}
+                    className="text-gray-500 hover:text-gray-700 flex items-center gap-1 text-sm font-medium"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Volver al perfil
+                  </button>
+                )}
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {showBookingHistory ? 'Historial de Reservas' : 'Perfil del Viajero'}
+                </h2>
+              </div>
               <button
                 onClick={() => setShowEditModal(false)}
                 className="text-gray-400 hover:text-gray-600"
@@ -623,6 +691,112 @@ export default function AdminTravelers() {
             </div>
 
             <div className="p-6">
+
+              {/* Vista historial de reservas */}
+              {showBookingHistory && (
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${selectedTraveler.profile_picture_url ? '' : 'bg-blue-100'}`}>
+                      {selectedTraveler.profile_picture_url
+                        ? <img src={selectedTraveler.profile_picture_url} className="h-8 w-8 rounded-full object-cover" alt="" />
+                        : <User className="h-5 w-5 text-blue-600" />}
+                    </div>
+                    <p className="text-sm text-gray-600 font-medium">{selectedTraveler.first_name} {selectedTraveler.last_name}</p>
+                    <span className="text-gray-400 text-sm">—</span>
+                    <span className="text-sm text-gray-500">{selectedTraveler.total_bookings} reservas en total</span>
+                  </div>
+
+                  {loadingHistory ? (
+                    <div className="flex items-center justify-center py-16">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                    </div>
+                  ) : bookingHistory.length === 0 ? (
+                    <div className="text-center py-16 text-gray-500">
+                      <ShoppingBag className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                      <p>No hay reservas registradas</p>
+                    </div>
+                  ) : (
+                    <div className="mt-4 overflow-x-auto rounded-lg border border-gray-200">
+                      <table className="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Folio</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tour</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agencia</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cargo Servicio</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-100">
+                          {bookingHistory.map((booking) => (
+                            <tr key={booking.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 font-mono text-xs text-gray-600">
+                                {booking.booking_code || booking.id.slice(0, 8).toUpperCase()}
+                              </td>
+                              <td className="px-4 py-3 text-gray-900 max-w-[180px] truncate">
+                                {booking.tours?.name || '—'}
+                              </td>
+                              <td className="px-4 py-3 text-gray-600 max-w-[140px] truncate">
+                                {booking.agencies?.name || '—'}
+                              </td>
+                              <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                                {new Date(booking.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  booking.payment_status === 'succeeded'
+                                    ? 'bg-green-100 text-green-800'
+                                    : booking.payment_status === 'pending'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : booking.payment_status === 'cancelled'
+                                    ? 'bg-red-100 text-red-800'
+                                    : 'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {booking.payment_status === 'succeeded' ? 'Pagada'
+                                    : booking.payment_status === 'pending' ? 'Pendiente'
+                                    : booking.payment_status === 'cancelled' ? 'Cancelada'
+                                    : booking.payment_status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right font-medium text-gray-900 whitespace-nowrap">
+                                {formatCurrency(Number(booking.total_price))}
+                              </td>
+                              <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
+                                {formatCurrency(Number(booking.service_charge))}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-gray-50 border-t border-gray-200">
+                          <tr>
+                            <td colSpan={5} className="px-4 py-3 text-sm font-semibold text-gray-700 text-right">Totales:</td>
+                            <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
+                              {formatCurrency(bookingHistory.reduce((s, b) => s + Number(b.total_price), 0))}
+                            </td>
+                            <td className="px-4 py-3 text-right font-medium text-gray-700 whitespace-nowrap">
+                              {formatCurrency(bookingHistory.reduce((s, b) => s + Number(b.service_charge), 0))}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+
+                  <div className="mt-6 flex justify-end">
+                    <button
+                      onClick={() => setShowEditModal(false)}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Vista perfil */}
+              {!showBookingHistory && <>
               <div className="flex items-center mb-6">
                 {selectedTraveler.profile_picture_url ? (
                   <img
@@ -661,15 +835,23 @@ export default function AdminTravelers() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <ShoppingBag className="h-8 w-8 text-blue-600 mr-3" />
-                    <div>
-                      <p className="text-sm text-gray-600">Total Reservas</p>
-                      <p className="text-2xl font-bold text-gray-900">{selectedTraveler.total_bookings}</p>
+                <button
+                  onClick={handleOpenBookingHistory}
+                  className="bg-blue-50 rounded-lg p-4 text-left hover:bg-blue-100 transition-colors group ring-0 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  title="Ver historial de reservas"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <ShoppingBag className="h-8 w-8 text-blue-600 mr-3 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm text-gray-600">Total Reservas</p>
+                        <p className="text-2xl font-bold text-gray-900">{selectedTraveler.total_bookings}</p>
+                      </div>
                     </div>
+                    <ChevronLeft className="h-4 w-4 text-blue-400 group-hover:text-blue-600 rotate-180 transition-colors flex-shrink-0" />
                   </div>
-                </div>
+                  <p className="text-xs text-blue-500 mt-1 group-hover:text-blue-700">Ver historial</p>
+                </button>
 
                 <div className="bg-green-50 rounded-lg p-4">
                   <div className="flex items-center">
@@ -834,6 +1016,75 @@ export default function AdminTravelers() {
                 </div>
               </div>
 
+              {/* Datos Fiscales */}
+              {(selectedTraveler.rfc || selectedTraveler.razon_social || selectedTraveler.regimen_fiscal || selectedTraveler.uso_cfdi || selectedTraveler.codigo_postal_fiscal) && (
+                <div className="mt-6 border border-gray-200 rounded-lg p-5">
+                  <h4 className="font-semibold text-gray-900 text-lg mb-4 flex items-center gap-2">
+                    <Receipt className="h-5 w-5 text-gray-500" />
+                    Datos Fiscales para Facturación
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {selectedTraveler.rfc && (
+                      <div className="flex items-start gap-3">
+                        <Hash className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">RFC</p>
+                          <p className="text-gray-900 font-mono font-medium">{selectedTraveler.rfc}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedTraveler.razon_social && (
+                      <div className="flex items-start gap-3">
+                        <Building className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Razón Social</p>
+                          <p className="text-gray-900">{selectedTraveler.razon_social}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedTraveler.regimen_fiscal && (
+                      <div className="flex items-start gap-3">
+                        <FileText className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Régimen Fiscal</p>
+                          <p className="text-gray-900">{selectedTraveler.regimen_fiscal}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedTraveler.uso_cfdi && (
+                      <div className="flex items-start gap-3">
+                        <Tag className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Uso de CFDI</p>
+                          <p className="text-gray-900">{selectedTraveler.uso_cfdi}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedTraveler.codigo_postal_fiscal && (
+                      <div className="flex items-start gap-3">
+                        <MapPinIcon className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">C.P. Fiscal</p>
+                          <p className="text-gray-900">{selectedTraveler.codigo_postal_fiscal}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {!(selectedTraveler.rfc || selectedTraveler.razon_social || selectedTraveler.regimen_fiscal || selectedTraveler.uso_cfdi || selectedTraveler.codigo_postal_fiscal) && (
+                <div className="mt-6 border border-dashed border-gray-200 rounded-lg p-5">
+                  <div className="flex items-center gap-3 text-gray-400">
+                    <Receipt className="h-5 w-5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-sm">Sin datos fiscales registrados</p>
+                      <p className="text-xs mt-0.5">El viajero no ha ingresado información para facturación.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="mt-8 flex justify-end space-x-3">
                 <button
                   onClick={() => toggleActiveStatus(selectedTraveler.id, selectedTraveler.is_active)}
@@ -852,6 +1103,8 @@ export default function AdminTravelers() {
                   Cerrar
                 </button>
               </div>
+              </>}
+
             </div>
           </div>
         </div>
