@@ -1570,7 +1570,7 @@ const TravelerBookings: React.FC = () => {
                       </button>
                     )}
 
-                    {booking.status === 'confirmed' && (
+                    {(booking.status === 'confirmed' || booking.status === 'completed') && (
                       <button
                         onClick={() => handleOpenReviewModal(booking)}
                         className="btn btn-primary flex items-center justify-center"
