@@ -45,6 +45,13 @@ interface BookingHistory {
   payment_status: string;
   total_price: number;
   service_charge: number;
+  deposit_amount: number | null;
+  travelers_count: number | null;
+  count_adultos: number | null;
+  count_ninos: number | null;
+  count_infantes: number | null;
+  count_adultos_mayores: number | null;
+  count_mascotas: number | null;
   tours: { name: string } | null;
   agencies: { name: string } | null;
 }
@@ -210,6 +217,13 @@ export default function AdminTravelers() {
           payment_status,
           total_price,
           service_charge,
+          deposit_amount,
+          travelers_count,
+          count_adultos,
+          count_ninos,
+          count_infantes,
+          count_adultos_mayores,
+          count_mascotas,
           tours(name),
           agencies(name)
         `)
@@ -716,71 +730,95 @@ export default function AdminTravelers() {
                       <p>No hay reservas registradas</p>
                     </div>
                   ) : (
-                    <div className="mt-4 overflow-x-auto rounded-lg border border-gray-200">
-                      <table className="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Folio</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tour</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agencia</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cargo Servicio</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-100">
-                          {bookingHistory.map((booking) => (
-                            <tr key={booking.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 font-mono text-xs text-gray-600">
-                                {booking.booking_code || booking.id.slice(0, 8).toUpperCase()}
+                    <div className="mt-4 rounded-lg border border-gray-200 overflow-hidden">
+                      <div className="overflow-x-scroll overflow-y-auto max-h-[420px]">
+                        <table className="min-w-max w-full divide-y divide-gray-200 text-sm">
+                          <thead className="bg-gray-50 sticky top-0 z-10">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Folio</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tour</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Agencia</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Fecha</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Estado</th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Pasajeros</th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Total Tour</th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Anticipo</th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Cargo Servicio</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-100">
+                            {bookingHistory.map((booking) => {
+                              const pax = (booking.count_adultos ?? 0)
+                                + (booking.count_ninos ?? 0)
+                                + (booking.count_infantes ?? 0)
+                                + (booking.count_adultos_mayores ?? 0)
+                                + (booking.count_mascotas ?? 0)
+                                || booking.travelers_count
+                                || 0;
+                              return (
+                                <tr key={booking.id} className="hover:bg-gray-50">
+                                  <td className="px-4 py-3 font-mono text-xs text-gray-600 whitespace-nowrap">
+                                    {booking.booking_code || booking.id.slice(0, 8).toUpperCase()}
+                                  </td>
+                                  <td className="px-4 py-3 text-gray-900 whitespace-nowrap max-w-[200px] truncate">
+                                    {booking.tours?.name || '—'}
+                                  </td>
+                                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap max-w-[150px] truncate">
+                                    {booking.agencies?.name || '—'}
+                                  </td>
+                                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                                    {new Date(booking.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                      booking.payment_status === 'succeeded'
+                                        ? 'bg-green-100 text-green-800'
+                                        : booking.payment_status === 'pending'
+                                        ? 'bg-yellow-100 text-yellow-800'
+                                        : booking.payment_status === 'cancelled'
+                                        ? 'bg-red-100 text-red-800'
+                                        : 'bg-gray-100 text-gray-700'
+                                    }`}>
+                                      {booking.payment_status === 'succeeded' ? 'Pagada'
+                                        : booking.payment_status === 'pending' ? 'Pendiente'
+                                        : booking.payment_status === 'cancelled' ? 'Cancelada'
+                                        : booking.payment_status}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-gray-700 whitespace-nowrap">
+                                    {pax > 0 ? pax : '—'}
+                                  </td>
+                                  <td className="px-4 py-3 text-right font-medium text-gray-900 whitespace-nowrap">
+                                    {formatCurrency(Number(booking.total_price))}
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-gray-700 whitespace-nowrap">
+                                    {booking.deposit_amount != null && Number(booking.deposit_amount) > 0
+                                      ? formatCurrency(Number(booking.deposit_amount))
+                                      : '—'}
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
+                                    {formatCurrency(Number(booking.service_charge))}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          <tfoot className="bg-gray-50 border-t-2 border-gray-200 sticky bottom-0">
+                            <tr>
+                              <td colSpan={6} className="px-4 py-3 text-sm font-semibold text-gray-700 text-right whitespace-nowrap">Totales:</td>
+                              <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
+                                {formatCurrency(bookingHistory.reduce((s, b) => s + Number(b.total_price), 0))}
                               </td>
-                              <td className="px-4 py-3 text-gray-900 max-w-[180px] truncate">
-                                {booking.tours?.name || '—'}
+                              <td className="px-4 py-3 text-right font-medium text-gray-700 whitespace-nowrap">
+                                {formatCurrency(bookingHistory.reduce((s, b) => s + Number(b.deposit_amount ?? 0), 0))}
                               </td>
-                              <td className="px-4 py-3 text-gray-600 max-w-[140px] truncate">
-                                {booking.agencies?.name || '—'}
-                              </td>
-                              <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                                {new Date(booking.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}
-                              </td>
-                              <td className="px-4 py-3">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                  booking.payment_status === 'succeeded'
-                                    ? 'bg-green-100 text-green-800'
-                                    : booking.payment_status === 'pending'
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : booking.payment_status === 'cancelled'
-                                    ? 'bg-red-100 text-red-800'
-                                    : 'bg-gray-100 text-gray-700'
-                                }`}>
-                                  {booking.payment_status === 'succeeded' ? 'Pagada'
-                                    : booking.payment_status === 'pending' ? 'Pendiente'
-                                    : booking.payment_status === 'cancelled' ? 'Cancelada'
-                                    : booking.payment_status}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-right font-medium text-gray-900 whitespace-nowrap">
-                                {formatCurrency(Number(booking.total_price))}
-                              </td>
-                              <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
-                                {formatCurrency(Number(booking.service_charge))}
+                              <td className="px-4 py-3 text-right font-medium text-gray-700 whitespace-nowrap">
+                                {formatCurrency(bookingHistory.reduce((s, b) => s + Number(b.service_charge), 0))}
                               </td>
                             </tr>
-                          ))}
-                        </tbody>
-                        <tfoot className="bg-gray-50 border-t border-gray-200">
-                          <tr>
-                            <td colSpan={5} className="px-4 py-3 text-sm font-semibold text-gray-700 text-right">Totales:</td>
-                            <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
-                              {formatCurrency(bookingHistory.reduce((s, b) => s + Number(b.total_price), 0))}
-                            </td>
-                            <td className="px-4 py-3 text-right font-medium text-gray-700 whitespace-nowrap">
-                              {formatCurrency(bookingHistory.reduce((s, b) => s + Number(b.service_charge), 0))}
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
+                          </tfoot>
+                        </table>
+                      </div>
                     </div>
                   )}
 
