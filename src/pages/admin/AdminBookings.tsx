@@ -207,7 +207,7 @@ export default function AdminBookings() {
 
       const { data, error: err } = await supabase
         .from('bookings')
-        .select(`*, users(*), tours(*), agencies(*), commission_records(*)`)
+        .select(`*, users!bookings_user_id_fkey(*), tours(*), agencies(*), commission_records(*)`)
         .order('created_at', { ascending: false });
 
       if (err) throw err;
@@ -827,3 +827,6 @@ const DetailModal: React.FC<{ booking: BookingRow; onClose: () => void }> = ({ b
     </div>
   );
 };
+
+
+export default AdminBookings
