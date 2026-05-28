@@ -632,6 +632,13 @@ const TravelerBookings: React.FC = () => {
     }
   };
 
+  const getTourEffectiveDate = (booking: Booking): Date => {
+    const tour = booking.tours as any;
+    // Tours receptivos no tienen start_date; usar booking_date o selected_date
+    const dateStr = tour?.start_date ?? (booking as any).selected_date ?? (booking as any).booking_date;
+    return parseDateFromDB(dateStr ?? null);
+  };
+
   const canCancelBooking = (booking: Booking) => {
     if (!booking.tours) return false;
 
@@ -640,11 +647,11 @@ const TravelerBookings: React.FC = () => {
     if ((booking as any).approval_status === 'rejected') return false;
     if (!['pending', 'confirmed'].includes(booking.status)) return false;
 
-    const tourStartDate = parseDateFromDB((booking.tours as any).start_date);
+    const tourDate = getTourEffectiveDate(booking);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    if (tourStartDate < today) return false;
+    if (tourDate < today) return false;
 
     return true;
   };
@@ -660,10 +667,10 @@ const TravelerBookings: React.FC = () => {
     const activeTravelersCount = (booking as any).active_travelers_count ?? booking.travelers_count;
     if (!activeTravelersCount || activeTravelersCount < 2) return false;
 
-    const tourStartDate = parseDateFromDB((booking.tours as any).start_date);
+    const tourDate = getTourEffectiveDate(booking);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    if (tourStartDate < today) return false;
+    if (tourDate < today) return false;
 
     return true;
   };
