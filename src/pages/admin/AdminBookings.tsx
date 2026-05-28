@@ -207,7 +207,13 @@ function AdminBookings() {
 
       const { data, error: err } = await supabase
         .from('bookings')
-        .select(`*, users!bookings_user_id_fkey(*), tours(*), agencies(*), commission_records(*)`)
+        .select(`
+          *,
+          users!bookings_user_id_fkey(*),
+          tours!bookings_tour_id_fkey(*),
+          agencies!bookings_agency_id_fkey(*),
+          commission_records!commission_records_booking_id_fkey(*)
+        `)
         .order('created_at', { ascending: false });
 
       if (err) throw err;
