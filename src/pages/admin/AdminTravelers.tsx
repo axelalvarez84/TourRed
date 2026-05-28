@@ -89,6 +89,8 @@ export default function AdminTravelers() {
   const [showBookingHistory, setShowBookingHistory] = useState(false);
   const [bookingHistory, setBookingHistory] = useState<BookingHistory[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historySort, setHistorySort] = useState<string>('created_at');
+  const [historySortDir, setHistorySortDir] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     loadTravelersAndStats();
@@ -236,6 +238,15 @@ export default function AdminTravelers() {
       console.error('Error cargando historial:', err);
     } finally {
       setLoadingHistory(false);
+    }
+  };
+
+  const handleHistorySort = (col: string) => {
+    if (historySort === col) {
+      setHistorySortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setHistorySort(col);
+      setHistorySortDir('asc');
     }
   };
 
@@ -729,98 +740,141 @@ export default function AdminTravelers() {
                       <ShoppingBag className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                       <p>No hay reservas registradas</p>
                     </div>
-                  ) : (
-                    <div className="mt-4 rounded-lg border border-gray-200 overflow-hidden">
-                      <div className="overflow-x-scroll overflow-y-auto max-h-[420px]">
-                        <table className="min-w-max w-full divide-y divide-gray-200 text-sm">
-                          <thead className="bg-gray-50 sticky top-0 z-10">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Folio</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tour</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Agencia</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Fecha</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Estado</th>
-                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Pasajeros</th>
-                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Total Tour</th>
-                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Anticipo</th>
-                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Cargo Servicio</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-100">
-                            {bookingHistory.map((booking) => {
-                              const pax = (booking.count_adultos ?? 0)
-                                + (booking.count_ninos ?? 0)
-                                + (booking.count_infantes ?? 0)
-                                + (booking.count_adultos_mayores ?? 0)
-                                + (booking.count_mascotas ?? 0)
-                                || booking.travelers_count
-                                || 0;
-                              return (
-                                <tr key={booking.id} className="hover:bg-gray-50">
-                                  <td className="px-4 py-3 font-mono text-xs text-gray-600 whitespace-nowrap">
-                                    {booking.booking_code || booking.id.slice(0, 8).toUpperCase()}
-                                  </td>
-                                  <td className="px-4 py-3 text-gray-900 whitespace-nowrap max-w-[200px] truncate">
-                                    {booking.tours?.name || '—'}
-                                  </td>
-                                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap max-w-[150px] truncate">
-                                    {booking.agencies?.name || '—'}
-                                  </td>
-                                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                                    {new Date(booking.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                  </td>
-                                  <td className="px-4 py-3 whitespace-nowrap">
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                      booking.payment_status === 'succeeded'
-                                        ? 'bg-green-100 text-green-800'
-                                        : booking.payment_status === 'pending'
-                                        ? 'bg-yellow-100 text-yellow-800'
-                                        : booking.payment_status === 'cancelled'
-                                        ? 'bg-red-100 text-red-800'
-                                        : 'bg-gray-100 text-gray-700'
-                                    }`}>
-                                      {booking.payment_status === 'succeeded' ? 'Pagada'
-                                        : booking.payment_status === 'pending' ? 'Pendiente'
-                                        : booking.payment_status === 'cancelled' ? 'Cancelada'
-                                        : booking.payment_status}
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-3 text-right text-gray-700 whitespace-nowrap">
-                                    {pax > 0 ? pax : '—'}
-                                  </td>
-                                  <td className="px-4 py-3 text-right font-medium text-gray-900 whitespace-nowrap">
-                                    {formatCurrency(Number(booking.total_price))}
-                                  </td>
-                                  <td className="px-4 py-3 text-right text-gray-700 whitespace-nowrap">
-                                    {booking.deposit_amount != null && Number(booking.deposit_amount) > 0
-                                      ? formatCurrency(Number(booking.deposit_amount))
-                                      : '—'}
-                                  </td>
-                                  <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
-                                    {formatCurrency(Number(booking.service_charge))}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                          <tfoot className="bg-gray-50 border-t-2 border-gray-200 sticky bottom-0">
-                            <tr>
-                              <td colSpan={6} className="px-4 py-3 text-sm font-semibold text-gray-700 text-right whitespace-nowrap">Totales:</td>
-                              <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
-                                {formatCurrency(bookingHistory.reduce((s, b) => s + Number(b.total_price), 0))}
-                              </td>
-                              <td className="px-4 py-3 text-right font-medium text-gray-700 whitespace-nowrap">
-                                {formatCurrency(bookingHistory.reduce((s, b) => s + Number(b.deposit_amount ?? 0), 0))}
-                              </td>
-                              <td className="px-4 py-3 text-right font-medium text-gray-700 whitespace-nowrap">
-                                {formatCurrency(bookingHistory.reduce((s, b) => s + Number(b.service_charge), 0))}
-                              </td>
-                            </tr>
-                          </tfoot>
-                        </table>
+                  ) : (() => {
+                    const statusOrder: Record<string, number> = { succeeded: 0, processing: 1, pending: 2, cancelled: 3, canceled: 3, failed: 4 };
+                    const sorted = [...bookingHistory].sort((a, b) => {
+                      let cmp = 0;
+                      const dir = historySortDir === 'asc' ? 1 : -1;
+                      if (historySort === 'booking_code') {
+                        cmp = (a.booking_code || a.id).localeCompare(b.booking_code || b.id);
+                      } else if (historySort === 'tour') {
+                        cmp = (a.tours?.name || '').localeCompare(b.tours?.name || '');
+                      } else if (historySort === 'agency') {
+                        cmp = (a.agencies?.name || '').localeCompare(b.agencies?.name || '');
+                      } else if (historySort === 'created_at') {
+                        cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+                      } else if (historySort === 'payment_status') {
+                        cmp = (statusOrder[a.payment_status] ?? 9) - (statusOrder[b.payment_status] ?? 9);
+                      } else if (historySort === 'pax') {
+                        const paxA = (a.count_adultos ?? 0) + (a.count_ninos ?? 0) + (a.count_infantes ?? 0) + (a.count_adultos_mayores ?? 0) + (a.count_mascotas ?? 0) || a.travelers_count || 0;
+                        const paxB = (b.count_adultos ?? 0) + (b.count_ninos ?? 0) + (b.count_infantes ?? 0) + (b.count_adultos_mayores ?? 0) + (b.count_mascotas ?? 0) || b.travelers_count || 0;
+                        cmp = paxA - paxB;
+                      } else if (historySort === 'total_price') {
+                        cmp = Number(a.total_price) - Number(b.total_price);
+                      } else if (historySort === 'deposit_amount') {
+                        cmp = Number(a.deposit_amount ?? 0) - Number(b.deposit_amount ?? 0);
+                      } else if (historySort === 'service_charge') {
+                        cmp = Number(a.service_charge) - Number(b.service_charge);
+                      }
+                      return cmp * dir;
+                    });
+
+                    const SortIcon = ({ col, align = 'left' }: { col: string; align?: 'left' | 'right' }) => (
+                      <button
+                        onClick={() => handleHistorySort(col)}
+                        className={`group inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wider whitespace-nowrap ${historySort === col ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'} ${align === 'right' ? 'flex-row-reverse w-full justify-end' : ''}`}
+                      >
+                        <span>{col === 'booking_code' ? 'Folio' : col === 'tour' ? 'Tour' : col === 'agency' ? 'Agencia' : col === 'created_at' ? 'Fecha' : col === 'payment_status' ? 'Estado' : col === 'pax' ? 'Pasajeros' : col === 'total_price' ? 'Total Tour' : col === 'deposit_amount' ? 'Anticipo' : 'Cargo Servicio'}</span>
+                        {historySort === col
+                          ? (historySortDir === 'asc'
+                            ? <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                            : <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>)
+                          : <svg className="w-3 h-3 opacity-30 group-hover:opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 9l7-7 7 7M5 15l7 7 7-7"/></svg>
+                        }
+                      </button>
+                    );
+
+                    return (
+                      <div className="mt-4 rounded-lg border border-gray-200 overflow-hidden">
+                        <div className="overflow-x-scroll overflow-y-auto max-h-[420px]">
+                          <table className="min-w-max w-full divide-y divide-gray-200 text-sm">
+                            <thead className="bg-gray-50 sticky top-0 z-10">
+                              <tr>
+                                <th className="px-4 py-3 text-left"><SortIcon col="booking_code" /></th>
+                                <th className="px-4 py-3 text-left"><SortIcon col="tour" /></th>
+                                <th className="px-4 py-3 text-left"><SortIcon col="agency" /></th>
+                                <th className="px-4 py-3 text-left"><SortIcon col="created_at" /></th>
+                                <th className="px-4 py-3 text-left"><SortIcon col="payment_status" /></th>
+                                <th className="px-4 py-3 text-right"><SortIcon col="pax" align="right" /></th>
+                                <th className="px-4 py-3 text-right"><SortIcon col="total_price" align="right" /></th>
+                                <th className="px-4 py-3 text-right"><SortIcon col="deposit_amount" align="right" /></th>
+                                <th className="px-4 py-3 text-right"><SortIcon col="service_charge" align="right" /></th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-100">
+                              {sorted.map((booking) => {
+                                const pax = (booking.count_adultos ?? 0)
+                                  + (booking.count_ninos ?? 0)
+                                  + (booking.count_infantes ?? 0)
+                                  + (booking.count_adultos_mayores ?? 0)
+                                  + (booking.count_mascotas ?? 0)
+                                  || booking.travelers_count
+                                  || 0;
+                                const statusLabel: Record<string, string> = { succeeded: 'Pagada', pending: 'Pendiente', processing: 'Procesando', cancelled: 'Cancelada', canceled: 'Cancelada', failed: 'Fallida' };
+                                const statusStyle: Record<string, string> = {
+                                  succeeded: 'bg-green-100 text-green-800',
+                                  pending: 'bg-yellow-100 text-yellow-800',
+                                  processing: 'bg-blue-100 text-blue-800',
+                                  cancelled: 'bg-red-100 text-red-800',
+                                  canceled: 'bg-red-100 text-red-800',
+                                  failed: 'bg-red-100 text-red-800',
+                                };
+                                return (
+                                  <tr key={booking.id} className="hover:bg-gray-50">
+                                    <td className="px-4 py-3 font-mono text-xs text-gray-600 whitespace-nowrap">
+                                      {booking.booking_code || booking.id.slice(0, 8).toUpperCase()}
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-900 whitespace-nowrap max-w-[200px] truncate">
+                                      {booking.tours?.name || '—'}
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap max-w-[150px] truncate">
+                                      {booking.agencies?.name || '—'}
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                                      {new Date(booking.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap">
+                                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusStyle[booking.payment_status] ?? 'bg-gray-100 text-gray-700'}`}>
+                                        {statusLabel[booking.payment_status] ?? booking.payment_status}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-gray-700 whitespace-nowrap">
+                                      {pax > 0 ? pax : '—'}
+                                    </td>
+                                    <td className="px-4 py-3 text-right font-medium text-gray-900 whitespace-nowrap">
+                                      {formatCurrency(Number(booking.total_price))}
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-gray-700 whitespace-nowrap">
+                                      {booking.deposit_amount != null && Number(booking.deposit_amount) > 0
+                                        ? formatCurrency(Number(booking.deposit_amount))
+                                        : '—'}
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
+                                      {formatCurrency(Number(booking.service_charge))}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                            <tfoot className="bg-gray-50 border-t-2 border-gray-200 sticky bottom-0">
+                              <tr>
+                                <td colSpan={6} className="px-4 py-3 text-sm font-semibold text-gray-700 text-right whitespace-nowrap">Totales:</td>
+                                <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
+                                  {formatCurrency(bookingHistory.reduce((s, b) => s + Number(b.total_price), 0))}
+                                </td>
+                                <td className="px-4 py-3 text-right font-medium text-gray-700 whitespace-nowrap">
+                                  {formatCurrency(bookingHistory.reduce((s, b) => s + Number(b.deposit_amount ?? 0), 0))}
+                                </td>
+                                <td className="px-4 py-3 text-right font-medium text-gray-700 whitespace-nowrap">
+                                  {formatCurrency(bookingHistory.reduce((s, b) => s + Number(b.service_charge), 0))}
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   <div className="mt-6 flex justify-end">
                     <button
