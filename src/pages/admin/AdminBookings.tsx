@@ -178,7 +178,7 @@ const SortIcon: React.FC<{ active: boolean; dir: 'asc' | 'desc' }> = ({ active, 
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function AdminBookings() {
+function AdminBookings() {
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
