@@ -13,96 +13,98 @@ import { formatCurrencyMXN } from '../../utils/formatCurrency';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface BookingRow {
+  // bookings
   id: string;
   booking_code: string | null;
+  user_id: string;
+  tour_id: string;
+  agency_id: string;
+  booking_date: string | null;
   created_at: string;
   updated_at: string;
-  booking_date: string | null;
   status: string;
   payment_status: string;
-  approval_status: string | null;
+  payment_method: string | null;
   total_price: number;
   deposit_amount: number | null;
-  service_charge: number;
-  commission_amount: number;
   user_payment: number;
+  service_charge: number;
   platform_revenue: number;
-  points_earned: number;
-  points_used: number;
-  used_membership_benefit: boolean;
-  membership_service_fee_saved: number;
-  service_charge_discount: number;
-  preventa_comision_descuento: number;
-  es_reserva_preventa: boolean;
+  commission_amount: number;
   travelers_count: number;
   count_adultos: number;
   count_ninos: number;
   count_infantes: number;
   count_adultos_mayores: number;
   count_mascotas: number;
-  payment_intent_id: string | null;
-  payment_method: string | null;
-  paid_at: string | null;
+  approval_status: string | null;
   approval_notes: string | null;
   approved_at: string | null;
   is_no_show: boolean;
   no_show_marked_at: string | null;
+  has_pending_reschedule: boolean;
+  has_pending_slot_reschedule: boolean;
+  slot_reschedule_response: string | null;
+  reschedule_response: string | null;
+  original_booking_date: string | null;
+  selected_date: string | null;
+  selected_time: string | null;
+  paid_at: string | null;
+  confirmation_email_sent: boolean;
+  payment_intent_id: string | null;
   cancelled_at: string | null;
   cancellation_type: string | null;
   cancellation_refund_amount: number | null;
-  has_pending_reschedule: boolean;
-  reschedule_response: string | null;
-  original_booking_date: string | null;
+  toursred_cash_used: number;
+  points_used: number;
+  points_earned: number;
+  used_membership_benefit: boolean;
+  service_charge_discount: number;
+  membership_service_fee_saved: number;
+  preventa_comision_descuento: number;
+  discount_amount: number;
+  es_reserva_preventa: boolean;
   needs_seat_reselection: boolean;
-  confirmation_email_sent: boolean;
-  // joined
-  users: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    email: string | null;
-    phone_number: string | null;
-    profile_picture_url: string | null;
-    is_active: boolean;
-    curp: string | null;
-    rfc: string | null;
-    razon_social: string | null;
-    regimen_fiscal: string | null;
-    uso_cfdi: string | null;
-    is_foreign_traveler: boolean | null;
-    passport_number: string | null;
-  } | null;
+  // users (aplanados)
+  user_first_name: string | null;
+  user_last_name: string | null;
   user_email: string | null;
-  tours: {
-    id: string;
-    name: string;
-    destination: string | null;
-    category: string[] | null;
-    price: number;
-    start_date: string | null;
-    end_date: string | null;
-    image_url: string | null;
-    deposit_percentage: number | null;
-    booking_approval_type: string | null;
-  } | null;
-  agencies: {
-    id: string;
-    name: string;
-    logo: string | null;
-    contact_email: string | null;
-    contact_phone: string | null;
-    commission_rate: number | null;
-  } | null;
-  commission_records: {
-    agency_commission_rate: number | null;
-    agency_commission_amount: number | null;
-    service_charge_rate: number | null;
-    service_charge_amount: number | null;
-    platform_total_revenue: number | null;
-    agency_net_amount: number | null;
-    status: string | null;
-    processed_at: string | null;
-  }[] | null;
+  user_profile_picture_url: string | null;
+  user_phone_number: string | null;
+  user_is_active: boolean | null;
+  user_curp: string | null;
+  user_rfc: string | null;
+  user_razon_social: string | null;
+  user_regimen_fiscal: string | null;
+  user_uso_cfdi: string | null;
+  user_is_foreign_traveler: boolean | null;
+  user_passport_number: string | null;
+  // tours (aplanados)
+  tour_name: string | null;
+  tour_destination: string | null;
+  tour_start_date: string | null;
+  tour_end_date: string | null;
+  tour_image_url: string | null;
+  tour_price: number | null;
+  tour_deposit_percentage: number | null;
+  tour_booking_approval_type: string | null;
+  tour_category: string[] | null;
+  // agencies (aplanados)
+  agency_name: string | null;
+  agency_logo: string | null;
+  agency_contact_email: string | null;
+  agency_contact_phone: string | null;
+  agency_commission_rate: number | null;
+  // commission_records (primer registro, aplanado)
+  cr_id: string | null;
+  cr_agency_commission_rate: number | null;
+  cr_agency_commission_amount: number | null;
+  cr_service_charge_rate: number | null;
+  cr_service_charge_amount: number | null;
+  cr_platform_total_revenue: number | null;
+  cr_agency_net_amount: number | null;
+  cr_status: string | null;
+  cr_processed_at: string | null;
 }
 
 interface Stats {
@@ -205,23 +207,11 @@ function AdminBookings() {
       setLoading(true);
       setError(null);
 
-      const { data, error: err } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          users!bookings_user_id_fkey(*),
-          tours!bookings_tour_id_fkey(*),
-          agencies!bookings_agency_id_fkey(*),
-          commission_records!commission_records_booking_id_fkey(*)
-        `)
-        .order('created_at', { ascending: false });
+      const { data, error: err } = await supabase.rpc('get_admin_bookings');
 
       if (err) throw err;
 
-      const enriched = ((data || []) as unknown as BookingRow[]).map(r => ({
-        ...r,
-        user_email: (r.users as any)?.email ?? null,
-      })) as unknown as BookingRow[];
+      const enriched = (data || []) as BookingRow[];
 
       setBookings(enriched);
 
@@ -253,12 +243,12 @@ function AdminBookings() {
     if (q) {
       const haystack = [
         b.booking_code,
-        b.users?.first_name,
-        b.users?.last_name,
+        b.user_first_name,
+        b.user_last_name,
         b.user_email,
-        b.tours?.name,
-        b.tours?.destination,
-        b.agencies?.name,
+        b.tour_name,
+        b.tour_destination,
+        b.agency_name,
         b.id,
       ].filter(Boolean).join(' ').toLowerCase();
       if (!haystack.includes(q)) return false;
@@ -276,9 +266,9 @@ function AdminBookings() {
       case 'booking_code': cmp = (a.booking_code || a.id).localeCompare(b.booking_code || b.id); break;
       case 'created_at': cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime(); break;
       case 'booking_date': cmp = (a.booking_date ?? '').localeCompare(b.booking_date ?? ''); break;
-      case 'traveler': cmp = `${a.users?.first_name} ${a.users?.last_name}`.localeCompare(`${b.users?.first_name} ${b.users?.last_name}`); break;
-      case 'tour': cmp = (a.tours?.name ?? '').localeCompare(b.tours?.name ?? ''); break;
-      case 'agency': cmp = (a.agencies?.name ?? '').localeCompare(b.agencies?.name ?? ''); break;
+      case 'traveler': cmp = `${a.user_first_name} ${a.user_last_name}`.localeCompare(`${b.user_first_name} ${b.user_last_name}`); break;
+      case 'tour': cmp = (a.tour_name ?? '').localeCompare(b.tour_name ?? ''); break;
+      case 'agency': cmp = (a.agency_name ?? '').localeCompare(b.agency_name ?? ''); break;
       case 'payment_status': cmp = (a.payment_status ?? '').localeCompare(b.payment_status ?? ''); break;
       case 'status': cmp = (a.status ?? '').localeCompare(b.status ?? ''); break;
       case 'total_price': cmp = Number(a.total_price) - Number(b.total_price); break;
@@ -483,23 +473,23 @@ function AdminBookings() {
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center gap-2">
-                            {b.users?.profile_picture_url ? (
-                              <img src={b.users.profile_picture_url} alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0" />
+                            {b.user_profile_picture_url ? (
+                              <img src={b.user_profile_picture_url} alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0" />
                             ) : (
                               <div className="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                                 <User className="h-3.5 w-3.5 text-blue-600" />
                               </div>
                             )}
                             <span className="text-gray-800 font-medium max-w-[140px] truncate">
-                              {b.users ? `${b.users.first_name} ${b.users.last_name}` : '—'}
+                              {b.user_first_name ? `${b.user_first_name} ${b.user_last_name}` : '—'}
                             </span>
                           </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap max-w-[180px] truncate text-gray-700">
-                          {b.tours?.name || '—'}
+                          {b.tour_name || '—'}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap max-w-[140px] truncate text-gray-600">
-                          {b.agencies?.name || '—'}
+                          {b.agency_name || '—'}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-gray-600 text-xs">
                           {fmtDate(b.created_at)}
@@ -557,7 +547,7 @@ const DetailModal: React.FC<{ booking: BookingRow; onClose: () => void }> = ({ b
   const ap = b.approval_status ? (APPROVAL_MAP[b.approval_status] ?? { label: b.approval_status, cls: 'bg-gray-100 text-gray-600' }) : null;
 
   const pax = (b.count_adultos || 0) + (b.count_ninos || 0) + (b.count_infantes || 0) + (b.count_adultos_mayores || 0) + (b.count_mascotas || 0) || b.travelers_count || 0;
-  const commRec = b.commission_records?.[0];
+  const hasCommRec = b.cr_id != null;
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
@@ -590,8 +580,8 @@ const DetailModal: React.FC<{ booking: BookingRow; onClose: () => void }> = ({ b
           {/* ── Viajero ─────────────────────────────────────────────────────────── */}
           <Section title="Viajero" icon={<User className="h-4 w-4" />}>
             <div className="flex items-start gap-4 mb-4">
-              {b.users?.profile_picture_url ? (
-                <img src={b.users.profile_picture_url} alt="" className="h-14 w-14 rounded-full object-cover border border-gray-200" />
+              {b.user_profile_picture_url ? (
+                <img src={b.user_profile_picture_url} alt="" className="h-14 w-14 rounded-full object-cover border border-gray-200" />
               ) : (
                 <div className="h-14 w-14 rounded-full bg-blue-100 flex items-center justify-center border border-gray-200">
                   <User className="h-6 w-6 text-blue-600" />
@@ -599,55 +589,53 @@ const DetailModal: React.FC<{ booking: BookingRow; onClose: () => void }> = ({ b
               )}
               <div>
                 <div className="font-semibold text-gray-900 text-base">
-                  {b.users ? `${b.users.first_name} ${b.users.last_name}` : '—'}
+                  {b.user_first_name ? `${b.user_first_name} ${b.user_last_name}` : '—'}
                 </div>
                 {b.user_email && <div className="text-sm text-gray-500 flex items-center gap-1 mt-0.5"><Mail className="h-3.5 w-3.5" />{b.user_email}</div>}
-                {b.users?.phone_number && <div className="text-sm text-gray-500 flex items-center gap-1 mt-0.5"><Phone className="h-3.5 w-3.5" />{b.users.phone_number}</div>}
+                {b.user_phone_number && <div className="text-sm text-gray-500 flex items-center gap-1 mt-0.5"><Phone className="h-3.5 w-3.5" />{b.user_phone_number}</div>}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-              <Field label="ID Usuario" value={<span className="font-mono text-xs">{b.users?.id?.slice(0, 16) ?? '—'}…</span>} />
-              <Field label="Estado cuenta" value={b.users?.is_active ? <span className="text-green-700 font-medium">Activa</span> : <span className="text-red-600 font-medium">Inactiva</span>} />
-              {b.users?.is_foreign_traveler ? (
-                <>
-                  <Field label="Pasaporte" value={b.users.passport_number} mono />
-                </>
+              <Field label="ID Usuario" value={<span className="font-mono text-xs">{b.user_id?.slice(0, 16) ?? '—'}…</span>} />
+              <Field label="Estado cuenta" value={b.user_is_active ? <span className="text-green-700 font-medium">Activa</span> : <span className="text-red-600 font-medium">Inactiva</span>} />
+              {b.user_is_foreign_traveler ? (
+                <Field label="Pasaporte" value={b.user_passport_number} mono />
               ) : (
                 <>
-                  <Field label="CURP" value={b.users?.curp} mono />
-                  <Field label="RFC" value={b.users?.rfc} mono />
+                  <Field label="CURP" value={b.user_curp} mono />
+                  <Field label="RFC" value={b.user_rfc} mono />
                 </>
               )}
-              <Field label="Razon Social" value={b.users?.razon_social} />
-              <Field label="Regimen Fiscal" value={b.users?.regimen_fiscal} />
-              <Field label="Uso CFDI" value={b.users?.uso_cfdi} />
-              <Field label="Viajero extranjero" value={b.users?.is_foreign_traveler ? 'Si' : 'No'} />
+              <Field label="Razon Social" value={b.user_razon_social} />
+              <Field label="Regimen Fiscal" value={b.user_regimen_fiscal} />
+              <Field label="Uso CFDI" value={b.user_uso_cfdi} />
+              <Field label="Viajero extranjero" value={b.user_is_foreign_traveler ? 'Si' : 'No'} />
             </div>
           </Section>
 
           {/* ── Tour ────────────────────────────────────────────────────────────── */}
           <Section title="Tour" icon={<Package className="h-4 w-4" />}>
-            {b.tours?.image_url && (
+            {b.tour_image_url && (
               <img
-                src={b.tours.image_url}
-                alt={b.tours.name}
+                src={b.tour_image_url}
+                alt={b.tour_name ?? ''}
                 className="w-full h-28 object-cover rounded-lg mb-3 border border-gray-100"
               />
             )}
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-              <Field label="Nombre" value={<span className="font-medium text-gray-900">{b.tours?.name}</span>} />
-              <Field label="Destino" value={<span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-gray-400" />{b.tours?.destination}</span>} />
-              <Field label="Fecha inicio" value={fmtDate(b.tours?.start_date)} />
-              <Field label="Fecha fin" value={fmtDate(b.tours?.end_date)} />
+              <Field label="Nombre" value={<span className="font-medium text-gray-900">{b.tour_name}</span>} />
+              <Field label="Destino" value={<span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-gray-400" />{b.tour_destination}</span>} />
+              <Field label="Fecha inicio" value={fmtDate(b.tour_start_date)} />
+              <Field label="Fecha fin" value={fmtDate(b.tour_end_date)} />
               <Field label="Fecha de la reserva" value={fmtDate(b.booking_date)} />
-              <Field label="Precio base" value={b.tours?.price != null ? formatCurrencyMXN(Number(b.tours.price)) : '—'} />
-              <Field label="% Deposito" value={b.tours?.deposit_percentage != null ? `${b.tours.deposit_percentage}%` : '—'} />
-              <Field label="Tipo aprobacion" value={b.tours?.booking_approval_type === 'automatic' ? 'Automatica' : 'Manual'} />
-              {b.tours?.category && b.tours.category.length > 0 && (
+              <Field label="Precio base" value={b.tour_price != null ? formatCurrencyMXN(Number(b.tour_price)) : '—'} />
+              <Field label="% Deposito" value={b.tour_deposit_percentage != null ? `${b.tour_deposit_percentage}%` : '—'} />
+              <Field label="Tipo aprobacion" value={b.tour_booking_approval_type === 'automatic' ? 'Automatica' : 'Manual'} />
+              {b.tour_category && b.tour_category.length > 0 && (
                 <div className="col-span-2">
                   <span className="text-xs text-gray-400 uppercase tracking-wide block mb-1">Categorias</span>
                   <div className="flex flex-wrap gap-1">
-                    {b.tours.category.map(c => (
+                    {b.tour_category.map(c => (
                       <span key={c} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 text-xs">
                         <Tag className="h-2.5 w-2.5" />{c}
                       </span>
@@ -661,19 +649,19 @@ const DetailModal: React.FC<{ booking: BookingRow; onClose: () => void }> = ({ b
           {/* ── Agencia ─────────────────────────────────────────────────────────── */}
           <Section title="Agencia" icon={<Building2 className="h-4 w-4" />}>
             <div className="flex items-center gap-3 mb-3">
-              {b.agencies?.logo ? (
-                <img src={b.agencies.logo} alt="" className="h-10 w-10 rounded-lg object-contain border border-gray-100" />
+              {b.agency_logo ? (
+                <img src={b.agency_logo} alt="" className="h-10 w-10 rounded-lg object-contain border border-gray-100" />
               ) : (
                 <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center">
                   <Building2 className="h-5 w-5 text-gray-400" />
                 </div>
               )}
-              <span className="font-semibold text-gray-900">{b.agencies?.name ?? '—'}</span>
+              <span className="font-semibold text-gray-900">{b.agency_name ?? '—'}</span>
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-              <Field label="Email contacto" value={b.agencies?.contact_email} />
-              <Field label="Telefono" value={b.agencies?.contact_phone} />
-              <Field label="Tasa de comision" value={b.agencies?.commission_rate != null ? `${(Number(b.agencies.commission_rate) * 100).toFixed(1)}%` : '—'} />
+              <Field label="Email contacto" value={b.agency_contact_email} />
+              <Field label="Telefono" value={b.agency_contact_phone} />
+              <Field label="Tasa de comision" value={b.agency_commission_rate != null ? `${(Number(b.agency_commission_rate) * 100).toFixed(1)}%` : '—'} />
             </div>
           </Section>
 
@@ -754,24 +742,24 @@ const DetailModal: React.FC<{ booking: BookingRow; onClose: () => void }> = ({ b
           </Section>
 
           {/* ── Comisiones ──────────────────────────────────────────────────────── */}
-          {commRec && (
+          {hasCommRec && (
             <Section title="Registro de Comision" icon={<Percent className="h-4 w-4" />}>
               <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                <Field label="Tasa comision agencia" value={commRec.agency_commission_rate != null ? `${(Number(commRec.agency_commission_rate) * 100).toFixed(1)}%` : '—'} />
-                <Field label="Monto comision agencia" value={commRec.agency_commission_amount != null ? formatCurrencyMXN(Number(commRec.agency_commission_amount)) : '—'} />
-                <Field label="Tasa cargo servicio" value={commRec.service_charge_rate != null ? `${(Number(commRec.service_charge_rate) * 100).toFixed(1)}%` : '—'} />
-                <Field label="Monto cargo servicio" value={commRec.service_charge_amount != null ? formatCurrencyMXN(Number(commRec.service_charge_amount)) : '—'} />
-                <Field label="Revenue total plataforma" value={commRec.platform_total_revenue != null ? formatCurrencyMXN(Number(commRec.platform_total_revenue)) : '—'} />
-                <Field label="Neto agencia" value={commRec.agency_net_amount != null ? formatCurrencyMXN(Number(commRec.agency_net_amount)) : '—'} />
-                <Field label="Estado pago comision" value={commRec.status ? (
+                <Field label="Tasa comision agencia" value={b.cr_agency_commission_rate != null ? `${(Number(b.cr_agency_commission_rate) * 100).toFixed(1)}%` : '—'} />
+                <Field label="Monto comision agencia" value={b.cr_agency_commission_amount != null ? formatCurrencyMXN(Number(b.cr_agency_commission_amount)) : '—'} />
+                <Field label="Tasa cargo servicio" value={b.cr_service_charge_rate != null ? `${(Number(b.cr_service_charge_rate) * 100).toFixed(1)}%` : '—'} />
+                <Field label="Monto cargo servicio" value={b.cr_service_charge_amount != null ? formatCurrencyMXN(Number(b.cr_service_charge_amount)) : '—'} />
+                <Field label="Revenue total plataforma" value={b.cr_platform_total_revenue != null ? formatCurrencyMXN(Number(b.cr_platform_total_revenue)) : '—'} />
+                <Field label="Neto agencia" value={b.cr_agency_net_amount != null ? formatCurrencyMXN(Number(b.cr_agency_net_amount)) : '—'} />
+                <Field label="Estado pago comision" value={b.cr_status ? (
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                    commRec.status === 'paid_out' ? 'bg-green-100 text-green-800' :
-                    commRec.status === 'processed' ? 'bg-blue-100 text-blue-800' :
-                    commRec.status === 'disputed' ? 'bg-red-100 text-red-800' :
+                    b.cr_status === 'paid_out' ? 'bg-green-100 text-green-800' :
+                    b.cr_status === 'processed' ? 'bg-blue-100 text-blue-800' :
+                    b.cr_status === 'disputed' ? 'bg-red-100 text-red-800' :
                     'bg-gray-100 text-gray-600'
-                  }`}>{commRec.status === 'paid_out' ? 'Pagado' : commRec.status === 'processed' ? 'Procesado' : commRec.status === 'disputed' ? 'Disputado' : commRec.status}</span>
+                  }`}>{b.cr_status === 'paid_out' ? 'Pagado' : b.cr_status === 'processed' ? 'Procesado' : b.cr_status === 'disputed' ? 'Disputado' : b.cr_status}</span>
                 ) : '—'} />
-                <Field label="Procesado el" value={fmtDateTime(commRec.processed_at)} />
+                <Field label="Procesado el" value={fmtDateTime(b.cr_processed_at)} />
               </div>
             </Section>
           )}
