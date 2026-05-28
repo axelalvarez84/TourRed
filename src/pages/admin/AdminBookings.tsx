@@ -61,6 +61,7 @@ interface BookingRow {
     id: string;
     first_name: string;
     last_name: string;
+    email: string | null;
     phone_number: string | null;
     profile_picture_url: string | null;
     is_active: boolean;
@@ -221,8 +222,8 @@ export default function AdminBookings() {
           cancelled_at, cancellation_type, cancellation_refund_amount,
           has_pending_reschedule, reschedule_response, original_booking_date,
           needs_seat_reselection, confirmation_email_sent,
-          users!bookings_user_id_fkey(
-            id, first_name, last_name, phone_number, profile_picture_url,
+          user:user_id(
+            id, first_name, last_name, email, phone_number, profile_picture_url,
             is_active, curp, rfc, razon_social, regimen_fiscal, uso_cfdi,
             is_foreign_traveler, passport_number
           ),
@@ -234,28 +235,11 @@ export default function AdminBookings() {
 
       if (err) throw err;
 
-      // Fetch emails from auth
-      const rows = (data || []) as unknown as BookingRow[];
-
-      // Get user emails via RPC or from users table if available
-      const userIds = [...new Set(rows.map(r => r.users?.id).filter(Boolean))] as string[];
-      let emailMap: Record<string, string> = {};
-      if (userIds.length > 0) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('id, email')
-          .in('id', userIds.slice(0, 500));
-        if (userData) {
-          userData.forEach((u: { id: string; email?: string }) => {
-            if (u.email) emailMap[u.id] = u.email;
-          });
-        }
-      }
-
-      const enriched = rows.map(r => ({
+      const enriched = ((data || []) as unknown as (Omit<BookingRow, 'users' | 'user_email'> & { user: BookingRow['users'] })[]).map(r => ({
         ...r,
-        user_email: r.users?.id ? (emailMap[r.users.id] ?? null) : null,
-      }));
+        users: r.user ?? null,
+        user_email: r.user?.email ?? null,
+      })) as unknown as BookingRow[];
 
       setBookings(enriched);
 
