@@ -90,6 +90,7 @@ import SupportAgencyPage from './pages/support/SupportAgencyPage';
 import TravelerSupportTickets from './pages/traveler/TravelerSupportTickets';
 import AgencySupportTickets from './pages/agency/AgencySupportTickets';
 import AdminBookings from './pages/admin/AdminBookings';
+import AdminBookingsCleanup from './pages/admin/AdminBookingsCleanup';
 import AdminServiceDesk from './pages/admin/AdminServiceDesk';
 import AdminTicketDetail from './pages/admin/AdminTicketDetail';
 import AdminSupportCategories from './pages/admin/AdminSupportCategories';
@@ -327,6 +328,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                 <AdminBookings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/bookings-cleanup"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminBookingsCleanup />
               </ProtectedRoute>
             }
           />

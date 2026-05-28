@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, User, LogOut, Search, MessageCircle, ChevronDown, LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation, Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent, DollarSign, Gift, Megaphone, Ticket, BadgePercent, Send, ArrowLeftRight, FileText, BookOpen, Headphones as HeadphonesIcon, TicketCheck, ShoppingBag } from 'lucide-react';
+import { Menu, X, User, LogOut, Search, MessageCircle, ChevronDown, LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation, Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent, DollarSign, Gift, Megaphone, Ticket, BadgePercent, Send, ArrowLeftRight, FileText, BookOpen, Headphones as HeadphonesIcon, TicketCheck, ShoppingBag, Trash2 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import { useAuth } from '../context/AuthContext';
 import { signOut, supabase } from '../lib/supabase';
@@ -26,6 +26,7 @@ const NavBar: React.FC = () => {
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
   const [mobileExpandedGroup, setMobileExpandedGroup] = useState<string | null>(null);
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  const [garbageBookingsCount, setGarbageBookingsCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
   const adminMenuRef = useRef<HTMLDivElement>(null);
@@ -81,6 +82,22 @@ const NavBar: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
+    if (!isAdmin) return;
+    const fetchGarbageCount = async () => {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 7);
+      const { count } = await supabase
+        .from('bookings')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['pending', 'cancelled'])
+        .eq('payment_status', 'pending')
+        .lt('created_at', cutoff.toISOString());
+      setGarbageBookingsCount(count ?? 0);
+    };
+    fetchGarbageCount();
+  }, [isAdmin]);
+
+  useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (adminMenuRef.current && !adminMenuRef.current.contains(e.target as Node)) {
         setIsAdminMenuOpen(false);
@@ -115,6 +132,13 @@ const NavBar: React.FC = () => {
     const usuariosItems: AdminMenuItem[] = [
       { to: '/admin/dashboard', label: 'Panel Admin', icon: <LayoutDashboard className="h-4 w-4" /> },
       { to: '/admin/bookings', label: 'Reservas', icon: <ShoppingBag className="h-4 w-4" /> },
+      {
+        to: '/admin/bookings-cleanup',
+        label: garbageBookingsCount > 0
+          ? `Limpieza (${garbageBookingsCount})`
+          : 'Limpieza de Basura',
+        icon: <Trash2 className="h-4 w-4 text-red-500" />,
+      },
     ];
     if (isSuperAdmin || permissions?.canManageAgencies)
       usuariosItems.push({ to: '/admin/agencies', label: 'Agencias', icon: <Building2 className="h-4 w-4" /> });
