@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Trash2, RefreshCw, AlertTriangle, CheckSquare, Square,
   Calendar, User, Building2, ShoppingBag, Clock, FileText,
-  ChevronDown, ChevronUp, Info, CheckCircle
+  ChevronDown, ChevronUp, Info, CheckCircle, Banknote
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrencyMXN } from '../../utils/formatCurrency';
@@ -17,12 +17,14 @@ interface GarbageBooking {
   created_at: string;
   status: string;
   payment_status: string;
+  payment_method: string | null;
   total_price: number;
   travelers_count: number;
   user_name: string;
   user_email: string;
   tour_name: string;
   agency_name: string;
+  reason: string;
 }
 
 type SortField = 'created_at' | 'days_old' | 'total_price' | 'type';
@@ -32,12 +34,19 @@ const THRESHOLD_OPTIONS = [7, 14, 30];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function getBookingType(status: string, paymentStatus: string): { label: string; cls: string } {
-  if (paymentStatus === 'pending' && status === 'pending')
+function getBookingType(reason: string): { label: string; cls: string } {
+  if (reason === 'abandoned')
     return { label: 'Nunca pagada / pendiente', cls: 'bg-amber-100 text-amber-800' };
-  if (paymentStatus === 'pending' && status === 'cancelled')
-    return { label: 'Cancelada sin pago', cls: 'bg-red-100 text-red-800' };
-  return { label: 'Otro', cls: 'bg-gray-100 text-gray-600' };
+  if (reason === 'unconfirmed_transfer')
+    return { label: 'Transferencia sin confirmar', cls: 'bg-orange-100 text-orange-800' };
+  return { label: 'Cancelada sin pago', cls: 'bg-red-100 text-red-800' };
+}
+
+function isDeletable(b: GarbageBooking): boolean {
+  return (
+    b.payment_status === 'pending' ||
+    (b.payment_status === 'processing' && b.payment_method === 'bank_transfer')
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -104,7 +113,7 @@ const AdminBookingsCleanup: React.FC = () => {
     } else if (sortField === 'total_price') {
       cmp = a.total_price - b.total_price;
     } else if (sortField === 'type') {
-      cmp = a.status.localeCompare(b.status);
+      cmp = a.reason.localeCompare(b.reason);
     }
     return sortDir === 'asc' ? cmp : -cmp;
   });
@@ -145,13 +154,8 @@ const AdminBookingsCleanup: React.FC = () => {
     if (confirmText !== 'CONFIRMAR') return;
     setDeleting(true);
 
-    const safeIds = targetBookings
-      .filter(b => b.payment_status === 'pending')
-      .map(b => b.id);
-
-    const codes = targetBookings
-      .filter(b => b.payment_status === 'pending')
-      .map(b => b.booking_code ?? b.id);
+    const safeIds = targetBookings.filter(isDeletable).map(b => b.id);
+    const codes = targetBookings.filter(isDeletable).map(b => b.booking_code ?? b.id);
 
     if (safeIds.length === 0) {
       setDeleting(false);
@@ -159,22 +163,51 @@ const AdminBookingsCleanup: React.FC = () => {
       return;
     }
 
-    const { error } = await supabase
-      .from('bookings')
-      .delete()
-      .in('id', safeIds)
-      .eq('payment_status', 'pending');
+    // Eliminar en dos lotes segun payment_status para respetar la policy
+    const pendingIds = targetBookings
+      .filter(b => b.payment_status === 'pending')
+      .map(b => b.id)
+      .filter(id => safeIds.includes(id));
 
-    if (!error) {
-      const criteria = `payment_status=pending, status IN (pending,cancelled), antiguedad > ${threshold} dias`;
+    const transferIds = targetBookings
+      .filter(b => b.payment_status === 'processing' && b.payment_method === 'bank_transfer')
+      .map(b => b.id)
+      .filter(id => safeIds.includes(id));
+
+    let totalDeleted = 0;
+    let hasError = false;
+
+    if (pendingIds.length > 0) {
+      const { error } = await supabase
+        .from('bookings')
+        .delete()
+        .in('id', pendingIds)
+        .eq('payment_status', 'pending');
+      if (!error) totalDeleted += pendingIds.length;
+      else hasError = true;
+    }
+
+    if (transferIds.length > 0) {
+      const { error } = await supabase
+        .from('bookings')
+        .delete()
+        .in('id', transferIds)
+        .eq('payment_status', 'processing')
+        .eq('payment_method', 'bank_transfer');
+      if (!error) totalDeleted += transferIds.length;
+      else hasError = true;
+    }
+
+    if (!hasError && totalDeleted > 0) {
+      const criteria = `payment_status IN (pending, processing/bank_transfer), status IN (pending,cancelled), antiguedad > ${threshold} dias`;
       await supabase.from('booking_cleanup_logs').insert({
-        deleted_count: safeIds.length,
+        deleted_count: totalDeleted,
         deleted_by: (await supabase.auth.getUser()).data.user?.id,
         criteria,
         booking_codes: codes,
       });
 
-      setSuccessMsg(`Se eliminaron ${safeIds.length} reserva(s) correctamente.`);
+      setSuccessMsg(`Se eliminaron ${totalDeleted} reserva(s) correctamente.`);
       setTimeout(() => setSuccessMsg(null), 5000);
       fetchBookings();
       fetchLogs();
@@ -185,6 +218,12 @@ const AdminBookingsCleanup: React.FC = () => {
     setConfirmText('');
     setSelected(new Set());
   };
+
+  // ─── Stats ─────────────────────────────────────────────────────────────────
+
+  const countAbandoned = bookings.filter(b => b.reason === 'abandoned').length;
+  const countTransfer = bookings.filter(b => b.reason === 'unconfirmed_transfer').length;
+  const countCancelled = bookings.filter(b => b.reason !== 'abandoned' && b.reason !== 'unconfirmed_transfer').length;
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -201,20 +240,30 @@ const AdminBookingsCleanup: React.FC = () => {
             <h1 className="text-2xl font-bold text-gray-900">Limpieza de Reservas Basura</h1>
           </div>
           <p className="text-sm text-gray-500 ml-14">
-            Reservas con pago pendiente que nunca se completaron. Eliminarlas es seguro y no afecta ningun dato financiero.
+            Reservas sin pago completado que nunca se finalizaron. Eliminarlas es seguro y no afecta ningun dato financiero.
           </p>
         </div>
 
         {/* Alert info */}
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 mb-6">
           <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-          <div className="text-sm text-amber-800">
-            <span className="font-semibold">Solo se muestran y eliminan</span> reservas con{' '}
-            <code className="bg-amber-100 px-1 rounded">payment_status = pending</code> y estado{' '}
-            <code className="bg-amber-100 px-1 rounded">pending</code> o{' '}
-            <code className="bg-amber-100 px-1 rounded">cancelled</code>, con mas de{' '}
-            <span className="font-semibold">{threshold} dias</span> de antiguedad.
-            La eliminacion tiene doble verificacion y nunca tocara reservas pagadas.
+          <div className="text-sm text-amber-800 space-y-1">
+            <p>
+              <span className="font-semibold">Se detectan dos tipos de reservas basura</span> con mas de{' '}
+              <span className="font-semibold">{threshold} dias</span> de antiguedad:
+            </p>
+            <ul className="list-disc list-inside space-y-0.5 text-amber-700">
+              <li>
+                <code className="bg-amber-100 px-1 rounded">payment_status = pending</code> — nunca iniciaron el pago
+              </li>
+              <li>
+                <code className="bg-amber-100 px-1 rounded">payment_status = processing</code> +{' '}
+                <code className="bg-amber-100 px-1 rounded">payment_method = bank_transfer</code> — eligieron transferencia bancaria pero el deposito nunca llego
+              </li>
+            </ul>
+            <p className="text-xs text-amber-600 mt-1">
+              Las reservas con pago confirmado (<code className="bg-amber-100 px-1 rounded">succeeded</code>) nunca son afectadas.
+            </p>
           </div>
         </div>
 
@@ -279,15 +328,15 @@ const AdminBookingsCleanup: React.FC = () => {
             },
             {
               label: 'Nunca pagadas',
-              value: bookings.filter(b => b.status === 'pending').length,
+              value: countAbandoned,
               icon: <Clock className="h-5 w-5 text-amber-500" />,
               cls: 'bg-amber-50 border-amber-100',
             },
             {
-              label: 'Canceladas sin pago',
-              value: bookings.filter(b => b.status === 'cancelled').length,
-              icon: <ShoppingBag className="h-5 w-5 text-gray-500" />,
-              cls: 'bg-gray-50 border-gray-100',
+              label: 'Transferencia sin confirmar',
+              value: countTransfer,
+              icon: <Banknote className="h-5 w-5 text-orange-500" />,
+              cls: 'bg-orange-50 border-orange-100',
             },
             {
               label: 'Seleccionadas',
@@ -363,7 +412,7 @@ const AdminBookingsCleanup: React.FC = () => {
                     <th className="px-4 py-3 text-left font-semibold text-gray-600">Folio</th>
                     <th className="px-4 py-3 text-left font-semibold text-gray-600">
                       <button onClick={() => toggleSort('type')} className="flex items-center gap-1">
-                        Tipo basura <SortIcon field="type" />
+                        Tipo <SortIcon field="type" />
                       </button>
                     </th>
                     <th className="px-4 py-3 text-left font-semibold text-gray-600">
@@ -394,7 +443,7 @@ const AdminBookingsCleanup: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {sorted.map(b => {
-                    const type = getBookingType(b.status, b.payment_status);
+                    const type = getBookingType(b.reason);
                     const days = differenceInDays(new Date(), parseISO(b.created_at));
                     const isSelected = selected.has(b.id);
                     return (
@@ -514,11 +563,11 @@ const AdminBookingsCleanup: React.FC = () => {
             <div className="bg-red-50 border border-red-100 rounded-lg p-4 mb-5">
               <p className="text-sm text-red-800">
                 Esta accion es <span className="font-bold">irreversible</span>. Se eliminaran permanentemente{' '}
-                <span className="font-bold">{targetIds.length}</span> reserva(s) con pago pendiente.
+                <span className="font-bold">{targetIds.length}</span> reserva(s) sin pago confirmado.
               </p>
               <p className="text-xs text-red-600 mt-2">
-                Solo se eliminan reservas con <code className="bg-red-100 px-1 rounded">payment_status = pending</code>.
-                Las reservas pagadas nunca son afectadas.
+                Solo se eliminan reservas con pago pendiente o transferencias sin confirmar.
+                Las reservas pagadas (<code className="bg-red-100 px-1 rounded">succeeded</code>) nunca son afectadas.
               </p>
             </div>
 
