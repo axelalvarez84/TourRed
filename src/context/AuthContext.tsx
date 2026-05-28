@@ -113,6 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [needsTermsAcceptance, setNeedsTermsAcceptance] = useState(false);
 
   const initializedUserIdRef = useRef<string | null>(null);
+  const isUpdatingRef = useRef(false);
 
   const getCachedRole = (userId: string): UserRole | null => {
     try {
@@ -196,7 +197,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const determineUserRole = async (authUser: any, forceRefresh: boolean = false): Promise<{ role: UserRole; emailVerified: boolean }> => {
     if (!authUser) return { role: UserRole.TRAVELER, emailVerified: false };
 
-    if (authUser.email === 'tourredmx@gmail.com') {
+    if (authUser.email === 'admin@toursred.com') {
       setCachedRole(authUser.id, UserRole.ADMIN);
       return { role: UserRole.ADMIN, emailVerified: true };
     }
@@ -262,6 +263,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateAuthState = async (authUser: any, forceRefresh: boolean = false) => {
+    if (isUpdatingRef.current) return;
+    isUpdatingRef.current = true;
     try {
       setUser(authUser);
 
@@ -271,17 +274,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsEmailVerified(emailVerified);
 
         if (role === UserRole.ADMIN) {
+          // Query is_super_admin primero — es la mas critica
+          let isSA = false;
           try {
-            const [superAdminRes, permsRes] = await Promise.all([
-              supabase.from('users').select('is_super_admin').eq('id', authUser.id).maybeSingle(),
-              supabase.from('admin_permissions').select('*').eq('user_id', authUser.id).maybeSingle(),
-            ]);
+            const { data: saData } = await supabase
+              .from('users')
+              .select('is_super_admin')
+              .eq('id', authUser.id)
+              .maybeSingle();
+            isSA = saData?.is_super_admin || false;
+          } catch {
+            // Si falla, asumir que no es super admin pero mantener rol admin
+            isSA = false;
+          }
+          setIsSuperAdmin(isSA);
 
-            const isSA = superAdminRes.data?.is_super_admin || false;
-            setIsSuperAdmin(isSA);
+          // Query admin_permissions por separado para no bloquear el rol
+          try {
+            const { data: permsData } = await supabase
+              .from('admin_permissions')
+              .select('*')
+              .eq('user_id', authUser.id)
+              .maybeSingle();
 
-            if (!isSA && permsRes.data) {
-              const p = permsRes.data;
+            if (!isSA && permsData) {
+              const p = permsData;
               setPermissions({
                 canManageAgencies: p.can_manage_agencies,
                 canManageUsers: p.can_manage_users,
@@ -304,11 +321,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } else {
               setPermissions(null);
             }
-            setAccountantPermissions(null);
           } catch {
-            setIsSuperAdmin(false);
             setPermissions(null);
           }
+          setAccountantPermissions(null);
           setAllStaffInfo([]);
         } else if (role === UserRole.ACCOUNTANT) {
           setIsSuperAdmin(false);
@@ -408,7 +424,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err: any) {
       if (err.message === 'Usuario bloqueado') return;
       if (authUser) {
-        if (authUser.email === 'tourredmx@gmail.com') {
+        if (authUser.email === 'admin@toursred.com') {
           setUserRole(UserRole.ADMIN);
           setIsEmailVerified(true);
           setIsSuperAdmin(true);
@@ -434,12 +450,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setActiveAgencyId(null);
       }
     } finally {
+      isUpdatingRef.current = false;
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
     let mounted = true;
+
+    // Timeout de seguridad: si en 8 segundos nada libera el loading, forzarlo
+    const safetyTimer = setTimeout(() => {
+      if (mounted) setIsLoading(false);
+    }, 8000);
 
     const initializeAuth = async () => {
       try {
@@ -451,7 +473,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         if (mounted) {
-          await updateAuthState(authUser);
+          // forceRefresh=true para siempre consultar BD en la carga inicial,
+          // ignorando cache potencialmente obsoleto
+          await updateAuthState(authUser, true);
         }
       } catch {
         if (mounted) {
@@ -459,6 +483,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUserRole(null);
           setIsLoading(false);
         }
+      } finally {
+        clearTimeout(safetyTimer);
       }
     };
 
@@ -480,6 +506,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const cachedRole = getCachedRole(session.user.id);
           if (cachedRole) setUserRole(cachedRole);
         }
+        // Siempre liberar el loading en TOKEN_REFRESHED para evitar ciclo infinito
+        setIsLoading(false);
       } else if (event === 'SIGNED_OUT') {
         initializedUserIdRef.current = null;
         setUser(null);
@@ -497,6 +525,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       mounted = false;
+      clearTimeout(safetyTimer);
       authListener?.subscription.unsubscribe();
     };
   }, []);
