@@ -212,26 +212,49 @@ function AdminBookings() {
       setLoading(true);
       setError(null);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('No hay sesión activa');
+      const { data, error: err } = await supabase
+        .from('bookings')
+        .select(`
+          id, booking_code, user_id, tour_id, agency_id,
+          booking_date, created_at, updated_at, status, payment_status,
+          payment_method, total_price, deposit_amount, user_payment,
+          service_charge, platform_revenue, commission_amount,
+          travelers_count, count_adultos, count_ninos, count_infantes,
+          count_adultos_mayores, count_mascotas,
+          approval_status, approval_notes, approved_at,
+          is_no_show, no_show_marked_at,
+          has_pending_reschedule, has_pending_slot_reschedule,
+          slot_reschedule_response, reschedule_response, original_booking_date,
+          selected_date, selected_time, paid_at, confirmation_email_sent,
+          payment_intent_id, cancelled_at, cancellation_type, cancellation_refund_amount,
+          toursred_cash_used, points_used, points_earned, used_membership_benefit,
+          service_charge_discount, membership_service_fee_saved,
+          preventa_comision_descuento, discount_amount, es_reserva_preventa,
+          needs_seat_reselection, selected_seats,
+          users!bookings_user_id_fkey(
+            first_name, last_name, email, profile_picture_url, phone_number,
+            is_active, curp, rfc, razon_social, regimen_fiscal, uso_cfdi,
+            is_foreign_traveler, passport_number
+          ),
+          tours!bookings_tour_id_fkey(
+            name, destination, start_date, end_date, image_url, price,
+            deposit_percentage, booking_approval_type, category
+          ),
+          agencies!bookings_agency_id_fkey(
+            name, logo, contact_email, contact_phone, commission_rate
+          ),
+          commission_records!commission_records_booking_id_fkey(
+            id, agency_commission_rate, agency_commission_amount,
+            service_charge_rate, service_charge_amount,
+            platform_total_revenue, agency_net_amount, status, processed_at
+          )
+        `)
+        .neq('status', 'draft')
+        .order('created_at', { ascending: false });
 
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-admin-bookings`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      if (err) throw err;
 
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
-      }
-
-      const json = await res.json();
-      const enriched = (json || []) as BookingRow[];
+      const enriched = (data || []) as BookingRow[];
 
       setBookings(enriched);
 
