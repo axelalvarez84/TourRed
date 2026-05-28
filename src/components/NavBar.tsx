@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, User, LogOut, Search, MessageCircle, ChevronDown, LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation, Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent, DollarSign, Gift, Megaphone, Ticket, BadgePercent, Send, ArrowLeftRight, FileText, BookOpen, Headphones as HeadphonesIcon, TicketCheck } from 'lucide-react';
+import { Menu, X, User, LogOut, Search, MessageCircle, ChevronDown, LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation, Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent, DollarSign, Gift, Megaphone, Ticket, BadgePercent, Send, ArrowLeftRight, FileText, BookOpen, Headphones as HeadphonesIcon, TicketCheck, ShoppingBag } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import { useAuth } from '../context/AuthContext';
 import { signOut, supabase } from '../lib/supabase';
@@ -114,6 +114,7 @@ const NavBar: React.FC = () => {
 
     const usuariosItems: AdminMenuItem[] = [
       { to: '/admin/dashboard', label: 'Panel Admin', icon: <LayoutDashboard className="h-4 w-4" /> },
+      { to: '/admin/bookings', label: 'Reservas', icon: <ShoppingBag className="h-4 w-4" /> },
     ];
     if (isSuperAdmin || permissions?.canManageAgencies)
       usuariosItems.push({ to: '/admin/agencies', label: 'Agencias', icon: <Building2 className="h-4 w-4" /> });
