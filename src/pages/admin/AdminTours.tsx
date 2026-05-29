@@ -13,7 +13,6 @@ interface TourRow {
   price: number;
   start_date: string | null;
   end_date: string | null;
-  is_active: boolean;
   commission_rate_override: number | null;
   commission_override_expires_at: string | null;
   commission_override_reason: string | null;
@@ -91,7 +90,7 @@ const AdminTours: React.FC = () => {
         supabase
           .from('tours')
           .select(`
-            id, name, destination, tour_type, price, start_date, end_date, is_active,
+            id, name, destination, tour_type, price, start_date, end_date,
             commission_rate_override, commission_override_expires_at, commission_override_reason,
             agencies(id, name, commission_rate)
           `)
@@ -618,3 +617,6 @@ const AdminTours: React.FC = () => {
 };
 
 export default AdminTours;
+
+
+export default AdminTours
