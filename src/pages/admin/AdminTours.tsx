@@ -94,6 +94,7 @@ const AdminTours: React.FC = () => {
             commission_rate_override, commission_override_expires_at, commission_override_reason,
             agencies(id, name, commission_rate)
           `)
+          .or(`end_date.is.null,end_date.gte.${new Date().toISOString().slice(0, 10)}`)
           .order('name'),
         supabase
           .from('platform_settings')
