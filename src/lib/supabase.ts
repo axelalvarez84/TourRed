@@ -1813,7 +1813,7 @@ export const processCancellation = async (
         });
 
       if (penaltyError) {
-        console.error('⚠️ Error creando cancellation_penalty_record:', penaltyError);
+        throw new Error(`Error creando cancellation_penalty_record: ${penaltyError.message}`);
       }
     }
 
@@ -2162,7 +2162,7 @@ export const processPartialCancellation = async (
         });
 
       if (penaltyError) {
-        console.error('⚠️ Error creando cancellation_penalty_record (parcial):', penaltyError);
+        throw new Error(`Error creando cancellation_penalty_record (parcial): ${penaltyError.message}`);
       }
     }
 
