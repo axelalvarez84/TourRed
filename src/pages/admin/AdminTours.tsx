@@ -618,5 +618,4 @@ const AdminTours: React.FC = () => {
 
 export default AdminTours;
 
-
 export default AdminTours
