@@ -39,14 +39,13 @@ function getBookingType(reason: string): { label: string; cls: string } {
     return { label: 'Nunca pagada / pendiente', cls: 'bg-amber-100 text-amber-800' };
   if (reason === 'unconfirmed_transfer')
     return { label: 'Transferencia sin confirmar', cls: 'bg-orange-100 text-orange-800' };
+  if (reason === 'expired_processing')
+    return { label: 'Pago en proceso expirado', cls: 'bg-red-100 text-red-800' };
   return { label: 'Cancelada sin pago', cls: 'bg-red-100 text-red-800' };
 }
 
 function isDeletable(b: GarbageBooking): boolean {
-  return (
-    b.payment_status === 'pending' ||
-    (b.payment_status === 'processing' && b.payment_method === 'Transferencia Bancaria')
-  );
+  return b.payment_status === 'pending' || b.payment_status === 'processing';
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -163,7 +162,7 @@ const AdminBookingsCleanup: React.FC = () => {
       return;
     }
 
-    // Eliminar en dos lotes segun payment_status para respetar la policy
+    // Eliminar en tres lotes segun payment_status para respetar la policy
     const pendingIds = targetBookings
       .filter(b => b.payment_status === 'pending')
       .map(b => b.id)
@@ -171,6 +170,11 @@ const AdminBookingsCleanup: React.FC = () => {
 
     const transferIds = targetBookings
       .filter(b => b.payment_status === 'processing' && b.payment_method === 'Transferencia Bancaria')
+      .map(b => b.id)
+      .filter(id => safeIds.includes(id));
+
+    const expiredProcessingIds = targetBookings
+      .filter(b => b.payment_status === 'processing' && b.payment_method !== 'Transferencia Bancaria')
       .map(b => b.id)
       .filter(id => safeIds.includes(id));
 
@@ -198,8 +202,19 @@ const AdminBookingsCleanup: React.FC = () => {
       else hasError = true;
     }
 
+    if (expiredProcessingIds.length > 0) {
+      const { error } = await supabase
+        .from('bookings')
+        .delete()
+        .in('id', expiredProcessingIds)
+        .eq('payment_status', 'processing')
+        .neq('payment_method', 'Transferencia Bancaria');
+      if (!error) totalDeleted += expiredProcessingIds.length;
+      else hasError = true;
+    }
+
     if (!hasError && totalDeleted > 0) {
-      const criteria = `payment_status IN (pending, processing/bank_transfer), status IN (pending,cancelled), antiguedad > ${threshold} dias`;
+      const criteria = `payment_status IN (pending, processing/bank_transfer, processing/expired-3d), status IN (pending,cancelled), antiguedad > ${threshold} dias`;
       await supabase.from('booking_cleanup_logs').insert({
         deleted_count: totalDeleted,
         deleted_by: (await supabase.auth.getUser()).data.user?.id,
@@ -223,7 +238,7 @@ const AdminBookingsCleanup: React.FC = () => {
 
   const countAbandoned = bookings.filter(b => b.reason === 'abandoned').length;
   const countTransfer = bookings.filter(b => b.reason === 'unconfirmed_transfer').length;
-  const countCancelled = bookings.filter(b => b.reason !== 'abandoned' && b.reason !== 'unconfirmed_transfer').length;
+  const countExpiredProcessing = bookings.filter(b => b.reason === 'expired_processing').length;
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -249,16 +264,20 @@ const AdminBookingsCleanup: React.FC = () => {
           <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
           <div className="text-sm text-amber-800 space-y-1">
             <p>
-              <span className="font-semibold">Se detectan dos tipos de reservas basura</span> con mas de{' '}
-              <span className="font-semibold">{threshold} dias</span> de antiguedad:
+              <span className="font-semibold">Se detectan tres tipos de reservas basura:</span>
             </p>
             <ul className="list-disc list-inside space-y-0.5 text-amber-700">
               <li>
-                <code className="bg-amber-100 px-1 rounded">payment_status = pending</code> — nunca iniciaron el pago
+                <code className="bg-amber-100 px-1 rounded">payment_status = pending</code> con mas de{' '}
+                <span className="font-semibold">{threshold} dias</span> — nunca iniciaron el pago
               </li>
               <li>
-                <code className="bg-amber-100 px-1 rounded">payment_status = processing</code> +{' '}
-                <code className="bg-amber-100 px-1 rounded">payment_method = bank_transfer</code> — eligieron transferencia bancaria pero el deposito nunca llego
+                <code className="bg-amber-100 px-1 rounded">Transferencia Bancaria</code> en proceso con mas de{' '}
+                <span className="font-semibold">{threshold} dias</span> — deposito nunca llego
+              </li>
+              <li>
+                <code className="bg-amber-100 px-1 rounded">OXXO u otro metodo</code> en proceso con mas de{' '}
+                <span className="font-semibold">3 dias</span> — voucher expirado (OXXO vence en 72 h)
               </li>
             </ul>
             <p className="text-xs text-amber-600 mt-1">
@@ -318,7 +337,7 @@ const AdminBookingsCleanup: React.FC = () => {
         </div>
 
         {/* Stats bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
           {[
             {
               label: 'Total basura',
@@ -337,6 +356,12 @@ const AdminBookingsCleanup: React.FC = () => {
               value: countTransfer,
               icon: <Banknote className="h-5 w-5 text-orange-500" />,
               cls: 'bg-orange-50 border-orange-100',
+            },
+            {
+              label: 'Pago expirado (OXXO/otro)',
+              value: countExpiredProcessing,
+              icon: <AlertTriangle className="h-5 w-5 text-red-500" />,
+              cls: 'bg-red-50 border-red-100',
             },
             {
               label: 'Seleccionadas',
