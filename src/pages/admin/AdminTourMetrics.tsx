@@ -123,6 +123,27 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => (
   </span>
 );
 
+const paymentColor: Record<string, string> = {
+  succeeded: 'bg-green-100 text-green-700',
+  processing: 'bg-yellow-100 text-yellow-700',
+  canceled: 'bg-red-100 text-red-700',
+};
+
+const paymentLabel: Record<string, string> = {
+  succeeded: 'Pagado',
+  processing: 'Procesando',
+  canceled: 'Cancelado',
+};
+
+const PaymentBadge: React.FC<{ status: string | null }> = ({ status }) => {
+  if (!status) return <span className="text-xs text-gray-400">—</span>;
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${paymentColor[status] ?? 'bg-gray-100 text-gray-600'}`}>
+      {paymentLabel[status] ?? status}
+    </span>
+  );
+};
+
 // ─── Detail panel ─────────────────────────────────────────────────────────────
 
 const TourDetailPanel: React.FC<{
@@ -290,6 +311,7 @@ const TourDetailPanel: React.FC<{
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Codigo</th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Viajero</th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Estado</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Pago</th>
                   <th className="px-3 py-2 text-center text-xs font-medium text-gray-500">Personas</th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Total</th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Plataforma</th>
@@ -305,6 +327,9 @@ const TourDetailPanel: React.FC<{
                     </td>
                     <td className="px-3 py-2">
                       <StatusBadge status={b.is_no_show ? 'no_show' : b.status} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <PaymentBadge status={b.payment_status} />
                     </td>
                     <td className="px-3 py-2 text-center text-gray-700">{b.travelers_count}</td>
                     <td className="px-3 py-2 text-right font-medium text-gray-900">{formatCurrencyMXN(b.total_price)}</td>
