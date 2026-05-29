@@ -49,6 +49,7 @@ interface PlatformSettings {
   odoo_url: string;
   odoo_api_key_encrypted: string;
   odoo_database: string;
+  travel_insurance_price_per_day_per_traveler: number;
 }
 
 const AdminSettings: React.FC = () => {
@@ -97,6 +98,7 @@ const AdminSettings: React.FC = () => {
     odoo_url: '',
     odoo_api_key_encrypted: '',
     odoo_database: '',
+    travel_insurance_price_per_day_per_traveler: 79,
   });
   const [zohoStatus, setZohoStatus] = useState<{
     connected: boolean;
@@ -276,6 +278,7 @@ const AdminSettings: React.FC = () => {
             odoo_url: platformSettings.odoo_url,
             odoo_api_key_encrypted: platformSettings.odoo_api_key_encrypted,
             odoo_database: platformSettings.odoo_database,
+            travel_insurance_price_per_day_per_traveler: platformSettings.travel_insurance_price_per_day_per_traveler,
             updated_at: new Date().toISOString(),
             updated_by: user?.id
           })
@@ -441,6 +444,70 @@ const AdminSettings: React.FC = () => {
                 {formatCurrency(5000 * platformSettings.agency_commission_percentage / 100)}.
                 La agencia recibe ${formatCurrency(1000 - (5000 * platformSettings.agency_commission_percentage / 100))} del anticipo
               </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Seguro de Viaje */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <Shield className="w-6 h-6 text-primary-600" />
+            <h2 className="text-xl font-semibold text-gray-900">Seguro de Viaje</h2>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-6 text-sm text-blue-800">
+            <p className="font-semibold mb-1">Venta cruzada automática en el flujo de reserva</p>
+            <p className="text-xs text-blue-700">
+              El seguro se ofrece a todos los viajeros como una opción pre-seleccionada en el formulario de reserva.
+              El precio es variable según el tipo de cambio del dólar. Se ajusta manualmente aquí cuando sea necesario.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="insurance_price" className="block text-sm font-medium text-gray-700 mb-1">
+                Precio por día por viajero (MXN)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">$</span>
+                <input
+                  id="insurance_price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={platformSettings.travel_insurance_price_per_day_per_traveler}
+                  onChange={(e) => setPlatformSettings(prev => ({
+                    ...prev,
+                    travel_insurance_price_per_day_per_traveler: parseFloat(e.target.value) || 0,
+                  }))}
+                  className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Precio base configurable. Ajustar cuando varíe el tipo de cambio.
+              </p>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Ejemplos de costo total</p>
+              <div className="space-y-1 text-sm text-gray-700">
+                <div className="flex justify-between">
+                  <span>1 día × 1 viajero:</span>
+                  <span className="font-medium">{formatCurrency(platformSettings.travel_insurance_price_per_day_per_traveler)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>3 días × 2 viajeros:</span>
+                  <span className="font-medium">{formatCurrency(platformSettings.travel_insurance_price_per_day_per_traveler * 3 * 2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>5 días × 4 viajeros:</span>
+                  <span className="font-medium">{formatCurrency(platformSettings.travel_insurance_price_per_day_per_traveler * 5 * 4)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>7 días × 2 viajeros:</span>
+                  <span className="font-medium">{formatCurrency(platformSettings.travel_insurance_price_per_day_per_traveler * 7 * 2)}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

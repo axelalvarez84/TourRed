@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet, Award, Ticket, X, Check, Loader2, ShoppingBag, Info, Tag, RefreshCw, Clock, Car, Globe, AlertTriangle, MapPin, Bus } from 'lucide-react';
+import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet, Award, Ticket, X, Check, Loader2, ShoppingBag, Info, Tag, RefreshCw, Clock, Car, Globe, AlertTriangle, MapPin, Bus, Shield, ShieldOff, ChevronRight } from 'lucide-react';
+import { differenceInDays } from 'date-fns';
 import SeatMapPicker from './seats/SeatMapPicker';
 import PaymentProviderSelector, { PaymentProvider } from './PaymentProviderSelector';
 import SlotCalendarPicker from './receptivo/SlotCalendarPicker';
@@ -68,7 +69,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [remainingExemption, setRemainingExemption] = useState(500);
   const [isLoadingExemption, setIsLoadingExemption] = useState(true);
 
-  const [optionalServices, setOptionalServices] = useState<TourOptionalService[]>([]);
+  // Travel insurance
+  const [insurancePricePerDayPerTraveler, setInsurancePricePerDayPerTraveler] = useState(79);
+  const [includeInsurance, setIncludeInsurance] = useState(true);
+  const [showInsuranceWarning, setShowInsuranceWarning] = useState(false);;
   const [optionalServiceQuantities, setOptionalServiceQuantities] = useState<Record<string, number>>({});
 
   const [activePromotion, setActivePromotion] = useState<{
@@ -153,11 +157,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         // Leer settings de plataforma
         const { data: platformData } = await supabase
           .from('platform_settings')
-          .select('service_charge_percentage, agency_commission_percentage')
+          .select('service_charge_percentage, agency_commission_percentage, travel_insurance_price_per_day_per_traveler')
           .maybeSingle();
 
         if (platformData) {
           setServiceChargePercentage(platformData.service_charge_percentage);
+          if (platformData.travel_insurance_price_per_day_per_traveler != null) {
+            setInsurancePricePerDayPerTraveler(platformData.travel_insurance_price_per_day_per_traveler);
+          }
           // Comenzar con el default de plataforma
           let effectiveCommission = platformData.agency_commission_percentage;
 
@@ -570,6 +577,25 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   // Calcular total de viajeros (sin contar mascotas)
   const totalTravelers = travelerCounts.adultos + travelerCounts.ninos + travelerCounts.infantes + travelerCounts.adultos_mayores;
 
+  // Calcular días del tour para el seguro de viaje
+  const tourDays = (() => {
+    if (isReceptivo) {
+      if (selectedSlot?.end_date) {
+        const d = differenceInDays(new Date(selectedSlot.end_date), new Date(selectedSlot.slot_date));
+        return Math.max(1, d + 1);
+      }
+      return Math.max(1, (tour as any).slot_duration_days || 1);
+    }
+    if (tour.start_date && tour.end_date) {
+      const d = differenceInDays(new Date(tour.end_date), new Date(tour.start_date));
+      return Math.max(1, d + 1);
+    }
+    return 1;
+  })();
+  const insuranceCost = includeInsurance
+    ? Math.round(insurancePricePerDayPerTraveler * tourDays * Math.max(1, totalTravelers) * 100) / 100
+    : 0;
+
   const preventaRatio = isEnPreventa && hasMembership && tour.preventa_precio_especial && tour.preventa_descuento_valor
     ? (tour.preventa_tipo_descuento === 'porcentaje'
         ? (1 - tour.preventa_descuento_valor / 100)
@@ -832,7 +858,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   // Si el residuo es menor a $10 (mínimo de los procesadores de pago), absorberlo como $0
   const amountAfterToursRedCash = rawAmountAfterToursRedCash < 10 && rawAmountAfterToursRedCash > 0 ? 0 : rawAmountAfterToursRedCash;
 
-  const totalToPayNow = amountAfterToursRedCash + membershipCost;
+  const totalToPayNow = amountAfterToursRedCash + membershipCost + insuranceCost;
 
   const agencyReceives = depositAmount - agencyCommission;
 
@@ -962,6 +988,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         restrictions_accepted: hasRestrictions ? restrictionsAccepted : false,
         selected_seats: hasSeatMap && selectedSeats.length > 0 ? selectedSeats : null,
         es_reserva_preventa: isEnPreventa && hasMembership,
+        travel_insurance_included: includeInsurance,
+        travel_insurance_cost: insuranceCost,
       };
 
       console.log('📝 Creando reserva con datos:', bookingData);
@@ -1011,6 +1039,31 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           console.error('❌ Error al guardar asientos seleccionados:', seatError);
           throw new Error('No se pudieron reservar los asientos seleccionados. Por favor intenta de nuevo.');
         }
+      }
+
+      // Enviar notificación de seguro de viaje si el viajero lo contrató
+      if (includeInsurance && data.id) {
+        supabase.functions.invoke('send-travel-insurance-notification', {
+          body: {
+            booking_id: data.id,
+            booking_code: data.booking_code || data.id,
+            tour_name: tour.name,
+            tour_start_date: isReceptivo && selectedSlot ? selectedSlot.slot_date : tour.start_date,
+            tour_end_date: isReceptivo && selectedSlot
+              ? (selectedSlot.end_date || selectedSlot.slot_date)
+              : tour.end_date,
+            agency_name: (tour as any).agencies?.name || '',
+            traveler_name: `${user?.user_metadata?.first_name || ''} ${user?.user_metadata?.last_name || ''}`.trim() || user?.email,
+            traveler_email: user?.email,
+            count_adultos: travelerCounts.adultos,
+            count_ninos: travelerCounts.ninos,
+            count_infantes: travelerCounts.infantes,
+            count_adultos_mayores: travelerCounts.adultos_mayores,
+            total_travelers: totalTravelers,
+            tour_days: tourDays,
+            insurance_cost: insuranceCost,
+          },
+        }).catch(err => console.error('Error sending insurance notification:', err));
       }
 
       navigate(`/booking-travelers/${data.id}`);
@@ -1737,6 +1790,145 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           </div>
         )}
 
+        {/* ─── Seguro de Viaje ─────────────────────────────────────────────── */}
+        {totalTravelers > 0 && (
+          <>
+            {/* Modal de advertencia al querer desmarcar el seguro */}
+            {showInsuranceWarning && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+                  <div className="bg-gradient-to-r from-slate-700 to-slate-900 px-6 py-5 text-white">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 bg-white/10 rounded-full">
+                        <ShieldOff className="h-6 w-6" />
+                      </div>
+                      <h3 className="text-lg font-bold">Viajarás sin protección</h3>
+                    </div>
+                    <p className="text-sm text-slate-300">
+                      Antes de continuar, considera lo siguiente:
+                    </p>
+                  </div>
+
+                  <div className="px-6 py-5">
+                    <ul className="space-y-3">
+                      {[
+                        { icon: '🏥', text: 'Gastos de asistencia médica en destino corren por tu cuenta.' },
+                        { icon: '🚑', text: 'Sin cobertura de traslado médico o repatriación en caso de emergencia.' },
+                        { icon: '✈️', text: 'Cualquier accidente o imprevisto durante el tour es bajo tu responsabilidad.' },
+                        { icon: '💳', text: 'Los costos de una emergencia médica pueden superar varios miles de pesos.' },
+                      ].map((item, i) => (
+                        <li key={i} className="flex items-start gap-3 text-sm text-gray-700">
+                          <span className="text-lg leading-none mt-0.5">{item.icon}</span>
+                          <span>{item.text}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <p className="mt-4 text-xs text-gray-500 bg-gray-50 rounded-lg p-3 border border-gray-100">
+                      Viajamos para crear recuerdos. Un seguro de viaje es la red de seguridad que esperamos nunca necesitar,
+                      pero agradeceremos tener si algo ocurre.
+                    </p>
+                  </div>
+
+                  <div className="px-6 pb-6 flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowInsuranceWarning(false)}
+                      className="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Shield className="h-4 w-4" />
+                      Mantener mi protección
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIncludeInsurance(false);
+                        setShowInsuranceWarning(false);
+                      }}
+                      className="w-full py-2.5 text-gray-500 hover:text-gray-700 text-sm transition-colors flex items-center justify-center gap-1"
+                    >
+                      Continuar sin seguro
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Tarjeta del seguro */}
+            <div className={`mb-4 rounded-xl border-2 overflow-hidden transition-all ${includeInsurance ? 'border-emerald-300 bg-gradient-to-br from-emerald-50 to-teal-50' : 'border-gray-200 bg-gray-50'}`}>
+              {/* Header */}
+              <div className={`px-4 py-3 flex items-center justify-between ${includeInsurance ? 'bg-emerald-600' : 'bg-gray-400'}`}>
+                <div className="flex items-center gap-2 text-white">
+                  <Shield className="h-5 w-5" />
+                  <span className="font-bold text-sm">Protege tu viaje</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {includeInsurance && (
+                    <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full font-medium">Recomendado</span>
+                  )}
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={includeInsurance}
+                      onChange={(e) => {
+                        if (!e.target.checked) {
+                          setShowInsuranceWarning(true);
+                        } else {
+                          setIncludeInsurance(true);
+                        }
+                      }}
+                    />
+                    <div className="w-10 h-5 bg-white/30 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-white/50" />
+                  </label>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="px-4 py-3">
+                {includeInsurance ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      {[
+                        { icon: '🏥', label: 'Asistencia médica en destino' },
+                        { icon: '🚑', label: 'Traslado y repatriación' },
+                        { icon: '📞', label: 'Asistencia 24/7 durante el tour' },
+                        { icon: '🛡️', label: 'Cobertura de accidentes' },
+                      ].map((b, i) => (
+                        <div key={i} className="flex items-center gap-1.5 text-xs text-emerald-800">
+                          <span>{b.icon}</span>
+                          <span>{b.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between border-t border-emerald-200 pt-2">
+                      <span className="text-xs text-emerald-700">
+                        {formatCurrencyMXN(insurancePricePerDayPerTraveler)}/día × {tourDays} día{tourDays !== 1 ? 's' : ''} × {Math.max(1, totalTravelers)} viajero{totalTravelers !== 1 ? 's' : ''}
+                      </span>
+                      <span className="text-sm font-bold text-emerald-700">+{formatCurrencyMXN(insuranceCost)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2 py-1">
+                    <ShieldOff className="h-4 w-4 text-gray-400 shrink-0" />
+                    <p className="text-xs text-gray-500">
+                      Viajas sin asistencia de viaje. En caso de emergencia médica los gastos corren por tu cuenta.{' '}
+                      <button
+                        type="button"
+                        onClick={() => setIncludeInsurance(true)}
+                        className="text-emerald-600 hover:text-emerald-700 font-medium underline"
+                      >
+                        Agregar protección
+                      </button>
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
         {!isLoadingMembership && !hasMembership && totalTravelers > 0 && serviceCharge > 0 && (
           <div className="mb-4 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-lg p-4">
             <div className="flex items-start mb-3">
@@ -2365,6 +2557,23 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     ToursRed Cash aplicado:
                   </span>
                   <span className="font-medium">-{formatCurrencyMXN(toursRedCashApplied)}</span>
+                </div>
+              )}
+
+              {/* Seguro de viaje en el desglose */}
+              {includeInsurance && insuranceCost > 0 && (
+                <div className="flex justify-between text-sm text-emerald-700 mt-1 border-t border-dashed border-emerald-200 pt-2">
+                  <span className="flex items-center gap-1">
+                    <Shield className="h-3 w-3" />
+                    Seguro de viaje ({tourDays} día{tourDays !== 1 ? 's' : ''} × {Math.max(1, totalTravelers)} viajero{totalTravelers !== 1 ? 's' : ''}):
+                  </span>
+                  <span className="font-medium">+{formatCurrencyMXN(insuranceCost)}</span>
+                </div>
+              )}
+              {!includeInsurance && (
+                <div className="flex items-center gap-1 text-xs text-gray-400 mt-1 border-t border-dashed border-gray-100 pt-2">
+                  <ShieldOff className="h-3 w-3" />
+                  <span>Sin seguro de viaje</span>
                 </div>
               )}
             </div>
