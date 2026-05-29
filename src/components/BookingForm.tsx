@@ -148,29 +148,43 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const { prices: membershipPrices, loading: loadingPrices } = useMembershipPrices();
 
   React.useEffect(() => {
-    const fetchPlatformSettings = async () => {
+    const fetchCommissionRates = async () => {
       try {
-        const { data, error } = await supabase
+        // Leer settings de plataforma
+        const { data: platformData } = await supabase
           .from('platform_settings')
           .select('service_charge_percentage, agency_commission_percentage')
           .maybeSingle();
 
-        if (error) {
-          console.error('Error fetching platform settings:', error);
-          return;
-        }
+        if (platformData) {
+          setServiceChargePercentage(platformData.service_charge_percentage);
+          // Comenzar con el default de plataforma
+          let effectiveCommission = platformData.agency_commission_percentage;
 
-        if (data) {
-          setServiceChargePercentage(data.service_charge_percentage);
-          setAgencyCommissionPercentage(data.agency_commission_percentage);
+          // Si la agencia tiene tasa propia, usarla
+          if (tour.agencies?.commission_rate != null) {
+            effectiveCommission = tour.agencies.commission_rate * 100;
+          }
+
+          // Si el tour tiene override activo (no expirado), tiene la máxima prioridad
+          if (tour.commission_rate_override != null) {
+            const expired = tour.commission_override_expires_at
+              ? new Date(tour.commission_override_expires_at) <= new Date()
+              : false;
+            if (!expired) {
+              effectiveCommission = tour.commission_rate_override * 100;
+            }
+          }
+
+          setAgencyCommissionPercentage(effectiveCommission);
         }
       } catch (err) {
-        console.error('Error loading platform settings:', err);
+        console.error('Error loading commission rates:', err);
       }
     };
 
-    fetchPlatformSettings();
-  }, []);
+    fetchCommissionRates();
+  }, [tour.id, tour.agencies?.commission_rate, tour.commission_rate_override, tour.commission_override_expires_at]);
 
   React.useEffect(() => {
     const checkMembership = async () => {

@@ -438,7 +438,7 @@ const AgencyTours: React.FC = () => {
         .from('tours')
         .select(`
           *,
-          agencies(id, name, rating)
+          agencies(id, name, rating, commission_rate)
         `)
         .eq('agency_id', resolvedAgencyId)
         .order('created_at', { ascending: false });
@@ -5050,6 +5050,43 @@ const AgencyTours: React.FC = () => {
                       <span className="font-semibold text-primary-600">${tour.price}</span>
                     </div>
                   </div>
+
+                  {/* Comisión efectiva */}
+                  {(() => {
+                    const hasOverride = (tour as any).commission_rate_override != null;
+                    const expired = hasOverride && (tour as any).commission_override_expires_at != null
+                      ? new Date((tour as any).commission_override_expires_at) <= new Date()
+                      : false;
+                    const overrideActive = hasOverride && !expired;
+
+                    if (!overrideActive) return null;
+
+                    const rate = ((tour as any).commission_rate_override * 100).toFixed(1);
+                    const reason = (tour as any).commission_override_reason;
+                    const expiresAt = (tour as any).commission_override_expires_at;
+
+                    return (
+                      <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-amber-800 text-xs font-medium">
+                            <Percent className="h-3.5 w-3.5 shrink-0" />
+                            Comisión especial: {rate}%
+                          </div>
+                          {expiresAt && (
+                            <span className="text-xs text-amber-600">
+                              Hasta {new Date(expiresAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </span>
+                          )}
+                          {!expiresAt && (
+                            <span className="text-xs text-amber-600">Sin fecha de fin</span>
+                          )}
+                        </div>
+                        {reason && (
+                          <p className="text-xs text-amber-700 mt-1 line-clamp-2">{reason}</p>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <p className="text-sm text-gray-600 mb-4 line-clamp-2">

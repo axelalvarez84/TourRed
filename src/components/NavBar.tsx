@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, User, LogOut, Search, MessageCircle, ChevronDown, LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation, Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent, DollarSign, Gift, Megaphone, Ticket, BadgePercent, Send, ArrowLeftRight, FileText, BookOpen, Headphones as HeadphonesIcon, TicketCheck, ShoppingBag, Trash2 } from 'lucide-react';
+import { Menu, X, User, LogOut, Search, MessageCircle, ChevronDown, LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation, Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent, DollarSign, Gift, Megaphone, Ticket, BadgePercent, Send, ArrowLeftRight, FileText, BookOpen, Headphones as HeadphonesIcon, TicketCheck, ShoppingBag, Trash2, Bus } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import { useAuth } from '../context/AuthContext';
 import { signOut, supabase } from '../lib/supabase';
@@ -155,6 +155,8 @@ const NavBar: React.FC = () => {
       contenidoItems.push({ to: '/admin/destinations', label: 'Destinos', icon: <MapPin className="h-4 w-4" /> });
     if (isSuperAdmin || permissions?.canManageCategories)
       contenidoItems.push({ to: '/admin/categories', label: 'Categorias', icon: <Tag className="h-4 w-4" /> });
+    if (isSuperAdmin || permissions?.canManageCategories)
+      contenidoItems.push({ to: '/admin/tours', label: 'Comisiones de Tours', icon: <Bus className="h-4 w-4" /> });
     if (isSuperAdmin || permissions?.canManageDeparturePoints)
       contenidoItems.push({ to: '/admin/departure-points', label: 'Puntos de Partida', icon: <Navigation className="h-4 w-4" /> });
     if (isSuperAdmin || permissions?.canManageReviews)

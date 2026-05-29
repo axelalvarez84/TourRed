@@ -621,7 +621,7 @@ export const getTourById = async (id: string) => {
       .from('tours')
       .select(`
         *,
-        agencies(id, name, rating, logo, description, contact_email, is_active)
+        agencies(id, name, rating, logo, description, contact_email, is_active, commission_rate)
       `)
       .eq('id', id)
       .single();

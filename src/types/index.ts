@@ -30,6 +30,7 @@ export interface Agency {
   rating?: number;
   is_active: boolean;
   created_at: string;
+  commission_rate?: number;
 }
 
 export interface Destination {
@@ -164,6 +165,9 @@ export interface Tour {
   preventa_precio_especial?: boolean;
   preventa_tipo_descuento?: 'monto' | 'porcentaje';
   preventa_descuento_valor?: number;
+  commission_rate_override?: number | null;
+  commission_override_expires_at?: string | null;
+  commission_override_reason?: string | null;
 }
 
 export interface TourSchedule {
