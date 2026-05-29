@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Crown, Calendar, DollarSign, AlertCircle, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Crown, Calendar, DollarSign, AlertCircle, CheckCircle, XCircle, Clock, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../utils/formatCurrency';
 
@@ -14,24 +14,57 @@ interface Membership {
   cancel_at_period_end: boolean;
   cancelled_at: string | null;
   service_fee_exemption_used: number;
+  price_paid: number;
+  renewal_amount: number;
   users: {
     first_name: string;
     last_name: string;
   };
 }
 
+interface Stats {
+  total: number;
+  active: number;
+  cancelled: number;
+  mrr: number;
+}
+
 export default function AdminMemberships() {
   const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [stats, setStats] = useState<Stats>({ total: 0, active: 0, cancelled: 0, mrr: 0 });
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'active' | 'cancelled' | 'past_due'>('active');
+  const [filter, setFilter] = useState<'all' | 'active' | 'cancelled' | 'past_due'>('all');
 
   useEffect(() => {
-    fetchMemberships();
+    fetchAll();
   }, [filter]);
 
-  const fetchMemberships = async () => {
+  const fetchAll = async () => {
     setLoading(true);
     try {
+      // Fetch stats over all memberships (independent of filter)
+      const { data: allData, error: allError } = await supabase
+        .from('memberships')
+        .select('status, plan_type, cancel_at_period_end, renewal_amount');
+
+      if (allError) throw allError;
+
+      const all = allData || [];
+      const mrr = all
+        .filter(m => m.status === 'active')
+        .reduce((sum, m) => {
+          const amount = m.renewal_amount ?? 0;
+          return sum + (m.plan_type === 'monthly' ? amount : amount / 12);
+        }, 0);
+
+      setStats({
+        total: all.length,
+        active: all.filter(m => m.status === 'active').length,
+        cancelled: all.filter(m => m.status === 'cancelled' || m.status === 'expired').length,
+        mrr,
+      });
+
+      // Fetch filtered list for the table
       let query = supabase
         .from('memberships')
         .select(`
@@ -48,7 +81,6 @@ export default function AdminMemberships() {
       }
 
       const { data, error } = await query;
-
       if (error) throw error;
       setMemberships(data || []);
     } catch (err) {
@@ -108,15 +140,6 @@ export default function AdminMemberships() {
     }
   };
 
-  const stats = {
-    total: memberships.length,
-    active: memberships.filter(m => m.status === 'active' && !m.cancel_at_period_end).length,
-    cancelling: memberships.filter(m => m.cancel_at_period_end).length,
-    revenue: memberships
-      .filter(m => m.status === 'active')
-      .reduce((sum, m) => sum + (m.plan_type === 'monthly' ? 49 : 490), 0),
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -128,6 +151,13 @@ export default function AdminMemberships() {
             </h1>
             <p className="text-gray-600 mt-1">Administra y monitorea las suscripciones premium</p>
           </div>
+          <button
+            onClick={fetchAll}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Actualizar
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -154,18 +184,20 @@ export default function AdminMemberships() {
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Cancelando</p>
-                <p className="text-3xl font-bold text-yellow-600 mt-1">{stats.cancelling}</p>
+                <p className="text-sm text-gray-600">Canceladas</p>
+                <p className="text-3xl font-bold text-gray-600 mt-1">{stats.cancelled}</p>
               </div>
-              <Clock className="h-10 w-10 text-yellow-400" />
+              <XCircle className="h-10 w-10 text-gray-400" />
             </div>
           </div>
 
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Ingresos Mensuales</p>
-                <p className="text-3xl font-bold text-blue-600 mt-1">${stats.revenue}</p>
+                <p className="text-sm text-gray-600">MRR Estimado</p>
+                <p className="text-3xl font-bold text-blue-600 mt-1">
+                  ${formatCurrency(stats.mrr)}
+                </p>
               </div>
               <DollarSign className="h-10 w-10 text-blue-400" />
             </div>
@@ -226,7 +258,9 @@ export default function AdminMemberships() {
             ) : memberships.length === 0 ? (
               <div className="text-center py-12">
                 <Crown className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500 text-lg">No hay membresías {filter !== 'all' ? `en estado "${filter}"` : ''}</p>
+                <p className="text-gray-500 text-lg">
+                  No hay membresías {filter !== 'all' ? `en este estado` : ''}
+                </p>
               </div>
             ) : (
               <table className="min-w-full divide-y divide-gray-200">
@@ -246,6 +280,12 @@ export default function AdminMemberships() {
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Próxima Renovación
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Precio Pagado
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Renovación
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Exención Usada
@@ -284,7 +324,22 @@ export default function AdminMemberships() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-4 w-4" />
-                          {formatDate(membership.current_period_end)}
+                          {membership.status === 'cancelled' || membership.status === 'expired'
+                            ? '—'
+                            : formatDate(membership.current_period_end)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        ${formatCurrency(membership.price_paid ?? 0)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            ${formatCurrency(membership.renewal_amount ?? 0)}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            {membership.plan_type === 'monthly' ? '/mes' : '/año'}
+                          </span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
@@ -295,7 +350,7 @@ export default function AdminMemberships() {
                         <div className="mt-1 w-full bg-gray-200 rounded-full h-1.5">
                           <div
                             className="bg-blue-600 h-1.5 rounded-full"
-                            style={{ width: `${(membership.service_fee_exemption_used / 500) * 100}%` }}
+                            style={{ width: `${Math.min((membership.service_fee_exemption_used / 500) * 100, 100)}%` }}
                           ></div>
                         </div>
                       </td>
