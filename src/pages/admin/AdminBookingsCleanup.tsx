@@ -519,7 +519,7 @@ const AdminBookingsCleanup: React.FC = () => {
               {showLogs ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
             </button>
             {showLogs && (
-              <div className="border-t border-gray-100">
+              <div className="border-t border-gray-100 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>

@@ -420,7 +420,7 @@ function AdminBookings() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-8">
           {statCards.map(c => (
             <div key={c.label} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
               <div className={`inline-flex p-2 rounded-lg ${c.bg} mb-2`}>
@@ -502,7 +502,7 @@ function AdminBookings() {
         )}
 
         {/* Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 320px)', minHeight: 300 }}>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 280px)', minHeight: 300 }}>
           {loading ? (
             <div className="flex items-center justify-center py-24">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />

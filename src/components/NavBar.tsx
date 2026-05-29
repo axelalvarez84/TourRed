@@ -350,10 +350,11 @@ const NavBar: React.FC = () => {
                   </button>
 
                   {isAdminMenuOpen && (
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 rounded-xl shadow-2xl bg-white ring-1 ring-black ring-opacity-5 z-50 overflow-hidden"
-                      style={{ width: 'min(680px, 95vw)' }}
+                    <div
+                      className="absolute top-full mt-1 rounded-xl shadow-2xl bg-white ring-1 ring-black ring-opacity-5 z-50 overflow-y-auto"
+                      style={{ width: 'min(720px, 95vw)', right: 'auto', left: '50%', transform: 'translateX(-50%)', maxHeight: 'calc(100vh - 5rem)' }}
                     >
-                      <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+                      <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50 sticky top-0 z-10">
                         <div className="flex items-center gap-2">
                           <LayoutDashboard className="h-4 w-4 text-primary-600" />
                           <span className="text-sm font-semibold text-gray-700">Panel de Administracion</span>
@@ -367,7 +368,7 @@ const NavBar: React.FC = () => {
                         </Link>
                       </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-0 divide-x divide-gray-100">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-0 divide-x divide-gray-100">
                         {getAdminMenuGroups().map((group) => (
                           <div key={group.title} className="p-3">
                             <div className="flex items-center gap-1.5 mb-2 px-1">

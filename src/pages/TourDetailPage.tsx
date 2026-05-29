@@ -509,7 +509,7 @@ const TourDetailPage: React.FC = () => {
       
       <div className="container-custom -mt-10 relative z-10">
         <div className="bg-white rounded-t-lg shadow-md p-6">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between">
             <div className="flex-1">
               <div className="flex items-center text-sm text-gray-500 mb-2">
                 <MapPin className="h-4 w-4 mr-1" />
@@ -560,7 +560,7 @@ const TourDetailPage: React.FC = () => {
               </div>
             </div>
             
-            <div className="flex items-center mt-4 lg:mt-0">
+            <div className="flex items-center mt-4 md:mt-0">
               <div className="flex items-center">
                 <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">
                   {tour.agencies?.logo ? (
@@ -584,7 +584,7 @@ const TourDetailPage: React.FC = () => {
       </div>
       
       <div className="container-custom">
-        <div className="flex flex-col lg:flex-row gap-6 mt-6">
+        <div className="flex flex-col lg:flex-row gap-4 md:gap-5 lg:gap-6 mt-6">
           <div className="w-full lg:w-2/3">
             {/* Tour Details Tabs */}
             <div className="bg-white rounded-lg shadow-md mb-6">

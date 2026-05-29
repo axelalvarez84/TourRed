@@ -344,7 +344,7 @@ const SignupPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
           Crea tu cuenta
@@ -370,7 +370,7 @@ const SignupPage: React.FC = () => {
           )}
 
           <form className="space-y-6" onSubmit={handleSubmit}>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
                   Nombre
@@ -587,7 +587,7 @@ const SignupPage: React.FC = () => {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label htmlFor="exteriorNumber" className="block text-sm font-medium text-gray-700">
                         Número Exterior
@@ -637,7 +637,7 @@ const SignupPage: React.FC = () => {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label htmlFor="city" className="block text-sm font-medium text-gray-700">
                         Ciudad
@@ -671,7 +671,7 @@ const SignupPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label htmlFor="postalCode" className="block text-sm font-medium text-gray-700">
                         Código Postal

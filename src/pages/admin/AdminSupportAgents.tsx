@@ -131,7 +131,7 @@ const AdminSupportAgents: React.FC = () => {
             <button onClick={() => openModal()} className="btn btn-primary">Agregar primer agente</button>
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">

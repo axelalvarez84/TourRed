@@ -881,9 +881,9 @@ const AdminAgencies: React.FC = () => {
 
       {/* Modal de Editar Agencia */}
       {isEditingAgency && selectedAgency && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
-            <div className="flex justify-between items-center mb-6">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-start justify-center py-10 px-4">
+          <div className="relative w-full max-w-4xl shadow-lg rounded-md bg-white flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-5 border-b shrink-0">
               <h3 className="text-xl font-medium text-gray-900">
                 Editar Agencia: {selectedAgency.name}
               </h3>
@@ -892,6 +892,7 @@ const AdminAgencies: React.FC = () => {
               </button>
             </div>
 
+            <div className="overflow-y-auto flex-1 p-5">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Información Principal */}
               <div className="lg:col-span-2 space-y-6">
@@ -1351,9 +1352,10 @@ const AdminAgencies: React.FC = () => {
                 </div>
               </div>
             </div>
+            </div>
 
             {/* Acciones */}
-            <div className="flex justify-end space-x-4 mt-6 pt-4 border-t">
+            <div className="flex justify-end space-x-4 p-5 pt-4 border-t shrink-0">
               <button
                 onClick={closeModals}
                 className="btn btn-outline"
