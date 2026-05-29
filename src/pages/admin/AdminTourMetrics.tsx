@@ -77,6 +77,7 @@ const statusColor: Record<string, string> = {
   cancelled: 'bg-red-100 text-red-700',
   completed: 'bg-blue-100 text-blue-700',
   draft: 'bg-gray-100 text-gray-500',
+  no_show: 'bg-orange-100 text-orange-700',
 };
 
 const statusLabel: Record<string, string> = {
@@ -85,6 +86,7 @@ const statusLabel: Record<string, string> = {
   cancelled: 'Cancelada',
   completed: 'Completada',
   draft: 'Borrador',
+  no_show: 'No-show',
 };
 
 const formatDate = (d: string | null) =>
@@ -295,17 +297,14 @@ const TourDetailPanel: React.FC<{
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
-                {bookings.slice(0, 20).map(b => (
+                {bookings.map(b => (
                   <tr key={b.id} className="hover:bg-gray-50">
                     <td className="px-3 py-2 font-mono text-xs text-gray-700">{b.booking_code ?? '—'}</td>
                     <td className="px-3 py-2 text-gray-700">
                       {b.users ? `${b.users.first_name} ${b.users.last_name}` : '—'}
                     </td>
                     <td className="px-3 py-2">
-                      {b.is_no_show
-                        ? <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">No-show</span>
-                        : <StatusBadge status={b.status} />
-                      }
+                      <StatusBadge status={b.is_no_show ? 'no_show' : b.status} />
                     </td>
                     <td className="px-3 py-2 text-center text-gray-700">{b.travelers_count}</td>
                     <td className="px-3 py-2 text-right font-medium text-gray-900">{formatCurrencyMXN(b.total_price)}</td>
@@ -553,7 +552,7 @@ const AdminTourMetrics: React.FC = () => {
           .eq('tour_id', tourId)
           .neq('status', 'draft')
           .order('created_at', { ascending: false })
-          .limit(50),
+          .limit(500),
         tourType === 'receptivo'
           ? supabase
               .from('tour_slots')
@@ -753,3 +752,6 @@ const AdminTourMetrics: React.FC = () => {
 };
 
 export default AdminTourMetrics;
+
+
+export default AdminTourMetrics
