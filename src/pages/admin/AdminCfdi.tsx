@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   FileText, Search, Download, XCircle, RefreshCw, CheckCircle,
-  AlertCircle, Clock, Filter, ChevronDown, ExternalLink, RotateCcw
+  AlertCircle, Clock, Filter, ChevronDown, ExternalLink, RotateCcw, Shield
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrencyMXN } from '../../utils/formatCurrency';
@@ -51,7 +51,7 @@ interface CfdiInvoice {
   email_sent: boolean;
   created_at: string;
   agencies?: { name: string } | null;
-  bookings?: { booking_code: string | null } | null;
+  bookings?: { booking_code: string | null; travel_insurance_included: boolean | null; travel_insurance_cost: number | null } | null;
   agency_payouts?: { payout_code: string | null } | null;
 }
 
@@ -100,7 +100,7 @@ const AdminCfdi: React.FC = () => {
           .select(`
             *,
             agencies(name),
-            bookings(booking_code),
+            bookings(booking_code, travel_insurance_included, travel_insurance_cost),
             agency_payouts(payout_code)
           `)
           .order('created_at', { ascending: false })
@@ -286,7 +286,9 @@ const AdminCfdi: React.FC = () => {
                   {filtered.map((inv) => {
                     const statusInfo = STATUS_LABELS[inv.status];
                     const agencyName = (inv.agencies as { name: string } | null)?.name;
-                    const bookingCode = (inv.bookings as { booking_code: string | null } | null)?.booking_code;
+                    const bookingData = inv.bookings as { booking_code: string | null; travel_insurance_included: boolean | null; travel_insurance_cost: number | null } | null;
+                    const bookingCode = bookingData?.booking_code;
+                    const hasInsurance = bookingData?.travel_insurance_included && (bookingData?.travel_insurance_cost ?? 0) > 0;
                     const payoutCode = (inv.agency_payouts as { payout_code: string | null } | null)?.payout_code;
                     return (
                       <tr key={inv.id} className="hover:bg-gray-50 transition-colors">
@@ -302,6 +304,12 @@ const AdminCfdi: React.FC = () => {
                           </span>
                           {agencyName && <div className="text-xs text-gray-400 mt-0.5 truncate max-w-24">{agencyName}</div>}
                           {bookingCode && <div className="text-xs text-gray-400">{bookingCode}</div>}
+                          {hasInsurance && (
+                            <div className="flex items-center gap-0.5 mt-0.5">
+                              <Shield size={10} className="text-emerald-600" />
+                              <span className="text-xs text-emerald-600 font-medium">Con seguro</span>
+                            </div>
+                          )}
                           {payoutCode && <div className="text-xs text-gray-400">{payoutCode}</div>}
                         </td>
                         <td className="px-4 py-3">

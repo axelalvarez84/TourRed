@@ -333,6 +333,7 @@ Deno.serve(async (req: Request) => {
       .select(`
         id, total_price, deposit_amount, service_charge, user_id, tour_id, booking_code,
         discount_amount, service_charge_discount,
+        travel_insurance_included, travel_insurance_cost,
         tours (name, agency_id)
       `)
       .eq("id", booking_id)
@@ -380,15 +381,18 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Montos: concepto del tour (a cuenta de terceros) y cargo por servicio (ingreso directo de ToursRed)
+    // Montos: concepto del tour (a cuenta de terceros), cargo por servicio e intermediacion de seguro
     const depositAmount = Number((booking as any).deposit_amount || booking.total_price);
     const serviceCharge = Number((booking as any).service_charge || 0);
     const discountAmountRaw = Number((booking as any).discount_amount || 0);
     const serviceChargeDiscountRaw = Number((booking as any).service_charge_discount || 0);
+    const insuranceCost = (booking as any).travel_insurance_included ? Number((booking as any).travel_insurance_cost || 0) : 0;
 
     // Precio bruto sin IVA por concepto (valor_unitario en FacturAPI)
     const precioTourBruto = Math.round((depositAmount / 1.16) * 100) / 100;
     const precioServicioBruto = serviceCharge > 0 ? Math.round((serviceCharge / 1.16) * 100) / 100 : 0;
+    // El seguro llega con IVA incluido; extraemos la base gravable
+    const precioSeguroBruto = insuranceCost > 0 ? Math.round((insuranceCost / 1.16) * 100) / 100 : 0;
 
     // Descuento sin IVA por concepto (campo descuento en FacturAPI)
     // El descuento viene con IVA incluido, lo extraemos igual que el precio
@@ -398,13 +402,15 @@ Deno.serve(async (req: Request) => {
     // Importe neto por concepto = valor_unitario - descuento (base gravable IVA)
     const importeNetoTour = Math.round((precioTourBruto - descuentoTour) * 100) / 100;
     const importeNetoServicio = serviceCharge > 0 ? Math.round((precioServicioBruto - descuentoServicio) * 100) / 100 : 0;
+    const importeNetoSeguro = precioSeguroBruto; // sin descuentos aplicables
 
     // IVA calculado sobre el importe neto (correcto SAT: nunca sobre el bruto)
     const ivaTour = Math.round(importeNetoTour * 0.16 * 100) / 100;
     const ivaServicio = serviceCharge > 0 ? Math.round(importeNetoServicio * 0.16 * 100) / 100 : 0;
+    const ivaSeguro = insuranceCost > 0 ? Math.round(importeNetoSeguro * 0.16 * 100) / 100 : 0;
 
-    const subtotal = Math.round((importeNetoTour + importeNetoServicio) * 100) / 100;
-    const iva = Math.round((ivaTour + ivaServicio) * 100) / 100;
+    const subtotal = Math.round((importeNetoTour + importeNetoServicio + importeNetoSeguro) * 100) / 100;
+    const iva = Math.round((ivaTour + ivaServicio + ivaSeguro) * 100) / 100;
     const total = Math.round((subtotal + iva) * 100) / 100;
 
     if (discountAmountRaw > 0 || serviceChargeDiscountRaw > 0) {
@@ -485,6 +491,17 @@ Deno.serve(async (req: Request) => {
         descripcion: `Cargo por servicio de plataforma (Reserva ${bookingRef})`,
         valor_unitario: precioServicioBruto,
         ...(descuentoServicio > 0 ? { descuento: descuentoServicio } : {}),
+      });
+    }
+
+    if (insuranceCost > 0) {
+      conceptos.push({
+        clave_prod_serv: "81143100",
+        cantidad: 1,
+        clave_unidad: "E48",
+        descripcion: `Seguro de asistencia de viaje (Reserva ${bookingRef})`,
+        valor_unitario: precioSeguroBruto,
+        // Sin tercero: ingreso directo de ToursRed como intermediario de seguros
       });
     }
 

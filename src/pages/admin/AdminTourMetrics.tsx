@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  BarChart2, Search, ChevronDown, ChevronUp, Users, DollarSign,
+  BarChart2, Search, ChevronDown, Users,
   Calendar, Building2, MapPin, Clock, TrendingUp, RefreshCw,
   ShoppingBag, CheckCircle, XCircle, AlertTriangle, Package,
-  Star, Percent, Activity, ArrowUpRight
+  Shield
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrencyMXN } from '../../utils/formatCurrency';
@@ -31,6 +31,7 @@ interface TourMetricRow {
   revenue_total: number;
   platform_revenue_total: number;
   commission_total: number;
+  insurance_total: number;
 }
 
 interface BookingDetail {
@@ -41,6 +42,8 @@ interface BookingDetail {
   total_price: number;
   platform_revenue: number;
   commission_amount: number;
+  travel_insurance_included: boolean;
+  travel_insurance_cost: number;
   travelers_count: number;
   count_adultos: number;
   count_ninos: number;
@@ -186,6 +189,7 @@ const TourDetailPanel: React.FC<{
   const grossRevenue = activeBookings.reduce((s, b) => s + b.total_price, 0);
   const platformRevenue = activeBookings.reduce((s, b) => s + b.platform_revenue, 0);
   const agencyCommission = activeBookings.reduce((s, b) => s + b.commission_amount, 0);
+  const insuranceTotal = activeBookings.reduce((s, b) => s + (b.travel_insurance_included ? (b.travel_insurance_cost ?? 0) : 0), 0);
 
   return (
     <div className="border-t border-gray-100 bg-gray-50 px-6 py-5 space-y-6">
@@ -193,7 +197,7 @@ const TourDetailPanel: React.FC<{
       {/* ── Finanzas ── */}
       <section>
         <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Resumen Financiero</h4>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-white rounded-lg border border-gray-200 p-4">
             <p className="text-xs text-gray-500">Ingresos Brutos</p>
             <p className="text-lg font-bold text-gray-900 mt-1">{formatCurrencyMXN(grossRevenue)}</p>
@@ -206,6 +210,12 @@ const TourDetailPanel: React.FC<{
             <p className="text-xs text-gray-500">Ingreso Plataforma</p>
             <p className="text-lg font-bold text-green-700 mt-1">{formatCurrencyMXN(platformRevenue)}</p>
           </div>
+          {insuranceTotal > 0 && (
+            <div className="bg-white rounded-lg border border-emerald-200 p-4">
+              <p className="text-xs text-emerald-600 flex items-center gap-1"><Shield size={11} /> Seguros de Viaje</p>
+              <p className="text-lg font-bold text-emerald-700 mt-1">{formatCurrencyMXN(insuranceTotal)}</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -315,6 +325,7 @@ const TourDetailPanel: React.FC<{
                   <th className="px-3 py-2 text-center text-xs font-medium text-gray-500">Personas</th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Total</th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Plataforma</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-emerald-600">Seguro</th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Fecha</th>
                 </tr>
               </thead>
@@ -334,6 +345,15 @@ const TourDetailPanel: React.FC<{
                     <td className="px-3 py-2 text-center text-gray-700">{b.travelers_count}</td>
                     <td className="px-3 py-2 text-right font-medium text-gray-900">{formatCurrencyMXN(b.total_price)}</td>
                     <td className="px-3 py-2 text-right text-green-700 font-medium">{formatCurrencyMXN(b.platform_revenue)}</td>
+                    <td className="px-3 py-2 text-right">
+                      {b.travel_insurance_included && b.travel_insurance_cost > 0 ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-700 font-medium text-xs">
+                          <Shield size={11} />{formatCurrencyMXN(b.travel_insurance_cost)}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 text-xs">—</span>
+                      )}
+                    </td>
                     <td className="px-3 py-2 text-gray-500 text-xs">{formatDate(b.booking_date ?? b.created_at.slice(0, 10))}</td>
                   </tr>
                 ))}
@@ -509,7 +529,7 @@ const AdminTourMetrics: React.FC = () => {
       // 2. Fetch booking aggregates for all tours at once
       const { data: bookingsAgg, error: bookingsErr } = await supabase
         .from('bookings')
-        .select('tour_id, status, is_no_show, travelers_count, total_price, platform_revenue, commission_amount')
+        .select('tour_id, status, is_no_show, travelers_count, total_price, platform_revenue, commission_amount, travel_insurance_cost, travel_insurance_included')
         .neq('status', 'draft')
         .in('tour_id', rawTours.map(t => t.id));
 
@@ -518,12 +538,12 @@ const AdminTourMetrics: React.FC = () => {
       // 3. Aggregate per tour
       const agg: Record<string, {
         total: number; confirmed: number; pending: number; cancelled: number; no_show: number;
-        travelers: number; revenue: number; platform_revenue: number; commission: number;
+        travelers: number; revenue: number; platform_revenue: number; commission: number; insurance: number;
       }> = {};
 
       for (const b of bookingsAgg ?? []) {
         if (!agg[b.tour_id]) {
-          agg[b.tour_id] = { total: 0, confirmed: 0, pending: 0, cancelled: 0, no_show: 0, travelers: 0, revenue: 0, platform_revenue: 0, commission: 0 };
+          agg[b.tour_id] = { total: 0, confirmed: 0, pending: 0, cancelled: 0, no_show: 0, travelers: 0, revenue: 0, platform_revenue: 0, commission: 0, insurance: 0 };
         }
         const a = agg[b.tour_id];
         a.total++;
@@ -537,6 +557,9 @@ const AdminTourMetrics: React.FC = () => {
           a.revenue += b.total_price ?? 0;
           a.platform_revenue += b.platform_revenue ?? 0;
           a.commission += b.commission_amount ?? 0;
+          if (b.travel_insurance_included) {
+            a.insurance += b.travel_insurance_cost ?? 0;
+          }
         }
       }
 
@@ -551,6 +574,7 @@ const AdminTourMetrics: React.FC = () => {
         revenue_total: agg[t.id]?.revenue ?? 0,
         platform_revenue_total: agg[t.id]?.platform_revenue ?? 0,
         commission_total: agg[t.id]?.commission ?? 0,
+        insurance_total: agg[t.id]?.insurance ?? 0,
       }));
 
       setTours(rows);
@@ -572,6 +596,7 @@ const AdminTourMetrics: React.FC = () => {
             id, booking_code, status, payment_status, total_price, platform_revenue,
             commission_amount, travelers_count, count_adultos, count_ninos, count_infantes,
             count_adultos_mayores, count_mascotas, created_at, booking_date, is_no_show,
+            travel_insurance_included, travel_insurance_cost,
             users!bookings_user_id_fkey(first_name, last_name, email)
           `)
           .eq('tour_id', tourId)
@@ -643,6 +668,7 @@ const AdminTourMetrics: React.FC = () => {
   const kpiBookings = kpiBase.reduce((s, t) => s + t.bookings_total, 0);
   const kpiTravelers = kpiBase.reduce((s, t) => s + t.travelers_total, 0);
   const kpiRevenue = kpiBase.reduce((s, t) => s + t.platform_revenue_total, 0);
+  const kpiInsurance = kpiBase.reduce((s, t) => s + t.insurance_total, 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -672,7 +698,7 @@ const AdminTourMetrics: React.FC = () => {
         )}
 
         {/* ── KPI Cards ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-8">
           <KpiCard
             label="Tours en vista"
             value={String(filtered.length)}
@@ -697,6 +723,15 @@ const AdminTourMetrics: React.FC = () => {
             icon={<TrendingUp size={20} />}
             accent="text-green-600"
           />
+          {kpiInsurance > 0 && (
+            <KpiCard
+              label="Total seguros"
+              value={formatCurrencyMXN(kpiInsurance)}
+              icon={<Shield size={20} />}
+              accent="text-emerald-600"
+              sub="Intermediacion aseguradora"
+            />
+          )}
         </div>
 
         {/* ── Tabs ── */}

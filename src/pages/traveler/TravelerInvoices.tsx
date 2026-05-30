@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, ExternalLink, CheckCircle, AlertCircle, Clock, XCircle, RefreshCw, Receipt, Star } from 'lucide-react';
+import { FileText, Download, ExternalLink, CheckCircle, AlertCircle, Clock, XCircle, RefreshCw, Receipt, Star, Shield } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { formatCurrencyMXN } from '../../utils/formatCurrency';
@@ -41,7 +41,7 @@ interface CfdiInvoice {
   created_at: string;
   booking_id: string | null;
   membership_id: string | null;
-  bookings?: { booking_code: string | null; tours?: { name: string } | null } | null;
+  bookings?: { booking_code: string | null; travel_insurance_included: boolean | null; travel_insurance_cost: number | null; tours?: { name: string } | null } | null;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -64,7 +64,7 @@ const TravelerInvoices: React.FC = () => {
       // Facturas de reservas del viajero
       const { data: bookingInvoices } = await supabase
         .from('cfdi_invoices')
-        .select(`id, invoice_type, uuid_fiscal, folio, serie, receptor_rfc, subtotal, iva_amount, total, status, xml_url, pdf_url, stamped_at, created_at, booking_id, membership_id, bookings(booking_code, tours(name))`)
+        .select(`id, invoice_type, uuid_fiscal, folio, serie, receptor_rfc, subtotal, iva_amount, total, status, xml_url, pdf_url, stamped_at, created_at, booking_id, membership_id, bookings(booking_code, travel_insurance_included, travel_insurance_cost, tours(name))`)
         .eq('invoice_type', 'booking')
         .order('created_at', { ascending: false })
         .limit(100);
@@ -187,10 +187,12 @@ const TravelerInvoices: React.FC = () => {
         <div className="space-y-3">
           {filtered.map((inv) => {
             const s = STATUS_CONFIG[inv.status];
-            const booking = inv.bookings as { booking_code: string | null; tours?: { name: string } | null } | null;
+            const booking = inv.bookings as { booking_code: string | null; travel_insurance_included: boolean | null; travel_insurance_cost: number | null; tours?: { name: string } | null } | null;
             const tourName = booking?.tours?.name;
             const bookingCode = booking?.booking_code;
             const isMembership = inv.invoice_type === 'membership';
+            const hasInsurance = !isMembership && booking?.travel_insurance_included && (booking?.travel_insurance_cost ?? 0) > 0;
+            const insuranceCost = hasInsurance ? (booking?.travel_insurance_cost ?? 0) : 0;
 
             return (
               <div
@@ -248,6 +250,12 @@ const TravelerInvoices: React.FC = () => {
                   <div className="text-xs text-gray-400">IVA incl.</div>
                   {inv.iva_amount > 0 && (
                     <div className="text-xs text-gray-400">IVA: {formatCurrencyMXN(inv.iva_amount)}</div>
+                  )}
+                  {hasInsurance && (
+                    <div className="flex items-center justify-end gap-0.5 mt-1">
+                      <Shield size={10} className="text-emerald-600" />
+                      <span className="text-xs text-emerald-600 font-medium">Seguro: {formatCurrencyMXN(insuranceCost)}</span>
+                    </div>
                   )}
                 </div>
 
