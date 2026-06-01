@@ -364,13 +364,48 @@ const ReceptorSelector: React.FC<{
 
 // ─── Subcomponente: tabla de conceptos ───────────────────────────────────────
 
+const CUSTOM_MARKER = '__custom__';
+
 const ConceptosTable: React.FC<{
   conceptos: Concepto[];
   onChange: (list: Concepto[]) => void;
-}> = ({ conceptos, onChange }) => {
+  extraClaves: { code: string; label: string }[];
+  onSaveClave: (code: string, label: string) => void;
+}> = ({ conceptos, onChange, extraClaves, onSaveClave }) => {
+  const [customInputs, setCustomInputs] = useState<Record<string, string>>({});
+  const allClaves = [...CLAVES_PROD_SERV, ...extraClaves];
+
   const update = (id: string, field: keyof Concepto, value: string | number) => {
     onChange(conceptos.map(c => c.id === id ? { ...c, [field]: value } : c));
   };
+
+  const handleClaveSelect = (id: string, value: string) => {
+    if (value === CUSTOM_MARKER) {
+      setCustomInputs(prev => ({ ...prev, [id]: '' }));
+      update(id, 'clave_prod_serv', CUSTOM_MARKER);
+    } else {
+      setCustomInputs(prev => { const n = { ...prev }; delete n[id]; return n; });
+      update(id, 'clave_prod_serv', value);
+    }
+  };
+
+  const handleCustomInput = (id: string, raw: string) => {
+    const val = raw.toUpperCase().replace(/\s/g, '');
+    setCustomInputs(prev => ({ ...prev, [id]: val }));
+    update(id, 'clave_prod_serv', val || CUSTOM_MARKER);
+  };
+
+  const handleCustomBlur = (id: string, val: string) => {
+    const trimmed = val.trim();
+    if (trimmed && trimmed !== CUSTOM_MARKER && !allClaves.find(k => k.code === trimmed)) {
+      onSaveClave(trimmed, trimmed);
+      update(id, 'clave_prod_serv', trimmed);
+      setCustomInputs(prev => { const n = { ...prev }; delete n[id]; return n; });
+    }
+  };
+
+  const isCustom = (id: string, clave: string) =>
+    clave === CUSTOM_MARKER || (id in customInputs);
 
   const totals = calcTotals(conceptos);
 
@@ -406,16 +441,29 @@ const ConceptosTable: React.FC<{
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <select
-                      value={c.clave_prod_serv}
-                      onChange={e => update(c.id, 'clave_prod_serv', e.target.value)}
-                      className="w-full min-w-[160px] px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
-                    >
-                      {CLAVES_PROD_SERV.map(k => (
-                        <option key={k.code} value={k.code}>{k.label}</option>
-                      ))}
-                      <option value="custom">Otra (escribir)</option>
-                    </select>
+                    {isCustom(c.id, c.clave_prod_serv) ? (
+                      <input
+                        type="text"
+                        autoFocus
+                        value={customInputs[c.id] ?? (c.clave_prod_serv !== CUSTOM_MARKER ? c.clave_prod_serv : '')}
+                        onChange={e => handleCustomInput(c.id, e.target.value)}
+                        onBlur={e => handleCustomBlur(c.id, e.target.value)}
+                        placeholder="Ej: 84111500"
+                        maxLength={12}
+                        className="w-full min-w-[130px] px-2 py-1 text-xs border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono bg-blue-50"
+                      />
+                    ) : (
+                      <select
+                        value={allClaves.find(k => k.code === c.clave_prod_serv) ? c.clave_prod_serv : CUSTOM_MARKER}
+                        onChange={e => handleClaveSelect(c.id, e.target.value)}
+                        className="w-full min-w-[160px] px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
+                      >
+                        {allClaves.map(k => (
+                          <option key={k.code} value={k.code}>{k.label}</option>
+                        ))}
+                        <option value={CUSTOM_MARKER}>Otra (escribir)</option>
+                      </select>
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     <select
@@ -518,6 +566,20 @@ const AdminCfdiManual: React.FC = () => {
   const [accountCode, setAccountCode] = useState('407');
   const [notes, setNotes] = useState('');
 
+  // Claves SAT personalizadas (se persisten en localStorage)
+  const [extraClaves, setExtraClaves] = useState<{ code: string; label: string }[]>(() => {
+    try { return JSON.parse(localStorage.getItem('cfdi_extra_claves') ?? '[]'); } catch { return []; }
+  });
+
+  const handleSaveClave = (code: string, label: string) => {
+    setExtraClaves(prev => {
+      if (prev.find(k => k.code === code)) return prev;
+      const next = [...prev, { code, label }];
+      localStorage.setItem('cfdi_extra_claves', JSON.stringify(next));
+      return next;
+    });
+  };
+
   // Complemento de pago
   const [selectedPpd, setSelectedPpd] = useState<PpdInvoice | null>(null);
   const [ppdSearch, setPpdSearch] = useState('');
@@ -607,7 +669,7 @@ const AdminCfdiManual: React.FC = () => {
   const isFormValid = () => {
     if (!rfcValid(receptor.rfc) || !receptor.nombre || !receptor.domicilio_fiscal_receptor) return false;
     if (cfdiType === 'P') return !!selectedPpd && importePagado > 0;
-    return conceptos.every(c => c.descripcion && c.valor_unitario > 0);
+    return conceptos.every(c => c.descripcion && c.valor_unitario > 0 && c.clave_prod_serv && c.clave_prod_serv !== CUSTOM_MARKER);
   };
 
   const handleSubmit = async () => {
@@ -887,7 +949,7 @@ const AdminCfdiManual: React.FC = () => {
                 <FileText size={14} />
                 Conceptos
               </h2>
-              <ConceptosTable conceptos={conceptos} onChange={setConceptos} />
+              <ConceptosTable conceptos={conceptos} onChange={setConceptos} extraClaves={extraClaves} onSaveClave={handleSaveClave} />
             </div>
           )}
 
@@ -1176,3 +1238,6 @@ const AdminCfdiManual: React.FC = () => {
 };
 
 export default AdminCfdiManual;
+
+
+export default AdminCfdiManual
