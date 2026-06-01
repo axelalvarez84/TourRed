@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FileText, Search, Download, XCircle, RefreshCw, CheckCircle,
   AlertCircle, Clock, Filter, ChevronDown, ExternalLink, RotateCcw, Shield
@@ -90,6 +90,17 @@ const AdminCfdi: React.FC = () => {
   });
   const [isCancelling, setIsCancelling] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableInnerRef = useRef<HTMLTableElement>(null);
+
+  const syncScroll = (source: 'top' | 'table') => {
+    if (source === 'top' && topScrollRef.current && tableScrollRef.current) {
+      tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+    } else if (source === 'table' && topScrollRef.current && tableScrollRef.current) {
+      topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+    }
+  };
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -273,8 +284,22 @@ const AdminCfdi: React.FC = () => {
               <p>No se encontraron CFDIs</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+            <>
+              <div
+                ref={topScrollRef}
+                className="overflow-x-scroll border-b border-gray-200"
+                style={{ scrollbarWidth: 'auto' }}
+                onScroll={() => syncScroll('top')}
+              >
+                <div style={{ height: 1, minWidth: tableInnerRef.current?.scrollWidth ?? 800 }} />
+              </div>
+              <div
+                ref={tableScrollRef}
+                className="overflow-x-scroll"
+                style={{ overflowX: 'scroll', scrollbarWidth: 'none' }}
+                onScroll={() => syncScroll('table')}
+              >
+              <table ref={tableInnerRef} className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
                     {['Tipo', 'UUID Fiscal', 'Receptor', 'Subtotal', 'IVA', 'Total', 'Estado', 'Fecha', 'Acciones'].map(h => (
@@ -386,7 +411,8 @@ const AdminCfdi: React.FC = () => {
                   })}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
         </div>
 
