@@ -166,10 +166,6 @@ async function facturapiStamp(
     })),
   };
 
-  if (sandboxMode) {
-    (body as any)._sandbox = true;
-  }
-
   const headers: Record<string, string> = {
     Authorization: `Bearer ${apiKey}`,
     "Content-Type": "application/json",
