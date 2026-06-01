@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, User, LogOut, Search, MessageCircle, ChevronDown, LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation, Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent, DollarSign, Gift, Megaphone, Ticket, BadgePercent, Send, ArrowLeftRight, FileText, BookOpen, Headphones as HeadphonesIcon, TicketCheck, ShoppingBag, Trash2, Bus, BarChart2 } from 'lucide-react';
+import { Menu, X, User, LogOut, Search, MessageCircle, ChevronDown, LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation, Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent, DollarSign, Gift, Megaphone, Ticket, BadgePercent, Send, ArrowLeftRight, FileText, FilePlus2, BookOpen, Headphones as HeadphonesIcon, TicketCheck, ShoppingBag, Trash2, Bus, BarChart2 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import { useAuth } from '../context/AuthContext';
 import { signOut, supabase } from '../lib/supabase';
@@ -185,6 +185,7 @@ const NavBar: React.FC = () => {
     const financieroItems: AdminMenuItem[] = [
       { to: '/admin/payouts', label: 'Gestion de Pagos', icon: <DollarSign className="h-4 w-4" /> },
       { to: '/admin/cfdi', label: 'CFDI / Facturacion', icon: <FileText className="h-4 w-4" /> },
+      { to: '/admin/cfdi-manual', label: 'CFDI Manual', icon: <FilePlus2 className="h-4 w-4" /> },
       { to: '/admin/contabilidad', label: 'Contabilidad (Sync)', icon: <BookOpen className="h-4 w-4" /> },
       { to: '/accounting', label: 'Mini ERP Interno', icon: <BookOpen className="h-4 w-4" /> },
     ];
