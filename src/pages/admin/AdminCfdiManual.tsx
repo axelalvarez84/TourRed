@@ -1240,6 +1240,3 @@ const AdminCfdiManual: React.FC = () => {
 
 
 export default AdminCfdiManual;
-
-
-export default AdminCfdiManual
