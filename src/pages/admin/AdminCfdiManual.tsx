@@ -65,15 +65,16 @@ const FORMAS_PAGO = [
 ];
 
 const CLAVES_PROD_SERV = [
-  { code: '81111500', label: '81111500 - Servicios de agencia de viajes' },
-  { code: '81141600', label: '81141600 - Servicios de intermediacion' },
-  { code: '81143100', label: '81143100 - Servicios de comisiones' },
+  { code: '90121502', label: '90121502 - Agencias de viajes' },
+  { code: '90121500', label: '90121500 - Agentes de viajes' },
+  { code: '90121501', label: '90121501 - Servicios de organizacion de excursiones' },
+  { code: '80141628', label: '80141628 - Servicio de distribuidores por comision' },
   { code: '80141600', label: '80141600 - Servicios de administracion de negocios' },
   { code: '80111500', label: '80111500 - Servicios de consultoria de negocios' },
-  { code: '84121806', label: '84121806 - Servicios de contabilidad' },
+  { code: '84121500', label: '84121500 - Servicios de contabilidad' },
   { code: '84121900', label: '84121900 - Servicios de auditoria' },
   { code: '80101501', label: '80101501 - Gestion de proyectos' },
-  { code: '81112000', label: '81112000 - Servicios de reservacion de transportacion' },
+  { code: '78111800', label: '78111800 - Servicios de reservacion de transporte' },
   { code: '92101500', label: '92101500 - Servicios de publicidad' },
 ];
 
@@ -163,7 +164,7 @@ interface AccountOption {
 const newConcepto = (): Concepto => ({
   id: crypto.randomUUID(),
   descripcion: '',
-  clave_prod_serv: '81143100',
+  clave_prod_serv: '90121502',
   clave_unidad: 'E48',
   cantidad: 1,
   valor_unitario: 0,
@@ -1238,3 +1239,5 @@ const AdminCfdiManual: React.FC = () => {
 };
 
 export default AdminCfdiManual;
+
+export default AdminCfdiManual
