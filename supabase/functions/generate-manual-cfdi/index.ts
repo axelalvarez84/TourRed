@@ -349,7 +349,7 @@ Deno.serve(async (req: Request) => {
     EdgeRuntime.waitUntil(
       supabase.rpc("create_accounting_entry_for_manual_cfdi", {
         p_cfdi_invoice_id: cfdiRecord.id,
-      }).catch((e: unknown) => console.error("Error asiento contable:", e))
+      }).then(({ error }) => { if (error) console.error("Error asiento contable:", error); })
     );
 
     // Guardar o actualizar receptor en directorio si se solicitó
