@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   DollarSign, Upload, CheckCircle, AlertCircle, X,
-  FileText, Download, ShieldCheck, ShieldAlert, Loader2
+  FileText, Download, ShieldCheck, ShieldAlert, Loader2, ExternalLink
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { formatCurrencyMXN } from '../../utils/formatCurrency';
+import CfdiViewerModal from '../../components/CfdiViewerModal';
 
 interface Commission {
   id: string;
@@ -116,6 +117,7 @@ export default function ExecutiveComisiones() {
   const [validation, setValidation] = useState<ValidationResult>({
     status: 'idle', parsed: null, errors: [], warnings: [],
   });
+  const [cfdiViewerUrl, setCfdiViewerUrl] = useState<string | null>(null);
 
   const loadCommissions = useCallback(async () => {
     if (!accountExecutiveInfo?.executiveId) return;
@@ -276,6 +278,22 @@ export default function ExecutiveComisiones() {
       setMessage({ type: 'error', text: e.message || 'Error al subir el CFDI.' });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const downloadCfdiXml = async (url: string, uuid: string | null) => {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const filename = uuid ? `CFDI-${uuid}.xml` : 'CFDI.xml';
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      // silenciar error de descarga
     }
   };
 
@@ -447,10 +465,31 @@ export default function ExecutiveComisiones() {
                       </td>
                       <td className="px-4 py-3">
                         {comm.cfdi_xml_url ? (
-                          <a href={comm.cfdi_xml_url} target="_blank" rel="noopener noreferrer"
-                            className="text-xs text-blue-600 hover:underline flex items-center gap-1">
-                            <FileText className="h-3 w-3" /> Ver CFDI
-                          </a>
+                          <div className="flex items-center gap-1">
+                            <a
+                              href={comm.cfdi_xml_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="Abrir XML"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                            <button
+                              onClick={() => downloadCfdiXml(comm.cfdi_xml_url!, comm.cfdi_uuid_fiscal)}
+                              className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Descargar XML"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setCfdiViewerUrl(comm.cfdi_xml_url)}
+                              className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Ver representación gráfica"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         ) : comm.status === 'pending' ? (
                           <button
                             onClick={() => {
@@ -622,6 +661,10 @@ export default function ExecutiveComisiones() {
             </div>
           </div>
         </div>
+      )}
+
+      {cfdiViewerUrl && (
+        <CfdiViewerModal xmlUrl={cfdiViewerUrl} onClose={() => setCfdiViewerUrl(null)} />
       )}
     </div>
   );

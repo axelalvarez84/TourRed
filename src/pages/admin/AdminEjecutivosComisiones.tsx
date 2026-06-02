@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   DollarSign, CheckCircle, XCircle, Clock, Eye, Download,
-  AlertCircle, X, Filter, Search, FileText, ChevronDown, Play, Calendar
+  AlertCircle, X, Filter, Search, FileText, ChevronDown, Play, Calendar, ExternalLink
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrencyMXN } from '../../utils/formatCurrency';
+import CfdiViewerModal from '../../components/CfdiViewerModal';
 
 interface Commission {
   id: string;
@@ -55,6 +56,7 @@ export default function AdminEjecutivosComisiones() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [cfdiViewerUrl, setCfdiViewerUrl] = useState<string | null>(null);
 
   // Estado para generación de comisiones mensuales
   const currentDate = new Date();
@@ -158,6 +160,22 @@ export default function AdminEjecutivosComisiones() {
       setMessage({ type: 'error', text: e.message || 'Error al procesar la acción.' });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const downloadCfdiXml = async (url: string, uuid: string | null) => {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const filename = uuid ? `CFDI-${uuid}.xml` : 'CFDI.xml';
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      // silenciar error de descarga
     }
   };
 
@@ -372,14 +390,31 @@ export default function AdminEjecutivosComisiones() {
                       </td>
                       <td className="px-4 py-3">
                         {comm.cfdi_xml_url ? (
-                          <a
-                            href={comm.cfdi_xml_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs"
-                          >
-                            <FileText className="h-3 w-3" /> Ver CFDI
-                          </a>
+                          <div className="flex items-center gap-1">
+                            <a
+                              href={comm.cfdi_xml_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="Abrir XML"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                            <button
+                              onClick={() => downloadCfdiXml(comm.cfdi_xml_url!, comm.cfdi_uuid_fiscal)}
+                              className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Descargar XML"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setCfdiViewerUrl(comm.cfdi_xml_url)}
+                              className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Ver representación gráfica"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         ) : (
                           <span className="text-xs text-gray-300">Sin CFDI</span>
                         )}
@@ -603,6 +638,10 @@ export default function AdminEjecutivosComisiones() {
             </div>
           </div>
         </div>
+      )}
+
+      {cfdiViewerUrl && (
+        <CfdiViewerModal xmlUrl={cfdiViewerUrl} onClose={() => setCfdiViewerUrl(null)} />
       )}
     </div>
   );
