@@ -37,26 +37,66 @@ const NavBar: React.FC = () => {
 
   useEffect(() => {
     const fetchProfilePicture = async () => {
-      if (user?.id) {
+      if (!user?.id) { setProfilePicture(null); return; }
+
+      if (isAccountExecutive && accountExecutiveInfo?.executiveId) {
+        // Ejecutivos: leer profile_photo_url desde account_executives y generar URL firmada
         const { data } = await supabase
-          .from('users')
-          .select('profile_picture_url')
-          .eq('id', user.id)
+          .from('account_executives')
+          .select('profile_photo_url')
+          .eq('id', accountExecutiveInfo.executiveId)
           .maybeSingle();
 
-        if (data?.profile_picture_url) {
-          setProfilePicture(data.profile_picture_url);
+        if (data?.profile_photo_url) {
+          const { data: signed } = await supabase.storage
+            .from('executive-avatars')
+            .createSignedUrl(data.profile_photo_url, 3600);
+          setProfilePicture(signed?.signedUrl || null);
         } else {
           setProfilePicture(null);
         }
-      } else {
-        setProfilePicture(null);
+        return;
       }
+
+      const { data } = await supabase
+        .from('users')
+        .select('profile_picture_url')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      setProfilePicture(data?.profile_picture_url || null);
     };
 
     fetchProfilePicture();
 
     if (user?.id) {
+      if (isAccountExecutive && accountExecutiveInfo?.executiveId) {
+        const channel = supabase
+          .channel('executive-avatar-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'account_executives',
+              filter: `id=eq.${accountExecutiveInfo.executiveId}`,
+            },
+            async (payload) => {
+              const path = payload.new?.profile_photo_url;
+              if (path) {
+                const { data: signed } = await supabase.storage
+                  .from('executive-avatars')
+                  .createSignedUrl(path, 3600);
+                setProfilePicture(signed?.signedUrl || null);
+              } else {
+                setProfilePicture(null);
+              }
+            }
+          )
+          .subscribe();
+        return () => { supabase.removeChannel(channel); };
+      }
+
       const channel = supabase
         .channel('profile-picture-changes')
         .on(
@@ -79,7 +119,7 @@ const NavBar: React.FC = () => {
         supabase.removeChannel(channel);
       };
     }
-  }, [user]);
+  }, [user, isAccountExecutive, accountExecutiveInfo?.executiveId]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -124,6 +164,7 @@ const NavBar: React.FC = () => {
   const getProfileLink = () => {
     if (isAdmin) return '/admin/profile';
     if (isAgency) return '/agency/profile';
+    if (isAccountExecutive) return '/executive/perfil';
     return '/traveler/profile';
   };
 
