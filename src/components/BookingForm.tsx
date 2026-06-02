@@ -1862,14 +1862,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setShowInsuranceCoverage(false)}>
                 <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
                   {/* Header */}
-                  <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-5 text-white flex items-center justify-between">
+                  <div className="bg-gradient-to-r from-blue-900 to-blue-800 px-6 py-5 text-white flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-white/20 rounded-full">
                         <Shield className="h-6 w-6" />
                       </div>
                       <div>
                         <h3 className="text-lg font-bold">Cobertura Completa</h3>
-                        <p className="text-sm text-emerald-100">Plan MX 200K</p>
+                        <p className="text-sm text-blue-200">Plan MX 200K</p>
                       </div>
                     </div>
                     <button type="button" onClick={() => setShowInsuranceCoverage(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
@@ -1888,7 +1888,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                       <tbody className="divide-y divide-gray-100">
                         {[
                           { concepto: 'Asistencia médica por enfermedad / accidente', monto: 'MXN 200,000' },
-                          { concepto: 'Asistencia médica por Covid-19', monto: 'MXN 200,000' },
                           { concepto: 'Asesoría y compensación por pérdida de equipaje complementaria (Aéreo)', monto: 'MXN 6,900' },
                           { concepto: 'Garantía de gastos de cancelación/interrupción con restricción de causas', monto: 'MXN 69,000' },
                           { concepto: 'Odontología*', monto: 'MXN 20,000' },
@@ -1913,7 +1912,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                         ].map((row, i) => (
                           <tr key={i}>
                             <td className="py-2 pr-4 text-gray-700">{row.concepto}</td>
-                            <td className="py-2 text-right font-medium text-emerald-700 whitespace-nowrap">{row.monto}</td>
+                            <td className="py-2 text-right font-medium text-blue-800 whitespace-nowrap">{row.monto}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1924,18 +1923,18 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     </div>
                   </div>
                   {/* Footer */}
-                  <div className="px-6 py-4 bg-emerald-50 border-t border-emerald-100 flex items-center gap-3">
-                    <Shield className="h-5 w-5 text-emerald-600 shrink-0" />
-                    <p className="text-sm font-semibold text-emerald-800">Cobertura Respaldada por Universal Assistance</p>
+                  <div className="px-6 py-3 bg-blue-900 border-t border-blue-800 flex items-center gap-3">
+                    <img src="/image copy copy copy copy copy copy.png" alt="Universal Assistance" className="h-7 object-contain" />
+                    <p className="text-sm font-semibold text-blue-100">Cobertura Respaldada por Universal Assistance</p>
                   </div>
                 </div>
               </div>
             )}
 
             {/* Tarjeta del seguro */}
-            <div className={`mb-4 rounded-xl border-2 overflow-hidden transition-all ${includeInsurance ? 'border-emerald-300 bg-gradient-to-br from-emerald-50 to-teal-50' : 'border-gray-200 bg-gray-50'}`}>
+            <div className={`mb-4 rounded-xl border-2 overflow-hidden transition-all ${includeInsurance ? 'border-blue-300 bg-gradient-to-br from-blue-50 to-slate-50' : 'border-gray-200 bg-gray-50'}`}>
               {/* Header */}
-              <div className={`px-4 py-3 flex items-center justify-between ${includeInsurance ? 'bg-emerald-600' : 'bg-gray-400'}`}>
+              <div className={`px-4 py-3 flex items-center justify-between ${includeInsurance ? 'bg-blue-900' : 'bg-gray-400'}`}>
                 <div className="flex items-center gap-2 text-white">
                   <Shield className="h-5 w-5" />
                   <span className="font-bold text-sm">Viaja Protegido</span>
@@ -1974,27 +1973,27 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                         { icon: '⚖️', label: 'Asistencia legal por accidentes' },
                         { icon: '📞', label: 'Atención 24/7 durante tu viaje' },
                       ].map((b, i) => (
-                        <div key={i} className="flex items-center gap-1.5 text-xs text-emerald-800">
+                        <div key={i} className="flex items-center gap-1.5 text-xs text-blue-900">
                           <span>{b.icon}</span>
                           <span>{b.label}</span>
                         </div>
                       ))}
                     </div>
-                    <p className="text-xs text-emerald-700 mb-2">
+                    <p className="text-xs text-blue-800 mb-2">
                       y mucho más,{' '}
                       <button
                         type="button"
                         onClick={() => setShowInsuranceCoverage(true)}
-                        className="underline font-medium hover:text-emerald-900 transition-colors"
+                        className="underline font-medium hover:text-blue-950 transition-colors"
                       >
                         ver cobertura completa da clic aquí
                       </button>
                     </p>
-                    <div className="flex items-center justify-between border-t border-emerald-200 pt-2">
-                      <span className="text-xs text-emerald-700">
+                    <div className="flex items-center justify-between border-t border-blue-200 pt-2">
+                      <span className="text-xs text-blue-800">
                         {formatCurrencyMXN(insurancePricePerDayPerTraveler)}/día × {tourDays} día{tourDays !== 1 ? 's' : ''} × {Math.max(1, totalTravelers)} viajero{totalTravelers !== 1 ? 's' : ''}
                       </span>
-                      <span className="text-sm font-bold text-emerald-700">+{formatCurrencyMXN(insuranceCost)}</span>
+                      <span className="text-sm font-bold text-blue-800">+{formatCurrencyMXN(insuranceCost)}</span>
                     </div>
                   </>
                 ) : (
