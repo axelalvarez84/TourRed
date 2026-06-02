@@ -119,7 +119,23 @@ export default function ExecutiveMisAgencias() {
 
       if (updateError) throw updateError;
 
-      setMessage({ type: 'success', text: `Agencia "${approveModal.name}" aprobada exitosamente.` });
+      // Enviar email de aprobación (fire-and-forget)
+      if (accountExecutiveInfo) {
+        const executiveName = `${accountExecutiveInfo.firstName} ${accountExecutiveInfo.lastName}`.trim();
+        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-agency-approval`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agencyName: approveModal.name,
+            contactEmail: approveModal.contact_email,
+            contactFirstName: approveModal.name,
+            executiveName,
+            executiveEmail: accountExecutiveInfo.email,
+          }),
+        }).catch(err => console.error('Error sending approval email:', err));
+      }
+
+      setMessage({ type: 'success', text: `Agencia "${approveModal.name}" aprobada exitosamente. Se notificó a la agencia por correo.` });
       setApproveModal(null);
       setContractFile(null);
       loadAgencies();

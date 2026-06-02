@@ -200,90 +200,55 @@ const AdminAgencies: React.FC = () => {
         .update({ is_approved: newApprovalStatus })
         .eq('id', userId);
 
-      if (error) {
-        throw new Error(error.message);
-      }
+      if (error) throw new Error(error.message);
 
-      // Actualizar el estado local
+      // Actualizar estado local
       setAgencies(agencies.map(agency =>
         agency.user_id === userId
           ? { ...agency, is_approved: newApprovalStatus }
           : agency
       ));
 
-      // Si se aprobó la agencia (pasó de no aprobado a aprobado), enviar email
-      console.log('🔍 Verificando si enviar email de aprobación...', {
-        newApprovalStatus,
-        currentApproval,
-        willSendEmail: newApprovalStatus && !currentApproval
-      });
-
       if (newApprovalStatus && !currentApproval) {
-        try {
-          const agency = agencies.find(a => a.user_id === userId);
-          console.log('🏢 Agencia encontrada:', agency ? `${agency.name} (${agency.contact_email})` : 'NO ENCONTRADA');
-
-          if (!agency) {
-            console.error('❌ No se encontró la agencia con user_id:', userId);
-            return;
+        const agency = agencies.find(a => a.user_id === userId);
+        if (agency) {
+          // Resolver datos del ejecutivo si la agencia tiene uno asignado
+          let executiveName = 'ToursRed';
+          let executiveEmail = 'agencias@toursred.com.mx';
+          if ((agency as any).account_executive_id && (agency as any)._executive_name) {
+            executiveName = (agency as any)._executive_name;
+            // Buscar email del ejecutivo
+            try {
+              const { data: execData } = await supabase
+                .from('account_executives')
+                .select('email')
+                .eq('id', (agency as any).account_executive_id)
+                .maybeSingle();
+              if (execData?.email) executiveEmail = execData.email;
+            } catch { /* ignorar */ }
           }
 
-          if (!agency.contact_email) {
-            console.error('❌ La agencia no tiene contact_email');
-            return;
-          }
-
-          const { data: { session } } = await supabase.auth.getSession();
-          console.log('🔐 Session obtenida:', session ? 'SÍ' : 'NO');
-
-          if (!session) {
-            console.error('❌ No hay sesión activa');
-            return;
-          }
-
-          console.log('📧 Enviando email de aprobación a:', {
-            email: agency.contact_email,
-            firstName: agency.users?.first_name || 'Estimado(a)',
-            agencyName: agency.name
-          });
-
-          const response = await fetch(
+          // Enviar email de aprobación (fire-and-forget)
+          fetch(
             `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-agency-approval`,
             {
               method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-                'Content-Type': 'application/json',
-              },
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                email: agency.contact_email,
-                firstName: agency.users?.first_name || 'Estimado(a)',
                 agencyName: agency.name,
+                contactEmail: agency.contact_email,
+                contactFirstName: agency.users?.first_name || agency.name,
+                contactLastName: agency.users?.last_name || '',
+                executiveName,
+                executiveEmail,
               }),
             }
-          );
+          ).catch(err => console.error('Error sending approval email:', err));
 
-          console.log('📬 Respuesta del servidor:', response.status);
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            console.error('❌ Error en la respuesta:', errorData);
-            throw new Error(`Error ${response.status}: ${JSON.stringify(errorData)}`);
-          }
-
-          const result = await response.json();
-          console.log('✅ Email de aprobación enviado exitosamente:', result);
-        } catch (emailError: any) {
-          console.error('❌ Error enviando email de aprobación:', emailError);
-          console.error('Stack:', emailError.stack);
-        }
-
-        // Sync agency contact to accounting system (fire and forget)
-        const agency = agencies.find(a => a.user_id === userId);
-        if (agency) {
+          // Sync to accounting (fire-and-forget)
           supabase.functions.invoke('sync-contact-to-accounting', {
             body: { contact_type: 'agency', contact_id: agency.id },
-          }).catch((err) => console.error('Error syncing agency to accounting:', err));
+          }).catch(err => console.error('Error syncing agency to accounting:', err));
         }
       }
 

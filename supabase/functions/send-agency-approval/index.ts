@@ -7,18 +7,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-interface ApprovalData {
-  email: string;
-  firstName: string;
+interface AgencyApprovalPayload {
   agencyName: string;
+  contactEmail: string;
+  contactFirstName: string;
+  contactLastName?: string;
+  executiveName: string;
+  executiveEmail: string;
 }
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders,
-    });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
@@ -26,256 +26,224 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { email, firstName, agencyName }: ApprovalData = await req.json();
+    const {
+      agencyName,
+      contactEmail,
+      contactFirstName,
+      contactLastName = "",
+      executiveName,
+      executiveEmail,
+    }: AgencyApprovalPayload = await req.json();
 
-    if (!email || !firstName || !agencyName) {
+    if (!agencyName || !contactEmail || !contactFirstName || !executiveEmail) {
       return new Response(
         JSON.stringify({ error: "Faltan campos requeridos" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const { data: emailSettings, error: settingsError } = await supabase
+    const { data: emailSettings } = await supabase
       .from("email_settings")
-      .select("*")
+      .select("smtp_api_key, contact_email")
       .maybeSingle();
 
-    if (settingsError || !emailSettings) {
-      console.error("Error fetching email settings:", settingsError);
-      return new Response(
-        JSON.stringify({ error: "Error al obtener configuración de email" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    if (!emailSettings.smtp_api_key) {
-      console.error("SMTP API key not configured");
+    if (!emailSettings?.smtp_api_key) {
       return new Response(
         JSON.stringify({ error: "API key de SMTP no configurada" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const textContent = `
-¡Felicidades ${firstName}!
-
-Tu agencia "${agencyName}" ha sido aprobada exitosamente en ToursRed.
-
-A partir de ahora puedes:
-✓ Publicar tus tours y experiencias
-✓ Recibir reservas de viajeros
-✓ Gestionar tus bookings desde el panel de control
-✓ Configurar tus tarifas y disponibilidad
-✓ Recibir pagos de los clientes
-
-PRÓXIMOS PASOS:
-
-1. Completa tu Perfil de Agencia
-   - Agrega una descripción atractiva de tu empresa
-   - Sube tu logo y fotos representativas
-   - Completa tu información de contacto
-
-2. Crea tu Primer Tour
-   - Ve a "Mis Tours" en tu panel de control
-   - Haz clic en "Crear Nuevo Tour"
-   - Agrega fotos, descripción, precio y disponibilidad
-
-3. Configura tus Métodos de Pago
-   - Revisa tu información bancaria en tu perfil
-   - Asegúrate de que tu CLABE esté correcta
-
-4. Promociona tus Tours
-   - Comparte el enlace de tu perfil
-   - Invita a tus clientes actuales
-   - Aprovecha las redes sociales
-
-IMPORTANTE:
-- Los pagos se procesarán automáticamente a través de la plataforma
-- Recibirás tus ganancias después de cada tour completado
-- Mantén actualizada tu disponibilidad para evitar problemas
-
-¿Tienes alguna duda?
-Estamos aquí para ayudarte: contacto@toursred.com
-
-¡Bienvenido oficialmente a la familia ToursRed!
-Estamos emocionados de trabajar contigo.
-
-Saludos,
-Equipo ToursRed
-    `;
+    const fromEmail = emailSettings.contact_email || "contacto@toursred.com";
+    const logoUrl = `${supabaseUrl}/storage/v1/object/public/images/email-logo.png`;
+    const appUrl = "https://toursred.com";
+    const displayName = `${contactFirstName} ${contactLastName}`.trim();
 
     const htmlContent = `
 <!DOCTYPE html>
 <html>
 <head>
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; padding: 30px 20px; text-align: center; }
-    .logo { max-width: 200px; height: auto; margin-bottom: 10px; }
-    .content { background-color: #f9fafb; padding: 30px 20px; border: 1px solid #e5e7eb; }
-    .success-box { background-color: #d1fae5; padding: 20px; border-left: 4px solid #10b981; margin: 20px 0; border-radius: 6px; }
-    .success-box h2 { color: #10b981; margin-top: 0; font-size: 24px; }
-    .benefits-box { background-color: white; padding: 20px; margin: 20px 0; border-radius: 8px; border: 1px solid #e5e7eb; }
-    .benefits-box ul { margin: 10px 0; padding-left: 20px; }
-    .benefits-box li { padding: 8px 0; color: #374151; }
-    .steps-section { margin: 25px 0; }
-    .step { background-color: white; padding: 20px; margin: 15px 0; border-radius: 8px; border-left: 4px solid #1e40af; }
-    .step h3 { color: #1e40af; margin-top: 0; font-size: 18px; }
-    .step p { color: #6b7280; margin: 5px 0; }
-    .important-box { background-color: #fef3c7; padding: 20px; border-left: 4px solid #f59e0b; margin: 20px 0; border-radius: 6px; }
-    .important-box h3 { color: #f59e0b; margin-top: 0; }
-    .important-box ul { margin: 10px 0; padding-left: 20px; }
-    .important-box li { padding: 5px 0; }
-    .button { display: inline-block; padding: 15px 30px; background-color: #1e40af; color: white; text-decoration: none; border-radius: 8px; margin-top: 20px; font-weight: bold; }
-    .button:hover { background-color: #1e3a8a; }
-    .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; border-top: 1px solid #e5e7eb; margin-top: 20px; }
-    .emoji { font-size: 24px; }
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tu agencia ha sido aprobada - ToursRed</title>
 </head>
-<body>
-  <div class="container">
-    <div class="header">
-      <img src="https://huzsedewwzjywcpbkjkm.supabase.co/storage/v1/object/public/images/email-logo.png" alt="ToursRed Logo" class="logo" />
-      <h1 style="margin: 10px 0;">¡Tu Agencia ha sido Aprobada!</h1>
-      <p style="margin: 0; font-size: 16px; opacity: 0.9;">Ya puedes comenzar a publicar tus tours</p>
-    </div>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" style="width: 100%; max-width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.07);">
 
-    <div class="content">
-      <div class="success-box">
-        <h2><span class="emoji">🎉</span> ¡Felicidades ${firstName}!</h2>
-        <p style="font-size: 16px; margin: 10px 0;">Tu agencia <strong>${agencyName}</strong> ha sido validada y aprobada exitosamente en ToursRed.</p>
-      </div>
+          <!-- Header -->
+          <tr>
+            <td style="padding: 36px 40px 28px 40px; text-align: center; background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); border-radius: 12px 12px 0 0;">
+              <img src="${logoUrl}" alt="ToursRed" style="max-width: 160px; height: auto; margin-bottom: 16px; background: white; padding: 8px 16px; border-radius: 8px;" />
+              <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 700;">Agencia Aprobada</h1>
+              <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.85); font-size: 15px;">${agencyName}</p>
+            </td>
+          </tr>
 
-      <div class="benefits-box">
-        <h3 style="color: #1e40af; margin-top: 0;">A partir de ahora puedes:</h3>
-        <ul>
-          <li>✅ Publicar tus tours y experiencias</li>
-          <li>✅ Recibir reservas de viajeros de toda la plataforma</li>
-          <li>✅ Gestionar tus bookings desde el panel de control</li>
-          <li>✅ Configurar tus tarifas y disponibilidad</li>
-          <li>✅ Recibir pagos automáticos de los clientes</li>
-        </ul>
-      </div>
+          <!-- Badge aprobado -->
+          <tr>
+            <td style="padding: 32px 40px 0 40px; text-align: center;">
+              <div style="display: inline-block; background-color: #f0fdf4; border: 2px solid #16a34a; border-radius: 50px; padding: 10px 24px;">
+                <span style="color: #16a34a; font-size: 15px; font-weight: 700;">Cuenta activa y verificada</span>
+              </div>
+            </td>
+          </tr>
 
-      <div class="steps-section">
-        <h2 style="color: #1e40af; text-align: center;">Próximos Pasos</h2>
+          <!-- Body -->
+          <tr>
+            <td style="padding: 28px 40px 40px 40px;">
 
-        <div class="step">
-          <h3>1. Completa tu Perfil de Agencia</h3>
-          <p>• Agrega una descripción atractiva de tu empresa</p>
-          <p>• Sube tu logo y fotos representativas</p>
-          <p>• Completa tu información de contacto</p>
-        </div>
+              <p style="margin: 0 0 20px 0; color: #374151; font-size: 17px; line-height: 28px;">
+                Hola <strong>${displayName}</strong>,
+              </p>
+              <p style="margin: 0 0 28px 0; color: #4b5563; font-size: 15px; line-height: 26px;">
+                Nos complace informarte que tu agencia <strong>${agencyName}</strong> ha sido
+                <strong style="color: #16a34a;">aprobada oficialmente</strong> en la plataforma ToursRed.
+                A partir de este momento puedes comenzar a publicar tus tours y recibir reservas.
+              </p>
 
-        <div class="step">
-          <h3>2. Crea tu Primer Tour</h3>
-          <p>• Ve a "Mis Tours" en tu panel de control</p>
-          <p>• Haz clic en "Crear Nuevo Tour"</p>
-          <p>• Agrega fotos, descripción, precio y disponibilidad</p>
-        </div>
+              <!-- Pasos -->
+              <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 24px 28px; margin: 0 0 28px 0;">
+                <p style="margin: 0 0 20px 0; color: #111827; font-size: 15px; font-weight: 700;">Primeros pasos en la plataforma</p>
 
-        <div class="step">
-          <h3>3. Configura tus Métodos de Pago</h3>
-          <p>• Revisa tu información bancaria en tu perfil</p>
-          <p>• Asegúrate de que tu CLABE esté correcta para recibir pagos</p>
-        </div>
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; vertical-align: middle;">
+                      <table role="presentation" style="border-collapse: collapse;">
+                        <tr>
+                          <td style="vertical-align: middle; padding-right: 12px;">
+                            <div style="width: 26px; height: 26px; background-color: #dc2626; color: white; border-radius: 50%; text-align: center; line-height: 26px; font-size: 12px; font-weight: 700;">1</div>
+                          </td>
+                          <td style="color: #4b5563; font-size: 14px; line-height: 22px;">Inicia sesión en tu cuenta con tus credenciales</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; vertical-align: middle;">
+                      <table role="presentation" style="border-collapse: collapse;">
+                        <tr>
+                          <td style="vertical-align: middle; padding-right: 12px;">
+                            <div style="width: 26px; height: 26px; background-color: #dc2626; color: white; border-radius: 50%; text-align: center; line-height: 26px; font-size: 12px; font-weight: 700;">2</div>
+                          </td>
+                          <td style="color: #4b5563; font-size: 14px; line-height: 22px;">Completa el perfil de tu agencia con logo, descripcion y datos bancarios</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; vertical-align: middle;">
+                      <table role="presentation" style="border-collapse: collapse;">
+                        <tr>
+                          <td style="vertical-align: middle; padding-right: 12px;">
+                            <div style="width: 26px; height: 26px; background-color: #dc2626; color: white; border-radius: 50%; text-align: center; line-height: 26px; font-size: 12px; font-weight: 700;">3</div>
+                          </td>
+                          <td style="color: #4b5563; font-size: 14px; line-height: 22px;">Crea tu primer tour y comienza a recibir reservas</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; vertical-align: middle;">
+                      <table role="presentation" style="border-collapse: collapse;">
+                        <tr>
+                          <td style="vertical-align: middle; padding-right: 12px;">
+                            <div style="width: 26px; height: 26px; background-color: #dc2626; color: white; border-radius: 50%; text-align: center; line-height: 26px; font-size: 12px; font-weight: 700;">4</div>
+                          </td>
+                          <td style="color: #4b5563; font-size: 14px; line-height: 22px;">Configura tus metodos de pago y datos de facturacion</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+              </div>
 
-        <div class="step">
-          <h3>4. Promociona tus Tours</h3>
-          <p>• Comparte el enlace de tu perfil público</p>
-          <p>• Invita a tus clientes actuales a reservar en línea</p>
-          <p>• Aprovecha las redes sociales para difundir tus tours</p>
-        </div>
-      </div>
+              <!-- Boton -->
+              <div style="text-align: center; margin-bottom: 32px;">
+                <a href="${appUrl}/login"
+                   style="display: inline-block; padding: 15px 48px; background-color: #dc2626; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                  Ir a mi panel de agencia
+                </a>
+              </div>
 
-      <div class="important-box">
-        <h3>⚠️ Importante</h3>
-        <ul>
-          <li>Los pagos se procesarán automáticamente a través de la plataforma</li>
-          <li>Recibirás tus ganancias después de cada tour completado</li>
-          <li>Mantén actualizada tu disponibilidad para evitar problemas con las reservas</li>
-          <li>Responde rápido a las consultas de los viajeros para mejorar tu reputación</li>
-        </ul>
-      </div>
+              <!-- Ejecutivo asignado -->
+              <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; padding: 20px 24px;">
+                <p style="margin: 0 0 8px 0; color: #0369a1; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Tu Ejecutivo de Cuenta</p>
+                <p style="margin: 0 0 6px 0; color: #0c4a6e; font-size: 15px; font-weight: 600;">${executiveName}</p>
+                <p style="margin: 0; color: #4b5563; font-size: 14px; line-height: 22px;">
+                  Para cualquier duda o asistencia, contacta directamente a
+                  <a href="mailto:${executiveEmail}" style="color: #dc2626; text-decoration: none; font-weight: 600;">${executiveEmail}</a>
+                </p>
+              </div>
 
-      <div style="text-align: center; margin: 30px 0;">
-        <a href="https://www.toursred.com/dashboard" class="button">Ir a Mi Panel de Control</a>
-      </div>
+            </td>
+          </tr>
 
-      <p style="text-align: center; color: #6b7280; margin-top: 30px;">
-        ¿Tienes alguna duda? Estamos aquí para ayudarte:<br>
-        <a href="mailto:contacto@toursred.com" style="color: #1e40af;">contacto@toursred.com</a>
-      </p>
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px 40px; background-color: #f9fafb; border-radius: 0 0 12px 12px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 4px 0; color: #9ca3af; font-size: 13px;">Dudas generales: <a href="mailto:${fromEmail}" style="color: #dc2626; text-decoration: none;">${fromEmail}</a></p>
+              <p style="margin: 0; color: #d1d5db; font-size: 12px;">&copy; ${new Date().getFullYear()} ToursRed. Todos los derechos reservados.</p>
+            </td>
+          </tr>
 
-      <p style="text-align: center; margin-top: 30px; font-size: 18px; color: #1e40af;">
-        <strong>¡Bienvenido oficialmente a la familia ToursRed!</strong><br>
-        <span style="font-size: 14px; color: #6b7280;">Estamos emocionados de trabajar contigo.</span>
-      </p>
-    </div>
-
-    <div class="footer">
-      <p><strong>Equipo ToursRed</strong></p>
-      <p>Este es un correo automático, por favor no respondas a este mensaje.</p>
-      <p>Para soporte, contacta a: contacto@toursred.com</p>
-    </div>
-  </div>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
-</html>
-    `;
+</html>`;
 
-    const emailPayload = {
-      api_key: emailSettings.smtp_api_key,
-      to: [email],
-      sender: "no-reply@toursred.com",
-      subject: `🎉 ¡Tu agencia ${agencyName} ha sido aprobada!`,
-      text_body: textContent,
-      html_body: htmlContent,
-    };
+    const textContent = `Tu agencia ha sido aprobada en ToursRed!
 
-    console.log("Sending agency approval email via SMTP2GO API...");
+Hola ${displayName},
+
+Nos complace informarte que tu agencia "${agencyName}" ha sido aprobada oficialmente en la plataforma ToursRed. A partir de este momento puedes comenzar a publicar tus tours y recibir reservas.
+
+PRIMEROS PASOS:
+1. Inicia sesion con tus credenciales en: ${appUrl}/login
+2. Completa el perfil de tu agencia con logo, descripcion y datos bancarios
+3. Crea tu primer tour y comienza a recibir reservas
+4. Configura tus metodos de pago y datos de facturacion
+
+TU EJECUTIVO DE CUENTA:
+${executiveName} - ${executiveEmail}
+
+Dudas generales: ${fromEmail}
+
+(c) ${new Date().getFullYear()} ToursRed. Todos los derechos reservados.`;
 
     const response = await fetch("https://api.smtp2go.com/v3/email/send", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "X-Smtp2go-Api-Key": emailSettings.smtp_api_key,
       },
-      body: JSON.stringify(emailPayload),
+      body: JSON.stringify({
+        sender: fromEmail,
+        to: [contactEmail],
+        subject: `Tu agencia "${agencyName}" ha sido aprobada en ToursRed`,
+        html_body: htmlContent,
+        text_body: textContent,
+      }),
     });
 
     const result = await response.json();
-
     if (!response.ok || result.data?.error) {
-      console.error("SMTP2GO API Error:", result);
-      throw new Error(result.data?.error || `SMTP2GO API Error: ${response.status}`);
+      throw new Error(result.data?.error || `SMTP2GO error: ${response.status}`);
     }
 
-    console.log("Approval email sent successfully:", result);
-
     return new Response(
-      JSON.stringify({ success: true, message: "Email de aprobación enviado correctamente" }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ success: true }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Error sending approval email:", error);
+    console.error("Error in send-agency-approval:", error);
     return new Response(
-      JSON.stringify({ error: "Error al enviar el email de aprobación", details: error.message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ error: error instanceof Error ? error.message : "Error interno" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
