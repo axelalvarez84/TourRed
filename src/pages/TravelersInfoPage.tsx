@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { Users, ArrowLeft, Save, UserPlus, Check, AlertCircle, AlertTriangle, Lock } from 'lucide-react';
+import { Users, ArrowLeft, Save, UserPlus, Check, AlertCircle, AlertTriangle, Lock, Shield, Copy } from 'lucide-react';
 import { formatCurrencyMXN, formatCurrency } from '../utils/formatCurrency';
 import { supabase } from '../lib/supabase';
 import { Booking, BookingTraveler, Tour, FrequentCompanion } from '../types';
@@ -18,6 +18,10 @@ interface TravelerFormData {
   promo_discount_per_traveler: number;
   saveAsFrequentCompanion: boolean;
   selectedCompanionId?: string;
+  documento_tipo?: 'curp' | 'pasaporte';
+  documento_numero?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
 }
 
 const TravelersInfoPage: React.FC = () => {
@@ -34,6 +38,14 @@ const TravelersInfoPage: React.FC = () => {
   const [travelerErrors, setTravelerErrors] = useState<string[]>([]);
   const [showCompanionsSection, setShowCompanionsSection] = useState(true);
   const [mpBrick, setMpBrick] = useState<{ preferenceId: string; publicKey: string; amount: number } | null>(null);
+  const [copyEmergencyToAll, setCopyEmergencyToAll] = useState(false);
+  const [userProfile, setUserProfile] = useState<{
+    curp?: string;
+    passport_number?: string;
+    is_foreign_traveler?: boolean;
+    emergency_contact_name?: string;
+    emergency_contact_phone?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!bookingId) {
@@ -117,6 +129,10 @@ const TravelersInfoPage: React.FC = () => {
       promo_discount_per_traveler: Number(t.promo_discount_per_traveler) || 0,
       saveAsFrequentCompanion: false,
       selectedCompanionId: t.frequent_companion_id,
+      documento_tipo: t.documento_tipo || undefined,
+      documento_numero: t.documento_numero || '',
+      emergency_contact_name: t.emergency_contact_name || '',
+      emergency_contact_phone: t.emergency_contact_phone || '',
     }));
   };
 
@@ -132,9 +148,19 @@ const TravelersInfoPage: React.FC = () => {
 
     const { data: userData } = await supabase
       .from('users')
-      .select('first_name, last_name, email, phone_number, date_of_birth')
+      .select('first_name, last_name, email, phone_number, date_of_birth, curp, passport_number, is_foreign_traveler, emergency_contact_name, emergency_contact_phone')
       .eq('id', user?.id)
       .maybeSingle();
+
+    if (userData) {
+      setUserProfile({
+        curp: userData.curp || undefined,
+        passport_number: userData.passport_number || undefined,
+        is_foreign_traveler: userData.is_foreign_traveler,
+        emergency_contact_name: userData.emergency_contact_name || undefined,
+        emergency_contact_phone: userData.emergency_contact_phone || undefined,
+      });
+    }
 
     let promoDiscountPct = 0;
     if ((bookingData as any).promotion_id && Number((bookingData as any).promo_discount_amount) > 0) {
@@ -169,6 +195,10 @@ const TravelersInfoPage: React.FC = () => {
           precio_aplicado: precioAdulto - discount,
           promo_discount_per_traveler: discount,
           saveAsFrequentCompanion: false,
+          documento_tipo: userData.is_foreign_traveler ? 'pasaporte' : 'curp',
+          documento_numero: userData.is_foreign_traveler ? (userData.passport_number || '') : (userData.curp || ''),
+          emergency_contact_name: userData.emergency_contact_name || '',
+          emergency_contact_phone: userData.emergency_contact_phone || '',
         });
       } else {
         travelersList.push(createEmptyTraveler('adulto', precioAdulto - calcDiscountForCategory(precioAdulto), calcDiscountForCategory(precioAdulto)));
@@ -207,6 +237,10 @@ const TravelersInfoPage: React.FC = () => {
       precio_aplicado: precio,
       promo_discount_per_traveler: promoDiscount,
       saveAsFrequentCompanion: false,
+      documento_tipo: undefined,
+      documento_numero: '',
+      emergency_contact_name: '',
+      emergency_contact_phone: '',
     };
   };
 
@@ -227,6 +261,12 @@ const TravelersInfoPage: React.FC = () => {
       ...updatedTravelers[index],
       [field]: value,
     };
+    // Si se cambia el contacto de emergencia del primer viajero y copyEmergencyToAll está activo, propagar a todos
+    if (copyEmergencyToAll && index === 0 && (field === 'emergency_contact_name' || field === 'emergency_contact_phone')) {
+      for (let i = 1; i < updatedTravelers.length; i++) {
+        updatedTravelers[i] = { ...updatedTravelers[i], [field]: value };
+      }
+    }
     setTravelers(updatedTravelers);
 
     if (field === 'fecha_nacimiento' && typeof value === 'string' && value) {
@@ -239,6 +279,19 @@ const TravelersInfoPage: React.FC = () => {
       while (newErrors.length <= index) newErrors.push('');
       newErrors[index] = result.isValid ? '' : result.errorMessage;
       setTravelerErrors(newErrors);
+    }
+  };
+
+  const handleCopyEmergencyToAll = (checked: boolean) => {
+    setCopyEmergencyToAll(checked);
+    if (checked && travelers.length > 1) {
+      const first = travelers[0];
+      const updatedTravelers = travelers.map((t, i) => i === 0 ? t : {
+        ...t,
+        emergency_contact_name: first.emergency_contact_name || '',
+        emergency_contact_phone: first.emergency_contact_phone || '',
+      });
+      setTravelers(updatedTravelers);
     }
   };
 
@@ -331,6 +384,10 @@ const TravelersInfoPage: React.FC = () => {
         precio_aplicado: traveler.precio_aplicado,
         promo_discount_per_traveler: traveler.promo_discount_per_traveler || 0,
         frequent_companion_id: traveler.selectedCompanionId || null,
+        documento_tipo: traveler.documento_tipo || null,
+        documento_numero: traveler.documento_numero || null,
+        emergency_contact_name: traveler.emergency_contact_name || null,
+        emergency_contact_phone: traveler.emergency_contact_phone || null,
       }));
 
       console.log('Datos a insertar:', travelersToInsert);
@@ -357,6 +414,10 @@ const TravelersInfoPage: React.FC = () => {
               email: traveler.email,
               telefono: traveler.telefono || null,
               fecha_nacimiento: traveler.fecha_nacimiento,
+              documento_tipo: traveler.documento_tipo || null,
+              documento_numero: traveler.documento_numero || null,
+              emergency_contact_name: traveler.emergency_contact_name || null,
+              emergency_contact_phone: traveler.emergency_contact_phone || null,
             });
           }
         }
@@ -1109,6 +1170,85 @@ const TravelersInfoPage: React.FC = () => {
                     </>
                   )}
                 </div>
+
+                {/* Campos para seguro de viajero — solo cuando la reserva incluye seguro y el viajero no es mascota */}
+                {booking?.travel_insurance_included && traveler.categoria_viajero !== 'mascota' && (
+                  <div className="mt-4 border border-emerald-200 rounded-lg bg-emerald-50 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Shield className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <span className="text-sm font-semibold text-emerald-800">Datos para el Seguro de Viajero</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Tipo de documento *
+                        </label>
+                        <select
+                          value={traveler.documento_tipo || ''}
+                          onChange={(e) => handleTravelerChange(index, 'documento_tipo', e.target.value as 'curp' | 'pasaporte')}
+                          className="input"
+                          required
+                        >
+                          <option value="">Seleccionar...</option>
+                          <option value="curp">CURP (nacional)</option>
+                          <option value="pasaporte">Pasaporte (extranjero)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {traveler.documento_tipo === 'pasaporte' ? 'Número de Pasaporte *' : 'CURP *'}
+                        </label>
+                        <input
+                          type="text"
+                          value={traveler.documento_numero || ''}
+                          onChange={(e) => handleTravelerChange(index, 'documento_numero', e.target.value.toUpperCase())}
+                          className="input uppercase"
+                          placeholder={traveler.documento_tipo === 'pasaporte' ? 'A12345678' : 'ABCD123456HDFRRL09'}
+                          maxLength={traveler.documento_tipo === 'pasaporte' ? 20 : 18}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Nombre del contacto de emergencia *
+                        </label>
+                        <input
+                          type="text"
+                          value={traveler.emergency_contact_name || ''}
+                          onChange={(e) => handleTravelerChange(index, 'emergency_contact_name', e.target.value)}
+                          className="input"
+                          placeholder="Nombre completo"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Teléfono del contacto de emergencia *
+                        </label>
+                        <input
+                          type="tel"
+                          value={traveler.emergency_contact_phone || ''}
+                          onChange={(e) => handleTravelerChange(index, 'emergency_contact_phone', e.target.value)}
+                          className="input"
+                          placeholder="+52 55 1234 5678"
+                        />
+                      </div>
+                    </div>
+                    {/* Opción "mismo contacto para todos" — solo visible en el primer viajero y si hay más de uno */}
+                    {index === 0 && travelers.filter(t => t.categoria_viajero !== 'mascota').length > 1 && (
+                      <div className="mt-3 pt-3 border-t border-emerald-200">
+                        <label className="flex items-center gap-2 cursor-pointer text-sm">
+                          <input
+                            type="checkbox"
+                            checked={copyEmergencyToAll}
+                            onChange={(e) => handleCopyEmergencyToAll(e.target.checked)}
+                            className="h-4 w-4 text-emerald-600 border-gray-300 rounded"
+                          />
+                          <Copy className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="text-emerald-800 font-medium">Usar el mismo contacto de emergencia para todos los acompañantes</span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {traveler.categoria_viajero !== 'mascota' && index > 0 && (
                   <div className="mt-4">

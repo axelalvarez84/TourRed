@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.6";
+import * as XLSX from "npm:xlsx@0.18.5";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -47,6 +48,86 @@ function formatDate(dateStr: string | null | undefined): string {
   }
 }
 
+function formatDateShort(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  try {
+    const d = new Date(dateStr + "T12:00:00");
+    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  } catch {
+    return dateStr;
+  }
+}
+
+function generateXlsxBase64(
+  travelers: any[],
+  bookingCode: string,
+  tourName: string,
+  agencyName: string,
+  tourStart: string,
+  tourEnd: string
+): { base64: string; filename: string } {
+  const headers = [
+    "Nombre",
+    "Apellido",
+    "País",
+    "Tipo de documento",
+    "Número de documento",
+    "Fecha de nacimiento",
+    "Email",
+    "Nombre contacto emergencia",
+    "Teléfono contacto emergencia",
+  ];
+
+  const rows = travelers.map((t) => {
+    const nameParts = (t.nombre || "").trim().split(/\s+/);
+    const nombre = nameParts[0] || "";
+    const apellido = nameParts.slice(1).join(" ") || "";
+    const tipoDoc = t.documento_tipo === "pasaporte" ? "PASAPORTE" : "CURP";
+    return [
+      nombre,
+      apellido,
+      "México",
+      tipoDoc,
+      (t.documento_numero || "").toUpperCase(),
+      formatDateShort(t.fecha_nacimiento),
+      t.email || "",
+      t.emergency_contact_name || "",
+      t.emergency_contact_phone || "",
+    ];
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws["!cols"] = [
+    { wch: 20 }, { wch: 25 }, { wch: 12 }, { wch: 18 },
+    { wch: 22 }, { wch: 18 }, { wch: 30 }, { wch: 30 }, { wch: 22 },
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Pasajeros");
+
+  const metaWs = XLSX.utils.aoa_to_sheet([
+    ["Campo", "Valor"],
+    ["Código de reserva", bookingCode],
+    ["Tour", tourName],
+    ["Agencia", agencyName],
+    ["Fecha inicio", formatDateShort(tourStart)],
+    ["Fecha fin", formatDateShort(tourEnd)],
+    ["Total viajeros asegurados", rows.length],
+  ]);
+  metaWs["!cols"] = [{ wch: 25 }, { wch: 40 }];
+  XLSX.utils.book_append_sheet(wb, metaWs, "Reserva");
+
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+  return { base64, filename: `seguro_${bookingCode}_pasajeros.xlsx` };
+}
+
+const TOURSRED_LOGO_HTML = `<div style="display:inline-flex;align-items:center;gap:8px;">
+  <div style="background:rgba(255,255,255,0.15);border-radius:6px;padding:6px 12px;display:inline-block;">
+    <span style="font-size:22px;font-weight:900;color:#ffffff;letter-spacing:-1px;">Tours</span><span style="font-size:22px;font-weight:900;color:#a7f3d0;letter-spacing:-1px;">Red</span>
+  </div>
+</div>`;
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -77,7 +158,6 @@ Deno.serve(async (req: Request) => {
       insurance_cost,
     } = payload;
 
-    // Obtener configuración de email
     const { data: emailSettings } = await supabase
       .from("email_settings")
       .select("smtp_api_key, contact_email")
@@ -87,15 +167,44 @@ Deno.serve(async (req: Request) => {
       throw new Error("Email settings no configurados");
     }
 
+    // Obtener datos individuales de cada viajero asegurado
+    const { data: bookingTravelers } = await supabase
+      .from("booking_travelers")
+      .select("nombre, fecha_nacimiento, documento_tipo, documento_numero, emergency_contact_name, emergency_contact_phone, email, categoria_viajero")
+      .eq("booking_id", booking_id)
+      .neq("categoria_viajero", "mascota")
+      .eq("is_cancelled", false)
+      .order("created_at", { ascending: true });
+
+    const travelers = bookingTravelers || [];
+
     const recipientEmail = "seguros@toursred.com.mx";
     const pricePerDay = total_travelers > 0 ? insurance_cost / tour_days / total_travelers : insurance_cost;
 
-    const travelerRows = [
+    const travelerCountRows = [
       count_adultos > 0 ? `<tr><td style="padding:6px 12px;color:#374151;">Adultos</td><td style="padding:6px 12px;text-align:right;font-weight:600;">${count_adultos}</td></tr>` : "",
       count_ninos > 0 ? `<tr><td style="padding:6px 12px;color:#374151;">Niños</td><td style="padding:6px 12px;text-align:right;font-weight:600;">${count_ninos}</td></tr>` : "",
       count_infantes > 0 ? `<tr><td style="padding:6px 12px;color:#374151;">Infantes</td><td style="padding:6px 12px;text-align:right;font-weight:600;">${count_infantes}</td></tr>` : "",
       count_adultos_mayores > 0 ? `<tr><td style="padding:6px 12px;color:#374151;">Adultos mayores</td><td style="padding:6px 12px;text-align:right;font-weight:600;">${count_adultos_mayores}</td></tr>` : "",
     ].filter(Boolean).join("");
+
+    const detailedTravelerRows = travelers.map((t, i) => {
+      const tipoDoc = t.documento_tipo === "pasaporte" ? "Pasaporte" : (t.documento_tipo === "curp" ? "CURP" : "—");
+      const numDoc = t.documento_numero ? t.documento_numero.toUpperCase() : "—";
+      const emergencia = t.emergency_contact_name
+        ? `${t.emergency_contact_name}${t.emergency_contact_phone ? " · " + t.emergency_contact_phone : ""}`
+        : "—";
+      const bg = i % 2 === 0 ? "#f9fafb" : "#ffffff";
+      return `
+      <tr style="background:${bg};">
+        <td style="padding:8px 10px;font-size:12px;color:#111827;font-weight:600;">${i + 1}. ${t.nombre || "—"}</td>
+        <td style="padding:8px 10px;font-size:12px;color:#374151;">${formatDateShort(t.fecha_nacimiento)}</td>
+        <td style="padding:8px 10px;font-size:12px;color:#374151;">${tipoDoc}: <span style="font-family:monospace;">${numDoc}</span></td>
+        <td style="padding:8px 10px;font-size:12px;color:#6b7280;">${emergencia}</td>
+      </tr>`;
+    }).join("");
+
+    const hasTravelerDetails = travelers.some(t => t.documento_numero || t.emergency_contact_name);
 
     const html = `<!DOCTYPE html>
 <html lang="es">
@@ -110,90 +219,70 @@ Deno.serve(async (req: Request) => {
       <td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
 
-          <!-- Header -->
+          <!-- Header con logo -->
           <tr>
-            <td style="background:linear-gradient(135deg,#064e3b,#065f46);padding:32px 40px;text-align:center;">
-              <div style="font-size:36px;margin-bottom:8px;">🛡️</div>
-              <h1 style="color:#ffffff;font-size:22px;font-weight:700;margin:0 0 6px;">Nueva solicitud de seguro de viaje</h1>
-              <p style="color:#a7f3d0;font-size:14px;margin:0;">Emitir póliza con Assist Card o Universal Assistance según corresponda</p>
+            <td style="background:linear-gradient(135deg,#064e3b,#065f46);padding:28px 40px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    ${TOURSRED_LOGO_HTML}
+                    <p style="color:#a7f3d0;font-size:11px;margin:4px 0 0;">Plataforma de viajes</p>
+                  </td>
+                  <td align="right">
+                    <div style="background:rgba(255,255,255,0.15);border-radius:8px;padding:10px 16px;display:inline-block;text-align:center;">
+                      <div style="font-size:28px;">🛡️</div>
+                      <div style="color:#a7f3d0;font-size:11px;margin-top:4px;">Seguro de Viaje</div>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+              <h1 style="color:#ffffff;font-size:20px;font-weight:700;margin:16px 0 4px;">Nueva solicitud de seguro de viaje</h1>
+              <p style="color:#a7f3d0;font-size:13px;margin:0;">Emitir póliza con Assist Card o Universal Assistance según corresponda</p>
             </td>
           </tr>
 
-          <!-- Alert box -->
+          <!-- Alert -->
           <tr>
             <td style="padding:24px 40px 0;">
-              <div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:14px 18px;display:flex;align-items:center;gap:12px;">
-                <span style="font-size:20px;">✅</span>
-                <div>
-                  <p style="margin:0;font-weight:600;color:#065f46;font-size:14px;">Pago recibido — seguro contratado</p>
-                  <p style="margin:4px 0 0;color:#047857;font-size:13px;">El viajero pagó <strong>${formatMXN(insurance_cost)}</strong> por cobertura de seguro de viaje. Favor de emitir la póliza correspondiente.</p>
-                </div>
+              <div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:14px 18px;">
+                <p style="margin:0;font-weight:600;color:#065f46;font-size:14px;">✅ Pago recibido — seguro contratado</p>
+                <p style="margin:4px 0 0;color:#047857;font-size:13px;">El viajero pagó <strong>${formatMXN(insurance_cost)}</strong> por cobertura de seguro de viaje. Favor de emitir la póliza correspondiente.</p>
               </div>
             </td>
           </tr>
 
-          <!-- Booking data -->
+          <!-- Datos de la reserva -->
           <tr>
             <td style="padding:24px 40px;">
-              <h2 style="font-size:16px;font-weight:700;color:#111827;margin:0 0 16px;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">
-                📋 Datos de la Reserva
-              </h2>
+              <h2 style="font-size:15px;font-weight:700;color:#111827;margin:0 0 14px;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">📋 Datos de la Reserva</h2>
               <table width="100%" cellpadding="0" cellspacing="0">
-                <tr style="background:#f9fafb;">
-                  <td style="padding:8px 12px;color:#6b7280;font-size:13px;width:45%;">Código de reserva</td>
-                  <td style="padding:8px 12px;font-weight:700;font-size:13px;font-family:monospace;color:#111827;">${booking_code}</td>
-                </tr>
-                <tr>
-                  <td style="padding:8px 12px;color:#6b7280;font-size:13px;">Tour</td>
-                  <td style="padding:8px 12px;font-weight:600;font-size:13px;color:#111827;">${tour_name}</td>
-                </tr>
-                <tr style="background:#f9fafb;">
-                  <td style="padding:8px 12px;color:#6b7280;font-size:13px;">Agencia</td>
-                  <td style="padding:8px 12px;font-size:13px;color:#374151;">${agency_name || "—"}</td>
-                </tr>
-                <tr>
-                  <td style="padding:8px 12px;color:#6b7280;font-size:13px;">Fecha de salida</td>
-                  <td style="padding:8px 12px;font-size:13px;color:#374151;">${formatDate(tour_start_date)}</td>
-                </tr>
-                <tr style="background:#f9fafb;">
-                  <td style="padding:8px 12px;color:#6b7280;font-size:13px;">Fecha de regreso</td>
-                  <td style="padding:8px 12px;font-size:13px;color:#374151;">${formatDate(tour_end_date)}</td>
-                </tr>
-                <tr>
-                  <td style="padding:8px 12px;color:#6b7280;font-size:13px;">Días de cobertura</td>
-                  <td style="padding:8px 12px;font-weight:600;font-size:13px;color:#111827;">${tour_days} día${tour_days !== 1 ? "s" : ""}</td>
-                </tr>
+                <tr style="background:#f9fafb;"><td style="padding:8px 12px;color:#6b7280;font-size:13px;width:42%;">Código de reserva</td><td style="padding:8px 12px;font-weight:700;font-size:13px;font-family:monospace;color:#111827;">${booking_code}</td></tr>
+                <tr><td style="padding:8px 12px;color:#6b7280;font-size:13px;">Tour</td><td style="padding:8px 12px;font-weight:600;font-size:13px;color:#111827;">${tour_name}</td></tr>
+                <tr style="background:#f9fafb;"><td style="padding:8px 12px;color:#6b7280;font-size:13px;">Agencia</td><td style="padding:8px 12px;font-size:13px;color:#374151;">${agency_name || "—"}</td></tr>
+                <tr><td style="padding:8px 12px;color:#6b7280;font-size:13px;">Fecha de salida</td><td style="padding:8px 12px;font-size:13px;color:#374151;">${formatDate(tour_start_date)}</td></tr>
+                <tr style="background:#f9fafb;"><td style="padding:8px 12px;color:#6b7280;font-size:13px;">Fecha de regreso</td><td style="padding:8px 12px;font-size:13px;color:#374151;">${formatDate(tour_end_date)}</td></tr>
+                <tr><td style="padding:8px 12px;color:#6b7280;font-size:13px;">Días de cobertura</td><td style="padding:8px 12px;font-weight:600;font-size:13px;color:#111827;">${tour_days} día${tour_days !== 1 ? "s" : ""}</td></tr>
               </table>
             </td>
           </tr>
 
-          <!-- Traveler data -->
+          <!-- Viajero titular -->
           <tr>
             <td style="padding:0 40px 24px;">
-              <h2 style="font-size:16px;font-weight:700;color:#111827;margin:0 0 16px;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">
-                👤 Datos del Viajero Titular
-              </h2>
+              <h2 style="font-size:15px;font-weight:700;color:#111827;margin:0 0 14px;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">👤 Viajero Titular</h2>
               <table width="100%" cellpadding="0" cellspacing="0">
-                <tr style="background:#f9fafb;">
-                  <td style="padding:8px 12px;color:#6b7280;font-size:13px;width:45%;">Nombre</td>
-                  <td style="padding:8px 12px;font-weight:600;font-size:13px;color:#111827;">${traveler_name || "—"}</td>
-                </tr>
-                <tr>
-                  <td style="padding:8px 12px;color:#6b7280;font-size:13px;">Email</td>
-                  <td style="padding:8px 12px;font-size:13px;color:#374151;"><a href="mailto:${traveler_email}" style="color:#059669;">${traveler_email || "—"}</a></td>
-                </tr>
+                <tr style="background:#f9fafb;"><td style="padding:8px 12px;color:#6b7280;font-size:13px;width:42%;">Nombre</td><td style="padding:8px 12px;font-weight:600;font-size:13px;color:#111827;">${traveler_name || "—"}</td></tr>
+                <tr><td style="padding:8px 12px;color:#6b7280;font-size:13px;">Email</td><td style="padding:8px 12px;font-size:13px;"><a href="mailto:${traveler_email}" style="color:#059669;">${traveler_email || "—"}</a></td></tr>
               </table>
             </td>
           </tr>
 
-          <!-- Travelers count -->
+          <!-- Conteo -->
           <tr>
             <td style="padding:0 40px 24px;">
-              <h2 style="font-size:16px;font-weight:700;color:#111827;margin:0 0 16px;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">
-                👥 Personas a Asegurar
-              </h2>
+              <h2 style="font-size:15px;font-weight:700;color:#111827;margin:0 0 14px;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">👥 Personas a Asegurar</h2>
               <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
-                ${travelerRows}
+                ${travelerCountRows}
                 <tr style="background:#ecfdf5;border-top:2px solid #6ee7b7;">
                   <td style="padding:8px 12px;color:#065f46;font-weight:700;font-size:13px;">Total de personas</td>
                   <td style="padding:8px 12px;text-align:right;font-weight:700;color:#065f46;font-size:15px;">${total_travelers}</td>
@@ -202,21 +291,32 @@ Deno.serve(async (req: Request) => {
             </td>
           </tr>
 
-          <!-- Insurance cost -->
+          ${hasTravelerDetails ? `
+          <!-- Datos detallados -->
+          <tr>
+            <td style="padding:0 40px 24px;">
+              <h2 style="font-size:15px;font-weight:700;color:#111827;margin:0 0 14px;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">📄 Datos de Cada Asegurado</h2>
+              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+                <tr style="background:#064e3b;">
+                  <th style="padding:8px 10px;color:#a7f3d0;font-size:11px;font-weight:600;text-align:left;">Nombre completo</th>
+                  <th style="padding:8px 10px;color:#a7f3d0;font-size:11px;font-weight:600;text-align:left;">Fecha nac.</th>
+                  <th style="padding:8px 10px;color:#a7f3d0;font-size:11px;font-weight:600;text-align:left;">Documento</th>
+                  <th style="padding:8px 10px;color:#a7f3d0;font-size:11px;font-weight:600;text-align:left;">Contacto emergencia</th>
+                </tr>
+                ${detailedTravelerRows}
+              </table>
+              <p style="font-size:11px;color:#9ca3af;margin:8px 0 0;">El archivo Excel adjunto contiene estos datos en el formato de importación de Universal Assistance.</p>
+            </td>
+          </tr>
+          ` : ""}
+
+          <!-- Costo -->
           <tr>
             <td style="padding:0 40px 32px;">
-              <h2 style="font-size:16px;font-weight:700;color:#111827;margin:0 0 16px;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">
-                💰 Costo del Seguro
-              </h2>
+              <h2 style="font-size:15px;font-weight:700;color:#111827;margin:0 0 14px;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">💰 Costo del Seguro</h2>
               <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
-                <tr style="background:#f9fafb;">
-                  <td style="padding:8px 12px;color:#6b7280;font-size:13px;">Precio por día por viajero</td>
-                  <td style="padding:8px 12px;text-align:right;font-size:13px;color:#374151;">${formatMXN(pricePerDay)}</td>
-                </tr>
-                <tr>
-                  <td style="padding:8px 12px;color:#6b7280;font-size:13px;">Días × viajeros</td>
-                  <td style="padding:8px 12px;text-align:right;font-size:13px;color:#374151;">${tour_days} × ${total_travelers}</td>
-                </tr>
+                <tr style="background:#f9fafb;"><td style="padding:8px 12px;color:#6b7280;font-size:13px;">Precio por día por viajero</td><td style="padding:8px 12px;text-align:right;font-size:13px;color:#374151;">${formatMXN(pricePerDay)}</td></tr>
+                <tr><td style="padding:8px 12px;color:#6b7280;font-size:13px;">Días × viajeros</td><td style="padding:8px 12px;text-align:right;font-size:13px;color:#374151;">${tour_days} × ${total_travelers}</td></tr>
                 <tr style="background:#ecfdf5;border-top:2px solid #6ee7b7;">
                   <td style="padding:10px 12px;color:#065f46;font-weight:700;font-size:15px;">Total pagado (MXN)</td>
                   <td style="padding:10px 12px;text-align:right;font-weight:700;color:#065f46;font-size:18px;">${formatMXN(insurance_cost)}</td>
@@ -225,7 +325,7 @@ Deno.serve(async (req: Request) => {
             </td>
           </tr>
 
-          <!-- Action required -->
+          <!-- Acción requerida -->
           <tr>
             <td style="padding:0 40px 32px;">
               <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:16px 20px;">
@@ -233,7 +333,8 @@ Deno.serve(async (req: Request) => {
                 <p style="margin:0;color:#78350f;font-size:13px;line-height:1.6;">
                   Por favor emitir la póliza de asistencia de viaje para los viajeros indicados.
                   Usar <strong>Assist Card</strong> o <strong>Universal Assistance</strong> según disponibilidad y cobertura del destino.
-                  Enviar la póliza al email del viajero titular: <strong>${traveler_email}</strong>
+                  Enviar la póliza al email del viajero titular: <strong>${traveler_email}</strong><br/>
+                  <span style="margin-top:6px;display:inline-block;">El archivo Excel adjunto contiene los datos de todos los pasajeros en el formato de importación de Universal Assistance.</span>
                 </p>
               </div>
             </td>
@@ -256,13 +357,30 @@ Deno.serve(async (req: Request) => {
 </body>
 </html>`;
 
-    const emailPayload = {
+    // Generar Excel adjunto
+    const { base64: xlsxBase64, filename: xlsxFilename } = generateXlsxBase64(
+      travelers,
+      booking_code,
+      tour_name,
+      agency_name,
+      tour_start_date,
+      tour_end_date
+    );
+
+    const emailPayload: any = {
       api_key: emailSettings.smtp_api_key,
       to: [{ email: recipientEmail, name: "Seguros ToursRed" }],
       sender: { email: emailSettings.contact_email, name: "ToursRed Plataforma" },
-      subject: `🛡️ Seguro de viaje — ${booking_code} | ${tour_name}`,
+      subject: `Seguro de viaje — ${booking_code} | ${tour_name}`,
       html_body: html,
       reply_to: emailSettings.contact_email,
+      attachments: [
+        {
+          filename: xlsxFilename,
+          fileblob: xlsxBase64,
+          mimetype: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        },
+      ],
     };
 
     const smtpResponse = await fetch("https://api.smtp2go.com/v3/email/send", {
@@ -272,13 +390,13 @@ Deno.serve(async (req: Request) => {
     });
 
     const smtpData = await smtpResponse.json();
+    console.log("SMTP response:", JSON.stringify(smtpData));
 
     if (smtpData.data?.succeeded !== 1) {
       console.error("SMTP error:", smtpData);
-      throw new Error("Error al enviar email de seguro");
+      throw new Error("Error al enviar email de seguro: " + JSON.stringify(smtpData));
     }
 
-    // Marcar como enviado
     await supabase
       .from("bookings")
       .update({ insurance_email_sent: true })

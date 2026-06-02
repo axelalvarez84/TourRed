@@ -2006,6 +2006,18 @@ const AgencyBookings: React.FC = () => {
                               <div className="text-gray-500 mb-1">Teléfono</div>
                               <div className="font-medium">{traveler.telefono || 'N/A'}</div>
                             </div>
+                            {(traveler.documento_numero) && (
+                              <div>
+                                <div className="text-gray-500 mb-1">Documento ({traveler.documento_tipo === 'pasaporte' ? 'Pasaporte' : 'CURP'})</div>
+                                <div className="font-medium font-mono uppercase">{traveler.documento_numero}</div>
+                              </div>
+                            )}
+                            {(traveler.emergency_contact_name || traveler.emergency_contact_phone) && (
+                              <div className="md:col-span-2">
+                                <div className="text-gray-500 mb-1">Contacto de emergencia</div>
+                                <div className="font-medium">{traveler.emergency_contact_name || '—'} {traveler.emergency_contact_phone ? `— ${traveler.emergency_contact_phone}` : ''}</div>
+                              </div>
+                            )}
                           </>
                         )}
                       </div>
@@ -2014,10 +2026,43 @@ const AgencyBookings: React.FC = () => {
                 </div>
               )}
 
-              <div className="mt-6 flex justify-end">
+              <div className="mt-6 flex items-center justify-between gap-3">
+                {travelersModal.booking?.travel_insurance_included && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const { data: { session } } = await supabase.auth.getSession();
+                        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-insurance-xlsx`, {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${session?.access_token}`,
+                          },
+                          body: JSON.stringify({ booking_id: travelersModal.booking!.id }),
+                        });
+                        const json = await res.json();
+                        if (!json.base64) throw new Error(json.error || 'Error al generar Excel');
+                        const bytes = Uint8Array.from(atob(json.base64), c => c.charCodeAt(0));
+                        const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = json.filename;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      } catch (e: any) {
+                        alert('Error al descargar: ' + e.message);
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                    Descargar Excel para aseguradora
+                  </button>
+                )}
                 <button
                   onClick={handleCloseTravelersModal}
-                  className="btn btn-outline"
+                  className="btn btn-outline ml-auto"
                 >
                   Cerrar
                 </button>

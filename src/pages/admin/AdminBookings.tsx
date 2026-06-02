@@ -65,6 +65,9 @@ interface BookingRow {
   es_reserva_preventa: boolean;
   needs_seat_reselection: boolean;
   selected_seats: number[] | null;
+  travel_insurance_included: boolean;
+  travel_insurance_cost: number;
+  insurance_email_sent: boolean;
   // joined (estructura de la Edge Function)
   users: {
     first_name: string;
@@ -253,7 +256,8 @@ function AdminBookings() {
           toursred_cash_used, points_used, points_earned, used_membership_benefit,
           service_charge_discount, membership_service_fee_saved,
           preventa_comision_descuento, discount_amount, es_reserva_preventa,
-          needs_seat_reselection, selected_seats
+          needs_seat_reselection, selected_seats,
+          travel_insurance_included, travel_insurance_cost, insurance_email_sent
         `)
         .neq('status', 'draft')
         .order('created_at', { ascending: false });
@@ -637,6 +641,36 @@ const DetailModal: React.FC<{ booking: BookingRow; onClose: () => void }> = ({ b
 
   const pax = (b.count_adultos || 0) + (b.count_ninos || 0) + (b.count_infantes || 0) + (b.count_adultos_mayores || 0) + (b.count_mascotas || 0) || b.travelers_count || 0;
   const commRec = b.commission_records?.[0] ?? null;
+  const [isDownloadingXlsx, setIsDownloadingXlsx] = React.useState(false);
+
+  const downloadInsuranceXlsx = async () => {
+    try {
+      setIsDownloadingXlsx(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-insurance-xlsx`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ booking_id: b.id }),
+      });
+      const json = await res.json();
+      if (!json.base64) throw new Error(json.error || 'Error al generar Excel');
+      const bytes = Uint8Array.from(atob(json.base64), c => c.charCodeAt(0));
+      const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = json.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      alert('Error al descargar: ' + e.message);
+    } finally {
+      setIsDownloadingXlsx(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto">
@@ -882,6 +916,33 @@ const DetailModal: React.FC<{ booking: BookingRow; onClose: () => void }> = ({ b
                 <Field label="Fecha original" value={fmtDate(b.original_booking_date)} />
                 <Field label="Nueva fecha" value={fmtDate(b.booking_date)} />
                 {b.reschedule_response && <Field label="Respuesta viajero" value={b.reschedule_response} />}
+              </div>
+            </Section>
+          )}
+
+          {/* ── Seguro de Viajero ────────────────────────────────────────────────── */}
+          {b.travel_insurance_included && (
+            <Section title="Seguro de Viajero" icon={<Shield className="h-4 w-4 text-emerald-600" />}>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                <Field label="Costo del seguro" value={formatCurrencyMXN(Number(b.travel_insurance_cost || 0))} />
+                <Field
+                  label="Notificacion a seguros"
+                  value={
+                    b.insurance_email_sent
+                      ? <span className="text-emerald-600 font-medium">Enviada</span>
+                      : <span className="text-amber-600 font-medium">Pendiente</span>
+                  }
+                />
+              </div>
+              <div className="mt-4">
+                <button
+                  onClick={downloadInsuranceXlsx}
+                  disabled={isDownloadingXlsx}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white text-sm font-medium rounded-lg transition"
+                >
+                  <FileText className="h-4 w-4" />
+                  {isDownloadingXlsx ? 'Generando...' : 'Descargar Excel para aseguradora'}
+                </button>
               </div>
             </Section>
           )}

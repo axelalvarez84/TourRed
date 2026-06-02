@@ -281,6 +281,8 @@ export interface Booking {
   restrictions_accepted?: boolean;
   es_reserva_preventa?: boolean;
   preventa_comision_descuento?: number;
+  travel_insurance_included?: boolean;
+  travel_insurance_cost?: number;
 }
 
 export interface BookingTraveler {
@@ -294,6 +296,10 @@ export interface BookingTraveler {
   precio_aplicado: number;
   frequent_companion_id?: string;
   created_at?: string;
+  documento_tipo?: 'curp' | 'pasaporte';
+  documento_numero?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
 }
 
 export interface FrequentCompanion {
@@ -304,6 +310,10 @@ export interface FrequentCompanion {
   telefono?: string;
   fecha_nacimiento: string;
   created_at?: string;
+  documento_tipo?: 'curp' | 'pasaporte';
+  documento_numero?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
 }
 
 export interface Notification {

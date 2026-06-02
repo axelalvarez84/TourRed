@@ -35,6 +35,8 @@ interface TravelerProfile {
   codigo_postal_fiscal?: string;
   num_reg_id_trib?: string;
   residencia_fiscal?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
   booking_count?: number;
   total_spent?: number;
   wallet_balance?: number;
@@ -71,7 +73,9 @@ const TravelerProfile: React.FC = () => {
     uso_cfdi: '',
     codigo_postal_fiscal: '',
     num_reg_id_trib: '',
-    residencia_fiscal: ''
+    residencia_fiscal: '',
+    emergency_contact_name: '',
+    emergency_contact_phone: ''
   });
 
   useEffect(() => {
@@ -159,7 +163,9 @@ const TravelerProfile: React.FC = () => {
         uso_cfdi: profileData.uso_cfdi || '',
         codigo_postal_fiscal: profileData.codigo_postal_fiscal || '',
         num_reg_id_trib: profileData.num_reg_id_trib || '',
-        residencia_fiscal: profileData.residencia_fiscal || ''
+        residencia_fiscal: profileData.residencia_fiscal || '',
+        emergency_contact_name: profileData.emergency_contact_name || '',
+        emergency_contact_phone: profileData.emergency_contact_phone || ''
       });
 
     } catch (err: any) {
@@ -217,6 +223,8 @@ const TravelerProfile: React.FC = () => {
         codigo_postal_fiscal: editForm.codigo_postal_fiscal?.trim() || null,
         num_reg_id_trib: profile?.is_foreign_traveler ? (editForm.num_reg_id_trib?.trim() || null) : null,
         residencia_fiscal: profile?.is_foreign_traveler ? (editForm.residencia_fiscal?.trim() || null) : null,
+        emergency_contact_name: editForm.emergency_contact_name?.trim() || null,
+        emergency_contact_phone: editForm.emergency_contact_phone?.trim() || null,
         updated_at: new Date().toISOString()
       };
 
@@ -537,6 +545,37 @@ const TravelerProfile: React.FC = () => {
                         />
                       </div>
                     )}
+                  </div>
+
+                  <div className="space-y-3 border-t pt-3">
+                    <h4 className="text-sm font-semibold text-gray-900">Contacto de Emergencia</h4>
+                    <p className="text-xs text-gray-500">Persona a contactar en caso de emergencia durante el viaje. Requerido para contratar seguro de viajero.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Nombre del contacto
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.emergency_contact_name}
+                          onChange={(e) => setEditForm({...editForm, emergency_contact_name: e.target.value})}
+                          className="input"
+                          placeholder="Nombre completo"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Teléfono del contacto
+                        </label>
+                        <input
+                          type="tel"
+                          value={editForm.emergency_contact_phone}
+                          onChange={(e) => setEditForm({...editForm, emergency_contact_phone: e.target.value})}
+                          className="input"
+                          placeholder="+52 55 1234 5678"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div className="space-y-3 border-t pt-3">
@@ -909,6 +948,23 @@ const TravelerProfile: React.FC = () => {
                         </span>
                       </div>
                     </div>
+
+                    {(profile.emergency_contact_name || profile.emergency_contact_phone) && (
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-500 mb-1">
+                          Contacto de Emergencia
+                        </label>
+                        <div className="flex items-center p-3 bg-amber-50 rounded-md border border-amber-200">
+                          <Phone className="h-4 w-4 text-amber-500 mr-2 flex-shrink-0" />
+                          <div>
+                            <span className="font-medium text-gray-900">{profile.emergency_contact_name || 'No especificado'}</span>
+                            {profile.emergency_contact_phone && (
+                              <span className="text-gray-600 ml-2">— {profile.emergency_contact_phone}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-500 mb-1">
