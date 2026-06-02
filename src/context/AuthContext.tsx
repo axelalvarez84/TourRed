@@ -370,13 +370,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setPermissions(null);
           setAccountantPermissions(null);
           setAllStaffInfo([]);
+          setNeedsTermsAcceptance(false);
           // Cargar info del ejecutivo
           try {
             const { data: execData } = await supabase
               .from('account_executives')
               .select('id, first_name, last_name, email, is_active')
               .eq('user_id', authUser.id)
-              .eq('is_active', true)
               .maybeSingle();
             if (execData) {
               setAccountExecutiveInfo({
@@ -384,15 +384,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 firstName: execData.first_name,
                 lastName: execData.last_name,
                 email: execData.email,
-                isActive: execData.is_active,
+                isActive: execData.is_active ?? true,
               });
             } else {
-              setAccountExecutiveInfo(null);
+              // Fallback: use auth metadata so the session is never broken
+              setAccountExecutiveInfo({
+                executiveId: authUser.id,
+                firstName: authUser.user_metadata?.first_name || authUser.email?.split('@')[0] || 'Ejecutivo',
+                lastName: authUser.user_metadata?.last_name || '',
+                email: authUser.email || '',
+                isActive: true,
+              });
             }
           } catch {
-            setAccountExecutiveInfo(null);
+            // Even on error, populate with minimal info so the app doesn't stall
+            setAccountExecutiveInfo({
+              executiveId: authUser.id,
+              firstName: authUser.user_metadata?.first_name || 'Ejecutivo',
+              lastName: authUser.user_metadata?.last_name || '',
+              email: authUser.email || '',
+              isActive: true,
+            });
           }
-          setNeedsTermsAcceptance(false);
         } else if (role === UserRole.TRAVELER) {
           setIsSuperAdmin(false);
           setPermissions(null);
