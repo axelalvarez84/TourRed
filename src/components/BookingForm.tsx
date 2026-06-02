@@ -1924,7 +1924,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                   </div>
                   {/* Footer */}
                   <div className="px-6 py-3 bg-blue-900 border-t border-blue-800 flex items-center gap-3">
-                    <img src="/image copy copy copy copy copy copy.png" alt="Universal Assistance" className="h-7 object-contain" />
+                    <img src="/universalassistance.jpg" alt="Universal Assistance" className="h-7 object-contain rounded" />
                     <p className="text-sm font-semibold text-blue-100">Cobertura Respaldada por Universal Assistance</p>
                   </div>
                 </div>
