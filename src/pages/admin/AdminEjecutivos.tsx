@@ -3,7 +3,6 @@ import { Users, Plus, CreditCard as Edit2, UserCheck, UserX, Building2, DollarSi
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { formatCurrencyMXN } from '../../utils/formatCurrency';
-import { signUp, UserRole } from '../../lib/supabase';
 
 interface Executive {
   id: string;
@@ -132,28 +131,30 @@ export default function AdminEjecutivos() {
         if (!form.password || form.password.length < 6) {
           throw new Error('La contraseña debe tener al menos 6 caracteres.');
         }
-        // Crear usuario en Auth con rol account_executive
-        const { data: authData, error: signupError } = await signUp(
-          form.email,
-          form.password,
-          UserRole.ACCOUNT_EXECUTIVE,
-          { first_name: form.first_name, last_name: form.last_name }
-        );
-        if (signupError) throw signupError;
-        const userId = authData?.user?.id;
+        // Use Edge Function with service role key — does NOT affect the admin session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Sesión expirada. Vuelve a iniciar sesión.');
 
-        const { data: session } = await supabase.auth.getSession();
-        const { error: insertError } = await supabase.from('account_executives').insert({
-          user_id: userId,
-          first_name: form.first_name,
-          last_name: form.last_name,
-          email: form.email,
-          phone: form.phone || null,
-          notes: form.notes || null,
-          is_active: true,
-          created_by: session.session?.user?.id,
-        });
-        if (insertError) throw insertError;
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-executive-user`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: form.email,
+              password: form.password,
+              first_name: form.first_name,
+              last_name: form.last_name,
+              phone: form.phone || null,
+              notes: form.notes || null,
+            }),
+          }
+        );
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Error al crear el ejecutivo.');
       }
       setMessage({ type: 'success', text: editingExec ? 'Ejecutivo actualizado.' : 'Ejecutivo creado y credenciales enviadas.' });
       setShowModal(false);
