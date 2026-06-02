@@ -157,8 +157,8 @@ Deno.serve(async (req: Request) => {
     const toursRedCashUsed = booking.toursred_cash_used || 0;
     const userPayment = booking.user_payment || (depositAmount + serviceCharge);
     const pointsValueUsed = pointsUsed / 100;
-    const cashAfterPoints = toursRedCashUsed > pointsValueUsed ? toursRedCashUsed - pointsValueUsed : 0;
-    const stripePayment = userPayment - toursRedCashUsed;
+    // stripePayment = lo que se cobró por Stripe: total pagado menos puntos y cash
+    const stripePayment = Math.max(0, Math.round((userPayment - toursRedCashUsed - pointsValueUsed) * 100) / 100);
     const remainingAmount = totalPrice - depositAmount;
 
     const agencyCommission = totalPrice * (agencyCommissionPercentage / 100);
@@ -376,7 +376,7 @@ Deno.serve(async (req: Request) => {
         </div>
         <div class="info-row">
           <span class="info-label">Anticipo (${depositPercentage}%):</span>
-          <span class="info-value">${formatCurrency(depositAmount - travelInsuranceCost)}</span>
+          <span class="info-value">${formatCurrency(depositAmount)}</span>
         </div>
         ${travelInsuranceCost > 0 ? `
         <div class="info-row">
@@ -384,9 +384,9 @@ Deno.serve(async (req: Request) => {
           <span class="info-value">${formatCurrency(travelInsuranceCost)}</span>
         </div>
         ` : ''}
-        <div class="info-row">
-          <span class="info-label">Total a pagar hoy (anticipo + seguro):</span>
-          <span class="info-value" style="font-weight: 700;">${formatCurrency(depositAmount)}</span>
+        <div class="info-row" style="${travelInsuranceCost > 0 ? 'background-color: #f0fdf4; padding: 8px 5px; margin: 5px -5px;' : ''}">
+          <span class="info-label" style="font-weight: ${travelInsuranceCost > 0 ? '700' : '400'};">Total cobrado hoy${travelInsuranceCost > 0 ? ' (anticipo + seguro)' : ''}:</span>
+          <span class="info-value" style="${travelInsuranceCost > 0 ? 'font-weight: 700;' : ''}">${formatCurrency(userPayment)}</span>
         </div>
         ${serviceChargeDiscount > 0 ? `
         <div class="info-row">
@@ -607,16 +607,16 @@ Deno.serve(async (req: Request) => {
         </div>
         <div class="info-row">
           <span class="info-label">Anticipo pagado por el viajero (${depositPercentage}%):</span>
-          <span class="info-value">${formatCurrency(depositAmount - travelInsuranceCost)}</span>
+          <span class="info-value">${formatCurrency(depositAmount)}</span>
         </div>
         ${travelInsuranceCost > 0 ? `
         <div class="info-row">
-          <span class="info-label">🛡️ Seguro de Viajero:</span>
+          <span class="info-label">🛡️ Seguro de Viajero (cobro separado, no pertenece a la agencia):</span>
           <span class="info-value">${formatCurrency(travelInsuranceCost)}</span>
         </div>
-        <div class="info-row">
-          <span class="info-label">Total cobrado al viajero hoy:</span>
-          <span class="info-value" style="font-weight: 700;">${formatCurrency(depositAmount)}</span>
+        <div class="info-row" style="background-color: #f0fdf4; padding: 8px 5px; margin: 5px -5px;">
+          <span class="info-label" style="font-weight: 700;">Total cobrado al viajero hoy (anticipo + seguro):</span>
+          <span class="info-value" style="font-weight: 700;">${formatCurrency(userPayment)}</span>
         </div>
         ` : ''}
         ${discountAmount > 0 ? `
@@ -811,12 +811,16 @@ Deno.serve(async (req: Request) => {
         </div>
         <div class="info-row">
           <span class="info-label">Anticipo (${depositPercentage}%):</span>
-          <span class="info-value">${formatCurrency(depositAmount - travelInsuranceCost)}</span>
+          <span class="info-value">${formatCurrency(depositAmount)}</span>
         </div>
         ${travelInsuranceCost > 0 ? `
         <div class="info-row">
-          <span class="info-label">🛡️ Seguro de Viajero:</span>
+          <span class="info-label">🛡️ Seguro de Viajero (va a aseguradora):</span>
           <span class="info-value">${formatCurrency(travelInsuranceCost)}</span>
+        </div>
+        <div class="info-row" style="background-color: #f0fdf4; padding: 8px 5px; margin: 5px -5px;">
+          <span class="info-label" style="font-weight: 700;">Total cobrado al viajero hoy:</span>
+          <span class="info-value" style="font-weight: 700;">${formatCurrency(userPayment)}</span>
         </div>
         ` : ''}
         ${serviceChargeDiscount > 0 ? `
@@ -1113,6 +1117,53 @@ Deno.serve(async (req: Request) => {
       }
     } catch (referralEmailErr) {
       console.error("Error sending referral bonus emails:", referralEmailErr);
+    }
+
+    // Send insurance notification to seguros@toursred.com.mx if applicable
+    if (booking.travel_insurance_included && travelInsuranceCost > 0) {
+      try {
+        const isReceptivoTour = !booking.tour.start_date && !booking.tour.end_date;
+        const tourStartDate = isReceptivoTour
+          ? (booking.selected_date || booking.booking_date)
+          : booking.tour.start_date;
+        const tourEndDate = isReceptivoTour
+          ? (booking.selected_date || booking.booking_date)
+          : booking.tour.end_date;
+
+        const startDate = new Date(tourStartDate);
+        const endDate = new Date(tourEndDate || tourStartDate);
+        const tourDays = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+        const totalTravelers = booking.travelers_count || 1;
+        const travelerName = `${booking.traveler.first_name || ''} ${booking.traveler.last_name || ''}`.trim() || booking.traveler.email;
+
+        await fetch(`${supabaseUrl}/functions/v1/send-travel-insurance-notification`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({
+            booking_id,
+            booking_code: booking.booking_code,
+            tour_name: booking.tour.name,
+            tour_start_date: tourStartDate,
+            tour_end_date: tourEndDate,
+            agency_name: booking.agency.name,
+            traveler_name: travelerName,
+            traveler_email: booking.traveler.email,
+            count_adultos: booking.count_adultos || 0,
+            count_ninos: booking.count_ninos || 0,
+            count_infantes: booking.count_infantes || 0,
+            count_adultos_mayores: booking.count_adultos_mayores || 0,
+            total_travelers: totalTravelers,
+            tour_days: tourDays,
+            insurance_cost: travelInsuranceCost,
+          }),
+        });
+        console.log("✅ Insurance notification sent to seguros@toursred.com.mx for booking:", booking_id);
+      } catch (insuranceErr) {
+        console.error("Error sending insurance notification:", insuranceErr);
+      }
     }
 
     return new Response(
