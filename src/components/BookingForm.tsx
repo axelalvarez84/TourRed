@@ -855,12 +855,13 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
   const amountAfterPoints = userPayment - pointsDiscountAmount;
 
-  const toursRedCashApplied = useToursRedCash ? Math.min(walletBalance, amountAfterPoints) : 0;
-  const rawAmountAfterToursRedCash = amountAfterPoints - toursRedCashApplied;
+  const cashBase = amountAfterPoints + insuranceCost;
+  const toursRedCashApplied = useToursRedCash ? Math.min(walletBalance, cashBase) : 0;
+  const rawAmountAfterToursRedCash = cashBase - toursRedCashApplied;
   // Si el residuo es menor a $10 (mínimo de los procesadores de pago), absorberlo como $0
   const amountAfterToursRedCash = rawAmountAfterToursRedCash < 10 && rawAmountAfterToursRedCash > 0 ? 0 : rawAmountAfterToursRedCash;
 
-  const totalToPayNow = amountAfterToursRedCash + membershipCost + insuranceCost;
+  const totalToPayNow = amountAfterToursRedCash + membershipCost;
 
   const agencyReceives = depositAmount - agencyCommission;
 
