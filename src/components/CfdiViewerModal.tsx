@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Download, ExternalLink, Loader2, AlertCircle, FileText, Building2, User, Receipt, Shield } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
+import QRCode from 'qrcode';
 
 interface CfdiConcepto {
   claveProdServ: string;
@@ -269,6 +269,7 @@ export default function CfdiViewerModal({ xmlUrl, onClose }: Props) {
   const [cfdi, setCfdi] = useState<CfdiData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [showFullSello, setShowFullSello] = useState(false);
   const [showFullSelloSAT, setShowFullSelloSAT] = useState(false);
 
@@ -295,6 +296,14 @@ export default function CfdiViewerModal({ xmlUrl, onClose }: Props) {
   }, [xmlUrl]);
 
   useEffect(() => { loadXml(); }, [loadXml]);
+
+  useEffect(() => {
+    if (!cfdi?.uuid) return;
+    const url = buildSatQrUrl(cfdi);
+    QRCode.toDataURL(url, { width: 140, margin: 1, errorCorrectionLevel: 'M' })
+      .then(setQrDataUrl)
+      .catch(() => setQrDataUrl(null));
+  }, [cfdi]);
 
   const downloadXml = async () => {
     try {
@@ -632,12 +641,13 @@ export default function CfdiViewerModal({ xmlUrl, onClose }: Props) {
                   {cfdi.uuid && (
                     <div className="flex flex-col items-center shrink-0">
                       <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
-                        <QRCodeSVG
-                          value={satQrUrl}
-                          size={120}
-                          level="M"
-                          includeMargin={false}
-                        />
+                        {qrDataUrl ? (
+                          <img src={qrDataUrl} alt="QR SAT" width={120} height={120} />
+                        ) : (
+                          <div className="w-[120px] h-[120px] flex items-center justify-center">
+                            <Loader2 className="h-5 w-5 text-gray-300 animate-spin" />
+                          </div>
+                        )}
                       </div>
                       <p className="text-xs text-gray-400 text-center mt-2 max-w-[140px] leading-relaxed">
                         Verifique este comprobante en el portal del SAT
