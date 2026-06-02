@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, ChevronDown, CreditCard as Edit2, Eye, ArrowRight, Trash2, User, Phone, Mail, MapPin, MessageSquare, Calendar, X, CheckCircle, Clock, AlertCircle, Building2, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
-import { signUp, UserRole } from '../../lib/supabase';
 
 type LeadStatus = 'prospecto' | 'contactado' | 'negociacion' | 'registrado' | 'aprobado' | 'perdido';
 
@@ -187,52 +186,42 @@ export default function ExecutiveLeads() {
     }
     setIsConverting(true);
     try {
-      // Crear usuario en Supabase Auth con rol agency
-      const { data: authData, error: signupError } = await signUp(
-        lead.contact_email,
-        convertPassword,
-        UserRole.AGENCY,
-        { first_name: lead.contact_first_name, last_name: lead.contact_last_name }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sesión expirada. Vuelve a iniciar sesión.');
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/convert-lead-to-agency`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            leadId: lead.id,
+            agencyName: lead.agency_name,
+            contactFirstName: lead.contact_first_name,
+            contactLastName: lead.contact_last_name,
+            contactEmail: lead.contact_email,
+            contactPhone: lead.contact_phone,
+            website: lead.website,
+            rfc: lead.rfc,
+            razonSocial: lead.razon_social,
+            rnt: lead.rnt,
+            street: lead.street,
+            exteriorNumber: lead.exterior_number,
+            interiorNumber: lead.interior_number,
+            colony: lead.colony,
+            city: lead.city,
+            state: lead.state,
+            postalCode: lead.postal_code,
+            country: lead.country || 'México',
+            password: convertPassword,
+          }),
+        }
       );
-      if (signupError) throw signupError;
-      const userId = authData?.user?.id;
-      if (!userId) throw new Error('No se pudo crear el usuario');
-
-      // Crear registro de agencia
-      const { data: agencyData, error: agencyError } = await supabase
-        .from('agencies')
-        .insert({
-          user_id: userId,
-          name: lead.agency_name,
-          contact_email: lead.contact_email,
-          contact_phone: lead.contact_phone,
-          website: lead.website,
-          rfc: lead.rfc,
-          razon_social: lead.razon_social,
-          rnt: lead.rnt,
-          street: lead.street,
-          exterior_number: lead.exterior_number,
-          interior_number: lead.interior_number,
-          colony: lead.colony,
-          city: lead.city,
-          state: lead.state,
-          postal_code: lead.postal_code,
-          country: lead.country || 'México',
-          is_active: true,
-          account_executive_id: accountExecutiveInfo?.executiveId,
-          registered_by_executive: true,
-        })
-        .select()
-        .single();
-
-      if (agencyError) throw agencyError;
-
-      // Actualizar lead
-      await supabase.from('agency_leads').update({
-        status: 'registrado',
-        converted_agency_id: agencyData.id,
-        converted_at: new Date().toISOString(),
-      }).eq('id', lead.id);
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Error al convertir el lead.');
 
       setMessage({ type: 'success', text: `Agencia "${lead.agency_name}" registrada exitosamente. Se enviaron las credenciales al email.` });
       setShowConvertModal(null);
