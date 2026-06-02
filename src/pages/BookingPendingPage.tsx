@@ -190,17 +190,38 @@ const BookingPendingPage: React.FC = () => {
                     <span className="text-gray-600">Precio Total del Tour:</span>
                     <span className="font-medium">{formatCurrencyMXN(booking.total_price ?? 0)}</span>
                   </div>
-                  
+
                   <div className="flex justify-between">
                     <span className="text-gray-600">Depósito a Pagar:</span>
                     <span className="font-medium">{formatCurrencyMXN(booking.deposit_amount ?? 0)}</span>
                   </div>
-                  
+
                   <div className="flex justify-between">
                     <span className="text-gray-600">Cargo por Servicio:</span>
                     <span className="font-medium">{formatCurrencyMXN(booking.service_charge ?? 0)}</span>
                   </div>
-                  
+
+                  {(booking as any).travel_insurance_cost > 0 && (
+                    <div className="flex justify-between text-emerald-700">
+                      <span>Seguro de Viaje:</span>
+                      <span className="font-medium">+{formatCurrencyMXN((booking as any).travel_insurance_cost)}</span>
+                    </div>
+                  )}
+
+                  {(booking as any).points_used > 0 && (
+                    <div className="flex justify-between text-amber-700">
+                      <span>Puntos ToursRed ({(booking as any).points_used} pts):</span>
+                      <span className="font-medium">-{formatCurrencyMXN((booking as any).points_used / 100)}</span>
+                    </div>
+                  )}
+
+                  {(booking as any).toursred_cash_used > 0 && (
+                    <div className="flex justify-between text-blue-700">
+                      <span>ToursRed Cash:</span>
+                      <span className="font-medium">-{formatCurrencyMXN((booking as any).toursred_cash_used)}</span>
+                    </div>
+                  )}
+
                   <div className="border-t border-gray-200 pt-2 mt-2">
                     <div className="flex justify-between text-lg font-bold">
                       <span className="text-yellow-600">Total a Pagar (si se aprueba):</span>
@@ -212,6 +233,15 @@ const BookingPendingPage: React.FC = () => {
                 <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                   <p className="text-sm text-yellow-800">
                     <strong>Sin cargo por ahora:</strong> No se realizará ningún cargo hasta que la agencia apruebe tu solicitud.
+                    {(() => {
+                      const pointsValue = ((booking as any).points_used || 0) / 100;
+                      const cashUsed = (booking as any).toursred_cash_used || 0;
+                      const totalCovered = pointsValue + cashUsed;
+                      const totalToPay = booking.user_payment ?? 0;
+                      return totalToPay > 0 && totalCovered >= totalToPay
+                        ? ' Al ser aprobada, el pago se procesará automáticamente con tus beneficios ToursRed.'
+                        : null;
+                    })()}
                   </p>
                 </div>
               </div>
@@ -252,8 +282,24 @@ const BookingPendingPage: React.FC = () => {
                 <span className="text-gray-400 text-sm font-bold">3</span>
               </div>
               <div>
-                <div className="font-medium text-gray-500">Pago (Pendiente)</div>
-                <div className="text-sm text-gray-500">Una vez aprobada, podrás proceder con el pago</div>
+                {(() => {
+                  const pointsValue = ((booking as any).points_used || 0) / 100;
+                  const cashUsed = (booking as any).toursred_cash_used || 0;
+                  const totalCovered = pointsValue + cashUsed;
+                  const totalToPay = booking.user_payment ?? 0;
+                  const autoConfirm = totalToPay > 0 && totalCovered >= totalToPay;
+                  return autoConfirm ? (
+                    <>
+                      <div className="font-medium text-gray-500">Confirmación Automática</div>
+                      <div className="text-sm text-gray-500">Al aprobarse, tu reserva se confirmará automáticamente con tus puntos y saldo ToursRed</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="font-medium text-gray-500">Pago (Pendiente)</div>
+                      <div className="text-sm text-gray-500">Una vez aprobada, podrás proceder con el pago</div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -292,10 +338,28 @@ const BookingPendingPage: React.FC = () => {
                 <span className="text-primary-600 text-sm font-bold">3</span>
               </div>
               <div>
-                <div className="font-medium">Procede con el Pago</div>
-                <div className="text-sm text-gray-600">
-                  Si tu solicitud es aprobada, podrás completar el pago de forma segura
-                </div>
+                {(() => {
+                  const pointsValue = ((booking as any).points_used || 0) / 100;
+                  const cashUsed = (booking as any).toursred_cash_used || 0;
+                  const totalCovered = pointsValue + cashUsed;
+                  const totalToPay = booking.user_payment ?? 0;
+                  const autoConfirm = totalToPay > 0 && totalCovered >= totalToPay;
+                  return autoConfirm ? (
+                    <>
+                      <div className="font-medium">Confirmación Automática</div>
+                      <div className="text-sm text-gray-600">
+                        Si tu solicitud es aprobada, tu reserva se confirmará y el pago se procesará automáticamente con tus beneficios ToursRed
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="font-medium">Procede con el Pago</div>
+                      <div className="text-sm text-gray-600">
+                        Si tu solicitud es aprobada, podrás completar el pago de forma segura
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>

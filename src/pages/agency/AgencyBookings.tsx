@@ -285,22 +285,28 @@ const AgencyBookings: React.FC = () => {
 
   const handleApprovalAction = async (bookingId: string, action: 'approve' | 'reject', notes?: string) => {
     try {
-      const approvalStatus = action === 'approve' ? 'approved' : 'rejected';
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No hay sesión activa');
 
-      const { error } = await supabase
-        .from('bookings')
-        .update({
-          approval_status: approvalStatus,
-          approval_notes: notes || null,
-          approved_at: action === 'approve' ? new Date().toISOString() : null,
-          approved_by: user?.id,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', bookingId);
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/approve-booking`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ booking_id: bookingId, action, notes }),
+        }
+      );
 
-      if (error) {
-        throw new Error(error.message);
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || `Error al ${action === 'approve' ? 'aprobar' : 'rechazar'} la reserva`);
       }
+
+      const approvalStatus = action === 'approve' ? 'approved' : 'rejected';
+      const now = new Date().toISOString();
 
       // Actualizar el estado local
       setBookings(bookings.map(booking =>
@@ -309,37 +315,39 @@ const AgencyBookings: React.FC = () => {
               ...booking,
               approval_status: approvalStatus as any,
               approval_notes: notes || null,
-              approved_at: action === 'approve' ? new Date().toISOString() : null,
-              approved_by: user?.id
+              approved_at: action === 'approve' ? now : null,
+              approved_by: user?.id,
+              ...(result.auto_confirmed ? {
+                payment_status: 'succeeded',
+                status: 'confirmed',
+              } : {}),
             }
           : booking
       ));
 
-      // Enviar notificación por email al viajero
+      // Enviar email de notificación al viajero
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-approval-notification`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${session.access_token}`,
-              },
-              body: JSON.stringify({
-                booking_id: bookingId,
-                approved: action === 'approve',
-                rejection_reason: notes
-              }),
-            }
-          );
-        }
+        await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-approval-notification`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              booking_id: bookingId,
+              approved: action === 'approve',
+              rejection_reason: notes,
+              auto_confirmed: result.auto_confirmed ?? false,
+            }),
+          }
+        );
       } catch (emailError) {
         console.error('Error enviando notificación al viajero:', emailError);
       }
 
-      console.log(`✅ Reserva ${bookingId} ${action === 'approve' ? 'aprobada' : 'rechazada'}`);
+      console.log(`✅ Reserva ${bookingId} ${action === 'approve' ? 'aprobada' : 'rechazada'}${result.auto_confirmed ? ' y confirmada automáticamente' : ''}`);
     } catch (err: any) {
       console.error(`❌ Error ${action === 'approve' ? 'aprobando' : 'rechazando'} reserva:`, err);
       setError(err.message || `Error al ${action === 'approve' ? 'aprobar' : 'rechazar'} la reserva`);

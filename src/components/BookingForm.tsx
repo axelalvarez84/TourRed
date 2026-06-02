@@ -959,7 +959,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         deposit_amount: depositAmount,
         commission_amount: agencyCommission,
         service_charge: serviceCharge,
-        user_payment: userPayment,
+        user_payment: userPayment + insuranceCost,
         platform_revenue: platformRevenue,
         booking_date: isReceptivo && selectedSlot ? selectedSlot.slot_date : tour.start_date,
         slot_id: isReceptivo && selectedSlot ? selectedSlot.id : null,
