@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Download, ExternalLink, Loader2, AlertCircle, FileText, Building2, User, Receipt, Shield } from 'lucide-react';
-import QRCode from 'qrcode';
+import { encode } from 'uqr';
 
 interface CfdiConcepto {
   claveProdServ: string;
@@ -298,11 +298,32 @@ export default function CfdiViewerModal({ xmlUrl, onClose }: Props) {
   useEffect(() => { loadXml(); }, [loadXml]);
 
   useEffect(() => {
-    if (!cfdi?.uuid) return;
-    const url = buildSatQrUrl(cfdi);
-    QRCode.toDataURL(url, { width: 140, margin: 1, errorCorrectionLevel: 'M' })
-      .then(setQrDataUrl)
-      .catch(() => setQrDataUrl(null));
+    if (!cfdi?.uuid) { setQrDataUrl(null); return; }
+    try {
+      const url = buildSatQrUrl(cfdi);
+      const result = encode(url, { ecc: 'M' });
+      const size = result.size;
+      const cellPx = 3;
+      const margin = 4;
+      const px = size * cellPx + margin * 2;
+      const canvas = document.createElement('canvas');
+      canvas.width = px;
+      canvas.height = px;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, px, px);
+      ctx.fillStyle = '#000000';
+      for (let row = 0; row < size; row++) {
+        for (let col = 0; col < size; col++) {
+          if (result.data[row * size + col]) {
+            ctx.fillRect(margin + col * cellPx, margin + row * cellPx, cellPx, cellPx);
+          }
+        }
+      }
+      setQrDataUrl(canvas.toDataURL('image/png'));
+    } catch {
+      setQrDataUrl(null);
+    }
   }, [cfdi]);
 
   const downloadXml = async () => {
