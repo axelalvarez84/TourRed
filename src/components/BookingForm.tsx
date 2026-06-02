@@ -73,6 +73,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [insurancePricePerDayPerTraveler, setInsurancePricePerDayPerTraveler] = useState(79);
   const [includeInsurance, setIncludeInsurance] = useState(true);
   const [showInsuranceWarning, setShowInsuranceWarning] = useState(false);;
+  const [optionalServices, setOptionalServices] = useState<TourOptionalService[]>([]);
   const [optionalServiceQuantities, setOptionalServiceQuantities] = useState<Record<string, number>>({});
 
   const [activePromotion, setActivePromotion] = useState<{
