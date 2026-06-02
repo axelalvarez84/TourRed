@@ -364,6 +364,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setAllStaffInfo([]);
           setAccountExecutiveInfo(null);
         } else if (role === UserRole.ACCOUNT_EXECUTIVE) {
+          // Executives are always considered email-verified
+          setIsEmailVerified(true);
           setIsSuperAdmin(false);
           setPermissions(null);
           setAccountantPermissions(null);

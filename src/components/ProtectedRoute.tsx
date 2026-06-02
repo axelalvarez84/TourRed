@@ -60,7 +60,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles,
     );
   }
 
-  if (!isEmailVerified) {
+  // Roles that bypass email verification (created with email pre-confirmed)
+  const bypassesEmailVerification = userRole === UserRole.ADMIN
+    || userRole === UserRole.ACCOUNTANT
+    || userRole === UserRole.ACCOUNT_EXECUTIVE;
+
+  if (!isEmailVerified && !bypassesEmailVerification) {
     return <Navigate to="/verify-email" replace />;
   }
 
