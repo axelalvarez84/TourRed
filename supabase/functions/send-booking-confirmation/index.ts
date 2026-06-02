@@ -166,6 +166,7 @@ Deno.serve(async (req: Request) => {
 
     const pickupExtraCost = Number(booking.pickup_zone_extra_cost) || 0;
     const languageExtraCost = Number(booking.language_extra_cost) || 0;
+    const travelInsuranceCost = booking.travel_insurance_included ? (Number(booking.travel_insurance_cost) || 0) : 0;
 
     const formatDate = (dateString: string | null | undefined) => {
       if (!dateString) return 'No disponible';
@@ -374,8 +375,18 @@ Deno.serve(async (req: Request) => {
           <span class="info-value" style="font-weight: 700;">${formatCurrency(totalPrice)}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">Depósito (${depositPercentage}%):</span>
-          <span class="info-value">${formatCurrency(depositAmount)}</span>
+          <span class="info-label">Anticipo (${depositPercentage}%):</span>
+          <span class="info-value">${formatCurrency(depositAmount - travelInsuranceCost)}</span>
+        </div>
+        ${travelInsuranceCost > 0 ? `
+        <div class="info-row">
+          <span class="info-label">🛡️ Seguro de Viajero:</span>
+          <span class="info-value">${formatCurrency(travelInsuranceCost)}</span>
+        </div>
+        ` : ''}
+        <div class="info-row">
+          <span class="info-label">Total a pagar hoy (anticipo + seguro):</span>
+          <span class="info-value" style="font-weight: 700;">${formatCurrency(depositAmount)}</span>
         </div>
         ${serviceChargeDiscount > 0 ? `
         <div class="info-row">
@@ -596,8 +607,18 @@ Deno.serve(async (req: Request) => {
         </div>
         <div class="info-row">
           <span class="info-label">Anticipo pagado por el viajero (${depositPercentage}%):</span>
-          <span class="info-value">${formatCurrency(depositAmount)}</span>
+          <span class="info-value">${formatCurrency(depositAmount - travelInsuranceCost)}</span>
         </div>
+        ${travelInsuranceCost > 0 ? `
+        <div class="info-row">
+          <span class="info-label">🛡️ Seguro de Viajero:</span>
+          <span class="info-value">${formatCurrency(travelInsuranceCost)}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Total cobrado al viajero hoy:</span>
+          <span class="info-value" style="font-weight: 700;">${formatCurrency(depositAmount)}</span>
+        </div>
+        ` : ''}
         ${discountAmount > 0 ? `
         <div class="info-row">
           <span class="info-label">Descuento aplicado al viajero:</span>
@@ -790,8 +811,14 @@ Deno.serve(async (req: Request) => {
         </div>
         <div class="info-row">
           <span class="info-label">Anticipo (${depositPercentage}%):</span>
-          <span class="info-value">${formatCurrency(depositAmount)}</span>
+          <span class="info-value">${formatCurrency(depositAmount - travelInsuranceCost)}</span>
         </div>
+        ${travelInsuranceCost > 0 ? `
+        <div class="info-row">
+          <span class="info-label">🛡️ Seguro de Viajero:</span>
+          <span class="info-value">${formatCurrency(travelInsuranceCost)}</span>
+        </div>
+        ` : ''}
         ${serviceChargeDiscount > 0 ? `
         <div class="info-row">
           <span class="info-label">Cargo por plataforma (${serviceChargePercentage}%):</span>

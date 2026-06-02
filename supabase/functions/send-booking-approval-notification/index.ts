@@ -61,6 +61,36 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // When auto_confirmed, delegate to send-booking-confirmation which has full templates
+    // (3 emails: traveler + agency + admin, with QR, breakdown, insurance)
+    if (approved && auto_confirmed) {
+      console.log("✅ auto_confirmed=true → delegating to send-booking-confirmation for full 3-email flow");
+      const confirmResponse = await fetch(`${supabaseUrl}/functions/v1/send-booking-confirmation`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${supabaseServiceKey}`,
+        },
+        body: JSON.stringify({ booking_id }),
+      });
+
+      const confirmResult = await confirmResponse.json();
+      console.log("send-booking-confirmation result:", confirmResult);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Correos de confirmación completos enviados (viajero, agencia, admin)",
+          delegated: true,
+          result: confirmResult,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const [emailSettingsResult] = await Promise.all([
       supabase.from("email_settings").select("*").maybeSingle(),
     ]);
@@ -91,102 +121,8 @@ Deno.serve(async (req: Request) => {
     let travelerEmailHtml = '';
     let subject = '';
 
-    if (approved && auto_confirmed) {
-      // Reserva aprobada Y pagada automáticamente con puntos/cash
-      subject = `¡Tu reserva está confirmada! - ${booking.tour.name}`;
-      travelerEmailHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background-color: #b8dfe6; padding: 30px 20px; text-align: center; }
-    .logo { max-width: 200px; height: auto; margin-bottom: 10px; }
-    .content { background-color: #ffffff; padding: 30px 20px; border: 1px solid #e5e7eb; }
-    .title { font-size: 24px; font-weight: bold; color: #10b981; margin-bottom: 20px; }
-    .section { margin-bottom: 25px; }
-    .section-title { font-weight: bold; color: #1e40af; margin-bottom: 10px; font-size: 16px; }
-    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
-    .info-label { color: #6b7280; }
-    .info-value { font-weight: 600; }
-    .highlight { background-color: #d1fae5; padding: 15px; border-left: 4px solid #10b981; margin: 20px 0; }
-    .button { display: inline-block; padding: 12px 24px; background-color: #10b981; color: white; text-decoration: none; border-radius: 6px; margin: 10px 5px; }
-    .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
-    .success-icon { font-size: 48px; text-align: center; margin: 20px 0; }
-    .badge { display: inline-block; background-color: #d1fae5; color: #065f46; padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; margin-bottom: 10px; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <img src="https://huzsedewwzjywcpbkjkm.supabase.co/storage/v1/object/public/images/email-logo.png" alt="ToursRed Logo" class="logo" />
-      <h1 style="margin: 0; color: #10b981;">¡Reserva Confirmada!</h1>
-    </div>
-    <div class="content">
-      <div class="success-icon">🎉</div>
-      <div class="title">¡Todo listo para tu aventura!</div>
-
-      <p>Estimado/a ${booking.traveler.first_name} ${booking.traveler.last_name},</p>
-
-      <p>
-        Tu reserva ha sido <strong>aprobada por ${booking.agency.name}</strong> y el pago fue procesado automáticamente
-        utilizando tus beneficios ToursRed (puntos y/o saldo del monedero).
-        <span class="badge">Pagado</span>
-      </p>
-
-      <div class="section">
-        <div class="section-title">🎫 Código de Reserva</div>
-        <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px;">
-          <div style="font-size: 12px; color: #92400e; margin-bottom: 5px;">Tu código de referencia</div>
-          <div style="font-size: 28px; font-weight: bold; color: #92400e; letter-spacing: 2px;">${booking.booking_code}</div>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">📍 Detalles de tu Reserva</div>
-        <div class="info-row">
-          <span class="info-label">Tour:</span>
-          <span class="info-value">${booking.tour.name}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Fecha del Tour:</span>
-          <span class="info-value">${bookingDate}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Número de Viajeros:</span>
-          <span class="info-value">${booking.travelers_count}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Monto Total:</span>
-          <span class="info-value">$${booking.total_price?.toLocaleString() || '0'} MXN</span>
-        </div>
-      </div>
-
-      <div class="highlight">
-        <strong>✅ Pago procesado automáticamente</strong><br>
-        No se requiere ninguna acción adicional de tu parte. Tu reserva está completamente confirmada.
-        Puedes ver todos los detalles en tu panel de viajero.
-      </div>
-
-      <p style="text-align: center; margin-top: 30px;">
-        <a href="https://www.toursred.com/traveler/bookings" class="button">
-          Ver Mis Reservas
-        </a>
-      </p>
-
-      <p style="margin-top: 30px; font-size: 14px; color: #6b7280;">
-        Si tienes alguna pregunta, no dudes en contactar a ${booking.agency.name}.
-      </p>
-    </div>
-    <div class="footer">
-      <p>Este es un correo automático de ToursRed. Por favor, no respondas a este mensaje.</p>
-    </div>
-  </div>
-</body>
-</html>
-      `;
-    } else if (approved) {
+    if (approved) {
+      // Approved but NOT auto_confirmed — traveler still needs to pay
       subject = `¡Tu reserva ha sido aprobada! - ${booking.tour.name}`;
       travelerEmailHtml = `
 <!DOCTYPE html>
@@ -385,7 +321,7 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Failed to send traveler email: ${errorText}`);
     }
 
-    const emailType = auto_confirmed ? 'auto-confirmación' : approved ? 'aprobación' : 'rechazo';
+    const emailType = approved ? 'aprobación' : 'rechazo';
     console.log(`✅ Email de ${emailType} enviado al viajero ${booking.traveler.email}`);
 
     return new Response(

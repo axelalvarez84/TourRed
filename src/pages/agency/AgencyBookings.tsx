@@ -118,7 +118,8 @@ const AgencyBookings: React.FC = () => {
               .from('bookings')
               .select('id', { count: 'exact', head: true })
               .eq('tour_id', tour.id)
-              .in('status', ['confirmed', 'completed']);
+              .in('status', ['confirmed', 'completed', 'pending'])
+              .in('approval_status', ['approved', 'pending']);
 
             return { ...tour, bookingsCount: count || 0 };
           })
@@ -345,6 +346,31 @@ const AgencyBookings: React.FC = () => {
         );
       } catch (emailError) {
         console.error('Error enviando notificación al viajero:', emailError);
+      }
+
+      // Recargar la lista de tours disponibles para que aparezca el tour recién aprobado
+      if (action === 'approve' && resolvedAgencyId) {
+        const { data: toursData, error: toursError } = await supabase
+          .from('tours')
+          .select('id, name, destination, start_date, end_date, tour_type')
+          .eq('agency_id', resolvedAgencyId)
+          .order('start_date', { ascending: false })
+          .limit(50);
+
+        if (!toursError && toursData) {
+          const toursWithBookings = await Promise.all(
+            toursData.map(async (tour) => {
+              const { count } = await supabase
+                .from('bookings')
+                .select('id', { count: 'exact', head: true })
+                .eq('tour_id', tour.id)
+                .in('status', ['confirmed', 'completed', 'pending'])
+                .in('approval_status', ['approved', 'pending']);
+              return { ...tour, bookingsCount: count || 0 };
+            })
+          );
+          setAvailableTours(toursWithBookings.filter(t => t.bookingsCount > 0));
+        }
       }
 
       console.log(`✅ Reserva ${bookingId} ${action === 'approve' ? 'aprobada' : 'rechazada'}${result.auto_confirmed ? ' y confirmada automáticamente' : ''}`);
