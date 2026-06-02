@@ -1815,9 +1815,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <ul className="space-y-3">
                       {[
                         { icon: '🏥', text: 'Gastos de asistencia médica en destino corren por tu cuenta.' },
-                        { icon: '🚑', text: 'Sin cobertura de traslado médico o repatriación en caso de emergencia.' },
+                        { icon: '🚑', text: 'Sin cobertura de ambulancia o traslado médico de emergencia.' },
                         { icon: '✈️', text: 'En caso de accidente o emergencia médica, los gastos serán cubiertos directamente por el viajero.' },
-                        { icon: '💳', text: 'Los costos de una emergencia médica pueden superar varios miles de pesos.' },
+                        { icon: '💳', text: 'Una emergencia médica durante un viaje, puede generar gastos médicos importantes e imprevistos.' },
                       ].map((item, i) => (
                         <li key={i} className="flex items-start gap-3 text-sm text-gray-700">
                           <span className="text-lg leading-none mt-0.5">{item.icon}</span>
