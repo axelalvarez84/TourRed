@@ -16,10 +16,9 @@ interface Commission {
   period_year: number | null;
   status: string;
   cfdi_xml_url: string | null;
-  cfdi_uuid: string | null;
-  cfdi_total_amount: number | null;
-  cfdi_submitted_at: string | null;
-  payment_method: string | null;
+  cfdi_uuid_fiscal: string | null;
+  cfdi_total: number | null;
+  cfdi_uploaded_at: string | null;
   payment_reference: string | null;
   paid_at: string | null;
   rejection_reason: string | null;
@@ -52,7 +51,6 @@ export default function AdminEjecutivosComisiones() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selected, setSelected] = useState<Commission | null>(null);
   const [reviewModal, setReviewModal] = useState<{ commission: Commission; action: 'approve' | 'reject' | 'pay' } | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState('');
   const [paymentRef, setPaymentRef] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -73,8 +71,8 @@ export default function AdminEjecutivosComisiones() {
         .select(`
           id, executive_id, agency_id, commission_type, amount,
           period_month, period_year, status,
-          cfdi_xml_url, cfdi_uuid, cfdi_total_amount, cfdi_submitted_at,
-          payment_method, payment_reference, paid_at,
+          cfdi_xml_url, cfdi_uuid_fiscal, cfdi_total, cfdi_uploaded_at,
+          payment_reference, paid_at,
           rejection_reason, notes, created_at,
           account_executives(first_name, last_name, email),
           agencies(name)
@@ -97,7 +95,7 @@ export default function AdminEjecutivosComisiones() {
     const q = searchQuery.toLowerCase();
     const execName = `${c.account_executives?.first_name} ${c.account_executives?.last_name}`.toLowerCase();
     const agencyName = (c.agencies?.name || '').toLowerCase();
-    return execName.includes(q) || agencyName.includes(q) || (c.cfdi_uuid || '').toLowerCase().includes(q);
+    return execName.includes(q) || agencyName.includes(q) || (c.cfdi_uuid_fiscal || '').toLowerCase().includes(q);
   });
 
   const counts = {
@@ -135,8 +133,8 @@ export default function AdminEjecutivosComisiones() {
         if (error) throw error;
         setMessage({ type: 'success', text: 'CFDI rechazado. El ejecutivo deberá corregir y reenviar.' });
       } else if (action === 'pay') {
-        if (!paymentMethod.trim()) {
-          setMessage({ type: 'error', text: 'Debes indicar el método de pago.' });
+        if (!paymentRef.trim()) {
+          setMessage({ type: 'error', text: 'Debes indicar la referencia del pago.' });
           setIsSubmitting(false);
           return;
         }
@@ -144,7 +142,6 @@ export default function AdminEjecutivosComisiones() {
           .from('executive_commissions')
           .update({
             status: 'paid',
-            payment_method: paymentMethod,
             payment_reference: paymentRef || null,
             paid_at: new Date().toISOString(),
           })
@@ -154,7 +151,6 @@ export default function AdminEjecutivosComisiones() {
       }
 
       setReviewModal(null);
-      setPaymentMethod('');
       setPaymentRef('');
       setRejectionReason('');
       loadCommissions();
@@ -413,7 +409,7 @@ export default function AdminEjecutivosComisiones() {
                           )}
                           {comm.status === 'approved' && (
                             <button
-                              onClick={() => { setReviewModal({ commission: comm, action: 'pay' }); setPaymentMethod(''); setPaymentRef(''); }}
+                              onClick={() => { setReviewModal({ commission: comm, action: 'pay' }); setPaymentRef(''); }}
                               className="px-2.5 py-1 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors"
                             >
                               Registrar pago
@@ -465,22 +461,22 @@ export default function AdminEjecutivosComisiones() {
               <p className="text-xs text-gray-500 mb-0.5">Monto comisión</p>
               <p className="font-bold text-gray-900">{formatCurrencyMXN(selected.amount)}</p>
             </div>
-            {selected.cfdi_total_amount && (
+            {selected.cfdi_total && (
               <div>
                 <p className="text-xs text-gray-500 mb-0.5">Total CFDI</p>
-                <p className="font-medium text-gray-900">{formatCurrencyMXN(selected.cfdi_total_amount)}</p>
+                <p className="font-medium text-gray-900">{formatCurrencyMXN(selected.cfdi_total)}</p>
               </div>
             )}
-            {selected.cfdi_uuid && (
+            {selected.cfdi_uuid_fiscal && (
               <div>
                 <p className="text-xs text-gray-500 mb-0.5">UUID Fiscal</p>
-                <p className="font-mono text-xs text-gray-700 break-all">{selected.cfdi_uuid}</p>
+                <p className="font-mono text-xs text-gray-700 break-all">{selected.cfdi_uuid_fiscal}</p>
               </div>
             )}
-            {selected.cfdi_submitted_at && (
+            {selected.cfdi_uploaded_at && (
               <div>
                 <p className="text-xs text-gray-500 mb-0.5">CFDI enviado</p>
-                <p className="text-gray-700">{new Date(selected.cfdi_submitted_at).toLocaleDateString('es-MX')}</p>
+                <p className="text-gray-700">{new Date(selected.cfdi_uploaded_at).toLocaleDateString('es-MX')}</p>
               </div>
             )}
             {selected.payment_method && (
@@ -529,12 +525,12 @@ export default function AdminEjecutivosComisiones() {
                     Vas a aprobar el CFDI de <strong>{reviewModal.commission.account_executives?.first_name} {reviewModal.commission.account_executives?.last_name}</strong> por{' '}
                     <strong>{formatCurrencyMXN(reviewModal.commission.amount)}</strong>.
                   </p>
-                  {reviewModal.commission.cfdi_uuid && (
+                  {reviewModal.commission.cfdi_uuid_fiscal && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                      <p className="text-xs text-blue-700">UUID: {reviewModal.commission.cfdi_uuid}</p>
-                      {reviewModal.commission.cfdi_total_amount && (
+                      <p className="text-xs text-blue-700">UUID: {reviewModal.commission.cfdi_uuid_fiscal}</p>
+                      {reviewModal.commission.cfdi_total && (
                         <p className="text-xs text-blue-700 mt-1">
-                          Total CFDI: {formatCurrencyMXN(reviewModal.commission.cfdi_total_amount)}
+                          Total CFDI: {formatCurrencyMXN(reviewModal.commission.cfdi_total)}
                         </p>
                       )}
                     </div>
@@ -567,31 +563,14 @@ export default function AdminEjecutivosComisiones() {
                     Pago a <strong>{reviewModal.commission.account_executives?.first_name} {reviewModal.commission.account_executives?.last_name}</strong> por{' '}
                     <strong>{formatCurrencyMXN(reviewModal.commission.amount)}</strong>.
                   </p>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1.5">Método de pago *</label>
-                      <select
-                        value={paymentMethod}
-                        onChange={e => setPaymentMethod(e.target.value)}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Seleccionar...</option>
-                        <option value="transferencia_bancaria">Transferencia bancaria</option>
-                        <option value="cheque">Cheque</option>
-                        <option value="efectivo">Efectivo</option>
-                        <option value="paypal">PayPal</option>
-                        <option value="otro">Otro</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1.5">Referencia / # de folio (opcional)</label>
-                      <input
-                        value={paymentRef}
-                        onChange={e => setPaymentRef(e.target.value)}
-                        placeholder="Ej: SPEI-XXXXXXXX"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Referencia / # de folio (SPEI, cheque, etc.) *</label>
+                    <input
+                      value={paymentRef}
+                      onChange={e => setPaymentRef(e.target.value)}
+                      placeholder="Ej: SPEI-XXXXXXXX"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
                   </div>
                 </>
               )}
