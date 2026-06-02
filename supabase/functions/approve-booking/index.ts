@@ -78,17 +78,39 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Verificar que el usuario sea de la agencia dueña de la reserva o admin
-    const { data: agencyUser } = await supabase
+    // Verificar permisos: admin/super_admin, dueño de agencia, o staff de la agencia
+    const { data: currentUser } = await supabase
       .from("users")
-      .select("role, agency_id")
+      .select("role")
       .eq("id", user.id)
       .maybeSingle();
 
-    const isAdmin = agencyUser?.role === "admin" || agencyUser?.role === "super_admin";
-    const isAgencyOwner = agencyUser?.agency_id === booking.agency_id;
+    const isAdmin = currentUser?.role === "admin" || currentUser?.role === "super_admin";
 
+    // El dueño de la agencia tiene agencies.user_id = user.id
+    const { data: ownedAgency } = await supabase
+      .from("agencies")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("id", booking.agency_id)
+      .maybeSingle();
+
+    const isAgencyOwner = !!ownedAgency;
+
+    // Staff de agencia: agency_staff.user_id = user.id y agency_staff.agency_id = booking.agency_id
+    let isAgencyStaff = false;
     if (!isAdmin && !isAgencyOwner) {
+      const { data: staffRecord } = await supabase
+        .from("agency_staff")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("agency_id", booking.agency_id)
+        .eq("is_active", true)
+        .maybeSingle();
+      isAgencyStaff = !!staffRecord;
+    }
+
+    if (!isAdmin && !isAgencyOwner && !isAgencyStaff) {
       return new Response(JSON.stringify({ error: "Sin permisos para esta reserva" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
