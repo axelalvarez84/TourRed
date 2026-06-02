@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   DollarSign, CheckCircle, XCircle, Clock, Eye, Download,
-  AlertCircle, X, Filter, Search, FileText, ChevronDown
+  AlertCircle, X, Filter, Search, FileText, ChevronDown, Play, Calendar
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrencyMXN } from '../../utils/formatCurrency';
@@ -57,6 +57,13 @@ export default function AdminEjecutivosComisiones() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Estado para generación de comisiones mensuales
+  const currentDate = new Date();
+  const [genMonth, setGenMonth] = useState(currentDate.getMonth() + 1);
+  const [genYear, setGenYear] = useState(currentDate.getFullYear());
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showGenPanel, setShowGenPanel] = useState(false);
 
   const loadCommissions = useCallback(async () => {
     setIsLoading(true);
@@ -158,8 +165,30 @@ export default function AdminEjecutivosComisiones() {
     }
   };
 
+  const generatePlatformCommissions = async () => {
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.rpc('generate_and_notify_platform_commissions', {
+        p_month: genMonth,
+        p_year: genYear,
+      });
+      if (error) throw error;
+      const count = data as number;
+      if (count === 0) {
+        setMessage({ type: 'success', text: `No hay comisiones nuevas para ${genMonth}/${genYear}. Ya estaban generadas o no hubo actividad en ese período.` });
+      } else {
+        setMessage({ type: 'success', text: `Se generaron ${count} comisión(es) para ${genMonth}/${genYear}. Los ejecutivos ya recibieron su notificación por correo.` });
+      }
+      setShowGenPanel(false);
+      loadCommissions();
+    } catch (e: any) {
+      setMessage({ type: 'error', text: e.message || 'Error al generar comisiones.' });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const STATUS_TABS: { key: StatusFilter; label: string }[] = [
-    { key: 'invoiced', label: 'CFDI enviados' },
     { key: 'approved', label: 'Aprobados' },
     { key: 'paid', label: 'Pagados' },
     { key: 'pending', label: 'Pendientes' },
@@ -169,9 +198,18 @@ export default function AdminEjecutivosComisiones() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Comisiones de Ejecutivos</h1>
-        <p className="text-gray-500 mt-1">Revisión y aprobación de CFDIs, registro de pagos</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Comisiones de Ejecutivos</h1>
+          <p className="text-gray-500 mt-1">Revisión y aprobación de CFDIs, registro de pagos</p>
+        </div>
+        <button
+          onClick={() => setShowGenPanel(prev => !prev)}
+          className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors"
+        >
+          <Calendar className="h-4 w-4" />
+          Generar comisiones mensuales
+        </button>
       </div>
 
       {message && (
@@ -179,6 +217,63 @@ export default function AdminEjecutivosComisiones() {
           {message.type === 'success' ? <CheckCircle className="h-4 w-4 shrink-0" /> : <AlertCircle className="h-4 w-4 shrink-0" />}
           {message.text}
           <button onClick={() => setMessage(null)} className="ml-auto"><X className="h-4 w-4" /></button>
+        </div>
+      )}
+
+      {/* Panel generación de comisiones mensuales */}
+      {showGenPanel && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center">
+                <DollarSign className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Generar comisiones de periodo</h3>
+                <p className="text-sm text-gray-400">Calcula e inserta las comisiones de plataforma del mes seleccionado y notifica a los ejecutivos</p>
+              </div>
+            </div>
+            <button onClick={() => setShowGenPanel(false)}><X className="h-5 w-5 text-gray-400" /></button>
+          </div>
+
+          <div className="flex items-end gap-4 flex-wrap">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">Mes</label>
+              <select
+                value={genMonth}
+                onChange={e => setGenMonth(Number(e.target.value))}
+                className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m, i) => (
+                  <option key={i + 1} value={i + 1}>{m}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">Año</label>
+              <select
+                value={genYear}
+                onChange={e => setGenYear(Number(e.target.value))}
+                className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {[currentDate.getFullYear() - 1, currentDate.getFullYear(), currentDate.getFullYear() + 1].map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={generatePlatformCommissions}
+              disabled={isGenerating}
+              className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
+            >
+              <Play className="h-4 w-4" />
+              {isGenerating ? 'Generando...' : 'Generar y notificar'}
+            </button>
+          </div>
+
+          <p className="text-xs text-gray-400 mt-3">
+            Al ejecutar, se insertan las comisiones nuevas y se envía un correo de resumen a cada ejecutivo con el detalle de sus agencias. Las comisiones ya generadas para ese mes se omiten.
+          </p>
         </div>
       )}
 
