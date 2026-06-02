@@ -1816,7 +1816,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                       {[
                         { icon: '🏥', text: 'Gastos de asistencia médica en destino corren por tu cuenta.' },
                         { icon: '🚑', text: 'Sin cobertura de traslado médico o repatriación en caso de emergencia.' },
-                        { icon: '✈️', text: 'Cualquier accidente o imprevisto durante el tour es bajo tu responsabilidad.' },
+                        { icon: '✈️', text: 'En caso de accidente o emergencia médica, los gastos serán cubiertos directamente por el viajero.' },
                         { icon: '💳', text: 'Los costos de una emergencia médica pueden superar varios miles de pesos.' },
                       ].map((item, i) => (
                         <li key={i} className="flex items-start gap-3 text-sm text-gray-700">
@@ -1827,8 +1827,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     </ul>
 
                     <p className="mt-4 text-xs text-gray-500 bg-gray-50 rounded-lg p-3 border border-gray-100">
-                      Viajamos para crear recuerdos. Un seguro de viaje es la red de seguridad que esperamos nunca necesitar,
-                      pero agradeceremos tener si algo ocurre.
+                      Esperamos que disfrutes tu viaje sin contratiempos. Esta protección existe para brindarte tranquilidad ante cualquier imprevisto.
                     </p>
                   </div>
 
