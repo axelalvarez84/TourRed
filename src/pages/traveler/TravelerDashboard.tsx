@@ -184,7 +184,12 @@ const TravelerDashboard: React.FC = () => {
       setUpcomingBookings(filteredBookings);
 
       if (savedResult.error) throw savedResult.error;
-      setSavedTours(savedResult.data || []);
+      const todayStr = new Date().toISOString().split('T')[0];
+      const futureSaved = (savedResult.data || []).filter(s => {
+        const d = s.tours?.start_date;
+        return d && d >= todayStr;
+      });
+      setSavedTours(futureSaved);
 
       if (membershipResult.error) {
         console.error('Error fetching membership:', membershipResult.error);
