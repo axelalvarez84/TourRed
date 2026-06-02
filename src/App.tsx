@@ -92,6 +92,13 @@ import SupportTravelerPage from './pages/support/SupportTravelerPage';
 import SupportAgencyPage from './pages/support/SupportAgencyPage';
 import TravelerSupportTickets from './pages/traveler/TravelerSupportTickets';
 import AgencySupportTickets from './pages/agency/AgencySupportTickets';
+import AdminEjecutivos from './pages/admin/AdminEjecutivos';
+import AdminEjecutivosComisiones from './pages/admin/AdminEjecutivosComisiones';
+import AdminEjecutivosConfig from './pages/admin/AdminEjecutivosConfig';
+import ExecutiveDashboard from './pages/executive/ExecutiveDashboard';
+import ExecutiveLeads from './pages/executive/ExecutiveLeads';
+import ExecutiveMisAgencias from './pages/executive/ExecutiveMisAgencias';
+import ExecutiveComisiones from './pages/executive/ExecutiveComisiones';
 import AdminBookings from './pages/admin/AdminBookings';
 import AdminBookingsCleanup from './pages/admin/AdminBookingsCleanup';
 import AdminServiceDesk from './pages/admin/AdminServiceDesk';
@@ -627,6 +634,66 @@ const App: React.FC = () => {
             }
           />
 
+          {/* Admin: Ejecutivos de Cuenta */}
+          <Route
+            path="/admin/ejecutivos"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminEjecutivos />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/ejecutivos/comisiones"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminEjecutivosComisiones />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/ejecutivos/configuracion"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminEjecutivosConfig />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Executive Routes */}
+          <Route
+            path="/executive/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ACCOUNT_EXECUTIVE]}>
+                <ExecutiveDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/executive/leads"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ACCOUNT_EXECUTIVE]}>
+                <ExecutiveLeads />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/executive/mis-agencias"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ACCOUNT_EXECUTIVE]}>
+                <ExecutiveMisAgencias />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/executive/comisiones"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ACCOUNT_EXECUTIVE]}>
+                <ExecutiveComisiones />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Accounting module — accessible to admin and accountant */}
           <Route
             path="/accounting"
@@ -690,12 +757,13 @@ const ProfileRedirect: React.FC = () => {
 };
 
 const DashboardRedirect: React.FC = () => {
-  const { isAdmin, isAgency, isTraveler, isAgencyStaff, isAccountant } = useAuth();
+  const { isAdmin, isAgency, isTraveler, isAgencyStaff, isAccountant, isAccountExecutive } = useAuth();
 
   if (isAdmin) return <Navigate to="/admin/dashboard" />;
   if (isAgency) return <Navigate to="/agency/dashboard" />;
   if (isAgencyStaff) return <Navigate to="/agency/dashboard" />;
   if (isAccountant) return <Navigate to="/accounting" />;
+  if (isAccountExecutive) return <Navigate to="/executive/dashboard" />;
   if (isTraveler) return <Navigate to="/traveler/dashboard" />;
 
   return <Navigate to="/login" />;

@@ -19,6 +19,7 @@ export interface AdminPermissions {
   canExportSatXml: boolean;
   canManageChartOfAccounts: boolean;
   canManageServiceDesk: boolean;
+  canManageExecutives: boolean;
 }
 
 export interface AgencyStaffPermissions {
@@ -48,6 +49,14 @@ export interface AccountantPermissions {
   canManageChartOfAccounts: boolean;
 }
 
+export interface AccountExecutiveInfo {
+  executiveId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  isActive: boolean;
+}
+
 interface AuthContextType {
   user: any | null;
   userRole: UserRole | null;
@@ -56,10 +65,12 @@ interface AuthContextType {
   isAgency: boolean;
   isTraveler: boolean;
   isAccountant: boolean;
+  isAccountExecutive: boolean;
   isEmailVerified: boolean;
   isSuperAdmin: boolean;
   permissions: AdminPermissions | null;
   accountantPermissions: AccountantPermissions | null;
+  accountExecutiveInfo: AccountExecutiveInfo | null;
   isAgencyStaff: boolean;
   staffInfo: AgencyStaffInfo | null;
   allStaffInfo: AgencyStaffInfo[];
@@ -77,10 +88,12 @@ const AuthContext = createContext<AuthContextType>({
   isAgency: false,
   isTraveler: false,
   isAccountant: false,
+  isAccountExecutive: false,
   isEmailVerified: false,
   isSuperAdmin: false,
   permissions: null,
   accountantPermissions: null,
+  accountExecutiveInfo: null,
   isAgencyStaff: false,
   staffInfo: null,
   allStaffInfo: [],
@@ -102,6 +115,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [permissions, setPermissions] = useState<AdminPermissions | null>(null);
   const [accountantPermissions, setAccountantPermissions] = useState<AccountantPermissions | null>(null);
+  const [accountExecutiveInfo, setAccountExecutiveInfo] = useState<AccountExecutiveInfo | null>(null);
   const [allStaffInfo, setAllStaffInfo] = useState<AgencyStaffInfo[]>([]);
   const [activeAgencyId, setActiveAgencyId] = useState<string | null>(() => {
     try {
@@ -317,6 +331,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 canExportSatXml: p.can_export_sat_xml ?? true,
                 canManageChartOfAccounts: p.can_manage_chart_of_accounts ?? false,
                 canManageServiceDesk: p.can_manage_service_desk ?? false,
+                canManageExecutives: p.can_manage_executives ?? false,
               });
             } else {
               setPermissions(null);
@@ -326,9 +341,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           setAccountantPermissions(null);
           setAllStaffInfo([]);
+          setAccountExecutiveInfo(null);
         } else if (role === UserRole.ACCOUNTANT) {
           setIsSuperAdmin(false);
           setPermissions(null);
+          setAccountExecutiveInfo(null);
           // Cargar permisos contables desde admin_permissions si existen
           try {
             const { data: acctPerms } = await supabase
@@ -345,10 +362,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setAccountantPermissions({ canViewAccounting: true, canExportSatXml: true, canManageChartOfAccounts: false });
           }
           setAllStaffInfo([]);
+          setAccountExecutiveInfo(null);
+        } else if (role === UserRole.ACCOUNT_EXECUTIVE) {
+          setIsSuperAdmin(false);
+          setPermissions(null);
+          setAccountantPermissions(null);
+          setAllStaffInfo([]);
+          // Cargar info del ejecutivo
+          try {
+            const { data: execData } = await supabase
+              .from('account_executives')
+              .select('id, first_name, last_name, email, is_active')
+              .eq('user_id', authUser.id)
+              .eq('is_active', true)
+              .maybeSingle();
+            if (execData) {
+              setAccountExecutiveInfo({
+                executiveId: execData.id,
+                firstName: execData.first_name,
+                lastName: execData.last_name,
+                email: execData.email,
+                isActive: execData.is_active,
+              });
+            } else {
+              setAccountExecutiveInfo(null);
+            }
+          } catch {
+            setAccountExecutiveInfo(null);
+          }
+          setNeedsTermsAcceptance(false);
         } else if (role === UserRole.TRAVELER) {
           setIsSuperAdmin(false);
           setPermissions(null);
           setAccountantPermissions(null);
+          setAllStaffInfo([]);
+          setNeedsTermsAcceptance(false);
 
           // Verificar si el viajero necesita aceptar T&C actualizados
           try {
@@ -386,11 +434,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else {
             setAllStaffInfo([]);
           }
+          setAccountExecutiveInfo(null);
         } else if (role === UserRole.AGENCY) {
           setIsSuperAdmin(false);
           setPermissions(null);
           setAccountantPermissions(null);
           setAllStaffInfo([]);
+          setAccountExecutiveInfo(null);
 
           // Verificar si la agencia necesita aceptar T&C actualizados
           try {
@@ -409,6 +459,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setPermissions(null);
           setAccountantPermissions(null);
           setAllStaffInfo([]);
+          setAccountExecutiveInfo(null);
           setNeedsTermsAcceptance(false);
         }
       } else {
@@ -417,6 +468,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsSuperAdmin(false);
         setPermissions(null);
         setAccountantPermissions(null);
+        setAccountExecutiveInfo(null);
         setAllStaffInfo([]);
         setActiveAgencyId(null);
         clearAuthCache();
@@ -534,6 +586,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isAgency = userRole === UserRole.AGENCY;
   const isTraveler = userRole === UserRole.TRAVELER;
   const isAccountant = userRole === UserRole.ACCOUNTANT;
+  const isAccountExecutive = userRole === UserRole.ACCOUNT_EXECUTIVE;
   const isAgencyStaff = isTraveler && allStaffInfo.length > 0;
 
   const staffInfo: AgencyStaffInfo | null = useMemo(() => {
@@ -549,10 +602,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isAgency,
     isTraveler,
     isAccountant,
+    isAccountExecutive,
     isEmailVerified,
     isSuperAdmin,
     permissions,
     accountantPermissions,
+    accountExecutiveInfo,
     isAgencyStaff,
     staffInfo,
     allStaffInfo,
@@ -560,7 +615,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     switchActiveAgency,
     needsTermsAcceptance,
     markTermsAccepted,
-  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isAccountant, isEmailVerified, isSuperAdmin, permissions, accountantPermissions, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency, needsTermsAcceptance, markTermsAccepted]);
+  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isAccountant, isAccountExecutive, isEmailVerified, isSuperAdmin, permissions, accountantPermissions, accountExecutiveInfo, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency, needsTermsAcceptance, markTermsAccepted]);
 
   return (
     <AuthContext.Provider value={contextValue}>

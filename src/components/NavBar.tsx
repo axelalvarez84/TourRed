@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, User, LogOut, Search, MessageCircle, ChevronDown, LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation, Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent, DollarSign, Gift, Megaphone, Ticket, BadgePercent, Send, ArrowLeftRight, FileText, FilePlus2, BookOpen, Headphones as HeadphonesIcon, TicketCheck, ShoppingBag, Trash2, Bus, BarChart2 } from 'lucide-react';
+import { Menu, X, User, LogOut, Search, MessageCircle, ChevronDown, LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation, Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent, DollarSign, Gift, Megaphone, Ticket, BadgePercent, Send, ArrowLeftRight, FileText, FilePlus2, BookOpen, Headphones as HeadphonesIcon, TicketCheck, ShoppingBag, Trash2, Bus, BarChart2, Briefcase } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import { useAuth } from '../context/AuthContext';
 import { signOut, supabase } from '../lib/supabase';
@@ -18,7 +18,7 @@ interface AdminMenuGroup {
 }
 
 const NavBar: React.FC = () => {
-  const { user, isAdmin, isAgency, isTraveler, isEmailVerified, isSuperAdmin, permissions, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency } = useAuth();
+  const { user, isAdmin, isAgency, isTraveler, isEmailVerified, isSuperAdmin, permissions, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency, isAccountExecutive, accountExecutiveInfo } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isToursDropdownOpen, setIsToursDropdownOpen] = useState(false);
@@ -117,6 +117,7 @@ const NavBar: React.FC = () => {
     if (isAdmin) return '/admin/dashboard';
     if (isAgency) return '/agency/dashboard';
     if (isAgencyStaff) return '/agency/dashboard';
+    if (isAccountExecutive) return '/executive/dashboard';
     return '/traveler/dashboard';
   };
 
@@ -214,6 +215,16 @@ const NavBar: React.FC = () => {
 
     if (serviceDeskItems.length > 0)
       groups.push({ title: 'Service Desk', icon: <HeadphonesIcon className="h-4 w-4" />, items: serviceDeskItems });
+
+    const ejecutivosItems: AdminMenuItem[] = [];
+    if (isSuperAdmin || permissions?.canManageExecutives) {
+      ejecutivosItems.push({ to: '/admin/ejecutivos', label: 'Ejecutivos', icon: <Briefcase className="h-4 w-4" /> });
+      ejecutivosItems.push({ to: '/admin/ejecutivos/comisiones', label: 'Comisiones', icon: <DollarSign className="h-4 w-4" /> });
+      ejecutivosItems.push({ to: '/admin/ejecutivos/configuracion', label: 'Configuracion', icon: <Settings className="h-4 w-4" /> });
+    }
+
+    if (ejecutivosItems.length > 0)
+      groups.push({ title: 'Ejecutivos', icon: <Briefcase className="h-4 w-4" />, items: ejecutivosItems });
 
     return groups;
   };
@@ -540,7 +551,7 @@ const NavBar: React.FC = () => {
                           </>
                         ) : (
                           <>
-                            {!isAdmin && getRoleSpecificMenuItems().map((item) => (
+                      {!isAdmin && getRoleSpecificMenuItems().map((item) => (
                               <Link
                                 key={item.to}
                                 to={item.to}
@@ -554,6 +565,32 @@ const NavBar: React.FC = () => {
 
                             {!isAdmin && getRoleSpecificMenuItems().length > 0 && (
                               <div className="border-t border-gray-100 my-1"></div>
+                            )}
+
+                            {isAccountExecutive && (
+                              <>
+                                <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                                  <Briefcase className="h-3 w-3" />
+                                  Ejecutivo
+                                </div>
+                                {[
+                                  { to: '/executive/dashboard', label: 'Panel' },
+                                  { to: '/executive/leads', label: 'Leads (CRM)' },
+                                  { to: '/executive/mis-agencias', label: 'Mis Agencias' },
+                                  { to: '/executive/comisiones', label: 'Mis Comisiones' },
+                                ].map(item => (
+                                  <Link
+                                    key={item.to}
+                                    to={item.to}
+                                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-100"
+                                    role="menuitem"
+                                    onClick={() => setIsProfileOpen(false)}
+                                  >
+                                    {item.label}
+                                  </Link>
+                                ))}
+                                <div className="border-t border-gray-100 my-1"></div>
+                              </>
                             )}
                           </>
                         )}
@@ -686,7 +723,7 @@ const NavBar: React.FC = () => {
                   <div className="ml-3">
                     <div className="text-base font-medium text-gray-800">{user.email}</div>
                     <div className="text-sm text-gray-500">
-                      {isAdmin ? 'Administrador' : isAgency ? 'Agencia' : isAgencyStaff ? (staffInfo?.agencyName ?? 'Coordinador') : 'Viajero'}
+                      {isAdmin ? 'Administrador' : isAgency ? 'Agencia' : isAgencyStaff ? (staffInfo?.agencyName ?? 'Coordinador') : isAccountExecutive ? 'Ejecutivo de Cuenta' : 'Viajero'}
                     </div>
                   </div>
                 </div>
@@ -780,6 +817,24 @@ const NavBar: React.FC = () => {
                       </div>
                       {travelerMenuItems.map((item) => (
                         <Link key={item.to} to={item.to} className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-blue-100" onClick={toggleMenu}>
+                          {item.label}
+                        </Link>
+                      ))}
+                    </>
+                  ) : isAccountExecutive ? (
+                    <>
+                      {[
+                        { to: '/executive/dashboard', label: 'Panel' },
+                        { to: '/executive/leads', label: 'Leads (CRM)' },
+                        { to: '/executive/mis-agencias', label: 'Mis Agencias' },
+                        { to: '/executive/comisiones', label: 'Mis Comisiones' },
+                      ].map(item => (
+                        <Link
+                          key={item.to}
+                          to={item.to}
+                          className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-blue-100"
+                          onClick={toggleMenu}
+                        >
                           {item.label}
                         </Link>
                       ))}

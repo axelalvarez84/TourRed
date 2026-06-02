@@ -94,6 +94,7 @@ const AdminAgencies: React.FC = () => {
           rfc,
           razon_social,
           user_id,
+          account_executive_id,
           users(first_name, last_name, email, is_approved)
         `)
         .order('created_at', { ascending: false })
@@ -163,7 +164,23 @@ const AdminAgencies: React.FC = () => {
         })
       );
 
-      setAgencies(agenciesWithStats);
+      // Fetch executive names for assigned agencies
+      const execIds = [...new Set(agenciesWithStats.map((a: any) => a.account_executive_id).filter(Boolean))];
+      const execNameMap: Record<string, string> = {};
+      if (execIds.length > 0) {
+        const { data: execs } = await supabase
+          .from('account_executives')
+          .select('id, first_name, last_name')
+          .in('id', execIds);
+        (execs || []).forEach((e: any) => { execNameMap[e.id] = `${e.first_name} ${e.last_name}`; });
+      }
+
+      const agenciesWithExec = agenciesWithStats.map((a: any) => ({
+        ...a,
+        _executive_name: a.account_executive_id ? (execNameMap[a.account_executive_id] || 'Ejecutivo') : null,
+      }));
+
+      setAgencies(agenciesWithExec);
     } catch (err: any) {
       console.error('❌ Error cargando agencias:', err);
       setError(err.message || 'Error al cargar las agencias');
@@ -717,6 +734,9 @@ const AdminAgencies: React.FC = () => {
                     Validación
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Ejecutivo
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Acciones
                   </th>
                 </tr>
@@ -820,6 +840,17 @@ const AdminAgencies: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getApprovalBadge(agency.is_approved)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {(agency as any).account_executive_id ? (
+                        <div className="text-xs">
+                          <span className="inline-flex items-center gap-1 text-blue-700 bg-blue-50 px-2 py-1 rounded-full font-medium">
+                            {(agency as any)._executive_name || 'Asignado'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center space-x-2">
