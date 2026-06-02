@@ -107,6 +107,23 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // Send credentials email (fire-and-forget — don't fail the creation if email fails)
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+      await fetch(`${supabaseUrl}/functions/v1/send-executive-credentials`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          firstName: first_name,
+          lastName: last_name || '',
+          password,
+        }),
+      });
+    } catch (emailErr) {
+      console.error('Failed to send credentials email:', emailErr);
+    }
+
     return new Response(JSON.stringify({ success: true, user_id: newUserId }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
