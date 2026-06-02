@@ -107,13 +107,11 @@ export default function ExecutiveMisAgencias() {
 
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage.from('signed-contracts').getPublicUrl(filePath);
-
       const { error: updateError } = await supabase
         .from('agencies')
         .update({
           is_approved: true,
-          signed_contract_url: urlData.publicUrl || filePath,
+          signed_contract_url: filePath,
         })
         .eq('id', approveModal.id);
 
@@ -258,14 +256,33 @@ export default function ExecutiveMisAgencias() {
                 )}
 
                 {agency.signed_contract_url && (
-                  <a
-                    href={agency.signed_contract_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    onClick={async () => {
+                      const url = agency.signed_contract_url!;
+                      // Si ya es una URL completa (http/https), intentar extraer el path
+                      const isFullUrl = url.startsWith('http');
+                      const filePath = isFullUrl
+                        ? url.split('/signed-contracts/').pop() || url
+                        : url;
+
+                      if (isFullUrl && !url.includes('/signed-contracts/')) {
+                        window.open(url, '_blank');
+                        return;
+                      }
+
+                      const { data, error } = await supabase.storage
+                        .from('signed-contracts')
+                        .createSignedUrl(filePath, 60);
+                      if (error || !data?.signedUrl) {
+                        setMessage({ type: 'error', text: 'No se pudo generar el enlace del contrato.' });
+                        return;
+                      }
+                      window.open(data.signedUrl, '_blank');
+                    }}
                     className="text-xs text-blue-600 hover:underline flex items-center gap-1"
                   >
                     <FileText className="h-3 w-3" /> Ver contrato firmado
-                  </a>
+                  </button>
                 )}
               </div>
             );
