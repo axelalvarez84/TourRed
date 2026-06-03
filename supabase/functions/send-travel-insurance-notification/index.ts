@@ -82,13 +82,14 @@ function generateXlsxBase64(
     const nameParts = (t.nombre || "").trim().split(/\s+/);
     const nombre = nameParts[0] || "";
     const apellido = nameParts.slice(1).join(" ") || "";
-    const tipoDoc = t.documento_tipo === "pasaporte" ? "PASAPORTE" : "CURP";
+    const tipoDoc = t.documento_tipo === "pasaporte" ? "PASAPORTE" : "Otro";
+    const numDoc = (t.documento_numero || t.curp_fallback || "").toUpperCase();
     return [
       nombre,
       apellido,
       "México",
       tipoDoc,
-      (t.documento_numero || "").toUpperCase(),
+      numDoc,
       formatDateShort(t.fecha_nacimiento),
       t.email || "",
       t.emergency_contact_name || "",
@@ -176,7 +177,20 @@ Deno.serve(async (req: Request) => {
       .eq("is_cancelled", false)
       .order("created_at", { ascending: true });
 
-    const travelers = bookingTravelers || [];
+    // Obtener el CURP del perfil del usuario titular como fallback
+    const { data: bookingUser } = await supabase
+      .from("bookings")
+      .select("users!bookings_user_id_fkey(curp)")
+      .eq("id", booking_id)
+      .maybeSingle();
+
+    const userCurp = (bookingUser?.users as any)?.curp || "";
+
+    // Inyectar curp_fallback en cada viajero que no tenga documento_numero
+    const travelers = (bookingTravelers || []).map((t) => ({
+      ...t,
+      curp_fallback: t.documento_numero ? "" : userCurp,
+    }));
 
     const recipientEmail = "seguros@toursred.com.mx";
     const pricePerDay = total_travelers > 0 ? insurance_cost / tour_days / total_travelers : insurance_cost;
@@ -189,8 +203,8 @@ Deno.serve(async (req: Request) => {
     ].filter(Boolean).join("");
 
     const detailedTravelerRows = travelers.map((t, i) => {
-      const tipoDoc = t.documento_tipo === "pasaporte" ? "Pasaporte" : (t.documento_tipo === "curp" ? "CURP" : "—");
-      const numDoc = t.documento_numero ? t.documento_numero.toUpperCase() : "—";
+      const tipoDoc = t.documento_tipo === "pasaporte" ? "Pasaporte" : "Otro";
+      const numDoc = (t.documento_numero || t.curp_fallback || "").toUpperCase() || "—";
       const emergencia = t.emergency_contact_name
         ? `${t.emergency_contact_name}${t.emergency_contact_phone ? " · " + t.emergency_contact_phone : ""}`
         : "—";
