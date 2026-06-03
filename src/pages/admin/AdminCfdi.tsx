@@ -28,7 +28,7 @@ const downloadCfdi = async (cfdiId: string, fileType: 'xml' | 'pdf') => {
 
 interface CfdiInvoice {
   id: string;
-  invoice_type: 'booking' | 'commission' | 'membership';
+  invoice_type: 'booking' | 'commission' | 'membership' | 'checkin_wallet';
   booking_id: string | null;
   payout_id: string | null;
   agency_id: string | null;
@@ -267,6 +267,7 @@ const AdminCfdi: React.FC = () => {
           >
             <option value="all">Todos los tipos</option>
             <option value="booking">Viajero (Reserva)</option>
+            <option value="checkin_wallet">Cobro en Check-in</option>
             <option value="commission">Comisión (Agencia)</option>
             <option value="membership">Membresía</option>
           </select>
@@ -323,9 +324,17 @@ const AdminCfdi: React.FC = () => {
                               ? 'bg-blue-100 text-blue-700'
                               : inv.invoice_type === 'membership'
                               ? 'bg-emerald-100 text-emerald-700'
+                              : inv.invoice_type === 'checkin_wallet'
+                              ? 'bg-teal-100 text-teal-700'
                               : 'bg-amber-100 text-amber-700'
                           }`}>
-                            {inv.invoice_type === 'booking' ? 'Reserva' : inv.invoice_type === 'membership' ? 'Membresía' : 'Comisión'}
+                            {inv.invoice_type === 'booking'
+                              ? 'Reserva'
+                              : inv.invoice_type === 'membership'
+                              ? 'Membresía'
+                              : inv.invoice_type === 'checkin_wallet'
+                              ? 'Check-in'
+                              : 'Comisión'}
                           </span>
                           {agencyName && <div className="text-xs text-gray-400 mt-0.5 truncate max-w-24">{agencyName}</div>}
                           {bookingCode && <div className="text-xs text-gray-400">{bookingCode}</div>}
