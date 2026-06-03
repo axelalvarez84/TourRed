@@ -79,9 +79,8 @@ function generateXlsxBase64(
   ];
 
   const rows = travelers.map((t) => {
-    const nameParts = (t.nombre || "").trim().split(/\s+/);
-    const nombre = nameParts[0] || "";
-    const apellido = nameParts.slice(1).join(" ") || "";
+    const nombre = t.nombre_real || (t.nombre || "").trim().split(/\s+/)[0] || "";
+    const apellido = t.apellido_real || (t.nombre || "").trim().split(/\s+/).slice(1).join(" ") || "";
     const tipoDoc = t.documento_tipo === "pasaporte" ? "PASAPORTE" : "Otro";
     const numDoc = (t.documento_numero || t.curp_fallback || "").toUpperCase();
     return [
@@ -161,14 +160,16 @@ Deno.serve(async (req: Request) => {
       .eq("is_cancelled", false)
       .order("created_at", { ascending: true });
 
-    // Obtener el CURP del perfil del usuario titular como fallback
+    // Obtener el CURP, nombre y apellidos del perfil del usuario titular como fallback
     const { data: bookingUser } = await supabase
       .from("bookings")
-      .select("users!bookings_user_id_fkey(curp)")
+      .select("users!bookings_user_id_fkey(curp, nombre, apellidos)")
       .eq("id", booking_id)
       .maybeSingle();
 
     const userCurp = (bookingUser?.users as any)?.curp || "";
+    const userNombre = (bookingUser?.users as any)?.nombre || "";
+    const userApellidos = (bookingUser?.users as any)?.apellidos || "";
 
     // Deduplicar: si hay dos registros con el mismo nombre, quedarse con el más completo
     const dedupedTravelers = (bookingTravelers || []).reduce((acc: any[], t: any) => {
@@ -182,11 +183,18 @@ Deno.serve(async (req: Request) => {
       return acc;
     }, []);
 
-    // Inyectar curp_fallback en cada viajero que no tenga documento_numero
-    const travelers = dedupedTravelers.map((t) => ({
-      ...t,
-      curp_fallback: t.documento_numero ? "" : userCurp,
-    }));
+    // Inyectar curp_fallback y nombre/apellido del perfil cuando el viajero es el titular
+    const travelers = dedupedTravelers.map((t) => {
+      const isTitular =
+        userNombre &&
+        (t.nombre || "").trim().toLowerCase().includes(userNombre.trim().toLowerCase());
+      return {
+        ...t,
+        curp_fallback: t.documento_numero ? "" : userCurp,
+        nombre_real: isTitular ? userNombre : null,
+        apellido_real: isTitular ? userApellidos : null,
+      };
+    });
 
     const recipientEmail = "seguros@toursred.com.mx";
     const pricePerDay = total_travelers > 0 ? insurance_cost / tour_days / total_travelers : insurance_cost;
