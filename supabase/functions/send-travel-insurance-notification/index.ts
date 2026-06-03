@@ -369,11 +369,10 @@ Deno.serve(async (req: Request) => {
 
     const emailPayload: any = {
       api_key: emailSettings.smtp_api_key,
-      to: [{ email: recipientEmail, name: "Seguros ToursRed" }],
-      sender: { email: emailSettings.contact_email, name: "ToursRed Plataforma" },
+      to: [recipientEmail],
+      sender: emailSettings.contact_email,
       subject: `Seguro de viaje — ${booking_code} | ${tour_name}`,
       html_body: html,
-      reply_to: emailSettings.contact_email,
       attachments: [
         {
           filename: xlsxFilename,
