@@ -65,6 +65,10 @@ Deno.serve(async (req: Request) => {
         toursred_cash_used,
         travel_insurance_cost,
         travel_insurance_included,
+        total_price,
+        service_charge,
+        service_charge_discount,
+        used_membership_benefit,
         agency_id,
         tours(name)
       `)
@@ -206,6 +210,43 @@ Deno.serve(async (req: Request) => {
         if (pointsError) {
           console.error("Error al descontar puntos:", pointsError);
           // Igual: no fallar, loguear para revision
+        }
+      }
+
+      // Actualizar service_fee_exemption_used en la membresía si aplica
+      if (!booking.used_membership_benefit) {
+        const { data: platformSettings } = await supabase
+          .from("platform_settings")
+          .select("service_charge_percentage")
+          .maybeSingle();
+
+        const serviceChargeRate = platformSettings?.service_charge_percentage || 5;
+        const fullServiceCharge = ((booking.total_price || 0) * serviceChargeRate) / 100;
+        const actualServiceCharge = parseFloat(booking.service_charge || 0);
+        const codeDiscount = parseFloat(booking.service_charge_discount || 0);
+        const exemptionUsed = fullServiceCharge - actualServiceCharge - codeDiscount;
+
+        if (exemptionUsed > 0) {
+          const { data: membership } = await supabase
+            .from("memberships")
+            .select("id, service_fee_exemption_used")
+            .eq("user_id", booking.user_id)
+            .eq("status", "active")
+            .maybeSingle();
+
+          if (membership) {
+            await supabase
+              .from("memberships")
+              .update({
+                service_fee_exemption_used: (membership.service_fee_exemption_used || 0) + exemptionUsed,
+              })
+              .eq("id", membership.id);
+          }
+
+          await supabase
+            .from("bookings")
+            .update({ used_membership_benefit: true })
+            .eq("id", booking_id);
         }
       }
 
