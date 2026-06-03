@@ -69,6 +69,7 @@ interface WalletChargeState {
   // From confirm response
   newRemainingAmount: number;
   newWalletBalance: number;
+  pointsEarned: number;
   loading: boolean;
   error: string | null;
   resendCooldown: number;
@@ -103,6 +104,7 @@ const INITIAL_WALLET_STATE: WalletChargeState = {
   expiresAt: null,
   newRemainingAmount: 0,
   newWalletBalance: 0,
+  pointsEarned: 0,
   loading: false,
   error: null,
   resendCooldown: 0,
@@ -302,6 +304,7 @@ export default function BookingCheckinPage() {
           step: 'success',
           newRemainingAmount: data.new_remaining_amount,
           newWalletBalance: data.new_wallet_balance,
+          pointsEarned: data.points_earned ?? 0,
           error: null,
         }));
         fetchDetails();
@@ -870,6 +873,16 @@ export default function BookingCheckinPage() {
                           </span>
                         </div>
                       </div>
+                      {wallet.pointsEarned > 0 && (
+                        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
+                          <div className="w-7 h-7 bg-amber-400 rounded-full flex items-center justify-center flex-shrink-0">
+                            <span className="text-white font-bold text-xs">P</span>
+                          </div>
+                          <p className="text-amber-800 text-sm">
+                            Se acreditaron <strong>{wallet.pointsEarned.toLocaleString()} puntos ToursRed</strong> al viajero por este pago.
+                          </p>
+                        </div>
+                      )}
                       {details.booking.remaining_amount > 0 && (
                         <button
                           onClick={() => setWallet(w => ({ ...w, step: 'input', amount: '', otpCode: '', error: null }))}

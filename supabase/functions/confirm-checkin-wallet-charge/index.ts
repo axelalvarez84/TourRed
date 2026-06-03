@@ -233,12 +233,73 @@ Deno.serve(async (req: Request) => {
 
     // 4. Actualizar wallet_charged_at_checkin en la reserva
     const newWalletCharged = parseFloat(((booking.wallet_charged_at_checkin || 0) + amountToCharge).toFixed(2));
+
+    // 5. Acreditar ToursRed Points si el viajero tiene membresía activa
+    let pointsEarned = 0;
+    const { data: membership } = await supabase
+      .from("memberships")
+      .select("id, status, current_period_end, service_fee_exemption_used")
+      .eq("user_id", booking.user_id)
+      .eq("status", "active")
+      .gt("current_period_end", new Date().toISOString())
+      .maybeSingle();
+
+    if (membership) {
+      pointsEarned = Math.floor(amountToCharge * 100);
+
+      if (pointsEarned > 0) {
+        // Obtener o crear billetera de puntos
+        const { data: walletId } = await supabase
+          .rpc("get_or_create_points_wallet", { p_user_id: booking.user_id });
+
+        if (walletId) {
+          // Leer balance actual para calcular balance_after
+          const { data: pointsWallet } = await supabase
+            .from("toursred_points_wallets")
+            .select("id, balance, total_earned")
+            .eq("id", walletId)
+            .maybeSingle();
+
+          if (pointsWallet) {
+            const newBalance = pointsWallet.balance + pointsEarned;
+            const newTotalEarned = pointsWallet.total_earned + pointsEarned;
+            const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+
+            // Insertar transacción de puntos
+            await supabase
+              .from("toursred_points_transactions")
+              .insert({
+                wallet_id: walletId,
+                user_id: booking.user_id,
+                amount: pointsEarned,
+                balance_after: newBalance,
+                type: "earned",
+                description: `Puntos por pago con ToursRed Cash en check-in (reserva ${booking_id.slice(0, 8)})`,
+                reference_id: booking_id,
+                reference_type: "booking",
+                expires_at: expiresAt,
+              });
+
+            // Actualizar billetera de puntos
+            await supabase
+              .from("toursred_points_wallets")
+              .update({ balance: newBalance, total_earned: newTotalEarned })
+              .eq("id", walletId);
+          }
+        }
+      }
+    }
+
+    // 6. Actualizar bookings: wallet cobrado y puntos ganados en check-in
     await supabase
       .from("bookings")
-      .update({ wallet_charged_at_checkin: newWalletCharged })
+      .update({
+        wallet_charged_at_checkin: newWalletCharged,
+        points_earned_at_checkin: pointsEarned,
+      })
       .eq("id", booking_id);
 
-    // 5. Insertar registro de auditoría
+    // 7. Insertar registro de auditoría
     await supabase
       .from("wallet_checkin_charges")
       .insert({
@@ -266,7 +327,8 @@ Deno.serve(async (req: Request) => {
         total_deducted_from_wallet: totalToDeduct,
         new_remaining_amount: newRemaining,
         new_wallet_balance: newWalletBalance,
-        message: `Cobro realizado exitosamente. Se descontaron $${totalToDeduct.toFixed(2)} del monedero del viajero.`,
+        points_earned: pointsEarned,
+        message: `Cobro realizado exitosamente. Se descontaron $${totalToDeduct.toFixed(2)} del monedero del viajero.${pointsEarned > 0 ? ` Se acreditaron ${pointsEarned} puntos ToursRed.` : ''}`,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
