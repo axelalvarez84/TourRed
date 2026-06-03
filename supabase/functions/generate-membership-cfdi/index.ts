@@ -300,18 +300,18 @@ Deno.serve(async (req: Request) => {
     const amountPaidMxn = stripe_amount_paid != null ? Math.round(Number(stripe_amount_paid)) / 100 : null;
     const hasDiscount = amountPaidMxn != null && amountPaidMxn < membershipPrice - 0.01;
 
-    // Precio bruto sin IVA (valor_unitario en FacturAPI = precio catálogo / 1.16)
-    const precioMembresiaBase = Math.round((membershipPrice / 1.16) * 100) / 100;
+    // 6 decimales para valor_unitario en FacturAPI (evita error de centavo en XML)
+    const precioMembresiaBase = Math.round((membershipPrice / 1.16) * 1000000) / 1000000;
 
-    // Descuento sin IVA: descuento_con_iva / 1.16 para que FacturAPI calcule IVA sobre el neto
+    // Descuento sin IVA: 6 decimales para que FacturAPI calcule IVA sobre el neto exacto
     const descuentoConIva = hasDiscount ? Math.round((membershipPrice - amountPaidMxn!) * 100) / 100 : 0;
-    const descuentoBase = descuentoConIva > 0 ? Math.round((descuentoConIva / 1.16) * 100) / 100 : 0;
+    const descuentoBase = descuentoConIva > 0 ? Math.round((descuentoConIva / 1.16) * 1000000) / 1000000 : 0;
 
-    // Importe neto = valor_unitario - descuento (base gravable IVA según SAT)
-    const importeNeto = Math.round((precioMembresiaBase - descuentoBase) * 100) / 100;
-    const iva = Math.round(importeNeto * 0.16 * 100) / 100;
-    const subtotal = importeNeto;
-    const total = Math.round((subtotal + iva) * 100) / 100;
+    // Monto exacto cobrado al cliente; IVA como complemento → subtotal + iva = total siempre
+    const exactTotal = amountPaidMxn ?? membershipPrice;
+    const iva = Math.round(exactTotal * 16 / 116 * 100) / 100;
+    const subtotal = Math.round((exactTotal - iva) * 100) / 100;
+    const total = exactTotal;
 
     if (hasDiscount) {
       console.log(`CFDI membresía con descuento: precio catálogo $${membershipPrice}, pagado $${amountPaidMxn}, descuento -$${descuentoConIva} MXN, total CFDI $${total} MXN`);

@@ -235,8 +235,11 @@ Deno.serve(async (req: Request) => {
     // Commission CFDI: ToursRed bills the agency for the platform commission
     // Use platform_commission_amount if available, otherwise fall back to net_amount
     const total = Number(payout.platform_commission_amount || payout.net_amount);
-    const subtotal = Math.round((total / 1.16) * 100) / 100;
-    const iva = Math.round((total - subtotal) * 100) / 100;
+    // 6 decimales para valor_unitario en FacturAPI (evita error de centavo en XML)
+    const subtotalFacturapi = Math.round((total / 1.16) * 1000000) / 1000000;
+    // IVA como complemento del total exacto → subtotal + iva = total siempre
+    const iva = Math.round(total * 16 / 116 * 100) / 100;
+    const subtotal = Math.round((total - iva) * 100) / 100;
 
     const serie = settings.cfdi_serie_commission || "B";
     const facturapiBody = {
@@ -256,7 +259,7 @@ Deno.serve(async (req: Request) => {
             description: `Comision por servicios de plataforma - Pago ${payout.payout_code || payout_id}`,
             product_key: "80141600",
             unit_key: "E48",
-            price: subtotal,
+            price: subtotalFacturapi,
             tax_included: false,
             taxes: [
               { type: "IVA", rate: 0.16, factor: "Tasa", withholding: false },

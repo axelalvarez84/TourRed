@@ -402,6 +402,7 @@ Deno.serve(async (req: Request) => {
     let descuentoServicio: number;
     let invoiceType: string;
     let effectivePaymentForm: string;
+    let exactTotal: number; // monto exacto cobrado al cliente (IVA incluido)
 
     if (isCheckinCharge) {
       // Cargar montos desde wallet_checkin_charges
@@ -421,11 +422,15 @@ Deno.serve(async (req: Request) => {
       const amountCharged = Number(checkinCharge.amount_charged);
       const netServiceCharge = Number(checkinCharge.service_charge_applied) - Number(checkinCharge.membership_exemption_used);
 
-      precioTourBruto = Math.round((amountCharged / 1.16) * 100) / 100;
-      precioServicioBruto = netServiceCharge > 0 ? Math.round((netServiceCharge / 1.16) * 100) / 100 : 0;
+      // r6: 6 decimales para valor_unitario en FacturAPI (evita error de centavo en XML)
+      const r6 = (n: number) => Math.round(n * 1000000) / 1000000;
+
+      precioTourBruto = r6(amountCharged / 1.16);
+      precioServicioBruto = netServiceCharge > 0 ? r6(netServiceCharge / 1.16) : 0;
       precioSeguroBruto = 0;
       descuentoTour = 0;
       descuentoServicio = 0;
+      exactTotal = amountCharged + (netServiceCharge > 0 ? netServiceCharge : 0);
       invoiceType = "checkin_wallet";
       effectivePaymentForm = payment_form || "17";
     } else {
@@ -436,11 +441,15 @@ Deno.serve(async (req: Request) => {
       const serviceChargeDiscountRaw = Number((booking as any).service_charge_discount || 0);
       const insuranceCost = (booking as any).travel_insurance_included ? Number((booking as any).travel_insurance_cost || 0) : 0;
 
-      precioTourBruto = Math.round((depositAmount / 1.16) * 100) / 100;
-      precioServicioBruto = serviceCharge > 0 ? Math.round((serviceCharge / 1.16) * 100) / 100 : 0;
-      precioSeguroBruto = insuranceCost > 0 ? Math.round((insuranceCost / 1.16) * 100) / 100 : 0;
-      descuentoTour = discountAmountRaw > 0 ? Math.round((discountAmountRaw / 1.16) * 100) / 100 : 0;
-      descuentoServicio = serviceChargeDiscountRaw > 0 ? Math.round((serviceChargeDiscountRaw / 1.16) * 100) / 100 : 0;
+      // r6 definido en bloque anterior; también aplica aquí
+      const r6b = (n: number) => Math.round(n * 1000000) / 1000000;
+
+      precioTourBruto = r6b(depositAmount / 1.16);
+      precioServicioBruto = serviceCharge > 0 ? r6b(serviceCharge / 1.16) : 0;
+      precioSeguroBruto = insuranceCost > 0 ? r6b(insuranceCost / 1.16) : 0;
+      descuentoTour = discountAmountRaw > 0 ? r6b(discountAmountRaw / 1.16) : 0;
+      descuentoServicio = serviceChargeDiscountRaw > 0 ? r6b(serviceChargeDiscountRaw / 1.16) : 0;
+      exactTotal = Math.round((depositAmount + serviceCharge + insuranceCost - discountAmountRaw - serviceChargeDiscountRaw) * 100) / 100;
       invoiceType = "booking";
       effectivePaymentForm = payment_form || "03";
 
@@ -449,19 +458,10 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Importe neto por concepto = valor_unitario - descuento (base gravable IVA)
-    const importeNetoTour = Math.round((precioTourBruto - descuentoTour) * 100) / 100;
-    const importeNetoServicio = precioServicioBruto > 0 ? Math.round((precioServicioBruto - descuentoServicio) * 100) / 100 : 0;
-    const importeNetoSeguro = precioSeguroBruto;
-
-    // IVA calculado sobre el importe neto (correcto SAT: nunca sobre el bruto)
-    const ivaTour = Math.round(importeNetoTour * 0.16 * 100) / 100;
-    const ivaServicio = importeNetoServicio > 0 ? Math.round(importeNetoServicio * 0.16 * 100) / 100 : 0;
-    const ivaSeguro = importeNetoSeguro > 0 ? Math.round(importeNetoSeguro * 0.16 * 100) / 100 : 0;
-
-    const subtotal = Math.round((importeNetoTour + importeNetoServicio + importeNetoSeguro) * 100) / 100;
-    const iva = Math.round((ivaTour + ivaServicio + ivaSeguro) * 100) / 100;
-    const total = Math.round((subtotal + iva) * 100) / 100;
+    // IVA como complemento del total exacto cobrado → subtotal + iva = exactTotal siempre
+    const iva = Math.round(exactTotal * 16 / 116 * 100) / 100;
+    const subtotal = Math.round((exactTotal - iva) * 100) / 100;
+    const total = exactTotal;
 
     // Build receptor data from separately-fetched traveler following SAT rules:
     // - Traveler with Mexican RFC: use their own fiscal data
