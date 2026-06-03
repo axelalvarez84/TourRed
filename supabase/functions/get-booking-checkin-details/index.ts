@@ -84,6 +84,7 @@ Deno.serve(async (req: Request) => {
         selected_seats,
         user_id,
         agency_id,
+        wallet_charged_at_checkin,
         tour:tours(id, name, destination, start_date, end_date),
         traveler:users!bookings_user_id_fkey(id, first_name, last_name, email, phone_number),
         agency:agencies(id, name, user_id, contact_email, contact_phone)
@@ -121,7 +122,38 @@ Deno.serve(async (req: Request) => {
       .eq("booking_id", tokenRecord.booking_id)
       .order("created_at", { ascending: true });
 
-    const remainingAmount = booking.total_price - booking.deposit_amount;
+    const remainingAmount = Math.max(
+      0,
+      booking.total_price - booking.deposit_amount - (booking.wallet_charged_at_checkin || 0)
+    );
+
+    // Obtener datos extra solo para agencia/admin (para el cobro con wallet)
+    let travelerWalletBalance = 0;
+    let serviceChargePct = 5;
+    let membershipExemptionAvailable = 0;
+
+    if (isAgency || isAdmin) {
+      // Saldo del wallet del viajero
+      const { data: wallet } = await supabase
+        .from("toursred_cash_wallets")
+        .select("balance")
+        .eq("user_id", booking.user_id)
+        .eq("is_active", true)
+        .maybeSingle();
+      travelerWalletBalance = wallet?.balance ?? 0;
+
+      // Porcentaje de cargo por servicio desde platform_settings
+      const { data: platformSettings } = await supabase
+        .from("platform_settings")
+        .select("service_charge_percentage")
+        .maybeSingle();
+      serviceChargePct = platformSettings?.service_charge_percentage ?? 5;
+
+      // Exencion disponible de membresia del viajero
+      const { data: exemptionResult } = await supabase
+        .rpc("get_available_service_fee_exemption", { p_user_id: booking.user_id });
+      membershipExemptionAvailable = exemptionResult ?? 0;
+    }
 
     return new Response(
       JSON.stringify({
@@ -139,6 +171,7 @@ Deno.serve(async (req: Request) => {
           total_price: booking.total_price,
           deposit_amount: booking.deposit_amount,
           remaining_amount: remainingAmount,
+          wallet_charged_at_checkin: booking.wallet_charged_at_checkin || 0,
           travelers_count: booking.travelers_count,
           count_adultos: booking.count_adultos,
           count_ninos: booking.count_ninos,
@@ -160,6 +193,10 @@ Deno.serve(async (req: Request) => {
         travelers: travelers || [],
         viewer_role: isAgency ? 'agency' : isAdmin ? 'admin' : 'traveler',
         can_checkin: (isAgency || isAdmin) && !isExpired && !isRedeemed && booking.status !== 'cancelled',
+        // Datos extra para cobro con wallet (solo para agencia/admin)
+        traveler_wallet_balance: travelerWalletBalance,
+        service_charge_pct: serviceChargePct,
+        membership_exemption_available: membershipExemptionAvailable,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
