@@ -245,7 +245,10 @@ Deno.serve(async (req: Request) => {
 
           await supabase
             .from("bookings")
-            .update({ used_membership_benefit: true })
+            .update({
+              used_membership_benefit: true,
+              membership_service_fee_saved: exemptionUsed,
+            })
             .eq("id", booking_id);
         }
       }
