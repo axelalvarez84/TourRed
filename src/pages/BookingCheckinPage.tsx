@@ -395,20 +395,17 @@ export default function BookingCheckinPage() {
                       <CheckCircle className="w-5 h-5" />
                       {confirming ? 'Confirmando...' : 'Confirmar Check-in Completo'}
                     </button>
-                    <button
-                      onClick={() => setShowPartialModal(true)}
-                      disabled={confirming || details.travelers.length === 0}
-                      className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <AlertTriangle className="w-5 h-5" />
-                      Check-in Parcial
-                    </button>
+                    {details.travelers.length > 1 && (
+                      <button
+                        onClick={() => setShowPartialModal(true)}
+                        disabled={confirming}
+                        className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <AlertTriangle className="w-5 h-5" />
+                        Check-in Parcial
+                      </button>
+                    )}
                   </div>
-                  {details.travelers.length === 0 && (
-                    <p className="text-xs text-gray-400 mt-2 text-center">
-                      No hay acompañantes registrados para check-in parcial.
-                    </p>
-                  )}
                 </div>
               )}
 
