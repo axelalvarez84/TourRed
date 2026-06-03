@@ -504,8 +504,14 @@ Deno.serve(async (req: Request) => {
     }
 
     // Build "a cuenta de terceros" (agency pass-through) — solo aplica al concepto del tour
+    // SAT CFDI40188: el RFC del tercero no puede coincidir con el del emisor ni el del receptor
     let terceroAgencia: CfdiTercero | undefined;
-    if (agencyData?.rfc && agencyData?.razon_social) {
+    if (
+      agencyData?.rfc &&
+      agencyData?.razon_social &&
+      agencyData.rfc !== receptorRfc &&
+      agencyData.rfc !== settings.pac_issuer_rfc
+    ) {
       terceroAgencia = {
         rfc: agencyData.rfc,
         nombre: agencyData.razon_social,
@@ -543,7 +549,7 @@ Deno.serve(async (req: Request) => {
 
     if (precioSeguroBruto > 0) {
       conceptos.push({
-        clave_prod_serv: "81143100",
+        clave_prod_serv: "84111506",
         cantidad: 1,
         clave_unidad: "E48",
         descripcion: `Seguro de asistencia de viaje (Reserva ${bookingRef})`,
