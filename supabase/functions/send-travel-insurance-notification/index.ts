@@ -106,28 +106,12 @@ function generateXlsxBase64(
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Pasajeros");
 
-  const metaWs = XLSX.utils.aoa_to_sheet([
-    ["Campo", "Valor"],
-    ["Código de reserva", bookingCode],
-    ["Tour", tourName],
-    ["Agencia", agencyName],
-    ["Fecha inicio", formatDateShort(tourStart)],
-    ["Fecha fin", formatDateShort(tourEnd)],
-    ["Total viajeros asegurados", rows.length],
-  ]);
-  metaWs["!cols"] = [{ wch: 25 }, { wch: 40 }];
-  XLSX.utils.book_append_sheet(wb, metaWs, "Reserva");
-
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
   return { base64, filename: `seguro_${bookingCode}_pasajeros.xlsx` };
 }
 
-const TOURSRED_LOGO_HTML = `<div style="display:inline-flex;align-items:center;gap:8px;">
-  <div style="background:rgba(255,255,255,0.15);border-radius:6px;padding:6px 12px;display:inline-block;">
-    <span style="font-size:22px;font-weight:900;color:#ffffff;letter-spacing:-1px;">Tours</span><span style="font-size:22px;font-weight:900;color:#a7f3d0;letter-spacing:-1px;">Red</span>
-  </div>
-</div>`;
+const TOURSRED_LOGO_HTML = `<img src="https://huzsedewwzjywcpbkjkm.supabase.co/storage/v1/object/public/images/email-logo.png" alt="ToursRed Logo" style="max-width:180px;height:auto;background:rgba(255,255,255,0.15);padding:8px 12px;border-radius:8px;" />`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -186,8 +170,20 @@ Deno.serve(async (req: Request) => {
 
     const userCurp = (bookingUser?.users as any)?.curp || "";
 
+    // Deduplicar: si hay dos registros con el mismo nombre, quedarse con el más completo
+    const dedupedTravelers = (bookingTravelers || []).reduce((acc: any[], t: any) => {
+      const existing = acc.findIndex((x) => (x.nombre || "").trim().toLowerCase() === (t.nombre || "").trim().toLowerCase());
+      const score = (t: any) => (t.documento_numero ? 2 : 0) + (t.fecha_nacimiento ? 1 : 0) + (t.emergency_contact_name ? 1 : 0);
+      if (existing === -1) {
+        acc.push(t);
+      } else if (score(t) > score(acc[existing])) {
+        acc[existing] = t;
+      }
+      return acc;
+    }, []);
+
     // Inyectar curp_fallback en cada viajero que no tenga documento_numero
-    const travelers = (bookingTravelers || []).map((t) => ({
+    const travelers = dedupedTravelers.map((t) => ({
       ...t,
       curp_fallback: t.documento_numero ? "" : userCurp,
     }));
@@ -251,7 +247,7 @@ Deno.serve(async (req: Request) => {
                 </tr>
               </table>
               <h1 style="color:#ffffff;font-size:20px;font-weight:700;margin:16px 0 4px;">Nueva solicitud de seguro de viaje</h1>
-              <p style="color:#a7f3d0;font-size:13px;margin:0;">Emitir póliza con Assist Card o Universal Assistance según corresponda</p>
+              <p style="color:#a7f3d0;font-size:13px;margin:0;">Emitir póliza con Universal Assistance</p>
             </td>
           </tr>
 
@@ -345,8 +341,7 @@ Deno.serve(async (req: Request) => {
               <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:16px 20px;">
                 <p style="margin:0 0 8px;font-weight:700;color:#92400e;font-size:14px;">⚡ Acción requerida</p>
                 <p style="margin:0;color:#78350f;font-size:13px;line-height:1.6;">
-                  Por favor emitir la póliza de asistencia de viaje para los viajeros indicados.
-                  Usar <strong>Assist Card</strong> o <strong>Universal Assistance</strong> según disponibilidad y cobertura del destino.
+                  Por favor emitir la póliza de asistencia de viaje para los viajeros indicados con <strong>Universal Assistance</strong>.
                   Enviar la póliza al email del viajero titular: <strong>${traveler_email}</strong><br/>
                   <span style="margin-top:6px;display:inline-block;">El archivo Excel adjunto contiene los datos de todos los pasajeros en el formato de importación de Universal Assistance.</span>
                 </p>
