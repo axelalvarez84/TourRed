@@ -11,6 +11,7 @@ import MercadoPagoBrick from '../components/MercadoPagoBrick';
 interface TravelerFormData {
   categoria_viajero: 'adulto' | 'nino' | 'infante' | 'adulto_mayor' | 'mascota';
   nombre: string;
+  apellido: string;
   email: string;
   telefono: string;
   fecha_nacimiento: string;
@@ -122,6 +123,7 @@ const TravelersInfoPage: React.FC = () => {
     return data.map(t => ({
       categoria_viajero: t.categoria_viajero,
       nombre: t.nombre,
+      apellido: t.apellido || '',
       email: t.email,
       telefono: t.telefono || '',
       fecha_nacimiento: t.fecha_nacimiento,
@@ -188,7 +190,8 @@ const TravelersInfoPage: React.FC = () => {
       if (i === 0 && userData) {
         travelersList.push({
           categoria_viajero: 'adulto',
-          nombre: `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
+          nombre: userData.first_name || '',
+          apellido: userData.last_name || '',
           email: userData.email || user?.email || '',
           telefono: userData.phone_number || '',
           fecha_nacimiento: userData.date_of_birth || '',
@@ -231,6 +234,7 @@ const TravelersInfoPage: React.FC = () => {
     return {
       categoria_viajero: categoria,
       nombre: '',
+      apellido: '',
       email: user?.email || '',
       telefono: '',
       fecha_nacimiento: '',
@@ -261,10 +265,14 @@ const TravelersInfoPage: React.FC = () => {
       ...updatedTravelers[index],
       [field]: value,
     };
-    // Si se cambia el contacto de emergencia del primer viajero y copyEmergencyToAll está activo, propagar a todos
+    // Si se cambia el contacto de emergencia del primer viajero y copyEmergencyToAll está activo,
+    // propagar solo a los acompañantes que no tienen contacto propio (los que fueron autollenados)
     if (copyEmergencyToAll && index === 0 && (field === 'emergency_contact_name' || field === 'emergency_contact_phone')) {
       for (let i = 1; i < updatedTravelers.length; i++) {
-        updatedTravelers[i] = { ...updatedTravelers[i], [field]: value };
+        const hasOwnContact = travelers[i].emergency_contact_name && travelers[i].emergency_contact_name!.trim();
+        if (!hasOwnContact) {
+          updatedTravelers[i] = { ...updatedTravelers[i], [field]: value };
+        }
       }
     }
     setTravelers(updatedTravelers);
@@ -286,10 +294,15 @@ const TravelersInfoPage: React.FC = () => {
     setCopyEmergencyToAll(checked);
     if (checked && travelers.length > 1) {
       const first = travelers[0];
-      const updatedTravelers = travelers.map((t, i) => i === 0 ? t : {
-        ...t,
-        emergency_contact_name: first.emergency_contact_name || '',
-        emergency_contact_phone: first.emergency_contact_phone || '',
+      const updatedTravelers = travelers.map((t, i) => {
+        if (i === 0) return t;
+        // Solo rellenar si el acompañante no tiene contacto propio registrado
+        if (t.emergency_contact_name && t.emergency_contact_name.trim()) return t;
+        return {
+          ...t,
+          emergency_contact_name: first.emergency_contact_name || '',
+          emergency_contact_phone: first.emergency_contact_phone || '',
+        };
       });
       setTravelers(updatedTravelers);
     }
@@ -300,10 +313,15 @@ const TravelersInfoPage: React.FC = () => {
     updatedTravelers[index] = {
       ...updatedTravelers[index],
       nombre: companion.nombre,
+      apellido: companion.apellido || '',
       email: companion.email,
       telefono: companion.telefono || '',
       fecha_nacimiento: companion.fecha_nacimiento,
       selectedCompanionId: companion.id,
+      documento_tipo: companion.documento_tipo || undefined,
+      documento_numero: companion.documento_numero || '',
+      emergency_contact_name: companion.emergency_contact_name || '',
+      emergency_contact_phone: companion.emergency_contact_phone || '',
     };
     setTravelers(updatedTravelers);
 
@@ -327,11 +345,16 @@ const TravelersInfoPage: React.FC = () => {
       const traveler = travelers[i];
 
       if (!traveler.nombre.trim()) {
-        setError(`Por favor ingresa el nombre completo del viajero ${i + 1}`);
+        setError(`Por favor ingresa el nombre del viajero ${i + 1}`);
         return false;
       }
 
       if (traveler.categoria_viajero !== 'mascota') {
+        if (!traveler.apellido.trim()) {
+          setError(`Por favor ingresa los apellidos del viajero ${i + 1}`);
+          return false;
+        }
+
         if (!traveler.email.trim()) {
           setError(`Por favor ingresa el email del viajero ${i + 1}`);
           return false;
@@ -351,6 +374,16 @@ const TravelersInfoPage: React.FC = () => {
           newErrors[i] = result.errorMessage;
           setTravelerErrors(newErrors);
           setError(`La fecha de nacimiento del viajero ${i + 1} no corresponde con su categoría. Verifica los datos o regresa a modificar la reserva.`);
+          return false;
+        }
+
+        // Documento siempre obligatorio para viajeros no-mascota
+        if (!traveler.documento_tipo) {
+          setError(`Por favor selecciona el tipo de documento del viajero ${i + 1}`);
+          return false;
+        }
+        if (!traveler.documento_numero || !traveler.documento_numero.trim()) {
+          setError(`Por favor ingresa el ${traveler.documento_tipo === 'pasaporte' ? 'número de pasaporte' : 'CURP'} del viajero ${i + 1}`);
           return false;
         }
       }
@@ -378,6 +411,7 @@ const TravelersInfoPage: React.FC = () => {
         booking_id: bookingId,
         categoria_viajero: traveler.categoria_viajero,
         nombre: traveler.nombre,
+        apellido: traveler.apellido || null,
         email: traveler.email,
         telefono: traveler.telefono || null,
         fecha_nacimiento: traveler.fecha_nacimiento || null,
@@ -411,6 +445,7 @@ const TravelersInfoPage: React.FC = () => {
             await supabase.from('frequent_companions').insert({
               user_id: user?.id,
               nombre: traveler.nombre,
+              apellido: traveler.apellido || null,
               email: traveler.email,
               telefono: traveler.telefono || null,
               fecha_nacimiento: traveler.fecha_nacimiento,
@@ -1088,20 +1123,52 @@ const TravelersInfoPage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nombre Completo *
-                    </label>
-                    <input
-                      type="text"
-                      value={traveler.nombre}
-                      onChange={(e) => handleTravelerChange(index, 'nombre', e.target.value)}
-                      className={`input ${nameChangesBlocked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
-                      placeholder={traveler.categoria_viajero === 'mascota' ? 'Nombre de la mascota' : 'Nombre y apellidos'}
-                      required
-                      readOnly={nameChangesBlocked}
-                    />
-                  </div>
+                  {traveler.categoria_viajero === 'mascota' ? (
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Nombre de la mascota *
+                      </label>
+                      <input
+                        type="text"
+                        value={traveler.nombre}
+                        onChange={(e) => handleTravelerChange(index, 'nombre', e.target.value)}
+                        className="input"
+                        placeholder="Nombre de la mascota"
+                        required
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Nombre(s) *
+                        </label>
+                        <input
+                          type="text"
+                          value={traveler.nombre}
+                          onChange={(e) => handleTravelerChange(index, 'nombre', e.target.value)}
+                          className={`input ${nameChangesBlocked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+                          placeholder="Nombre(s)"
+                          required
+                          readOnly={nameChangesBlocked}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Apellidos *
+                        </label>
+                        <input
+                          type="text"
+                          value={traveler.apellido}
+                          onChange={(e) => handleTravelerChange(index, 'apellido', e.target.value)}
+                          className={`input ${nameChangesBlocked ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+                          placeholder="Apellido paterno y materno"
+                          required
+                          readOnly={nameChangesBlocked}
+                        />
+                      </div>
+                    </>
+                  )}
 
                   {traveler.categoria_viajero !== 'mascota' && (
                     <>
@@ -1171,12 +1238,12 @@ const TravelersInfoPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* Campos para seguro de viajero — solo cuando la reserva incluye seguro y el viajero no es mascota */}
-                {booking?.travel_insurance_included && traveler.categoria_viajero !== 'mascota' && (
-                  <div className="mt-4 border border-emerald-200 rounded-lg bg-emerald-50 p-4">
+                {/* Documento de identificación — siempre obligatorio para viajeros no-mascota */}
+                {traveler.categoria_viajero !== 'mascota' && (
+                  <div className="mt-4 border border-blue-200 rounded-lg bg-blue-50 p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <Shield className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span className="text-sm font-semibold text-emerald-800">Datos para el Seguro de Viajero</span>
+                      <Shield className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                      <span className="text-sm font-semibold text-blue-800">Identificación *</span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
@@ -1203,10 +1270,23 @@ const TravelersInfoPage: React.FC = () => {
                           value={traveler.documento_numero || ''}
                           onChange={(e) => handleTravelerChange(index, 'documento_numero', e.target.value.toUpperCase())}
                           className="input uppercase"
-                          placeholder={traveler.documento_tipo === 'pasaporte' ? 'A12345678' : 'ABCD123456HDFRRL09'}
+                          placeholder={traveler.documento_tipo === 'pasaporte' ? 'A12345678' : traveler.documento_tipo === 'curp' ? 'ABCD123456HDFRRL09' : '—'}
                           maxLength={traveler.documento_tipo === 'pasaporte' ? 20 : 18}
+                          disabled={!traveler.documento_tipo}
                         />
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Contacto de emergencia — solo cuando la reserva incluye seguro y el viajero no es mascota */}
+                {booking?.travel_insurance_included && traveler.categoria_viajero !== 'mascota' && (
+                  <div className="mt-4 border border-emerald-200 rounded-lg bg-emerald-50 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Shield className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <span className="text-sm font-semibold text-emerald-800">Datos para el Seguro de Viajero</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Nombre del contacto de emergencia *
@@ -1243,7 +1323,7 @@ const TravelersInfoPage: React.FC = () => {
                             className="h-4 w-4 text-emerald-600 border-gray-300 rounded"
                           />
                           <Copy className="w-3.5 h-3.5 text-emerald-600" />
-                          <span className="text-emerald-800 font-medium">Usar el mismo contacto de emergencia para todos los acompañantes</span>
+                          <span className="text-emerald-800 font-medium">Usar el mismo contacto de emergencia para los acompañantes sin contacto registrado</span>
                         </label>
                       </div>
                     )}

@@ -306,6 +306,7 @@ export interface FrequentCompanion {
   id: string;
   user_id: string;
   nombre: string;
+  apellido?: string;
   email: string;
   telefono?: string;
   fecha_nacimiento: string;
@@ -432,12 +433,17 @@ export interface BookingTraveler {
   booking_id: string;
   categoria_viajero: 'infante' | 'nino' | 'adulto' | 'adulto_mayor';
   nombre: string;
+  apellido?: string;
   email: string;
   telefono?: string;
   fecha_nacimiento: string;
   precio_aplicado: number;
   frequent_companion_id?: string;
   created_at: string;
+  documento_tipo?: 'curp' | 'pasaporte';
+  documento_numero?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
 }
 
 export interface TravelerCategory {

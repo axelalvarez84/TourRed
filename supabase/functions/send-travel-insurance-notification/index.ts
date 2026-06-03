@@ -79,8 +79,10 @@ function generateXlsxBase64(
   ];
 
   const rows = travelers.map((t) => {
+    // Usar nombre_real/apellido_real del titular, luego el campo apellido separado de DB,
+    // y como último recurso hacer split del campo nombre completo
     const nombre = t.nombre_real || (t.nombre || "").trim().split(/\s+/)[0] || "";
-    const apellido = t.apellido_real || (t.nombre || "").trim().split(/\s+/).slice(1).join(" ") || "";
+    const apellido = t.apellido_real || t.apellido || (t.nombre || "").trim().split(/\s+/).slice(1).join(" ") || "";
     const tipoDoc = t.documento_tipo === "pasaporte" ? "PASAPORTE" : "Otro";
     const numDoc = (t.documento_numero || t.curp_fallback || "").toUpperCase();
     return [
@@ -151,10 +153,10 @@ Deno.serve(async (req: Request) => {
       throw new Error("Email settings no configurados");
     }
 
-    // Obtener datos individuales de cada viajero asegurado
+    // Obtener datos individuales de cada viajero asegurado (incluyendo apellido)
     const { data: bookingTravelers } = await supabase
       .from("booking_travelers")
-      .select("nombre, fecha_nacimiento, documento_tipo, documento_numero, emergency_contact_name, emergency_contact_phone, email, categoria_viajero")
+      .select("nombre, apellido, fecha_nacimiento, documento_tipo, documento_numero, emergency_contact_name, emergency_contact_phone, email, categoria_viajero")
       .eq("booking_id", booking_id)
       .neq("categoria_viajero", "mascota")
       .eq("is_cancelled", false)

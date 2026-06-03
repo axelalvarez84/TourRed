@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Edit, Trash2, Save, X, AlertCircle, Search, UserPlus } from 'lucide-react';
+import { Users, Plus, CreditCard as Edit, Trash2, Save, X, AlertCircle, Search, UserPlus, Shield, Phone } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { FrequentCompanion } from '../../types';
@@ -7,16 +7,26 @@ import { Link } from 'react-router-dom';
 
 interface CompanionForm {
   nombre: string;
+  apellido: string;
   email: string;
   telefono: string;
   fecha_nacimiento: string;
+  documento_tipo: 'curp' | 'pasaporte' | '';
+  documento_numero: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
 }
 
 const emptyForm: CompanionForm = {
   nombre: '',
+  apellido: '',
   email: '',
   telefono: '',
   fecha_nacimiento: '',
+  documento_tipo: '',
+  documento_numero: '',
+  emergency_contact_name: '',
+  emergency_contact_phone: '',
 };
 
 const TravelerCompanions: React.FC = () => {
@@ -48,17 +58,40 @@ const TravelerCompanions: React.FC = () => {
 
       if (error) throw error;
       setCompanions(data || []);
-    } catch (err: any) {
+    } catch {
       setError('Error al cargar los acompañantes');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const validateForm = (): string | null => {
+    if (!form.nombre.trim()) return 'El nombre es obligatorio';
+    if (!form.apellido.trim()) return 'Los apellidos son obligatorios';
+    if (!form.email.trim()) return 'El email es obligatorio';
+    if (!form.fecha_nacimiento) return 'La fecha de nacimiento es obligatoria';
+    if (!form.documento_tipo) return 'El tipo de documento es obligatorio';
+    if (!form.documento_numero.trim()) return `El ${form.documento_tipo === 'pasaporte' ? 'número de pasaporte' : 'CURP'} es obligatorio`;
+    return null;
+  };
+
+  const buildRecord = () => ({
+    nombre: form.nombre.trim(),
+    apellido: form.apellido.trim(),
+    email: form.email.trim(),
+    telefono: form.telefono.trim() || null,
+    fecha_nacimiento: form.fecha_nacimiento,
+    documento_tipo: form.documento_tipo as 'curp' | 'pasaporte',
+    documento_numero: form.documento_numero.trim().toUpperCase(),
+    emergency_contact_name: form.emergency_contact_name.trim() || null,
+    emergency_contact_phone: form.emergency_contact_phone.trim() || null,
+  });
+
   const handleAdd = async () => {
     if (!user) return;
-    if (!form.nombre.trim() || !form.email.trim() || !form.fecha_nacimiento) {
-      setError('Nombre, email y fecha de nacimiento son obligatorios');
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -67,13 +100,7 @@ const TravelerCompanions: React.FC = () => {
     try {
       const { error } = await supabase
         .from('frequent_companions')
-        .insert({
-          user_id: user.id,
-          nombre: form.nombre.trim(),
-          email: form.email.trim(),
-          telefono: form.telefono.trim() || null,
-          fecha_nacimiento: form.fecha_nacimiento,
-        });
+        .insert({ user_id: user.id, ...buildRecord() });
 
       if (error) throw error;
 
@@ -93,9 +120,14 @@ const TravelerCompanions: React.FC = () => {
     setEditingId(companion.id);
     setForm({
       nombre: companion.nombre,
+      apellido: companion.apellido || '',
       email: companion.email,
       telefono: companion.telefono || '',
       fecha_nacimiento: companion.fecha_nacimiento,
+      documento_tipo: companion.documento_tipo || '',
+      documento_numero: companion.documento_numero || '',
+      emergency_contact_name: companion.emergency_contact_name || '',
+      emergency_contact_phone: companion.emergency_contact_phone || '',
     });
     setShowAddForm(false);
     setError('');
@@ -103,8 +135,9 @@ const TravelerCompanions: React.FC = () => {
 
   const handleUpdate = async () => {
     if (!editingId) return;
-    if (!form.nombre.trim() || !form.email.trim() || !form.fecha_nacimiento) {
-      setError('Nombre, email y fecha de nacimiento son obligatorios');
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -113,12 +146,7 @@ const TravelerCompanions: React.FC = () => {
     try {
       const { error } = await supabase
         .from('frequent_companions')
-        .update({
-          nombre: form.nombre.trim(),
-          email: form.email.trim(),
-          telefono: form.telefono.trim() || null,
-          fecha_nacimiento: form.fecha_nacimiento,
-        })
+        .update(buildRecord())
         .eq('id', editingId);
 
       if (error) throw error;
@@ -163,8 +191,9 @@ const TravelerCompanions: React.FC = () => {
   const filteredCompanions = companions.filter(c => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
+    const fullName = `${c.nombre} ${c.apellido || ''}`.toLowerCase();
     return (
-      c.nombre.toLowerCase().includes(q) ||
+      fullName.includes(q) ||
       c.email.toLowerCase().includes(q) ||
       (c.telefono && c.telefono.toLowerCase().includes(q))
     );
@@ -178,6 +207,8 @@ const TravelerCompanions: React.FC = () => {
       return dateStr;
     }
   };
+
+  const docLabel = (tipo?: string) => tipo === 'pasaporte' ? 'Pasaporte' : tipo === 'curp' ? 'CURP' : '';
 
   if (isLoading) {
     return (
@@ -248,17 +279,31 @@ const TravelerCompanions: React.FC = () => {
                 <UserPlus className="h-5 w-5 mr-2 text-primary-600" />
                 {editingId ? 'Editar Acompañante' : 'Nuevo Acompañante'}
               </h3>
+
+              {/* Datos personales */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nombre Completo *
+                    Nombre(s) *
                   </label>
                   <input
                     type="text"
                     value={form.nombre}
                     onChange={(e) => setForm({ ...form, nombre: e.target.value })}
                     className="input"
-                    placeholder="Nombre y apellidos"
+                    placeholder="Nombre(s)"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Apellidos *
+                  </label>
+                  <input
+                    type="text"
+                    value={form.apellido}
+                    onChange={(e) => setForm({ ...form, apellido: e.target.value })}
+                    className="input"
+                    placeholder="Apellido paterno y materno"
                   />
                 </div>
                 <div>
@@ -286,7 +331,7 @@ const TravelerCompanions: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Telefono
+                    Teléfono
                   </label>
                   <input
                     type="tel"
@@ -297,6 +342,80 @@ const TravelerCompanions: React.FC = () => {
                   />
                 </div>
               </div>
+
+              {/* Documento de identificación */}
+              <div className="mt-5 border border-blue-200 rounded-lg bg-blue-50 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Shield className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                  <span className="text-sm font-semibold text-blue-800">Identificación *</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tipo de documento *
+                    </label>
+                    <select
+                      value={form.documento_tipo}
+                      onChange={(e) => setForm({ ...form, documento_tipo: e.target.value as 'curp' | 'pasaporte' | '', documento_numero: '' })}
+                      className="input"
+                    >
+                      <option value="">Seleccionar...</option>
+                      <option value="curp">CURP (nacional)</option>
+                      <option value="pasaporte">Pasaporte (extranjero)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {form.documento_tipo === 'pasaporte' ? 'Número de Pasaporte *' : 'CURP *'}
+                    </label>
+                    <input
+                      type="text"
+                      value={form.documento_numero}
+                      onChange={(e) => setForm({ ...form, documento_numero: e.target.value.toUpperCase() })}
+                      className="input uppercase"
+                      placeholder={form.documento_tipo === 'pasaporte' ? 'A12345678' : form.documento_tipo === 'curp' ? 'ABCD123456HDFRRL09' : '—'}
+                      maxLength={form.documento_tipo === 'pasaporte' ? 20 : 18}
+                      disabled={!form.documento_tipo}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Contacto de emergencia (opcional) */}
+              <div className="mt-4 border border-gray-200 rounded-lg bg-gray-50 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Phone className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                  <span className="text-sm font-semibold text-gray-700">Contacto de Emergencia</span>
+                  <span className="text-xs text-gray-400">(opcional)</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nombre del contacto
+                    </label>
+                    <input
+                      type="text"
+                      value={form.emergency_contact_name}
+                      onChange={(e) => setForm({ ...form, emergency_contact_name: e.target.value })}
+                      className="input"
+                      placeholder="Nombre completo"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Teléfono del contacto
+                    </label>
+                    <input
+                      type="tel"
+                      value={form.emergency_contact_phone}
+                      onChange={(e) => setForm({ ...form, emergency_contact_phone: e.target.value })}
+                      className="input"
+                      placeholder="+52 55 1234 5678"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex justify-end gap-3 mt-5">
                 <button
                   onClick={handleCancel}
@@ -360,16 +479,38 @@ const TravelerCompanions: React.FC = () => {
                         </span>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h4 className="font-semibold text-gray-900 truncate">{companion.nombre}</h4>
+                        <h4 className="font-semibold text-gray-900 truncate">
+                          {companion.nombre}{companion.apellido ? ` ${companion.apellido}` : ''}
+                        </h4>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-1 mt-1.5">
                           <div className="text-sm text-gray-500 truncate">{companion.email}</div>
                           <div className="text-sm text-gray-500">
                             {formatDate(companion.fecha_nacimiento)}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {companion.telefono || 'Sin telefono'}
+                            {companion.telefono || 'Sin teléfono'}
                           </div>
                         </div>
+                        {(companion.documento_tipo && companion.documento_numero) && (
+                          <div className="mt-1.5 flex items-center gap-1.5">
+                            <Shield className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                            <span className="text-xs text-blue-700 font-medium">
+                              {docLabel(companion.documento_tipo)}:
+                            </span>
+                            <span className="text-xs text-gray-600 font-mono">
+                              {companion.documento_numero}
+                            </span>
+                          </div>
+                        )}
+                        {companion.emergency_contact_name && (
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                            <span className="text-xs text-gray-500">
+                              Emergencia: {companion.emergency_contact_name}
+                              {companion.emergency_contact_phone ? ` · ${companion.emergency_contact_phone}` : ''}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 ml-4 flex-shrink-0">
