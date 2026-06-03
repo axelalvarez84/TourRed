@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, ExternalLink, CheckCircle, AlertCircle, Clock, XCircle, RefreshCw } from 'lucide-react';
+import { FileText, Download, ExternalLink, CheckCircle, AlertCircle, Clock, XCircle, RefreshCw, Wallet } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrencyMXN } from '../utils/formatCurrency';
 
@@ -25,7 +25,7 @@ const downloadCfdi = async (cfdiId: string, fileType: 'xml' | 'pdf') => {
 
 interface CfdiInvoice {
   id: string;
-  invoice_type: 'booking' | 'commission';
+  invoice_type: 'booking' | 'commission' | 'checkin_wallet';
   uuid_fiscal: string | null;
   folio: string | null;
   serie: string | null;
@@ -164,8 +164,15 @@ const AgencyCfdiList: React.FC<Props> = ({ agencyId }) => {
                       {s.icon}
                       {s.label}
                     </span>
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs ${inv.invoice_type === 'booking' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
-                      {inv.invoice_type === 'booking' ? 'Reserva' : 'Comisión'}
+                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${
+                      inv.invoice_type === 'booking'
+                        ? 'bg-blue-100 text-blue-600'
+                        : inv.invoice_type === 'checkin_wallet'
+                        ? 'bg-teal-100 text-teal-600'
+                        : 'bg-amber-100 text-amber-600'
+                    }`}>
+                      {inv.invoice_type === 'checkin_wallet' && <Wallet className="h-3 w-3" />}
+                      {inv.invoice_type === 'booking' ? 'Reserva' : inv.invoice_type === 'checkin_wallet' ? 'Check-in' : 'Comisión'}
                     </span>
                     {ref && <span className="text-xs text-gray-400 font-mono">{ref}</span>}
                   </div>
