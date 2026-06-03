@@ -290,12 +290,16 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // 6. Actualizar bookings: wallet cobrado y puntos ganados en check-in
+    // 6. Actualizar bookings: wallet cobrado, puntos ganados y ahorro de membresía en check-in
+    const updatedMembershipSaved = parseFloat(
+      ((booking.membership_service_fee_saved || 0) + exemptionApplied).toFixed(2)
+    );
     await supabase
       .from("bookings")
       .update({
         wallet_charged_at_checkin: newWalletCharged,
         points_earned_at_checkin: pointsEarned,
+        ...(exemptionApplied > 0 && { membership_service_fee_saved: updatedMembershipSaved }),
       })
       .eq("id", booking_id);
 
