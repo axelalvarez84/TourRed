@@ -303,8 +303,8 @@ Deno.serve(async (req: Request) => {
       })
       .eq("id", booking_id);
 
-    // 7. Insertar registro de auditoría
-    await supabase
+    // 7. Insertar registro de auditoría y capturar su ID para el CFDI
+    const { data: checkinChargeRecord } = await supabase
       .from("wallet_checkin_charges")
       .insert({
         booking_id,
@@ -314,7 +314,34 @@ Deno.serve(async (req: Request) => {
         total_deducted_from_wallet: totalToDeduct,
         charged_by: user.id,
         otp_id: otpRecord.id,
-      });
+      })
+      .select("id")
+      .single();
+
+    // Trigger CFDI si el PAC está configurado (forma de pago 17 - Compensación)
+    if (checkinChargeRecord?.id) {
+      const { data: cfdiSettings } = await supabase
+        .from("platform_settings")
+        .select("pac_provider, pac_api_key_encrypted")
+        .maybeSingle();
+
+      if (cfdiSettings?.pac_provider && cfdiSettings.pac_provider !== "none" && cfdiSettings.pac_api_key_encrypted) {
+        EdgeRuntime.waitUntil(
+          fetch(`${supabaseUrl}/functions/v1/generate-booking-cfdi`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${supabaseServiceKey}`,
+            },
+            body: JSON.stringify({
+              booking_id,
+              checkin_charge_id: checkinChargeRecord.id,
+              payment_form: "17",
+            }),
+          }).catch((err) => console.error("CFDI trigger failed (checkin-wallet-charge):", err))
+        );
+      }
+    }
 
     const newRemaining = Math.max(0, remainingAmount - amountToCharge);
     const walletResultJson = walletResult as any;

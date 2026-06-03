@@ -303,7 +303,7 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { booking_id } = await req.json();
+    const { booking_id, checkin_charge_id, payment_form } = await req.json();
     if (!booking_id) {
       return new Response(JSON.stringify({ error: "booking_id is required" }), {
         status: 400,
@@ -311,14 +311,25 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Check if a CFDI already exists (stamped or pending) for this booking
-    const { data: existingCfdi } = await supabase
-      .from("cfdi_invoices")
-      .select("id, status")
-      .eq("booking_id", booking_id)
-      .eq("invoice_type", "booking")
-      .in("status", ["stamped", "pending"])
-      .maybeSingle();
+    const isCheckinCharge = !!checkin_charge_id;
+
+    // Check if a CFDI already exists (stamped or pending) for this booking/charge
+    const existingQuery = isCheckinCharge
+      ? supabase
+          .from("cfdi_invoices")
+          .select("id, status")
+          .eq("checkin_charge_id", checkin_charge_id)
+          .in("status", ["stamped", "pending"])
+          .maybeSingle()
+      : supabase
+          .from("cfdi_invoices")
+          .select("id, status")
+          .eq("booking_id", booking_id)
+          .eq("invoice_type", "booking")
+          .in("status", ["stamped", "pending"])
+          .maybeSingle();
+
+    const { data: existingCfdi } = await existingQuery;
 
     if (existingCfdi) {
       return new Response(
@@ -381,41 +392,76 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Montos: concepto del tour (a cuenta de terceros), cargo por servicio e intermediacion de seguro
-    const depositAmount = Number((booking as any).deposit_amount || booking.total_price);
-    const serviceCharge = Number((booking as any).service_charge || 0);
-    const discountAmountRaw = Number((booking as any).discount_amount || 0);
-    const serviceChargeDiscountRaw = Number((booking as any).service_charge_discount || 0);
-    const insuranceCost = (booking as any).travel_insurance_included ? Number((booking as any).travel_insurance_cost || 0) : 0;
+    // -------------------------------------------------------
+    // MONTOS: difieren según si es cobro de check-in o reserva
+    // -------------------------------------------------------
+    let precioTourBruto: number;
+    let precioServicioBruto: number;
+    let precioSeguroBruto: number;
+    let descuentoTour: number;
+    let descuentoServicio: number;
+    let invoiceType: string;
+    let effectivePaymentForm: string;
 
-    // Precio bruto sin IVA por concepto (valor_unitario en FacturAPI)
-    const precioTourBruto = Math.round((depositAmount / 1.16) * 100) / 100;
-    const precioServicioBruto = serviceCharge > 0 ? Math.round((serviceCharge / 1.16) * 100) / 100 : 0;
-    // El seguro llega con IVA incluido; extraemos la base gravable
-    const precioSeguroBruto = insuranceCost > 0 ? Math.round((insuranceCost / 1.16) * 100) / 100 : 0;
+    if (isCheckinCharge) {
+      // Cargar montos desde wallet_checkin_charges
+      const { data: checkinCharge, error: checkinError } = await supabase
+        .from("wallet_checkin_charges")
+        .select("amount_charged, service_charge_applied, membership_exemption_used")
+        .eq("id", checkin_charge_id)
+        .maybeSingle();
 
-    // Descuento sin IVA por concepto (campo descuento en FacturAPI)
-    // El descuento viene con IVA incluido, lo extraemos igual que el precio
-    const descuentoTour = discountAmountRaw > 0 ? Math.round((discountAmountRaw / 1.16) * 100) / 100 : 0;
-    const descuentoServicio = serviceChargeDiscountRaw > 0 ? Math.round((serviceChargeDiscountRaw / 1.16) * 100) / 100 : 0;
+      if (checkinError || !checkinCharge) {
+        return new Response(
+          JSON.stringify({ error: "Checkin charge not found", detail: checkinError?.message }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const amountCharged = Number(checkinCharge.amount_charged);
+      const netServiceCharge = Number(checkinCharge.service_charge_applied) - Number(checkinCharge.membership_exemption_used);
+
+      precioTourBruto = Math.round((amountCharged / 1.16) * 100) / 100;
+      precioServicioBruto = netServiceCharge > 0 ? Math.round((netServiceCharge / 1.16) * 100) / 100 : 0;
+      precioSeguroBruto = 0;
+      descuentoTour = 0;
+      descuentoServicio = 0;
+      invoiceType = "checkin_wallet";
+      effectivePaymentForm = payment_form || "17";
+    } else {
+      // Montos de la reserva original
+      const depositAmount = Number((booking as any).deposit_amount || booking.total_price);
+      const serviceCharge = Number((booking as any).service_charge || 0);
+      const discountAmountRaw = Number((booking as any).discount_amount || 0);
+      const serviceChargeDiscountRaw = Number((booking as any).service_charge_discount || 0);
+      const insuranceCost = (booking as any).travel_insurance_included ? Number((booking as any).travel_insurance_cost || 0) : 0;
+
+      precioTourBruto = Math.round((depositAmount / 1.16) * 100) / 100;
+      precioServicioBruto = serviceCharge > 0 ? Math.round((serviceCharge / 1.16) * 100) / 100 : 0;
+      precioSeguroBruto = insuranceCost > 0 ? Math.round((insuranceCost / 1.16) * 100) / 100 : 0;
+      descuentoTour = discountAmountRaw > 0 ? Math.round((discountAmountRaw / 1.16) * 100) / 100 : 0;
+      descuentoServicio = serviceChargeDiscountRaw > 0 ? Math.round((serviceChargeDiscountRaw / 1.16) * 100) / 100 : 0;
+      invoiceType = "booking";
+      effectivePaymentForm = payment_form || "03";
+
+      if (discountAmountRaw > 0 || serviceChargeDiscountRaw > 0) {
+        console.log(`CFDI con descuento: tour -$${discountAmountRaw} MXN, servicio -$${serviceChargeDiscountRaw} MXN`);
+      }
+    }
 
     // Importe neto por concepto = valor_unitario - descuento (base gravable IVA)
     const importeNetoTour = Math.round((precioTourBruto - descuentoTour) * 100) / 100;
-    const importeNetoServicio = serviceCharge > 0 ? Math.round((precioServicioBruto - descuentoServicio) * 100) / 100 : 0;
-    const importeNetoSeguro = precioSeguroBruto; // sin descuentos aplicables
+    const importeNetoServicio = precioServicioBruto > 0 ? Math.round((precioServicioBruto - descuentoServicio) * 100) / 100 : 0;
+    const importeNetoSeguro = precioSeguroBruto;
 
     // IVA calculado sobre el importe neto (correcto SAT: nunca sobre el bruto)
     const ivaTour = Math.round(importeNetoTour * 0.16 * 100) / 100;
-    const ivaServicio = serviceCharge > 0 ? Math.round(importeNetoServicio * 0.16 * 100) / 100 : 0;
-    const ivaSeguro = insuranceCost > 0 ? Math.round(importeNetoSeguro * 0.16 * 100) / 100 : 0;
+    const ivaServicio = importeNetoServicio > 0 ? Math.round(importeNetoServicio * 0.16 * 100) / 100 : 0;
+    const ivaSeguro = importeNetoSeguro > 0 ? Math.round(importeNetoSeguro * 0.16 * 100) / 100 : 0;
 
     const subtotal = Math.round((importeNetoTour + importeNetoServicio + importeNetoSeguro) * 100) / 100;
     const iva = Math.round((ivaTour + ivaServicio + ivaSeguro) * 100) / 100;
     const total = Math.round((subtotal + iva) * 100) / 100;
-
-    if (discountAmountRaw > 0 || serviceChargeDiscountRaw > 0) {
-      console.log(`CFDI con descuento: tour -$${discountAmountRaw} MXN, servicio -$${serviceChargeDiscountRaw} MXN, total CFDI $${total} MXN`);
-    }
 
     // Build receptor data from separately-fetched traveler following SAT rules:
     // - Traveler with Mexican RFC: use their own fiscal data
@@ -470,38 +516,38 @@ Deno.serve(async (req: Request) => {
 
     const tourName = tourData?.name || "";
     const bookingRef = booking.booking_code || booking.id;
+    const checkinLabel = isCheckinCharge ? " (cobro en check-in)" : "";
 
     const conceptos: CfdiConcepto[] = [
       {
         clave_prod_serv: "90121500",
         cantidad: 1,
         clave_unidad: "E48",
-        descripcion: `Servicio de viaje: ${tourName} (Reserva ${bookingRef})`,
+        descripcion: `Servicio de viaje: ${tourName} (Reserva ${bookingRef})${checkinLabel}`,
         valor_unitario: precioTourBruto,
         ...(descuentoTour > 0 ? { descuento: descuentoTour } : {}),
         tercero: terceroAgencia,
       },
     ];
 
-    if (serviceCharge > 0) {
+    if (precioServicioBruto > 0) {
       conceptos.push({
         clave_prod_serv: "81141600",
         cantidad: 1,
         clave_unidad: "E48",
-        descripcion: `Cargo por servicio de plataforma (Reserva ${bookingRef})`,
+        descripcion: `Cargo por servicio de plataforma (Reserva ${bookingRef})${checkinLabel}`,
         valor_unitario: precioServicioBruto,
         ...(descuentoServicio > 0 ? { descuento: descuentoServicio } : {}),
       });
     }
 
-    if (insuranceCost > 0) {
+    if (precioSeguroBruto > 0) {
       conceptos.push({
         clave_prod_serv: "81143100",
         cantidad: 1,
         clave_unidad: "E48",
         descripcion: `Seguro de asistencia de viaje (Reserva ${bookingRef})`,
         valor_unitario: precioSeguroBruto,
-        // Sin tercero: ingreso directo de ToursRed como intermediario de seguros
       });
     }
 
@@ -518,17 +564,19 @@ Deno.serve(async (req: Request) => {
         ...(receptorResidenciaFiscal ? { residencia_fiscal: receptorResidenciaFiscal } : {}),
       },
       conceptos,
+      payment_form: effectivePaymentForm,
     };
 
-    // Descuento total consolidado (suma de ambos conceptos, con IVA incluido)
-    const descuentoTotal = Math.round((discountAmountRaw + serviceChargeDiscountRaw) * 100) / 100;
+    // Descuento total consolidado (con IVA incluido)
+    const descuentoTotal = Math.round((descuentoTour + descuentoServicio) * 1.16 * 100) / 100;
 
     // Create pending CFDI record
     const { data: cfdiRecord, error: insertError } = await supabase
       .from("cfdi_invoices")
       .insert({
-        invoice_type: "booking",
+        invoice_type: invoiceType,
         booking_id: booking.id,
+        ...(isCheckinCharge ? { checkin_charge_id } : {}),
         agency_id: agencyData?.id || null,
         pac_provider: settings.pac_provider,
         serie: settings.cfdi_serie_booking || "A",

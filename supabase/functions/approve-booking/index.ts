@@ -253,6 +253,25 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // Trigger CFDI si el PAC está configurado (pago con compensación: puntos y/o wallet)
+      const { data: cfdiSettings } = await supabase
+        .from("platform_settings")
+        .select("pac_provider, pac_api_key_encrypted")
+        .maybeSingle();
+
+      if (cfdiSettings?.pac_provider && cfdiSettings.pac_provider !== "none" && cfdiSettings.pac_api_key_encrypted) {
+        EdgeRuntime.waitUntil(
+          fetch(`${supabaseUrl}/functions/v1/generate-booking-cfdi`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${supabaseServiceKey}`,
+            },
+            body: JSON.stringify({ booking_id, payment_form: "17" }),
+          }).catch((err) => console.error("CFDI trigger failed (approve-booking):", err))
+        );
+      }
+
       return new Response(
         JSON.stringify({ success: true, auto_confirmed: true, action: "approved" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
