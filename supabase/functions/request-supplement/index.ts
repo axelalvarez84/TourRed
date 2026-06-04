@@ -157,7 +157,7 @@ Deno.serve(async (req: Request) => {
           title: "Nueva solicitud de suplemento",
           message: `Un viajero ha solicitado ${quantity}x "${supplement.name}". Aprueba o rechaza la solicitud.`,
           data: { booking_supplement_id: newRecord.id, booking_id, supplement_name: supplement.name },
-        }).catch(() => {});
+        });
       }
     }
 
