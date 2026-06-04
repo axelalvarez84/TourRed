@@ -127,7 +127,7 @@ Deno.serve(async (req: Request) => {
         title: "Suplemento aprobado",
         message: `Tu solicitud de "${supplementName}" fue aprobada. Tienes 48 horas para completar el pago.`,
         data: { booking_supplement_id, booking_id: supplementRequest.booking_id },
-      }).catch(() => {});
+      });
     }
 
     return new Response(JSON.stringify({

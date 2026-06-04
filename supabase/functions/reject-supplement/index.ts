@@ -126,7 +126,7 @@ Deno.serve(async (req: Request) => {
         title: "Solicitud de suplemento rechazada",
         message: `Tu solicitud de "${supplementName}" fue rechazada.${noteMsg}`,
         data: { booking_supplement_id, booking_id: supplementRequest.booking_id },
-      }).catch(() => {});
+      });
     }
 
     return new Response(JSON.stringify({

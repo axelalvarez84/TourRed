@@ -359,7 +359,7 @@ Deno.serve(async (req: Request) => {
           .from("manual_cfdi_recipients")
           .update({ updated_at: new Date().toISOString() })
           .eq("id", body.recipient_id)
-          .catch(() => {})
+          .then(() => {})
       );
     }
 
