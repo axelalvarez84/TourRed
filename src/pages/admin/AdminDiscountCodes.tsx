@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Ticket, Plus, CreditCard as Edit2, Trash2, Eye, Percent, DollarSign, Calendar, Users, AlertCircle, CheckCircle, XCircle, Search, Map, Crown, Gift, ArrowUpDown, ArrowUp, ArrowDown, Building2, Target, Shield } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -63,6 +63,22 @@ export default function AdminDiscountCodes() {
   const [agencies, setAgencies] = useState<AgencyOption[]>([]);
   const [agencyTours, setAgencyTours] = useState<TourOption[]>([]);
   const [loadingAgencyTours, setLoadingAgencyTours] = useState(false);
+
+  // Refs para scroll espejado en la tabla principal
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const isSyncingScroll = useRef(false);
+
+  const syncScroll = useCallback((source: 'top' | 'table') => {
+    if (isSyncingScroll.current) return;
+    isSyncingScroll.current = true;
+    if (source === 'top' && topScrollRef.current && tableScrollRef.current) {
+      tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+    } else if (source === 'table' && topScrollRef.current && tableScrollRef.current) {
+      topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+    }
+    isSyncingScroll.current = false;
+  }, []);
 
   const [formData, setFormData] = useState({
     code: '',
@@ -659,8 +675,23 @@ export default function AdminDiscountCodes() {
               <p className="text-gray-600">No se encontraron códigos de descuento</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+            <>
+              {/* Barra de scroll superior espejada */}
+              <div
+                ref={topScrollRef}
+                className="overflow-x-auto overflow-y-hidden border-b border-gray-100"
+                style={{ height: '12px' }}
+                onScroll={() => syncScroll('top')}
+              >
+                <div style={{ minWidth: '900px', height: '1px' }} />
+              </div>
+              {/* Tabla con scroll real */}
+              <div
+                ref={tableScrollRef}
+                className="overflow-x-auto"
+                onScroll={() => syncScroll('table')}
+              >
+                <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
                     <th
@@ -873,7 +904,8 @@ export default function AdminDiscountCodes() {
                   ))}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
         </div>
       </div>
