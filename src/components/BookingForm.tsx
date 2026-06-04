@@ -1128,6 +1128,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
             total_travelers: totalTravelers,
             tour_days: tourDays,
             insurance_cost: insuranceCost,
+            insurance_discount_amount: insuranceDiscountAmount,
+            insurance_effective_cost: effectiveInsuranceCost,
           },
         }).catch(err => console.error('Error sending insurance notification:', err));
       }

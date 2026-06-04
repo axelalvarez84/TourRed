@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { CheckCircle, Calendar, MapPin, Users, DollarSign, ArrowRight, CreditCard, Mail, Wallet, Award, Ticket, Tag, Bus } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, Users, DollarSign, ArrowRight, CreditCard, Mail, Wallet, Award, Ticket, Tag, Bus, ShieldCheck } from 'lucide-react';
 import { supabase, parseDateFromDB } from '../lib/supabase';
 import { Booking, Tour } from '../types';
 import { format } from 'date-fns';
@@ -417,6 +417,28 @@ const BookingSuccessPage: React.FC = () => {
                         Código de Descuento:
                       </span>
                       <span className="font-bold text-green-600">-{formatCurrencyMXN(Number(booking.discount_amount))}</span>
+                    </div>
+                  )}
+
+                  {(booking as any).travel_insurance_included && (
+                    <div className="flex justify-between items-center bg-blue-50 border border-blue-200 rounded px-2 py-1.5 -mx-1">
+                      <span className="text-blue-700 font-medium flex items-center">
+                        <ShieldCheck className="h-4 w-4 mr-1" />
+                        Seguro de Viaje:
+                      </span>
+                      <span className="font-bold text-blue-700 flex items-center gap-2">
+                        {Number((booking as any).insurance_discount_amount) > 0 && (
+                          <span className="text-gray-400 line-through font-normal text-xs">
+                            {formatCurrencyMXN(
+                              (Number((booking as any).travel_insurance_cost) || 0) +
+                              (Number((booking as any).insurance_discount_amount) || 0)
+                            )}
+                          </span>
+                        )}
+                        {Number((booking as any).travel_insurance_cost) === 0
+                          ? <span className="text-green-600">GRATIS</span>
+                          : formatCurrencyMXN(Number((booking as any).travel_insurance_cost))}
+                      </span>
                     </div>
                   )}
 
