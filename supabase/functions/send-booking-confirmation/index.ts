@@ -150,7 +150,8 @@ Deno.serve(async (req: Request) => {
     const depositAmount = booking.deposit_amount;
     const depositPercentage = booking.tour.deposit_percentage;
     const serviceChargePercentage = platformSettings.service_charge_percentage;
-    const agencyCommissionPercentage = platformSettings.agency_commission_percentage;
+    const agencyCommission = Number(booking.commission_amount) || 0;
+    const agencyCommissionPercentage = totalPrice > 0 ? Math.round((agencyCommission / totalPrice) * 1000) / 10 : 0;
     const serviceCharge = booking.service_charge || 0;
     const serviceChargeDiscount = Number(booking.service_charge_discount) || 0;
     const discountAmount = Number(booking.discount_amount) || 0;
@@ -161,7 +162,6 @@ Deno.serve(async (req: Request) => {
     const stripePayment = Math.max(0, Math.round((userPayment - toursRedCashUsed - pointsValueUsed) * 100) / 100);
     const remainingAmount = totalPrice - depositAmount;
 
-    const agencyCommission = totalPrice * (agencyCommissionPercentage / 100);
     const agencyReceives = depositAmount - agencyCommission;
 
     const pickupExtraCost = Number(booking.pickup_zone_extra_cost) || 0;

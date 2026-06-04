@@ -46,7 +46,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [serviceChargePercentage, setServiceChargePercentage] = useState(5);
-  const [agencyCommissionPercentage, setAgencyCommissionPercentage] = useState(15);
+  const [agencyCommissionPercentage, setAgencyCommissionPercentage] = useState(0);
   const [availableSpots, setAvailableSpots] = useState<number | null>(null);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(true);
   const [showTravelerSelector, setShowTravelerSelector] = useState(false);
