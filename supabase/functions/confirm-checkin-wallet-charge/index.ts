@@ -245,7 +245,7 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (membership) {
-      pointsEarned = Math.floor(amountToCharge * 100);
+      pointsEarned = Math.floor(amountToCharge);
 
       if (pointsEarned > 0) {
         // Obtener o crear billetera de puntos
