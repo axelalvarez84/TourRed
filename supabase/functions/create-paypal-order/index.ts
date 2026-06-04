@@ -104,6 +104,9 @@ Deno.serve(async (req: Request) => {
     if (context === "gift_card") {
       returnUrl = `${origin}/payment-return?provider=paypal&gift_card_id=${bookingId}&status=success`;
       cancelUrl = `${origin}/gift-cards`;
+    } else if (context === "supplement") {
+      returnUrl = `${origin}/payment-return?provider=paypal&booking_supplement_id=${bookingId}&status=success`;
+      cancelUrl = `${origin}/traveler/bookings`;
     } else {
       returnUrl = `${origin}/payment-return?provider=paypal&booking_id=${bookingId}&status=success`;
       cancelUrl = `${origin}/payment-return?provider=paypal&booking_id=${bookingId}&status=cancel`;
@@ -167,7 +170,7 @@ Deno.serve(async (req: Request) => {
         .from("gift_cards")
         .update({ paypal_order_id: order.id })
         .eq("id", bookingId);
-    } else {
+    } else if (context !== "supplement") {
       await supabase
         .from("bookings")
         .update({ paypal_order_id: order.id })

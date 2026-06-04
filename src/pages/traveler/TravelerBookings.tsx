@@ -1427,6 +1427,29 @@ const TravelerBookings: React.FC = () => {
         return;
       }
 
+      if (selectedMethod === 'paypal') {
+        const totalAmount = Number(bookingSupplement.unit_price || 0) * Number(bookingSupplement.quantity || 1);
+        const ppRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-paypal-order`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+            'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            bookingId: bookingSupplement.id,
+            amount: totalAmount,
+            description: `Suplemento: ${bookingSupplement.tour_supplements?.name || 'Suplemento'}`,
+            context: 'supplement',
+          }),
+        });
+        const ppData = await ppRes.json();
+        if (!ppRes.ok || !ppData.success) throw new Error(ppData.error || 'Error al crear orden de PayPal');
+        setSupplementDirectPayModal(prev => ({ ...prev, open: false, isProcessing: false }));
+        window.location.href = ppData.url;
+        return;
+      }
+
       const payRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-supplement-payment`, {
         method: 'POST',
         headers: {
@@ -1512,6 +1535,29 @@ const TravelerBookings: React.FC = () => {
           if (!mpRes.ok || !mpData.success) throw new Error(mpData.error || 'Error al crear preferencia de MercadoPago');
           setSupplementPaymentModal(prev => ({ ...prev, open: false, isProcessing: false }));
           setMpSupplementBrickModal({ open: true, preferenceId: mpData.preference_id, publicKey: mpData.public_key, supplementId: data.booking_supplement_id, amount: totalAmount });
+          return;
+        }
+
+        if (selectedMethod === 'paypal') {
+          const totalAmount = Number(supplement.price || 0) * quantity;
+          const ppRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-paypal-order`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token}`,
+              'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({
+              bookingId: data.booking_supplement_id,
+              amount: totalAmount,
+              description: `Suplemento: ${supplement.name || 'Suplemento'}`,
+              context: 'supplement',
+            }),
+          });
+          const ppData = await ppRes.json();
+          if (!ppRes.ok || !ppData.success) throw new Error(ppData.error || 'Error al crear orden de PayPal');
+          setSupplementPaymentModal(prev => ({ ...prev, open: false, isProcessing: false }));
+          window.location.href = ppData.url;
           return;
         }
 

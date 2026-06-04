@@ -14,6 +14,7 @@ export default function PaymentReturnPage() {
   const provider = searchParams.get('provider');
   const bookingId = searchParams.get('booking_id');
   const giftCardId = searchParams.get('gift_card_id');
+  const bookingSupplementId = searchParams.get('booking_supplement_id');
   const paypalOrderId = searchParams.get('token');
 
   // Our custom status param, but MercadoPago may override 'status' with its own value
@@ -67,6 +68,35 @@ export default function PaymentReturnPage() {
     if (provider === 'paypal' && paypalOrderId && returnStatus === 'success') {
       try {
         const { data: { session } } = await supabase.auth.getSession();
+
+        if (bookingSupplementId) {
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-supplement-payment`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+              },
+              body: JSON.stringify({
+                booking_supplement_id: bookingSupplementId,
+                payment_method: 'paypal',
+                paypal_order_id: paypalOrderId,
+              }),
+            }
+          );
+          const result = await response.json();
+          if (result.success) {
+            setStatus('success');
+            setMessage('Pago del suplemento exitoso.');
+            setTimeout(() => navigate('/traveler/bookings'), 2000);
+          } else {
+            setStatus('error');
+            setMessage(result.error || 'Hubo un problema al confirmar tu pago. Contacta soporte si el cargo fue aplicado.');
+          }
+          return;
+        }
 
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/capture-paypal-order`,
