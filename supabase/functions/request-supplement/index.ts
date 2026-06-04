@@ -88,13 +88,13 @@ Deno.serve(async (req: Request) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Check for duplicate active request
+    // Check for duplicate active (not yet resolved) request
     const { data: existingRequest } = await supabase
       .from("booking_supplements")
       .select("id, status")
       .eq("booking_id", booking_id)
       .eq("tour_supplement_id", tour_supplement_id)
-      .in("status", ["pending_approval", "approved", "pending_payment", "paid"])
+      .in("status", ["pending_approval", "approved", "pending_payment"])
       .maybeSingle();
 
     if (existingRequest) {
