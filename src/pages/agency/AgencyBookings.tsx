@@ -1213,11 +1213,21 @@ const AgencyBookings: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center">
-                      <DollarSign className="h-4 w-4 text-gray-400 mr-2" />
+                    <div className="flex items-start">
+                      <DollarSign className="h-4 w-4 text-gray-400 mr-2 mt-0.5" />
                       <div>
-                        <div className="text-sm text-gray-500">Depósito Recibido</div>
-                        <div className="font-medium">${(booking.deposit_amount || 0) - (booking.commission_amount || 0)}</div>
+                        <div className="text-sm text-gray-500">Pago del Viajero</div>
+                        <div className="font-medium">{formatCurrencyMXN(booking.deposit_amount || 0)}</div>
+                        {(booking.commission_amount || 0) > 0 && (
+                          <div className="text-xs text-red-500 mt-0.5">
+                            Comisión plataforma: -{formatCurrencyMXN(booking.commission_amount || 0)}
+                          </div>
+                        )}
+                        {(booking.commission_amount || 0) > 0 && (
+                          <div className="text-xs font-semibold text-green-700 mt-0.5">
+                            Tu ingreso neto: {formatCurrencyMXN((booking.deposit_amount || 0) - (booking.commission_amount || 0))}
+                          </div>
+                        )}
                       </div>
                     </div>
 
