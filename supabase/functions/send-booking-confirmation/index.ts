@@ -167,6 +167,7 @@ Deno.serve(async (req: Request) => {
     const pickupExtraCost = Number(booking.pickup_zone_extra_cost) || 0;
     const languageExtraCost = Number(booking.language_extra_cost) || 0;
     const travelInsuranceCost = booking.travel_insurance_included ? (Number(booking.travel_insurance_cost) || 0) : 0;
+    const insuranceDiscountAmount = Number(booking.insurance_discount_amount) || 0;
 
     const formatDate = (dateString: string | null | undefined) => {
       if (!dateString) return 'No disponible';
@@ -378,11 +379,16 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">Anticipo (${depositPercentage}%):</span>
           <span class="info-value">${formatCurrency(depositAmount)}</span>
         </div>
-        ${travelInsuranceCost > 0 ? `
+        ${travelInsuranceCost > 0 || (travelInsuranceCost === 0 && insuranceDiscountAmount > 0) ? `
         <div class="info-row">
-          <span class="info-label">🛡️ Seguro de Viajero:</span>
-          <span class="info-value">${formatCurrency(travelInsuranceCost)}</span>
+          <span class="info-label">🛡️ Seguro de Viajero${insuranceDiscountAmount > 0 ? ` <span style="text-decoration:line-through;color:#9ca3af;font-size:12px;">${formatCurrency(travelInsuranceCost + insuranceDiscountAmount)}</span>` : ''}:</span>
+          <span class="info-value">${travelInsuranceCost === 0 ? 'GRATIS' : formatCurrency(travelInsuranceCost)}</span>
         </div>
+        ${insuranceDiscountAmount > 0 ? `
+        <div class="info-row">
+          <span class="info-label" style="color:#059669;">Descuento en seguro:</span>
+          <span class="info-value" style="color:#059669;">-${formatCurrency(insuranceDiscountAmount)}</span>
+        </div>` : ''}
         ` : ''}
         <div class="info-row" style="${travelInsuranceCost > 0 ? 'background-color: #f0fdf4; padding: 8px 5px; margin: 5px -5px;' : ''}">
           <span class="info-label" style="font-weight: ${travelInsuranceCost > 0 ? '700' : '400'};">Total cobrado hoy${travelInsuranceCost > 0 ? ' (anticipo + seguro)' : ''}:</span>
@@ -609,11 +615,12 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">Anticipo pagado por el viajero (${depositPercentage}%):</span>
           <span class="info-value">${formatCurrency(depositAmount)}</span>
         </div>
-        ${travelInsuranceCost > 0 ? `
+        ${travelInsuranceCost > 0 || insuranceDiscountAmount > 0 ? `
         <div class="info-row">
-          <span class="info-label">🛡️ Seguro de Viajero (cobro separado, no pertenece a la agencia):</span>
-          <span class="info-value">${formatCurrency(travelInsuranceCost)}</span>
+          <span class="info-label">🛡️ Seguro de Viajero (cobro separado, no pertenece a la agencia)${insuranceDiscountAmount > 0 ? ` <span style="text-decoration:line-through;color:#9ca3af;font-size:12px;">${formatCurrency(travelInsuranceCost + insuranceDiscountAmount)}</span>` : ''}:</span>
+          <span class="info-value">${travelInsuranceCost === 0 ? 'GRATIS' : formatCurrency(travelInsuranceCost)}</span>
         </div>
+        ${insuranceDiscountAmount > 0 ? `<div class="info-row"><span class="info-label" style="color:#059669;">Descuento en seguro:</span><span class="info-value" style="color:#059669;">-${formatCurrency(insuranceDiscountAmount)}</span></div>` : ''}
         <div class="info-row" style="background-color: #f0fdf4; padding: 8px 5px; margin: 5px -5px;">
           <span class="info-label" style="font-weight: 700;">Total cobrado al viajero hoy (anticipo + seguro):</span>
           <span class="info-value" style="font-weight: 700;">${formatCurrency(userPayment)}</span>
@@ -813,11 +820,12 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">Anticipo (${depositPercentage}%):</span>
           <span class="info-value">${formatCurrency(depositAmount)}</span>
         </div>
-        ${travelInsuranceCost > 0 ? `
+        ${travelInsuranceCost > 0 || insuranceDiscountAmount > 0 ? `
         <div class="info-row">
-          <span class="info-label">🛡️ Seguro de Viajero (va a aseguradora):</span>
-          <span class="info-value">${formatCurrency(travelInsuranceCost)}</span>
+          <span class="info-label">🛡️ Seguro de Viajero (va a aseguradora)${insuranceDiscountAmount > 0 ? ` <span style="text-decoration:line-through;color:#9ca3af;font-size:12px;">${formatCurrency(travelInsuranceCost + insuranceDiscountAmount)}</span>` : ''}:</span>
+          <span class="info-value">${travelInsuranceCost === 0 ? 'GRATIS' : formatCurrency(travelInsuranceCost)}</span>
         </div>
+        ${insuranceDiscountAmount > 0 ? `<div class="info-row"><span class="info-label" style="color:#059669;">Descuento en seguro (plataforma absorbe):</span><span class="info-value" style="color:#059669;">-${formatCurrency(insuranceDiscountAmount)}</span></div>` : ''}
         <div class="info-row" style="background-color: #f0fdf4; padding: 8px 5px; margin: 5px -5px;">
           <span class="info-label" style="font-weight: 700;">Total cobrado al viajero hoy:</span>
           <span class="info-value" style="font-weight: 700;">${formatCurrency(userPayment)}</span>

@@ -518,6 +518,36 @@ Deno.serve(async (req) => {
               }
             }
 
+            // Record insurance discount code usage if applicable
+            try {
+              const { data: bookingForInsurance } = await supabase
+                .from('bookings')
+                .select('user_id, insurance_discount_code_id')
+                .eq('id', bookingId)
+                .maybeSingle();
+
+              if (bookingForInsurance?.insurance_discount_code_id) {
+                const insCodeId = bookingForInsurance.insurance_discount_code_id;
+                const { data: existingInsUsage } = await supabase
+                  .from('discount_code_usage')
+                  .select('id')
+                  .eq('discount_code_id', insCodeId)
+                  .eq('user_id', bookingForInsurance.user_id)
+                  .maybeSingle();
+
+                if (!existingInsUsage) {
+                  await supabase.from('discount_code_usage').insert({
+                    discount_code_id: insCodeId,
+                    user_id: bookingForInsurance.user_id,
+                    booking_id: bookingId,
+                  });
+                  console.log(`Insurance discount code ${insCodeId} usage recorded for booking ${bookingId}`);
+                }
+              }
+            } catch (insDiscountError) {
+              console.error('Error recording insurance discount code usage:', insDiscountError);
+            }
+
             try {
               // Check if confirmation email was already sent to prevent duplicates
               const { data: bookingCheck } = await supabase

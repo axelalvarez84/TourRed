@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Ticket, Plus, Edit2, Trash2, Eye, Percent, DollarSign, Calendar, Users, AlertCircle, CheckCircle, XCircle, Search, Map, Crown, Gift, ArrowUpDown, ArrowUp, ArrowDown, Building2, Target } from 'lucide-react';
+import { Ticket, Plus, CreditCard as Edit2, Trash2, Eye, Percent, DollarSign, Calendar, Users, AlertCircle, CheckCircle, XCircle, Search, Map, Crown, Gift, ArrowUpDown, ArrowUp, ArrowDown, Building2, Target, Shield } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -7,9 +7,9 @@ interface DiscountCode {
   id: string;
   code: string;
   description: string;
-  discount_type: 'tour_percentage' | 'tour_fixed' | 'membership_free_month' | 'gift_card_percentage' | 'gift_card_fixed' | 'service_fee_percentage' | 'service_fee_fixed' | 'service_fee_full';
+  discount_type: 'tour_percentage' | 'tour_fixed' | 'membership_free_month' | 'membership_percentage' | 'membership_fixed' | 'gift_card_percentage' | 'gift_card_fixed' | 'service_fee_percentage' | 'service_fee_fixed' | 'service_fee_full' | 'insurance_percentage' | 'insurance_fixed' | 'insurance_free';
   discount_value: number;
-  applicable_to: 'tours' | 'memberships' | 'gift_cards' | 'service_fees';
+  applicable_to: 'tours' | 'memberships' | 'gift_cards' | 'service_fees' | 'insurance';
   discount_applies_to: 'total_price' | 'payment_amount';
   is_single_use: boolean;
   is_active: boolean;
@@ -67,7 +67,7 @@ export default function AdminDiscountCodes() {
   const [formData, setFormData] = useState({
     code: '',
     description: '',
-    applicable_to: 'tours' as 'tours' | 'memberships' | 'gift_cards' | 'service_fees',
+    applicable_to: 'tours' as 'tours' | 'memberships' | 'gift_cards' | 'service_fees' | 'insurance',
     discount_type: 'tour_percentage' as string,
     discount_value: '',
     discount_applies_to: 'total_price' as 'total_price' | 'payment_amount',
@@ -161,7 +161,7 @@ export default function AdminDiscountCodes() {
       return;
     }
 
-    if (formData.discount_type !== 'membership_free_month' && formData.discount_type !== 'service_fee_full' && !formData.discount_value) {
+    if (formData.discount_type !== 'membership_free_month' && formData.discount_type !== 'service_fee_full' && formData.discount_type !== 'insurance_free' && !formData.discount_value) {
       alert('Por favor complete todos los campos requeridos');
       return;
     }
@@ -172,8 +172,8 @@ export default function AdminDiscountCodes() {
     }
 
     try {
-      const discountValue = formData.discount_type === 'membership_free_month' || formData.discount_type === 'service_fee_full'
-        ? (formData.discount_type === 'service_fee_full' ? 100 : 1)
+      const discountValue = formData.discount_type === 'membership_free_month' || formData.discount_type === 'service_fee_full' || formData.discount_type === 'insurance_free'
+        ? (formData.discount_type === 'service_fee_full' || formData.discount_type === 'insurance_free' ? 100 : 1)
         : parseFloat(formData.discount_value);
 
       const codeData: Record<string, any> = {
@@ -229,7 +229,7 @@ export default function AdminDiscountCodes() {
       description: code.description,
       applicable_to: code.applicable_to,
       discount_type: code.discount_type,
-      discount_value: (code.discount_type === 'membership_free_month' || code.discount_type === 'service_fee_full') ? '' : code.discount_value.toString(),
+      discount_value: (code.discount_type === 'membership_free_month' || code.discount_type === 'service_fee_full' || code.discount_type === 'insurance_free') ? '' : code.discount_value.toString(),
       discount_applies_to: code.discount_applies_to || 'total_price',
       valid_from: code.valid_from.split('T')[0],
       valid_until: code.valid_until.split('T')[0],
@@ -315,6 +315,12 @@ export default function AdminDiscountCodes() {
           { value: 'service_fee_fixed', label: 'Monto Fijo' },
           { value: 'service_fee_full', label: 'Cargo por Servicio Gratis' },
         ];
+      case 'insurance':
+        return [
+          { value: 'insurance_percentage', label: 'Porcentaje del Seguro' },
+          { value: 'insurance_fixed', label: 'Monto Fijo' },
+          { value: 'insurance_free', label: 'Seguro Gratis' },
+        ];
       default:
         return [];
     }
@@ -332,6 +338,9 @@ export default function AdminDiscountCodes() {
       service_fee_percentage: 'Porcentaje del Cargo',
       service_fee_fixed: 'Monto Fijo',
       service_fee_full: 'Cargo Gratis',
+      insurance_percentage: 'Porcentaje del Seguro',
+      insurance_fixed: 'Monto Fijo',
+      insurance_free: 'Seguro Gratis',
     };
     return labels[type] || type;
   };
@@ -348,9 +357,10 @@ export default function AdminDiscountCodes() {
   const getApplicableToLabel = (type: string) => {
     const labels: Record<string, string> = {
       tours: 'Tours',
-      memberships: 'Membresías',
+      memberships: 'Membresias',
       gift_cards: 'Tarjetas de Regalo',
       service_fees: 'Cargo por Servicio',
+      insurance: 'Seguro de Viajero',
     };
     return labels[type] || type;
   };
@@ -611,9 +621,10 @@ export default function AdminDiscountCodes() {
               >
                 <option value="all">Todos</option>
                 <option value="tours">Tours</option>
-                <option value="memberships">Membresías</option>
+                <option value="memberships">Membresias</option>
                 <option value="gift_cards">Tarjetas de Regalo</option>
                 <option value="service_fees">Cargo por Servicio</option>
+                <option value="insurance">Seguro de Viajero</option>
               </select>
             </div>
 
@@ -749,6 +760,8 @@ export default function AdminDiscountCodes() {
                               <>1 Mes Gratis</>
                             ) : code.discount_type === 'service_fee_full' ? (
                               <>Cargo Gratis</>
+                            ) : code.discount_type === 'insurance_free' ? (
+                              <>Seguro Gratis</>
                             ) : (
                               <>
                                 <DollarSign className="h-4 w-4 text-green-600" />
@@ -793,6 +806,12 @@ export default function AdminDiscountCodes() {
                           {code.applicable_to === 'service_fees' && (
                             <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-800">
                               <DollarSign className="h-3 w-3" />
+                              {getApplicableToLabel(code.applicable_to)}
+                            </span>
+                          )}
+                          {code.applicable_to === 'insurance' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              <Shield className="h-3 w-3" />
                               {getApplicableToLabel(code.applicable_to)}
                             </span>
                           )}
@@ -892,7 +911,7 @@ export default function AdminDiscountCodes() {
                     <select
                       value={formData.applicable_to}
                       onChange={(e) => {
-                        const newApplicableTo = e.target.value as 'tours' | 'memberships' | 'gift_cards' | 'service_fees';
+                        const newApplicableTo = e.target.value as 'tours' | 'memberships' | 'gift_cards' | 'service_fees' | 'insurance';
                         const options = getDiscountTypeOptions(newApplicableTo);
                         setFormData({
                           ...formData,
@@ -906,13 +925,19 @@ export default function AdminDiscountCodes() {
                       required
                     >
                       <option value="tours">Tours</option>
-                      <option value="memberships">Membresías</option>
+                      <option value="memberships">Membresias</option>
                       <option value="gift_cards">Tarjetas de Regalo</option>
                       <option value="service_fees">Cargo por Servicio</option>
+                      <option value="insurance">Seguro de Viajero</option>
                     </select>
                     {formData.applicable_to === 'service_fees' && (
                       <p className="text-xs text-cyan-600 mt-1">
-                        Descuentos aplicables únicamente al cargo por servicio de la plataforma. No afecta el precio del tour.
+                        Descuentos aplicables unicamente al cargo por servicio de la plataforma. No afecta el precio del tour.
+                      </p>
+                    )}
+                    {formData.applicable_to === 'insurance' && (
+                      <p className="text-xs text-green-600 mt-1">
+                        Descuentos aplicables unicamente al seguro de viajero. No afecta el precio del tour.
                       </p>
                     )}
                   </div>
@@ -942,8 +967,8 @@ export default function AdminDiscountCodes() {
                       onChange={(e) => setFormData({
                         ...formData,
                         discount_type: e.target.value,
-                        discount_value: (e.target.value === 'membership_free_month' || e.target.value === 'service_fee_full') ? '' : formData.discount_value,
-                        max_discount_amount: e.target.value === 'service_fee_full' ? '' : formData.max_discount_amount,
+                        discount_value: (e.target.value === 'membership_free_month' || e.target.value === 'service_fee_full' || e.target.value === 'insurance_free') ? '' : formData.discount_value,
+                        max_discount_amount: (e.target.value === 'service_fee_full' || e.target.value === 'insurance_free') ? '' : formData.max_discount_amount,
                         membership_plan_type: e.target.value === 'membership_free_month' ? 'monthly' : formData.membership_plan_type,
                       })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -957,12 +982,17 @@ export default function AdminDiscountCodes() {
                     </select>
                     {formData.discount_type === 'service_fee_full' && (
                       <p className="text-xs text-cyan-600 mt-1">
-                        Este código eliminará completamente el cargo por servicio para el usuario
+                        Este codigo eliminara completamente el cargo por servicio para el usuario
+                      </p>
+                    )}
+                    {formData.discount_type === 'insurance_free' && (
+                      <p className="text-xs text-green-600 mt-1">
+                        Este codigo eliminara completamente el costo del seguro para el usuario
                       </p>
                     )}
                   </div>
 
-                  {formData.discount_type !== 'membership_free_month' && formData.discount_type !== 'service_fee_full' && (
+                  {formData.discount_type !== 'membership_free_month' && formData.discount_type !== 'service_fee_full' && formData.discount_type !== 'insurance_free' && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Valor del Descuento *
@@ -1009,7 +1039,8 @@ export default function AdminDiscountCodes() {
                 )}
 
                 {(formData.applicable_to === 'service_fees' && formData.discount_type === 'service_fee_percentage') ||
-                 (formData.applicable_to === 'tours' && formData.discount_type.includes('percentage')) ? (
+                 (formData.applicable_to === 'tours' && formData.discount_type.includes('percentage')) ||
+                 (formData.applicable_to === 'insurance' && formData.discount_type === 'insurance_percentage') ? (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Monto Máximo de Descuento (Opcional)
@@ -1248,6 +1279,8 @@ export default function AdminDiscountCodes() {
                         ? '1 Mes Gratis'
                         : selectedCode.discount_type === 'service_fee_full'
                         ? 'Cargo por Servicio Gratis'
+                        : selectedCode.discount_type === 'insurance_free'
+                        ? 'Seguro Gratis'
                         : `$${selectedCode.discount_value}`
                       }
                     </p>
@@ -1287,7 +1320,14 @@ export default function AdminDiscountCodes() {
                 {selectedCode.applicable_to === 'service_fees' && (
                   <div className="mt-4 p-3 bg-cyan-50 border border-cyan-200 rounded-lg">
                     <p className="text-sm text-cyan-800">
-                      <strong>Nota:</strong> Este código solo afecta el cargo por servicio de la plataforma y no modifica el precio base del tour.
+                      <strong>Nota:</strong> Este codigo solo afecta el cargo por servicio de la plataforma y no modifica el precio base del tour.
+                    </p>
+                  </div>
+                )}
+                {selectedCode.applicable_to === 'insurance' && (
+                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-800">
+                      <strong>Nota:</strong> Este codigo solo afecta el costo del seguro de viajero y no modifica el precio del tour ni el cargo por servicio.
                     </p>
                   </div>
                 )}

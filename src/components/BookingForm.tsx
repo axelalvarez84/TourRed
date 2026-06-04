@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet, Award, Ticket, X, Check, Loader2, ShoppingBag, Info, Tag, RefreshCw, Clock, Car, Globe, AlertTriangle, MapPin, Bus, Shield, ShieldOff, ChevronRight } from 'lucide-react';
+import { Calendar, CreditCard, Users, AlertCircle, DollarSign, Settings, Minus, Plus, Crown, Sparkles, Wallet, Award, Ticket, X, Check, CheckCircle, Loader2, ShoppingBag, Info, Tag, RefreshCw, Clock, Car, Globe, AlertTriangle, MapPin, Bus, Shield, ShieldOff, ChevronRight } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import SeatMapPicker from './seats/SeatMapPicker';
 import PaymentProviderSelector, { PaymentProvider } from './PaymentProviderSelector';
@@ -141,6 +141,17 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     discount_applies_to: 'total_price' | 'payment_amount';
     max_discount_amount: number | null;
     applicable_to: 'tours' | 'service_fees';
+  } | null>(null);
+
+  const [insuranceDiscountInput, setInsuranceDiscountInput] = useState('');
+  const [isValidatingInsuranceCode, setIsValidatingInsuranceCode] = useState(false);
+  const [insuranceDiscountError, setInsuranceDiscountError] = useState('');
+  const [appliedInsuranceDiscount, setAppliedInsuranceDiscount] = useState<{
+    code_id: string;
+    code: string;
+    discount_type: 'insurance_percentage' | 'insurance_fixed' | 'insurance_free';
+    discount_value: number;
+    max_discount_amount: number | null;
   } | null>(null);
 
   const [travelerCounts, setTravelerCounts] = useState<TravelerCounts>({
@@ -576,7 +587,40 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     setDiscountCodeError('');
   };
 
-  // Calcular total de viajeros (sin contar mascotas)
+  const handleApplyInsuranceDiscountCode = async () => {
+    if (!insuranceDiscountInput.trim() || !user) return;
+    setIsValidatingInsuranceCode(true);
+    setInsuranceDiscountError('');
+    try {
+      const { data, error } = await supabase.rpc('validate_insurance_discount_code', {
+        p_code: insuranceDiscountInput.trim(),
+        p_user_id: user.id,
+      });
+      if (error) throw error;
+      if (data && data.valid) {
+        setAppliedInsuranceDiscount({
+          code_id: data.code_id,
+          code: data.code,
+          discount_type: data.discount_type,
+          discount_value: data.discount_value,
+          max_discount_amount: data.max_discount_amount || null,
+        });
+        setInsuranceDiscountError('');
+        setInsuranceDiscountInput('');
+      } else {
+        setInsuranceDiscountError(data?.error || 'Codigo invalido');
+      }
+    } catch (err: any) {
+      setInsuranceDiscountError(err.message || 'Error al validar el codigo');
+    } finally {
+      setIsValidatingInsuranceCode(false);
+    }
+  };
+
+  const handleRemoveInsuranceDiscount = () => {
+    setAppliedInsuranceDiscount(null);
+    setInsuranceDiscountError('');
+  };
   const totalTravelers = travelerCounts.adultos + travelerCounts.ninos + travelerCounts.infantes + travelerCounts.adultos_mayores;
 
   // Calcular días del tour para el seguro de viaje
@@ -597,6 +641,23 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const insuranceCost = includeInsurance
     ? Math.round(insurancePricePerDayPerTraveler * tourDays * Math.max(1, totalTravelers) * 100) / 100
     : 0;
+
+  const insuranceDiscountAmount = (() => {
+    if (!includeInsurance || !appliedInsuranceDiscount || insuranceCost <= 0) return 0;
+    if (appliedInsuranceDiscount.discount_type === 'insurance_free') return insuranceCost;
+    let d = 0;
+    if (appliedInsuranceDiscount.discount_type === 'insurance_percentage') {
+      d = insuranceCost * (appliedInsuranceDiscount.discount_value / 100);
+    } else {
+      d = Math.min(appliedInsuranceDiscount.discount_value, insuranceCost);
+    }
+    if (appliedInsuranceDiscount.max_discount_amount && d > appliedInsuranceDiscount.max_discount_amount) {
+      d = appliedInsuranceDiscount.max_discount_amount;
+    }
+    return Math.round(d * 100) / 100;
+  })();
+
+  const effectiveInsuranceCost = Math.max(0, insuranceCost - insuranceDiscountAmount);
 
   const preventaRatio = isEnPreventa && hasMembership && tour.preventa_precio_especial && tour.preventa_descuento_valor
     ? (tour.preventa_tipo_descuento === 'porcentaje'
@@ -855,7 +916,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
   const amountAfterPoints = userPayment - pointsDiscountAmount;
 
-  const cashBase = amountAfterPoints + insuranceCost;
+  const cashBase = amountAfterPoints + effectiveInsuranceCost;
   const toursRedCashApplied = useToursRedCash ? Math.min(walletBalance, cashBase) : 0;
   const rawAmountAfterToursRedCash = cashBase - toursRedCashApplied;
   // Si el residuo es menor a $10 (mínimo de los procesadores de pago), absorberlo como $0
@@ -959,7 +1020,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         deposit_amount: depositAmount,
         commission_amount: agencyCommission,
         service_charge: serviceCharge,
-        user_payment: userPayment + insuranceCost,
+        user_payment: userPayment + effectiveInsuranceCost,
         platform_revenue: platformRevenue,
         booking_date: isReceptivo && selectedSlot ? selectedSlot.slot_date : tour.start_date,
         slot_id: isReceptivo && selectedSlot ? selectedSlot.id : null,
@@ -992,7 +1053,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         selected_seats: hasSeatMap && selectedSeats.length > 0 ? selectedSeats : null,
         es_reserva_preventa: isEnPreventa && hasMembership,
         travel_insurance_included: includeInsurance,
-        travel_insurance_cost: insuranceCost,
+        travel_insurance_cost: effectiveInsuranceCost,
+        insurance_discount_code_id: appliedInsuranceDiscount?.code_id || null,
+        insurance_discount_amount: insuranceDiscountAmount,
       };
 
       console.log('📝 Creando reserva con datos:', bookingData);
@@ -1993,8 +2056,68 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                       <span className="text-xs text-blue-800">
                         {formatCurrencyMXN(insurancePricePerDayPerTraveler)}/día × {tourDays} día{tourDays !== 1 ? 's' : ''} × {Math.max(1, totalTravelers)} viajero{totalTravelers !== 1 ? 's' : ''}
                       </span>
-                      <span className="text-sm font-bold text-blue-800">+{formatCurrencyMXN(insuranceCost)}</span>
+                      {appliedInsuranceDiscount ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-blue-400 line-through">{formatCurrencyMXN(insuranceCost)}</span>
+                          <span className="text-sm font-bold text-emerald-700">+{formatCurrencyMXN(effectiveInsuranceCost)}</span>
+                        </div>
+                      ) : (
+                        <span className="text-sm font-bold text-blue-800">+{formatCurrencyMXN(insuranceCost)}</span>
+                      )}
                     </div>
+
+                    {/* Input de codigo de descuento para seguro */}
+                    {appliedInsuranceDiscount ? (
+                      <div className="mt-2 flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+                          <div>
+                            <span className="text-xs font-semibold text-emerald-800">{appliedInsuranceDiscount.code}</span>
+                            <p className="text-xs text-emerald-700">
+                              {appliedInsuranceDiscount.discount_type === 'insurance_free'
+                                ? 'Seguro gratis'
+                                : appliedInsuranceDiscount.discount_type === 'insurance_percentage'
+                                ? `${appliedInsuranceDiscount.discount_value}% de descuento en seguro`
+                                : `$${appliedInsuranceDiscount.discount_value} de descuento en seguro`}
+                              {' — '}
+                              <span className="font-semibold">-{formatCurrencyMXN(insuranceDiscountAmount)}</span>
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveInsuranceDiscount}
+                          className="text-emerald-600 hover:text-emerald-800 transition-colors ml-2"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mt-2">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={insuranceDiscountInput}
+                            onChange={(e) => setInsuranceDiscountInput(e.target.value.toUpperCase())}
+                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleApplyInsuranceDiscountCode())}
+                            placeholder="Código descuento seguro"
+                            className="flex-1 px-3 py-1.5 text-xs border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white uppercase"
+                            disabled={isValidatingInsuranceCode}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleApplyInsuranceDiscountCode}
+                            disabled={!insuranceDiscountInput.trim() || isValidatingInsuranceCode}
+                            className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                          >
+                            {isValidatingInsuranceCode ? 'Validando...' : 'Aplicar'}
+                          </button>
+                        </div>
+                        {insuranceDiscountError && (
+                          <p className="mt-1 text-xs text-red-600">{insuranceDiscountError}</p>
+                        )}
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="flex items-center gap-2 py-1">
@@ -2649,13 +2772,30 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
               {/* Seguro de viaje en el desglose */}
               {includeInsurance && insuranceCost > 0 && (
-                <div className="flex justify-between text-sm text-emerald-700 mt-1 border-t border-dashed border-emerald-200 pt-2">
-                  <span className="flex items-center gap-1">
-                    <Shield className="h-3 w-3" />
-                    Seguro de viaje ({tourDays} día{tourDays !== 1 ? 's' : ''} × {Math.max(1, totalTravelers)} viajero{totalTravelers !== 1 ? 's' : ''}):
-                  </span>
-                  <span className="font-medium">+{formatCurrencyMXN(insuranceCost)}</span>
-                </div>
+                <>
+                  <div className="flex justify-between text-sm text-emerald-700 mt-1 border-t border-dashed border-emerald-200 pt-2">
+                    <span className="flex items-center gap-1">
+                      <Shield className="h-3 w-3" />
+                      Seguro de viaje ({tourDays} día{tourDays !== 1 ? 's' : ''} × {Math.max(1, totalTravelers)} viajero{totalTravelers !== 1 ? 's' : ''}):
+                    </span>
+                    {appliedInsuranceDiscount ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-emerald-400 line-through">+{formatCurrencyMXN(insuranceCost)}</span>
+                        <span className="font-medium text-emerald-700">+{formatCurrencyMXN(effectiveInsuranceCost)}</span>
+                      </div>
+                    ) : (
+                      <span className="font-medium">+{formatCurrencyMXN(insuranceCost)}</span>
+                    )}
+                  </div>
+                  {appliedInsuranceDiscount && (
+                    <div className="flex justify-between text-xs text-emerald-600">
+                      <span className="flex items-center gap-1 pl-4">
+                        Descuento seguro ({appliedInsuranceDiscount.code}):
+                      </span>
+                      <span>-{formatCurrencyMXN(insuranceDiscountAmount)}</span>
+                    </div>
+                  )}
+                </>
               )}
               {!includeInsurance && (
                 <div className="flex items-center gap-1 text-xs text-gray-400 mt-1 border-t border-dashed border-gray-100 pt-2">
