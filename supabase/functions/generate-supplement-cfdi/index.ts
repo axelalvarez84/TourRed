@@ -113,7 +113,7 @@ Deno.serve(async (req: Request) => {
     const { data: existingCfdi } = await supabase
       .from("cfdi_invoices")
       .select("id, status")
-      .eq("booking_id", booking_supplement_id)
+      .eq("booking_supplement_id", booking_supplement_id)
       .eq("invoice_type", "supplement")
       .in("status", ["stamped", "pending"])
       .maybeSingle();
@@ -285,6 +285,7 @@ Deno.serve(async (req: Request) => {
       .insert({
         invoice_type: "supplement",
         booking_id: suppReq.booking_id,
+        booking_supplement_id: booking_supplement_id,
         agency_id: agencyData?.id || null,
         pac_provider: settings.pac_provider,
         serie,
