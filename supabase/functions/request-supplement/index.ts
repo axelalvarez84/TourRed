@@ -120,6 +120,11 @@ Deno.serve(async (req: Request) => {
     const serviceChargeGross = parseFloat((subtotal * serviceChargePct / 100).toFixed(2));
     const supplementCommission = parseFloat((subtotal * supplementCommissionPct / 100).toFixed(2));
 
+    // For pending_payment (no approval required), set a 48-hour payment deadline
+    const expiresAt = initialStatus === "pending_payment"
+      ? new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
+      : null;
+
     // Create booking_supplement record
     const { data: newRecord, error: insertError } = await supabase
       .from("booking_supplements")
@@ -133,6 +138,7 @@ Deno.serve(async (req: Request) => {
         total_paid: 0,
         status: initialStatus,
         requested_at: new Date().toISOString(),
+        ...(expiresAt ? { expires_at: expiresAt } : {}),
       })
       .select()
       .single();

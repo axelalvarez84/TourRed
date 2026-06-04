@@ -1408,10 +1408,10 @@ const TravelerBookings: React.FC = () => {
         }),
       });
       const payData = await payRes.json();
-      if (!payRes.ok && !payData.client_secret) throw new Error(payData.error || 'Error procesando pago');
+      if (!payRes.ok && !payData.url) throw new Error(payData.error || 'Error procesando pago');
 
-      if (payData.client_secret) {
-        setSupplementDirectPayModal(prev => ({ ...prev, isProcessing: false, error: 'Redireccionando a Stripe...' }));
+      if (payData.url) {
+        window.location.href = payData.url;
         return;
       }
 
@@ -1474,10 +1474,10 @@ const TravelerBookings: React.FC = () => {
           }),
         });
         const payData = await payRes.json();
-        if (!payRes.ok && !payData.client_secret) throw new Error(payData.error || 'Error procesando pago');
+        if (!payRes.ok && !payData.url) throw new Error(payData.error || 'Error procesando pago');
 
-        if (payData.client_secret) {
-          setSupplementPaymentModal(prev => ({ ...prev, isProcessing: false, error: 'Redireccionando a Stripe...' }));
+        if (payData.url) {
+          window.location.href = payData.url;
           return;
         }
       }

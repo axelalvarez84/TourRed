@@ -130,6 +130,135 @@ Deno.serve(async (req) => {
           break;
         }
 
+        // Handle supplement payment
+        const paymentForSupplement = session.metadata?.payment_for === 'supplement';
+        const bookingSupplementId = session.metadata?.booking_supplement_id;
+        if (paymentForSupplement && bookingSupplementId) {
+          const suppPaymentStatus = session.payment_status;
+          console.log(`Supplement checkout session completed: ${bookingSupplementId}, status: ${suppPaymentStatus}`);
+
+          if (suppPaymentStatus === 'paid') {
+            const { data: suppReq } = await supabase
+              .from('booking_supplements')
+              .select(`
+                id, booking_id, quantity, unit_price, service_charge, supplement_commission,
+                membership_exemption_used,
+                bookings!inner(user_id)
+              `)
+              .eq('id', bookingSupplementId)
+              .maybeSingle();
+
+            if (!suppReq) {
+              console.error(`Supplement ${bookingSupplementId} not found`);
+              break;
+            }
+
+            const userId = (suppReq.bookings as any).user_id;
+            const subtotal = Number(suppReq.unit_price) * suppReq.quantity;
+            const serviceChargePct = 5; // same default used when creating the record
+            const grossServiceCharge = parseFloat((subtotal * serviceChargePct / 100).toFixed(2));
+
+            // Resolve membership exemption
+            const { data: exemptionResult } = await supabase
+              .rpc('get_available_service_fee_exemption', { p_user_id: userId });
+            const exemptionAvailable = parseFloat(exemptionResult ?? '0');
+            const exemptionApplied = Math.min(exemptionAvailable, grossServiceCharge);
+            const netServiceCharge = parseFloat((grossServiceCharge - exemptionApplied).toFixed(2));
+            const supplementCommissionPct = 10;
+            const supplementCommission = parseFloat((subtotal * supplementCommissionPct / 100).toFixed(2));
+            const totalToPay = parseFloat((subtotal + netServiceCharge).toFixed(2));
+
+            if (exemptionApplied > 0) {
+              const { data: membership } = await supabase
+                .from('memberships')
+                .select('id, service_fee_exemption_used')
+                .eq('user_id', userId)
+                .eq('status', 'active')
+                .maybeSingle();
+              if (membership) {
+                await supabase.from('memberships').update({
+                  service_fee_exemption_used: (Number(membership.service_fee_exemption_used) || 0) + exemptionApplied,
+                }).eq('id', membership.id);
+              }
+            }
+
+            // Award points if member
+            let pointsEarned = 0;
+            const { data: activeMembership } = await supabase
+              .from('memberships')
+              .select('id')
+              .eq('user_id', userId)
+              .eq('status', 'active')
+              .gt('current_period_end', new Date().toISOString())
+              .maybeSingle();
+
+            if (activeMembership) {
+              pointsEarned = Math.floor(subtotal * 100);
+              if (pointsEarned > 0) {
+                const { data: walletId } = await supabase.rpc('get_or_create_points_wallet', { p_user_id: userId });
+                if (walletId) {
+                  const { data: pWallet } = await supabase
+                    .from('toursred_points_wallets')
+                    .select('id, balance, total_earned')
+                    .eq('id', walletId)
+                    .maybeSingle();
+                  if (pWallet) {
+                    const newBalance = pWallet.balance + pointsEarned;
+                    await supabase.from('toursred_points_transactions').insert({
+                      wallet_id: walletId,
+                      user_id: userId,
+                      amount: pointsEarned,
+                      balance_after: newBalance,
+                      type: 'earned',
+                      description: `Puntos por suplemento (Stripe)`,
+                      reference_id: bookingSupplementId,
+                      reference_type: 'supplement',
+                      expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                    });
+                    await supabase.from('toursred_points_wallets').update({
+                      balance: newBalance,
+                      total_earned: pWallet.total_earned + pointsEarned,
+                    }).eq('id', walletId);
+                  }
+                }
+              }
+            }
+
+            const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : null;
+
+            await supabase.from('booking_supplements').update({
+              status: 'paid',
+              payment_method: 'stripe',
+              payment_intent_id: paymentIntentId,
+              service_charge: netServiceCharge,
+              membership_exemption_used: exemptionApplied,
+              supplement_commission: supplementCommission,
+              total_paid: totalToPay,
+              paid_at: new Date().toISOString(),
+              points_earned: pointsEarned,
+              updated_at: new Date().toISOString(),
+            }).eq('id', bookingSupplementId);
+
+            console.log(`✅ Supplement ${bookingSupplementId} marked as paid via Stripe`);
+
+            // Trigger CFDI async
+            const { data: cfdiSettings } = await supabase
+              .from('platform_settings')
+              .select('pac_provider, pac_api_key_encrypted')
+              .maybeSingle();
+            if (cfdiSettings?.pac_provider && cfdiSettings.pac_provider !== 'none' && cfdiSettings.pac_api_key_encrypted) {
+              EdgeRuntime.waitUntil(
+                fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-supplement-cfdi`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
+                  body: JSON.stringify({ booking_supplement_id: bookingSupplementId }),
+                }).catch(() => {})
+              );
+            }
+          }
+          break;
+        }
+
         if (!bookingId) {
           console.error("No booking ID or gift card ID in session metadata");
           break;

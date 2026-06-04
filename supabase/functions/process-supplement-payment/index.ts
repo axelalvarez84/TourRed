@@ -284,7 +284,7 @@ Deno.serve(async (req: Request) => {
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // 3. Stripe — create PaymentIntent or confirm existing
+    // 3. Stripe — create Checkout Session (hosted by Stripe, same as booking flow)
     if (payment_method === "stripe") {
       const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") || "";
       if (!stripeKey) {
@@ -294,43 +294,34 @@ Deno.serve(async (req: Request) => {
       }
       const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
 
-      // Confirm existing intent after frontend confirmation
-      if (stripe_payment_intent_id) {
-        const intent = await stripe.paymentIntents.retrieve(stripe_payment_intent_id);
-        if (intent.status !== "succeeded") {
-          return new Response(JSON.stringify({ error: `Pago no completado. Estado Stripe: ${intent.status}` }), {
-            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        const pointsEarned = await finalizePayment("stripe", stripe_payment_intent_id);
-        return new Response(JSON.stringify({
-          success: true, total_charged: totalToPay, points_earned: pointsEarned,
-          message: "Pago con tarjeta completado.",
-        }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+      const origin = req.headers.get("origin") || req.headers.get("referer")?.split("/").slice(0, 3).join("/") || "https://toursred.com";
 
-      // Create new PaymentIntent
-      const intent = await stripe.paymentIntents.create({
-        amount: Math.round(totalToPay * 100),
-        currency: "mxn",
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        mode: "payment",
+        line_items: [{
+          price_data: {
+            currency: "mxn",
+            product_data: {
+              name: supplementName,
+              description: `${suppReq.quantity}x suplemento`,
+            },
+            unit_amount: Math.round(totalToPay * 100),
+          },
+          quantity: 1,
+        }],
         metadata: {
           booking_supplement_id,
           payment_for: "supplement",
           user_id: user.id,
         },
+        success_url: `${origin}/supplement-success?supplement_id=${booking_supplement_id}`,
+        cancel_url: `${origin}/traveler/bookings`,
       });
-
-      await supabase.from("booking_supplements").update({
-        payment_intent_id: intent.id,
-        updated_at: new Date().toISOString(),
-      }).eq("id", booking_supplement_id);
 
       return new Response(JSON.stringify({
         success: true,
-        requires_action: true,
-        client_secret: intent.client_secret,
-        payment_intent_id: intent.id,
-        total_to_pay: totalToPay,
+        url: session.url,
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
