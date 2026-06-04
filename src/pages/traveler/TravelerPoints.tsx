@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { formatCurrency } from '../../utils/formatCurrency';
+import { formatCurrencyMXN } from '../../utils/formatCurrency';
 import { Award, TrendingUp, TrendingDown, Clock, ArrowUp, ArrowDown, AlertCircle, HelpCircle, Calendar, Crown } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
