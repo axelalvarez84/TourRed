@@ -97,7 +97,7 @@ Deno.serve(async (req: Request) => {
     // Platform settings
     const { data: platformSettings } = await supabase
       .from("platform_settings")
-      .select("service_charge_percentage, supplement_commission_percentage, mercadopago_access_token, paypal_client_id, paypal_client_secret, paypal_sandbox_mode")
+      .select("service_charge_percentage, supplement_commission_percentage, mercadopago_access_token, paypal_client_id, paypal_client_secret, paypal_sandbox")
       .maybeSingle();
 
     const serviceChargePct = platformSettings?.service_charge_percentage ?? 5;
@@ -381,7 +381,7 @@ Deno.serve(async (req: Request) => {
 
       const paypalClientId = platformSettings?.paypal_client_id;
       const paypalClientSecret = platformSettings?.paypal_client_secret;
-      const isSandbox = platformSettings?.paypal_sandbox_mode ?? true;
+      const isSandbox = platformSettings?.paypal_sandbox ?? true;
       if (!paypalClientId || !paypalClientSecret) {
         return new Response(JSON.stringify({ error: "PayPal no configurado" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
