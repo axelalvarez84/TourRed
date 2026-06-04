@@ -52,6 +52,32 @@ const TravelerBookings: React.FC = () => {
     selectedMethod: 'stripe',
     cashToUse: 0,
   });
+  const [supplementsModal, setSupplementsModal] = useState<{
+    open: boolean;
+    booking: Booking | null;
+    activeTab: 'mis_suplementos' | 'disponibles';
+  }>({ open: false, booking: null, activeTab: 'mis_suplementos' });
+  const [supplementDirectPayModal, setSupplementDirectPayModal] = useState<{
+    open: boolean;
+    bookingSupplement: any | null;
+    booking: Booking | null;
+    isProcessing: boolean;
+    error: string;
+    walletBalance: number;
+    pointsBalance: number;
+    pointsValueMxn: number;
+    selectedMethod: 'toursred_cash' | 'points' | 'stripe' | 'mercadopago' | 'paypal';
+  }>({
+    open: false,
+    bookingSupplement: null,
+    booking: null,
+    isProcessing: false,
+    error: '',
+    walletBalance: 0,
+    pointsBalance: 0,
+    pointsValueMxn: 0,
+    selectedMethod: 'stripe',
+  });
   const [reviewModal, setReviewModal] = useState<{
     open: boolean;
     booking: Booking | null;
@@ -1335,6 +1361,73 @@ const TravelerBookings: React.FC = () => {
     });
   };
 
+  const handlePayExistingSupplement = async (bs: any, booking: Booking) => {
+    const { data: walletData } = await supabase
+      .from('toursred_cash_wallets')
+      .select('balance')
+      .eq('user_id', user!.id)
+      .maybeSingle();
+
+    const { data: pointsData } = await supabase
+      .from('toursred_points_wallets')
+      .select('balance')
+      .eq('user_id', user!.id)
+      .maybeSingle();
+
+    setSupplementsModal(prev => ({ ...prev, open: false }));
+    setSupplementDirectPayModal({
+      open: true,
+      bookingSupplement: bs,
+      booking,
+      isProcessing: false,
+      error: '',
+      walletBalance: walletData?.balance ?? 0,
+      pointsBalance: pointsData?.balance ?? 0,
+      pointsValueMxn: Math.floor((pointsData?.balance ?? 0) / 100),
+      selectedMethod: 'stripe',
+    });
+  };
+
+  const handleProcessDirectSupplementPayment = async () => {
+    const { bookingSupplement, booking, selectedMethod } = supplementDirectPayModal;
+    if (!bookingSupplement || !booking) return;
+
+    setSupplementDirectPayModal(prev => ({ ...prev, isProcessing: true, error: '' }));
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const payRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-supplement-payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          booking_supplement_id: bookingSupplement.id,
+          payment_method: selectedMethod,
+        }),
+      });
+      const payData = await payRes.json();
+      if (!payRes.ok && !payData.client_secret) throw new Error(payData.error || 'Error procesando pago');
+
+      if (payData.client_secret) {
+        setSupplementDirectPayModal(prev => ({ ...prev, isProcessing: false, error: 'Redireccionando a Stripe...' }));
+        return;
+      }
+
+      setSupplementDirectPayModal(prev => ({ ...prev, open: false }));
+      await fetchBookings();
+    } catch (err: any) {
+      setSupplementDirectPayModal(prev => ({ ...prev, isProcessing: false, error: err.message }));
+    }
+  };
+
+  const handleOpenSupplementsModal = (booking: Booking) => {
+    const hasRequested = (bookingSupplements[booking.id] || []).length > 0;
+    const activeTab = hasRequested ? 'mis_suplementos' : 'disponibles';
+    setSupplementsModal({ open: true, booking, activeTab });
+  };
+
   const handleRequestSupplement = async () => {
     const { supplement, booking, quantity, selectedMethod, cashToUse } = supplementPaymentModal;
     if (!supplement || !booking) return;
@@ -1664,7 +1757,7 @@ const TravelerBookings: React.FC = () => {
                         <div className="text-gray-500">Depósito Pagado:</div>
                         <div className="font-medium">{formatCurrencyMXN(booking.deposit_amount ?? 0)}</div>
                       </div>
-                      {booking.service_charge && (
+                      {Number(booking.service_charge) > 0 && (
                         <div>
                           <div className="text-gray-500">Cargo por Servicio:</div>
                           <div className="font-medium">{formatCurrencyMXN(booking.service_charge)}</div>
@@ -1689,94 +1782,8 @@ const TravelerBookings: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* My Supplement Requests */}
-                  {bookingSupplements[booking.id] && bookingSupplements[booking.id].length > 0 && (
-                    <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 mb-4">
-                      <h4 className="text-sm font-semibold text-teal-800 mb-2 flex items-center gap-2">
-                        <Tag className="w-4 h-4" />
-                        Mis Suplementos Solicitados
-                      </h4>
-                      <div className="space-y-2">
-                        {bookingSupplements[booking.id].map((bs: any) => {
-                          const statusConfig: Record<string, { label: string; color: string }> = {
-                            pending_approval: { label: 'Esperando aprobacion de la agencia', color: 'bg-amber-100 text-amber-700' },
-                            approved: { label: 'Aprobado — pendiente de pago', color: 'bg-blue-100 text-blue-700' },
-                            rejected: { label: 'Rechazado', color: 'bg-red-100 text-red-700' },
-                            pending_payment: { label: 'Pendiente de pago', color: 'bg-blue-100 text-blue-700' },
-                            paid: { label: 'Pagado', color: 'bg-green-100 text-green-700' },
-                            cancelled: { label: 'Cancelado / Expirado', color: 'bg-gray-100 text-gray-500' },
-                          };
-                          const sc = statusConfig[bs.status] || { label: bs.status, color: 'bg-gray-100 text-gray-500' };
-                          return (
-                            <div key={bs.id} className="flex items-center justify-between text-sm bg-white rounded px-3 py-2 border border-teal-100">
-                              <div>
-                                <span className="font-medium text-gray-800">{bs.tour_supplements?.name}</span>
-                                <span className="text-gray-500 text-xs ml-1">× {bs.quantity}</span>
-                                <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${sc.color}`}>{sc.label}</span>
-                                {bs.rejection_note && (
-                                  <p className="text-xs text-red-600 mt-0.5">Motivo: {bs.rejection_note}</p>
-                                )}
-                              </div>
-                              {bs.total_paid != null && (
-                                <span className="font-semibold text-teal-700 ml-2">{formatCurrencyMXN(Number(bs.total_paid))}</span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Available Supplements */}
-                  {(booking.status === 'confirmed' || booking.status === 'pending') &&
-                   tourSupplements[booking.tour_id] &&
-                   tourSupplements[booking.tour_id].length > 0 && (
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
-                      <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                        <Tag className="w-4 h-4" />
-                        Suplementos Disponibles
-                      </h4>
-                      <p className="text-xs text-gray-500 mb-3">Extras que puedes agregar a tu reserva actual.</p>
-                      <div className="space-y-2">
-                        {tourSupplements[booking.tour_id].map((ts: any) => {
-                          const alreadyRequested = (bookingSupplements[booking.id] || []).some(
-                            (bs: any) => bs.tour_supplement_id === ts.id && !['rejected', 'cancelled'].includes(bs.status)
-                          );
-                          return (
-                            <div key={ts.id} className="flex items-center justify-between bg-white rounded px-3 py-2 border border-gray-200">
-                              <div>
-                                <span className="text-sm font-medium text-gray-800">{ts.name}</span>
-                                {ts.description && <p className="text-xs text-gray-500">{ts.description}</p>}
-                                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                  <span className="text-xs font-semibold text-teal-700">{formatCurrencyMXN(Number(ts.price))} / unidad</span>
-                                  {ts.requires_approval && (
-                                    <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Requiere aprobacion</span>
-                                  )}
-                                  {!ts.is_cancellable && (
-                                    <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">No cancelable</span>
-                                  )}
-                                </div>
-                              </div>
-                              {alreadyRequested ? (
-                                <span className="text-xs text-gray-400 ml-3">Ya solicitado</span>
-                              ) : (
-                                <button
-                                  onClick={() => handleOpenSupplementRequest(booking, ts)}
-                                  className="btn btn-sm bg-teal-600 text-white hover:bg-teal-700 text-xs px-3 ml-3 flex items-center gap-1 flex-shrink-0"
-                                >
-                                  <Plus className="w-3 h-3" />
-                                  Solicitar
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
                   {/* Actions */}
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex flex-wrap gap-3">
                     <Link
                       to={`/tours/${booking.tour_id}`}
                       className="btn btn-outline flex items-center justify-center"
@@ -1792,6 +1799,31 @@ const TravelerBookings: React.FC = () => {
                       <UserCheck className="h-4 w-4 mr-2" />
                       Ver Acompañantes
                     </button>
+
+                    {(booking.status === 'confirmed' || booking.status === 'pending') &&
+                     ((bookingSupplements[booking.id] || []).length > 0 ||
+                      (tourSupplements[booking.tour_id] || []).length > 0) && (() => {
+                      const activeCount = (bookingSupplements[booking.id] || []).filter(
+                        (bs: any) => ['pending_approval', 'approved', 'pending_payment', 'paid'].includes(bs.status)
+                      ).length;
+                      const hasPendingPayment = (bookingSupplements[booking.id] || []).some(
+                        (bs: any) => bs.status === 'pending_payment' || bs.status === 'approved'
+                      );
+                      return (
+                        <button
+                          onClick={() => handleOpenSupplementsModal(booking)}
+                          className={`btn flex items-center justify-center gap-2 relative ${hasPendingPayment ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'btn-outline'}`}
+                        >
+                          <Tag className="h-4 w-4" />
+                          Suplementos
+                          {activeCount > 0 && (
+                            <span className={`inline-flex items-center justify-center w-5 h-5 text-xs font-bold rounded-full ${hasPendingPayment ? 'bg-white text-amber-600' : 'bg-teal-600 text-white'}`}>
+                              {activeCount}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })()}
 
                     {booking.status === 'pending' &&
                      booking.payment_status !== 'succeeded' &&
@@ -3524,6 +3556,250 @@ const TravelerBookings: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Supplements Manager Modal */}
+      {supplementsModal.open && supplementsModal.booking && (() => {
+        const booking = supplementsModal.booking!;
+        const mySupplements = bookingSupplements[booking.id] || [];
+        const available = tourSupplements[booking.tour_id] || [];
+        const SUPP_STATUS: Record<string, { label: string; color: string }> = {
+          pending_approval: { label: 'Esperando aprobacion', color: 'bg-amber-100 text-amber-700' },
+          approved: { label: 'Aprobado — pendiente de pago', color: 'bg-blue-100 text-blue-700' },
+          rejected: { label: 'Rechazado', color: 'bg-red-100 text-red-700' },
+          pending_payment: { label: 'Pendiente de pago', color: 'bg-blue-100 text-blue-700' },
+          paid: { label: 'Pagado', color: 'bg-green-100 text-green-700' },
+          cancelled: { label: 'Cancelado / Expirado', color: 'bg-gray-100 text-gray-500' },
+        };
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[85vh] flex flex-col">
+              {/* Header */}
+              <div className="p-5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Tag className="w-5 h-5 text-teal-600" />
+                  Suplementos
+                </h3>
+                <button onClick={() => setSupplementsModal(prev => ({ ...prev, open: false }))} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Tabs */}
+              <div className="flex border-b border-gray-200 flex-shrink-0">
+                {mySupplements.length > 0 && (
+                  <button
+                    onClick={() => setSupplementsModal(prev => ({ ...prev, activeTab: 'mis_suplementos' }))}
+                    className={`flex-1 py-3 text-sm font-medium transition-colors ${supplementsModal.activeTab === 'mis_suplementos' ? 'border-b-2 border-teal-600 text-teal-700' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Mis Suplementos
+                    {mySupplements.filter((bs: any) => !['rejected', 'cancelled'].includes(bs.status)).length > 0 && (
+                      <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 text-xs font-bold rounded-full bg-teal-100 text-teal-700">
+                        {mySupplements.filter((bs: any) => !['rejected', 'cancelled'].includes(bs.status)).length}
+                      </span>
+                    )}
+                  </button>
+                )}
+                {available.length > 0 && (
+                  <button
+                    onClick={() => setSupplementsModal(prev => ({ ...prev, activeTab: 'disponibles' }))}
+                    className={`flex-1 py-3 text-sm font-medium transition-colors ${supplementsModal.activeTab === 'disponibles' ? 'border-b-2 border-teal-600 text-teal-700' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Disponibles
+                    <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 text-xs font-bold rounded-full bg-gray-100 text-gray-600">
+                      {available.length}
+                    </span>
+                  </button>
+                )}
+              </div>
+
+              {/* Body */}
+              <div className="flex-1 overflow-y-auto p-5">
+                {/* Tab: Mis Suplementos */}
+                {supplementsModal.activeTab === 'mis_suplementos' && (
+                  <div className="space-y-3">
+                    {mySupplements.length === 0 ? (
+                      <p className="text-sm text-gray-500 text-center py-6">No tienes suplementos solicitados para esta reserva.</p>
+                    ) : (
+                      mySupplements.map((bs: any) => {
+                        const sc = SUPP_STATUS[bs.status] || { label: bs.status, color: 'bg-gray-100 text-gray-500' };
+                        const expectedAmount = Number(bs.unit_price || 0) * Number(bs.quantity || 1);
+                        const canPay = bs.status === 'pending_payment' || bs.status === 'approved';
+                        return (
+                          <div key={bs.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-gray-900 text-sm">
+                                  {bs.tour_supplements?.name}
+                                  <span className="font-normal text-gray-500 ml-1">× {bs.quantity}</span>
+                                </p>
+                                <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full ${sc.color}`}>{sc.label}</span>
+                                {bs.rejection_note && (
+                                  <p className="text-xs text-red-600 mt-1">Motivo: {bs.rejection_note}</p>
+                                )}
+                                {bs.status === 'cancelled' && bs.updated_at && (
+                                  <p className="text-xs text-gray-400 mt-1">
+                                    {format(new Date(bs.updated_at), 'dd/MM/yyyy HH:mm')}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <p className="text-sm font-bold text-teal-700">
+                                  {bs.status === 'paid'
+                                    ? formatCurrencyMXN(Number(bs.total_paid))
+                                    : bs.status === 'cancelled' || bs.status === 'rejected'
+                                      ? null
+                                      : formatCurrencyMXN(expectedAmount)}
+                                </p>
+                                {canPay && (
+                                  <button
+                                    onClick={() => handlePayExistingSupplement(bs, booking)}
+                                    className="mt-2 btn btn-sm bg-teal-600 text-white hover:bg-teal-700 text-xs px-3 py-1.5"
+                                  >
+                                    Pagar
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+
+                {/* Tab: Disponibles */}
+                {supplementsModal.activeTab === 'disponibles' && (
+                  <div className="space-y-3">
+                    {available.length === 0 ? (
+                      <p className="text-sm text-gray-500 text-center py-6">No hay suplementos disponibles para este tour.</p>
+                    ) : (
+                      <>
+                        <p className="text-xs text-gray-500 mb-1">Extras que puedes agregar a tu reserva actual.</p>
+                        {available.map((ts: any) => {
+                          const activeCount = mySupplements.filter(
+                            (bs: any) => bs.tour_supplement_id === ts.id && !['rejected', 'cancelled'].includes(bs.status)
+                          ).length;
+                          return (
+                            <div key={ts.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-gray-900 text-sm">{ts.name}</p>
+                                  {ts.description && <p className="text-xs text-gray-500 mt-0.5">{ts.description}</p>}
+                                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                                    <span className="text-sm font-bold text-teal-700">{formatCurrencyMXN(Number(ts.price))} / unidad</span>
+                                    {ts.requires_approval && (
+                                      <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Requiere aprobacion</span>
+                                    )}
+                                    {!ts.is_cancellable && (
+                                      <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">No cancelable</span>
+                                    )}
+                                  </div>
+                                  {activeCount > 0 && (
+                                    <p className="text-xs text-teal-600 mt-1">Ya tienes {activeCount} activo{activeCount > 1 ? 's' : ''}</p>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setSupplementsModal(prev => ({ ...prev, open: false }));
+                                    handleOpenSupplementRequest(booking, ts);
+                                  }}
+                                  className="btn btn-sm bg-teal-600 text-white hover:bg-teal-700 text-xs px-3 flex items-center gap-1 flex-shrink-0"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  Solicitar
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Direct Supplement Payment Modal */}
+      {supplementDirectPayModal.open && supplementDirectPayModal.bookingSupplement && supplementDirectPayModal.booking && (() => {
+        const bs = supplementDirectPayModal.bookingSupplement;
+        const totalAmount = Number(bs.unit_price || 0) * Number(bs.quantity || 1);
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-100">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <Tag className="w-5 h-5 text-teal-600" />
+                    Pagar Suplemento
+                  </h3>
+                  <button onClick={() => setSupplementDirectPayModal(prev => ({ ...prev, open: false }))} className="text-gray-400 hover:text-gray-600">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="bg-teal-50 rounded-xl p-4">
+                  <p className="font-semibold text-gray-900">{bs.tour_supplements?.name}</p>
+                  <p className="text-sm text-gray-500 mt-0.5">Cantidad: {bs.quantity}</p>
+                  <p className="text-lg font-bold text-teal-700 mt-2">{formatCurrencyMXN(totalAmount)}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Metodo de Pago</label>
+                  <div className="space-y-2">
+                    {[
+                      { id: 'stripe', label: 'Tarjeta de credito / debito' },
+                      { id: 'toursred_cash', label: `ToursRed Cash (Saldo: ${formatCurrencyMXN(supplementDirectPayModal.walletBalance)})` },
+                      { id: 'points', label: `Puntos ToursRed (${supplementDirectPayModal.pointsBalance} pts = ${formatCurrencyMXN(supplementDirectPayModal.pointsValueMxn)})` },
+                      { id: 'mercadopago', label: 'MercadoPago' },
+                      { id: 'paypal', label: 'PayPal' },
+                    ].map(method => (
+                      <label key={method.id} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="direct_sup_payment_method"
+                          value={method.id}
+                          checked={supplementDirectPayModal.selectedMethod === method.id}
+                          onChange={() => setSupplementDirectPayModal(prev => ({ ...prev, selectedMethod: method.id as any }))}
+                          className="w-4 h-4 text-teal-600"
+                        />
+                        <span className="text-sm text-gray-700">{method.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {supplementDirectPayModal.error && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                    {supplementDirectPayModal.error}
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => setSupplementDirectPayModal(prev => ({ ...prev, open: false }))}
+                    className="btn btn-outline flex-1"
+                    disabled={supplementDirectPayModal.isProcessing}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleProcessDirectSupplementPayment}
+                    disabled={supplementDirectPayModal.isProcessing}
+                    className="btn flex-1 bg-teal-600 text-white hover:bg-teal-700"
+                  >
+                    {supplementDirectPayModal.isProcessing ? 'Procesando...' : 'Confirmar y pagar'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
