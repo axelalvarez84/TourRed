@@ -159,6 +159,13 @@ const TravelerBookings: React.FC = () => {
     bookingId: string;
     amount: number;
   } | null>(null);
+  const [mpSupplementBrickModal, setMpSupplementBrickModal] = useState<{
+    open: boolean;
+    preferenceId: string;
+    publicKey: string;
+    supplementId: string;
+    amount: number;
+  } | null>(null);
   const [rescheduleModal, setRescheduleModal] = useState<{
     open: boolean;
     booking: Booking | null;
@@ -1395,6 +1402,31 @@ const TravelerBookings: React.FC = () => {
     setSupplementDirectPayModal(prev => ({ ...prev, isProcessing: true, error: '' }));
     try {
       const { data: { session } } = await supabase.auth.getSession();
+
+      if (selectedMethod === 'mercadopago') {
+        const totalAmount = Number(bookingSupplement.unit_price || 0) * Number(bookingSupplement.quantity || 1);
+        const mpRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-mercadopago-preference`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+            'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            bookingId: booking.id,
+            customerEmail: (await supabase.auth.getUser()).data.user?.email,
+            amount: totalAmount,
+            description: `Suplemento: ${bookingSupplement.tour_supplements?.name || 'Suplemento'}`,
+            context: 'supplement',
+          }),
+        });
+        const mpData = await mpRes.json();
+        if (!mpRes.ok || !mpData.success) throw new Error(mpData.error || 'Error al crear preferencia de MercadoPago');
+        setSupplementDirectPayModal(prev => ({ ...prev, open: false, isProcessing: false }));
+        setMpSupplementBrickModal({ open: true, preferenceId: mpData.preference_id, publicKey: mpData.public_key, supplementId: bookingSupplement.id, amount: totalAmount });
+        return;
+      }
+
       const payRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-supplement-payment`, {
         method: 'POST',
         headers: {
@@ -1459,6 +1491,30 @@ const TravelerBookings: React.FC = () => {
       if (!res.ok) throw new Error(data.error || 'Error solicitando suplemento');
 
       if (data.status === 'pending_payment' || data.status === 'approved') {
+        if (selectedMethod === 'mercadopago') {
+          const totalAmount = Number(supplement.price || 0) * quantity;
+          const mpRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-mercadopago-preference`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token}`,
+              'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({
+              bookingId: booking.id,
+              customerEmail: (await supabase.auth.getUser()).data.user?.email,
+              amount: totalAmount,
+              description: `Suplemento: ${supplement.name || 'Suplemento'}`,
+              context: 'supplement',
+            }),
+          });
+          const mpData = await mpRes.json();
+          if (!mpRes.ok || !mpData.success) throw new Error(mpData.error || 'Error al crear preferencia de MercadoPago');
+          setSupplementPaymentModal(prev => ({ ...prev, open: false, isProcessing: false }));
+          setMpSupplementBrickModal({ open: true, preferenceId: mpData.preference_id, publicKey: mpData.public_key, supplementId: data.booking_supplement_id, amount: totalAmount });
+          return;
+        }
+
         // Proceed to process payment for this supplement
         const payRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-supplement-payment`, {
           method: 'POST',
@@ -3075,6 +3131,45 @@ const TravelerBookings: React.FC = () => {
                 }}
                 onError={(err) => {
                   setMpBrickModal(null);
+                  alert(`Error en el pago: ${err}`);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mpSupplementBrickModal?.open && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Completa tu pago</h2>
+                  <p className="text-sm text-gray-500 mt-1">Pago seguro con MercadoPago</p>
+                </div>
+                <button
+                  onClick={() => setMpSupplementBrickModal(null)}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+              <MercadoPagoBrick
+                preferenceId={mpSupplementBrickModal.preferenceId}
+                publicKey={mpSupplementBrickModal.publicKey}
+                amount={mpSupplementBrickModal.amount}
+                supplementId={mpSupplementBrickModal.supplementId}
+                onSuccess={() => {
+                  setMpSupplementBrickModal(null);
+                  fetchBookings();
+                }}
+                onPending={() => {
+                  setMpSupplementBrickModal(null);
+                  fetchBookings();
+                }}
+                onError={(err) => {
+                  setMpSupplementBrickModal(null);
                   alert(`Error en el pago: ${err}`);
                 }}
               />

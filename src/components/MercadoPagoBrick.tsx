@@ -27,7 +27,8 @@ interface MercadoPagoBrickProps {
   preferenceId: string;
   publicKey: string;
   amount: number;
-  bookingId: string;
+  bookingId?: string;
+  supplementId?: string;
   onSuccess: () => void;
   onError: (error: string) => void;
   onPending?: () => void;
@@ -44,6 +45,7 @@ export default function MercadoPagoBrick({
   publicKey,
   amount,
   bookingId,
+  supplementId,
   onSuccess,
   onError,
   onPending,
@@ -135,6 +137,31 @@ export default function MercadoPagoBrick({
             onSubmit: async ({ formData }: any) => {
               try {
                 const { data: { session } } = await supabase.auth.getSession();
+
+                let result: any;
+                if (supplementId) {
+                  const response = await fetch(
+                    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-supplement-payment`,
+                    {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                        'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                      },
+                      body: JSON.stringify({
+                        booking_supplement_id: supplementId,
+                        payment_method: 'mercadopago',
+                        mp_form_data: formData,
+                      }),
+                    }
+                  );
+                  result = await response.json();
+                  if (!response.ok || result.error) throw new Error(result.error || 'Error al procesar el pago');
+                  onSuccess();
+                  return;
+                }
+
                 const response = await fetch(
                   `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-mercadopago-brick-payment`,
                   {
@@ -147,7 +174,7 @@ export default function MercadoPagoBrick({
                   }
                 );
 
-                const result = await response.json();
+                result = await response.json();
 
                 if (!response.ok || result.error) {
                   throw new Error(result.error || 'Error al procesar el pago');
