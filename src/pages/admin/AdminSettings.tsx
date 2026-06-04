@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard, Crown, Gift, Award, Users, Globe, FileText, Shield, BookOpen, Link, Unlink, RefreshCw, ExternalLink } from 'lucide-react';
+import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard, Crown, Gift, Award, Users, Globe, FileText, Shield, BookOpen, Link, Unlink, RefreshCw, ExternalLink, Tag } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../utils/formatCurrency';
 
@@ -50,6 +50,7 @@ interface PlatformSettings {
   odoo_api_key_encrypted: string;
   odoo_database: string;
   travel_insurance_price_per_day_per_traveler: number;
+  supplement_commission_percentage: number;
 }
 
 const AdminSettings: React.FC = () => {
@@ -99,6 +100,7 @@ const AdminSettings: React.FC = () => {
     odoo_api_key_encrypted: '',
     odoo_database: '',
     travel_insurance_price_per_day_per_traveler: 79,
+    supplement_commission_percentage: 10,
   });
   const [zohoStatus, setZohoStatus] = useState<{
     connected: boolean;
@@ -279,6 +281,7 @@ const AdminSettings: React.FC = () => {
             odoo_api_key_encrypted: platformSettings.odoo_api_key_encrypted,
             odoo_database: platformSettings.odoo_database,
             travel_insurance_price_per_day_per_traveler: platformSettings.travel_insurance_price_per_day_per_traveler,
+            supplement_commission_percentage: platformSettings.supplement_commission_percentage,
             updated_at: new Date().toISOString(),
             updated_by: user?.id
           })
@@ -317,7 +320,7 @@ const AdminSettings: React.FC = () => {
 
   const handlePlatformChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    const numericFields = ['service_charge_percentage', 'agency_commission_percentage', 'membership_monthly_price', 'membership_annual_price', 'default_max_referrals_per_user', 'referral_bonus_points'];
+    const numericFields = ['service_charge_percentage', 'agency_commission_percentage', 'supplement_commission_percentage', 'membership_monthly_price', 'membership_annual_price', 'default_max_referrals_per_user', 'referral_bonus_points'];
     const booleanFields = ['referral_program_enabled', 'mercadopago_enabled', 'paypal_enabled'];
     setPlatformSettings(prev => ({
       ...prev,
@@ -445,6 +448,49 @@ const AdminSettings: React.FC = () => {
                 La agencia recibe ${formatCurrency(1000 - (5000 * platformSettings.agency_commission_percentage / 100))} del anticipo
               </p>
             </div>
+          </div>
+        </div>
+
+        {/* Comision de Suplementos */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <Tag className="w-6 h-6 text-teal-600" />
+            <h2 className="text-xl font-semibold text-gray-900">Comision de Suplementos Adicionales</h2>
+          </div>
+
+          <div className="bg-teal-50 border border-teal-200 rounded-md p-4 mb-6 text-sm text-teal-800">
+            <p className="font-semibold mb-1">Comision de plataforma sobre suplementos post-reserva</p>
+            <p className="text-xs text-teal-700">
+              Los suplementos son extras que el viajero compra despues de confirmar su reserva (ej. asiento preferente, equipaje adicional). Esta comision se aplica sobre el subtotal del suplemento.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="supplement_commission_percentage" className="block text-sm font-medium text-gray-700 mb-1">
+              Comision de Suplementos (%)
+            </label>
+            <p className="text-xs text-gray-500 mb-2">
+              Porcentaje que la plataforma retiene del precio del suplemento como comision.
+            </p>
+            <div className="relative max-w-xs">
+              <input
+                type="number"
+                id="supplement_commission_percentage"
+                name="supplement_commission_percentage"
+                value={platformSettings.supplement_commission_percentage}
+                onChange={handlePlatformChange}
+                min="0"
+                max="100"
+                step="0.01"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 pr-10"
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <Percent className="w-4 h-4 text-gray-400" />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Ejemplo: Suplemento de $500. Comision {platformSettings.supplement_commission_percentage}% = ${(500 * platformSettings.supplement_commission_percentage / 100).toFixed(2)} para la plataforma.
+            </p>
           </div>
         </div>
 

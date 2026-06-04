@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X, CreditCard as Edit, UserCheck, XCircle, CalendarX, Check, Wallet, Lock, UserMinus, Car, Globe } from 'lucide-react';
+import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X, CreditCard as Edit, UserCheck, XCircle, CalendarX, Check, Wallet, Lock, UserMinus, Car, Globe, Tag, Plus, AlertTriangle } from 'lucide-react';
 import SeatReselectionModal from '../../components/SeatReselectionModal';
 import { useAuth } from '../../context/AuthContext';
 import { getUserBookings, parseDateFromDB, supabase, calculateCancellationPolicy, processCancellation, calculatePartialCancellationPolicy, processPartialCancellation, PartialCancellationTraveler } from '../../lib/supabase';
@@ -23,6 +23,35 @@ const TravelerBookings: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [bookingOptionalServices, setBookingOptionalServices] = useState<Record<string, any[]>>({});
+  const [bookingSupplements, setBookingSupplements] = useState<Record<string, any[]>>({});
+  const [tourSupplements, setTourSupplements] = useState<Record<string, any[]>>({});
+  const [supplementPaymentModal, setSupplementPaymentModal] = useState<{
+    open: boolean;
+    supplement: any | null;
+    booking: Booking | null;
+    quantity: number;
+    availableCapacity: number;
+    isProcessing: boolean;
+    error: string;
+    walletBalance: number;
+    pointsBalance: number;
+    pointsValueMxn: number;
+    selectedMethod: 'toursred_cash' | 'points' | 'stripe' | 'mercadopago' | 'paypal';
+    cashToUse: number;
+  }>({
+    open: false,
+    supplement: null,
+    booking: null,
+    quantity: 1,
+    availableCapacity: 0,
+    isProcessing: false,
+    error: '',
+    walletBalance: 0,
+    pointsBalance: 0,
+    pointsValueMxn: 0,
+    selectedMethod: 'stripe',
+    cashToUse: 0,
+  });
   const [reviewModal, setReviewModal] = useState<{
     open: boolean;
     booking: Booking | null;
@@ -252,6 +281,44 @@ const TravelerBookings: React.FC = () => {
             grouped[bos.booking_id].push(bos);
           }
           setBookingOptionalServices(grouped);
+        }
+
+        // Load supplements for all bookings
+        const { data: suppData } = await supabase
+          .from('booking_supplements')
+          .select(`*, tour_supplements(name, description, price, is_cancellable, requires_approval)`)
+          .in('booking_id', ids)
+          .order('requested_at', { ascending: false });
+
+        if (suppData) {
+          const groupedSupp: Record<string, any[]> = {};
+          for (const bs of suppData) {
+            if (!groupedSupp[bs.booking_id]) groupedSupp[bs.booking_id] = [];
+            groupedSupp[bs.booking_id].push(bs);
+          }
+          setBookingSupplements(groupedSupp);
+        }
+
+        // Load available tour supplements for active bookings
+        const activeTourIds = [...new Set(
+          data.filter((b: any) => ['confirmed', 'pending'].includes(b.status)).map((b: any) => b.tour_id)
+        )];
+        if (activeTourIds.length > 0) {
+          const { data: tourSupData } = await supabase
+            .from('tour_supplements')
+            .select('*')
+            .in('tour_id', activeTourIds)
+            .eq('is_active', true)
+            .order('display_order');
+
+          if (tourSupData) {
+            const groupedTourSup: Record<string, any[]> = {};
+            for (const ts of tourSupData) {
+              if (!groupedTourSup[ts.tour_id]) groupedTourSup[ts.tour_id] = [];
+              groupedTourSup[ts.tour_id].push(ts);
+            }
+            setTourSupplements(groupedTourSup);
+          }
         }
 
         if (slotReschedulesResult.data && slotReschedulesResult.data.length > 0) {
@@ -1236,6 +1303,88 @@ const TravelerBookings: React.FC = () => {
     );
   };
 
+  const handleOpenSupplementRequest = async (booking: Booking, supplement: any) => {
+    const { data: walletData } = await supabase
+      .from('toursred_cash_wallets')
+      .select('balance')
+      .eq('user_id', user!.id)
+      .maybeSingle();
+
+    const { data: pointsData } = await supabase
+      .from('toursred_points_wallets')
+      .select('balance')
+      .eq('user_id', user!.id)
+      .maybeSingle();
+
+    const { data: capData } = await supabase
+      .rpc('get_supplement_available_capacity', { p_supplement_id: supplement.id });
+
+    setSupplementPaymentModal({
+      open: true,
+      supplement,
+      booking,
+      quantity: 1,
+      availableCapacity: capData ?? 0,
+      isProcessing: false,
+      error: '',
+      walletBalance: walletData?.balance ?? 0,
+      pointsBalance: pointsData?.balance ?? 0,
+      pointsValueMxn: Math.floor((pointsData?.balance ?? 0) / 100),
+      selectedMethod: 'stripe',
+      cashToUse: 0,
+    });
+  };
+
+  const handleRequestSupplement = async () => {
+    const { supplement, booking, quantity, selectedMethod, cashToUse } = supplementPaymentModal;
+    if (!supplement || !booking) return;
+
+    setSupplementPaymentModal(prev => ({ ...prev, isProcessing: true, error: '' }));
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/request-supplement`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ booking_id: booking.id, tour_supplement_id: supplement.id, quantity }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error solicitando suplemento');
+
+      if (data.status === 'pending_payment' || data.status === 'approved') {
+        // Proceed to process payment for this supplement
+        const payRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-supplement-payment`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+            'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            booking_supplement_id: data.booking_supplement_id,
+            payment_method: selectedMethod,
+            toursred_cash_amount: selectedMethod === 'toursred_cash' ? cashToUse : 0,
+          }),
+        });
+        const payData = await payRes.json();
+        if (!payRes.ok && !payData.client_secret) throw new Error(payData.error || 'Error procesando pago');
+
+        if (payData.client_secret) {
+          setSupplementPaymentModal(prev => ({ ...prev, isProcessing: false, error: 'Redireccionando a Stripe...' }));
+          return;
+        }
+      }
+
+      setSupplementPaymentModal(prev => ({ ...prev, open: false }));
+      await fetchBookings();
+    } catch (err: any) {
+      setSupplementPaymentModal(prev => ({ ...prev, isProcessing: false, error: err.message }));
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -1539,6 +1688,92 @@ const TravelerBookings: React.FC = () => {
                       )}
                     </div>
                   </div>
+
+                  {/* My Supplement Requests */}
+                  {bookingSupplements[booking.id] && bookingSupplements[booking.id].length > 0 && (
+                    <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 mb-4">
+                      <h4 className="text-sm font-semibold text-teal-800 mb-2 flex items-center gap-2">
+                        <Tag className="w-4 h-4" />
+                        Mis Suplementos Solicitados
+                      </h4>
+                      <div className="space-y-2">
+                        {bookingSupplements[booking.id].map((bs: any) => {
+                          const statusConfig: Record<string, { label: string; color: string }> = {
+                            pending_approval: { label: 'Esperando aprobacion de la agencia', color: 'bg-amber-100 text-amber-700' },
+                            approved: { label: 'Aprobado — pendiente de pago', color: 'bg-blue-100 text-blue-700' },
+                            rejected: { label: 'Rechazado', color: 'bg-red-100 text-red-700' },
+                            pending_payment: { label: 'Pendiente de pago', color: 'bg-blue-100 text-blue-700' },
+                            paid: { label: 'Pagado', color: 'bg-green-100 text-green-700' },
+                            cancelled: { label: 'Cancelado / Expirado', color: 'bg-gray-100 text-gray-500' },
+                          };
+                          const sc = statusConfig[bs.status] || { label: bs.status, color: 'bg-gray-100 text-gray-500' };
+                          return (
+                            <div key={bs.id} className="flex items-center justify-between text-sm bg-white rounded px-3 py-2 border border-teal-100">
+                              <div>
+                                <span className="font-medium text-gray-800">{bs.tour_supplements?.name}</span>
+                                <span className="text-gray-500 text-xs ml-1">× {bs.quantity}</span>
+                                <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${sc.color}`}>{sc.label}</span>
+                                {bs.rejection_note && (
+                                  <p className="text-xs text-red-600 mt-0.5">Motivo: {bs.rejection_note}</p>
+                                )}
+                              </div>
+                              {bs.total_paid != null && (
+                                <span className="font-semibold text-teal-700 ml-2">{formatCurrencyMXN(Number(bs.total_paid))}</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Available Supplements */}
+                  {(booking.status === 'confirmed' || booking.status === 'pending') &&
+                   tourSupplements[booking.tour_id] &&
+                   tourSupplements[booking.tour_id].length > 0 && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                        <Tag className="w-4 h-4" />
+                        Suplementos Disponibles
+                      </h4>
+                      <p className="text-xs text-gray-500 mb-3">Extras que puedes agregar a tu reserva actual.</p>
+                      <div className="space-y-2">
+                        {tourSupplements[booking.tour_id].map((ts: any) => {
+                          const alreadyRequested = (bookingSupplements[booking.id] || []).some(
+                            (bs: any) => bs.tour_supplement_id === ts.id && !['rejected', 'cancelled'].includes(bs.status)
+                          );
+                          return (
+                            <div key={ts.id} className="flex items-center justify-between bg-white rounded px-3 py-2 border border-gray-200">
+                              <div>
+                                <span className="text-sm font-medium text-gray-800">{ts.name}</span>
+                                {ts.description && <p className="text-xs text-gray-500">{ts.description}</p>}
+                                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                  <span className="text-xs font-semibold text-teal-700">{formatCurrencyMXN(Number(ts.price))} / unidad</span>
+                                  {ts.requires_approval && (
+                                    <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Requiere aprobacion</span>
+                                  )}
+                                  {!ts.is_cancellable && (
+                                    <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">No cancelable</span>
+                                  )}
+                                </div>
+                              </div>
+                              {alreadyRequested ? (
+                                <span className="text-xs text-gray-400 ml-3">Ya solicitado</span>
+                              ) : (
+                                <button
+                                  onClick={() => handleOpenSupplementRequest(booking, ts)}
+                                  className="btn btn-sm bg-teal-600 text-white hover:bg-teal-700 text-xs px-3 ml-3 flex items-center gap-1 flex-shrink-0"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  Solicitar
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Actions */}
                   <div className="flex flex-col sm:flex-row gap-3">
@@ -3167,6 +3402,127 @@ const TravelerBookings: React.FC = () => {
           }}
           onClose={() => setSeatReselectionModal(null)}
         />
+      )}
+
+      {/* Supplement Request Modal */}
+      {supplementPaymentModal.open && supplementPaymentModal.supplement && supplementPaymentModal.booking && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Tag className="w-5 h-5 text-teal-600" />
+                  Solicitar Suplemento
+                </h3>
+                <button onClick={() => setSupplementPaymentModal(prev => ({ ...prev, open: false }))} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-teal-50 rounded-lg p-3">
+                <p className="font-semibold text-gray-900">{supplementPaymentModal.supplement.name}</p>
+                {supplementPaymentModal.supplement.description && (
+                  <p className="text-sm text-gray-500 mt-0.5">{supplementPaymentModal.supplement.description}</p>
+                )}
+                <p className="text-sm font-semibold text-teal-700 mt-1">{formatCurrencyMXN(Number(supplementPaymentModal.supplement.price))} / unidad</p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {supplementPaymentModal.supplement.requires_approval && (
+                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Requiere aprobacion de la agencia (48h)</span>
+                  )}
+                  {!supplementPaymentModal.supplement.is_cancellable && (
+                    <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      No cancelable
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Cantidad</label>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setSupplementPaymentModal(prev => ({ ...prev, quantity: Math.max(1, prev.quantity - 1) }))}
+                    className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                  >-</button>
+                  <span className="font-semibold text-lg w-8 text-center">{supplementPaymentModal.quantity}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSupplementPaymentModal(prev => ({
+                      ...prev,
+                      quantity: supplementPaymentModal.availableCapacity > 0
+                        ? Math.min(supplementPaymentModal.availableCapacity, prev.quantity + 1)
+                        : prev.quantity + 1
+                    }))}
+                    className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                  >+</button>
+                </div>
+                {supplementPaymentModal.availableCapacity > 0 && (
+                  <p className="text-xs text-gray-400 mt-1">Disponibles: {supplementPaymentModal.availableCapacity}</p>
+                )}
+              </div>
+
+              {!supplementPaymentModal.supplement.requires_approval && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Metodo de Pago</label>
+                  <div className="space-y-2">
+                    {[
+                      { id: 'stripe', label: 'Tarjeta de credito / debito' },
+                      { id: 'toursred_cash', label: `ToursRed Cash (Saldo: ${formatCurrencyMXN(supplementPaymentModal.walletBalance)})` },
+                      { id: 'points', label: `Puntos ToursRed (${supplementPaymentModal.pointsBalance} pts = ${formatCurrencyMXN(supplementPaymentModal.pointsValueMxn)})` },
+                      { id: 'mercadopago', label: 'MercadoPago' },
+                      { id: 'paypal', label: 'PayPal' },
+                    ].map(method => (
+                      <label key={method.id} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="sup_payment_method"
+                          value={method.id}
+                          checked={supplementPaymentModal.selectedMethod === method.id}
+                          onChange={() => setSupplementPaymentModal(prev => ({ ...prev, selectedMethod: method.id as any }))}
+                          className="w-4 h-4 text-teal-600"
+                        />
+                        <span className="text-sm text-gray-700">{method.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {supplementPaymentModal.error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                  {supplementPaymentModal.error}
+                </div>
+              )}
+
+              {supplementPaymentModal.supplement.requires_approval && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                  Al confirmar, tu solicitud sera enviada a la agencia para aprobacion. Una vez aprobada, tendras 48 horas para completar el pago. Podras elegir el metodo de pago en ese momento.
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setSupplementPaymentModal(prev => ({ ...prev, open: false }))}
+                  className="btn btn-outline flex-1"
+                  disabled={supplementPaymentModal.isProcessing}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleRequestSupplement}
+                  disabled={supplementPaymentModal.isProcessing}
+                  className="btn flex-1 bg-teal-600 text-white hover:bg-teal-700"
+                >
+                  {supplementPaymentModal.isProcessing ? 'Procesando...' : supplementPaymentModal.supplement.requires_approval ? 'Enviar solicitud' : 'Confirmar y pagar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

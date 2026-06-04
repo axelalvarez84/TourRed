@@ -198,6 +198,55 @@ Deno.serve(async (req: Request) => {
           throw new Error("Error actualizando reserva");
         }
 
+        // Refund all paid supplements to ToursRed Cash (100% regardless of is_cancellable)
+        const { data: paidSupplements } = await supabase
+          .from("booking_supplements")
+          .select("id, total_paid, tour_supplements(name)")
+          .eq("booking_id", booking.id)
+          .eq("status", "paid");
+
+        if (paidSupplements && paidSupplements.length > 0) {
+          for (const sup of paidSupplements) {
+            const supRefundAmount = Number(sup.total_paid) || 0;
+            if (supRefundAmount <= 0) continue;
+
+            const { data: updatedWalletForSup } = await supabase
+              .from("toursred_cash_wallets")
+              .select("id, balance")
+              .eq("user_id", booking.user_id)
+              .maybeSingle();
+
+            const walletId = updatedWalletForSup?.id || wallet.data?.id;
+            const currentBalance = updatedWalletForSup?.balance ?? wallet.data?.balance ?? 0;
+            const newSupBalance = Number(currentBalance) + supRefundAmount;
+
+            await supabase.from("toursred_cash_transactions").insert({
+              wallet_id: walletId,
+              user_id: booking.user_id,
+              amount: supRefundAmount,
+              balance_after: newSupBalance,
+              type: "refund",
+              description: `Reembolso suplemento "${(sup.tour_supplements as any)?.name}" por cancelación del tour: ${tour.name}`,
+              reference_id: sup.id,
+              reference_type: "supplement_cancellation"
+            });
+
+            await supabase.from("toursred_cash_wallets")
+              .update({ balance: newSupBalance })
+              .eq("id", walletId);
+
+            await supabase.from("booking_supplements").update({
+              status: "cancelled",
+              cancelled_at: new Date().toISOString(),
+              cancelled_by: "tour_cancellation",
+              refund_amount: supRefundAmount,
+              updated_at: new Date().toISOString(),
+            }).eq("id", sup.id);
+
+            totalRefunded += supRefundAmount;
+          }
+        }
+
         // Generar póliza contable por cada reserva cancelada
         if (bookingCancellationRecord) {
           try {

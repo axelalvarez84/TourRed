@@ -21,6 +21,17 @@ interface OptionalService {
   is_active: boolean;
 }
 
+interface TourSupplement {
+  id?: string;
+  name: string;
+  description: string;
+  price: string;
+  max_capacity: string;
+  requires_approval: boolean;
+  is_cancellable: boolean;
+  is_active: boolean;
+}
+
 interface ScheduleDraft {
   id?: string;
   departure_time: string;
@@ -269,6 +280,7 @@ const AgencyTours: React.FC = () => {
   const [tourImageData, setTourImageData] = useState<{base64: string, type: string, size: number} | null>(null);
   const [hasDraft, setHasDraft] = useState(false);
   const [optionalServices, setOptionalServices] = useState<OptionalService[]>([]);
+  const [supplements, setSupplements] = useState<TourSupplement[]>([]);
 
   const [schedulesDraft, setSchedulesDraft] = useState<ScheduleDraft[]>([]);
   const [scheduleForm, setScheduleForm] = useState<ScheduleDraft>({
@@ -516,6 +528,7 @@ const AgencyTours: React.FC = () => {
     setSelectedDeparturePoints([]);
     setTourImageData(null);
     setOptionalServices([]);
+    setSupplements([]);
     setSchedulesDraft([]);
     setScheduleForm({ departure_time: '', label: '', slot_capacity: '', days_of_week: [], is_active: true });
     setShowScheduleForm(false);
@@ -735,6 +748,33 @@ const AgencyTours: React.FC = () => {
     } catch (err) {
       console.error('Error loading optional services:', err);
       setOptionalServices([]);
+    }
+
+    // Load supplements for this tour
+    try {
+      const { data: supplementsData } = await supabase
+        .from('tour_supplements')
+        .select('*')
+        .eq('tour_id', tour.id)
+        .order('display_order');
+
+      if (supplementsData) {
+        setSupplements(supplementsData.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          description: s.description || '',
+          price: s.price.toString(),
+          max_capacity: s.max_capacity ? s.max_capacity.toString() : '',
+          requires_approval: s.requires_approval,
+          is_cancellable: s.is_cancellable,
+          is_active: s.is_active,
+        })));
+      } else {
+        setSupplements([]);
+      }
+    } catch (err) {
+      console.error('Error loading supplements:', err);
+      setSupplements([]);
     }
 
     // Load schedules for receptivo tours
@@ -1558,6 +1598,28 @@ const AgencyTours: React.FC = () => {
     setOptionalServices(updated);
   };
 
+  const addSupplement = () => {
+    setSupplements([...supplements, {
+      name: '',
+      description: '',
+      price: '',
+      max_capacity: '',
+      requires_approval: false,
+      is_cancellable: true,
+      is_active: true,
+    }]);
+  };
+
+  const removeSupplement = (index: number) => {
+    setSupplements(supplements.filter((_, i) => i !== index));
+  };
+
+  const updateSupplement = (index: number, field: keyof TourSupplement, value: any) => {
+    const updated = [...supplements];
+    updated[index] = { ...updated[index], [field]: value };
+    setSupplements(updated);
+  };
+
   const handleDeparturePointChange = (index: number, value: string) => {
     const newDeparturePoints = [...departurePoints];
     newDeparturePoints[index] = value;
@@ -1918,6 +1980,57 @@ const AgencyTours: React.FC = () => {
           display_order: i + 1,
         }));
         await supabase.from('tour_optional_services').insert(toInsert);
+      }
+
+      // Save supplements
+      const validSupplements = supplements.filter(s => s.name.trim() && s.price);
+      if (editingTour) {
+        const { data: existingSupplements } = await supabase
+          .from('tour_supplements')
+          .select('id')
+          .eq('tour_id', tourId);
+
+        const existingSupIds = new Set(existingSupplements?.map((s: any) => s.id) || []);
+        const incomingSupIds = new Set(validSupplements.filter(s => s.id).map(s => s.id!));
+
+        const toDeleteSup = Array.from(existingSupIds).filter(id => !incomingSupIds.has(id));
+        if (toDeleteSup.length > 0) {
+          await supabase.from('tour_supplements').delete().in('id', toDeleteSup);
+        }
+
+        for (let i = 0; i < validSupplements.length; i++) {
+          const sup = validSupplements[i];
+          const payload = {
+            tour_id: tourId,
+            name: sup.name.trim(),
+            description: sup.description.trim() || null,
+            price: parseFloat(sup.price),
+            max_capacity: sup.max_capacity ? parseInt(sup.max_capacity) : null,
+            requires_approval: sup.requires_approval,
+            is_cancellable: sup.is_cancellable,
+            is_active: sup.is_active,
+            display_order: i + 1,
+            updated_at: new Date().toISOString(),
+          };
+          if (sup.id) {
+            await supabase.from('tour_supplements').update(payload).eq('id', sup.id);
+          } else {
+            await supabase.from('tour_supplements').insert(payload);
+          }
+        }
+      } else if (validSupplements.length > 0) {
+        const toInsertSup = validSupplements.map((sup, i) => ({
+          tour_id: tourId,
+          name: sup.name.trim(),
+          description: sup.description.trim() || null,
+          price: parseFloat(sup.price),
+          max_capacity: sup.max_capacity ? parseInt(sup.max_capacity) : null,
+          requires_approval: sup.requires_approval,
+          is_cancellable: sup.is_cancellable,
+          is_active: sup.is_active,
+          display_order: i + 1,
+        }));
+        await supabase.from('tour_supplements').insert(toInsertSup);
       }
 
       // Save schedules for receptivo tours
@@ -3846,14 +3959,171 @@ const AgencyTours: React.FC = () => {
               </div>
             </div>
 
-            {/* SECCIÓN 7 — Promociones Grupales */}
+            {/* SECCIÓN 7 — Suplementos Adicionales */}
+            <div className="bg-white rounded-xl shadow-sm border border-teal-100 overflow-hidden">
+              <div className="bg-teal-600 px-5 py-3 flex items-center gap-2">
+                <div className="bg-white/20 rounded-lg p-1.5">
+                  <Tag className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold text-sm">Paso 7 — Suplementos Adicionales</h3>
+                  <p className="text-teal-100 text-xs">Extras que el viajero puede solicitar <strong>después</strong> de reservar (asientos preferentes, equipaje, habitación superior, etc.)</p>
+                </div>
+                <span className="ml-auto bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">Opcional</span>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 flex gap-2 text-sm text-teal-800">
+                  <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <p>
+                    A diferencia de los servicios opcionales (que se agregan <em>al reservar</em>), los suplementos son extras que el viajero puede solicitar <em>después</em> de tener una reserva confirmada. Puedes requerir tu aprobación antes de que paguen, o permitir el pago directo. Si cancelas el tour, todos los suplementos pagados se reembolsan en ToursRed Cash al 100%.
+                  </p>
+                </div>
+
+                {supplements.length === 0 && (
+                  <p className="text-sm text-gray-500 text-center py-2">No hay suplementos definidos. Haz clic en "Agregar suplemento" para crear uno.</p>
+                )}
+
+                {supplements.map((sup, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Suplemento {index + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeSupplement(index)}
+                        className="text-red-500 hover:text-red-700 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          Nombre <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={sup.name}
+                          onChange={(e) => updateSupplement(index, 'name', e.target.value)}
+                          className="input text-sm"
+                          placeholder="Ej: Asiento preferente, Equipaje extra, Habitación doble"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          Descripción breve
+                        </label>
+                        <input
+                          type="text"
+                          value={sup.description}
+                          onChange={(e) => updateSupplement(index, 'description', e.target.value)}
+                          className="input text-sm"
+                          placeholder="Información visible al viajero"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          Precio por unidad (MXN) <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium text-sm">$</span>
+                          <input
+                            type="number"
+                            value={sup.price}
+                            onChange={(e) => updateSupplement(index, 'price', e.target.value)}
+                            className="input pl-7 text-sm"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          Cupo máximo
+                        </label>
+                        <input
+                          type="number"
+                          value={sup.max_capacity}
+                          onChange={(e) => updateSupplement(index, 'max_capacity', e.target.value)}
+                          className="input text-sm"
+                          min="1"
+                          placeholder="Sin límite (dejar vacío)"
+                        />
+                        <p className="text-xs text-gray-400 mt-0.5">Vacío = sin límite de cupo</p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3 pt-1">
+                      <label className="flex items-start gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={sup.requires_approval}
+                          onChange={(e) => updateSupplement(index, 'requires_approval', e.target.checked)}
+                          className="mt-0.5 w-4 h-4 text-teal-600 rounded border-gray-300 focus:ring-teal-500"
+                        />
+                        <span className="text-sm text-gray-700">
+                          <span className="font-medium">Requiere tu aprobacion antes del pago</span>
+                          <span className="block text-xs text-gray-500">El viajero solicita el suplemento y debe esperar tu aprobacion para poder pagar. Tienes 48 horas para aprobar o rechazar; si no respondes, la solicitud caduca automaticamente.</span>
+                        </span>
+                      </label>
+
+                      <label className="flex items-start gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!sup.is_cancellable}
+                          onChange={(e) => updateSupplement(index, 'is_cancellable', !e.target.checked)}
+                          className="mt-0.5 w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500"
+                        />
+                        <span className="text-sm text-gray-700">
+                          <span className="font-medium">No cancelable (sin reembolso si el viajero cancela)</span>
+                          <span className="block text-xs text-gray-500">Apropiado para asientos de aerolinea, equipaje adicional u otros con costo fijo irrecuperable. Si <em>tu</em> cancelas el tour, se reembolsa siempre al 100% en ToursRed Cash.</span>
+                        </span>
+                      </label>
+
+                      {!sup.is_cancellable && (
+                        <div className="ml-6 bg-red-50 border border-red-200 rounded-lg p-2 flex gap-2">
+                          <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                          <p className="text-xs text-red-700">
+                            Este suplemento <strong>no se reembolsa</strong> si el viajero cancela su reserva. Asegurate de que el nombre y descripcion sean claros para el viajero.
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={sup.is_active}
+                            onChange={(e) => updateSupplement(index, 'is_active', e.target.checked)}
+                            className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
+                          />
+                          <span className="text-sm text-gray-700 font-medium">Activo (visible al viajero)</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={addSupplement}
+                  className="btn btn-outline btn-sm w-full text-teal-700 border-teal-300 hover:bg-teal-50"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Agregar suplemento adicional
+                </button>
+              </div>
+            </div>
+
+            {/* SECCIÓN 8 — Promociones Grupales */}
             <div className="bg-white rounded-xl shadow-sm border border-rose-100 overflow-hidden">
               <div className="bg-rose-600 px-5 py-3 flex items-center gap-2">
                 <div className="bg-white/20 rounded-lg p-1.5">
                   <Percent className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-white font-semibold text-sm">Paso 7 — Promociones Grupales</h3>
+                  <h3 className="text-white font-semibold text-sm">Paso 8 — Promociones Grupales</h3>
                   <p className="text-rose-100 text-xs">Configura 2x1, 3x2 o precio especial para grupos</p>
                 </div>
                 <span className="ml-auto bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">Opcional</span>

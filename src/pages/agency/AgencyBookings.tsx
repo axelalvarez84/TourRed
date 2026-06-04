@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter, Star, X, User, MessageSquare, UserCheck, UserX, FileSpreadsheet, FileText, Download, QrCode, Car, Globe, Send } from 'lucide-react';
+import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCircle, XCircle, AlertCircle, Search, Filter, Star, X, User, MessageSquare, UserCheck, UserX, FileSpreadsheet, FileText, Download, QrCode, Car, Globe, Send, Tag, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { formatCurrency, formatCurrencyMXN } from '../../utils/formatCurrency';
 import { getAgencyBookings, getTourBookingReport, supabase, parseDateFromDB } from '../../lib/supabase';
@@ -50,6 +50,13 @@ const AgencyBookings: React.FC = () => {
   const [sentMessages, setSentMessages] = useState<any[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [bookingOptionalServices, setBookingOptionalServices] = useState<Record<string, any[]>>({});
+  const [bookingSupplements, setBookingSupplements] = useState<Record<string, any[]>>({});
+  const [supplementAction, setSupplementAction] = useState<{
+    type: 'approve' | 'reject';
+    supplementId: string;
+    isSubmitting: boolean;
+    rejectionNote: string;
+  } | null>(null);
   const [availableTours, setAvailableTours] = useState<any[]>([]);
   const [selectedTourForReport, setSelectedTourForReport] = useState<string>('');
   const [reportData, setReportData] = useState<any>(null);
@@ -101,6 +108,21 @@ const AgencyBookings: React.FC = () => {
             grouped[bos.booking_id].push(bos);
           }
           setBookingOptionalServices(grouped);
+        }
+
+        const { data: suppData } = await supabase
+          .from('booking_supplements')
+          .select(`*, tour_supplements(name, is_cancellable, requires_approval)`)
+          .in('booking_id', ids)
+          .order('requested_at', { ascending: false });
+
+        if (suppData) {
+          const groupedSupp: Record<string, any[]> = {};
+          for (const bs of suppData) {
+            if (!groupedSupp[bs.booking_id]) groupedSupp[bs.booking_id] = [];
+            groupedSupp[bs.booking_id].push(bs);
+          }
+          setBookingSupplements(groupedSupp);
         }
       }
 
@@ -767,6 +789,70 @@ const AgencyBookings: React.FC = () => {
     exportTourReportToPDF(reportData, agencyName);
   };
 
+  const handleApproveSupplementRequest = async (supplementId: string) => {
+    setSupplementAction({ type: 'approve', supplementId, isSubmitting: true, rejectionNote: '' });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/approve-supplement`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ booking_supplement_id: supplementId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error aprobando suplemento');
+
+      setBookingSupplements(prev => {
+        const updated = { ...prev };
+        for (const bookingId in updated) {
+          updated[bookingId] = updated[bookingId].map(s =>
+            s.id === supplementId ? { ...s, status: 'approved' } : s
+          );
+        }
+        return updated;
+      });
+    } catch (err: any) {
+      alert(`Error: ${err.message}`);
+    } finally {
+      setSupplementAction(null);
+    }
+  };
+
+  const handleRejectSupplementRequest = async (supplementId: string, note: string) => {
+    setSupplementAction(prev => prev ? { ...prev, isSubmitting: true } : null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reject-supplement`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ booking_supplement_id: supplementId, rejection_note: note }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error rechazando suplemento');
+
+      setBookingSupplements(prev => {
+        const updated = { ...prev };
+        for (const bookingId in updated) {
+          updated[bookingId] = updated[bookingId].map(s =>
+            s.id === supplementId ? { ...s, status: 'rejected', rejection_note: note } : s
+          );
+        }
+        return updated;
+      });
+    } catch (err: any) {
+      alert(`Error: ${err.message}`);
+    } finally {
+      setSupplementAction(null);
+    }
+  };
+
   const fetchSentMessages = async () => {
     if (!agencyId) return;
     setIsLoadingMessages(true);
@@ -1262,6 +1348,105 @@ const AgencyBookings: React.FC = () => {
                             </span>
                           </div>
                         ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Booking Supplements */}
+                  {bookingSupplements[booking.id] && bookingSupplements[booking.id].length > 0 && (
+                    <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 mb-4">
+                      <h4 className="text-sm font-semibold text-teal-800 mb-3 flex items-center gap-2">
+                        <Tag className="w-4 h-4" />
+                        Suplementos Adicionales
+                      </h4>
+                      <div className="space-y-3">
+                        {bookingSupplements[booking.id].map((bs: any) => {
+                          const statusConfig: Record<string, { label: string; color: string }> = {
+                            pending_approval: { label: 'Pendiente aprobacion', color: 'bg-amber-100 text-amber-700' },
+                            approved: { label: 'Aprobado — esperando pago', color: 'bg-blue-100 text-blue-700' },
+                            rejected: { label: 'Rechazado', color: 'bg-red-100 text-red-700' },
+                            pending_payment: { label: 'Pendiente de pago', color: 'bg-blue-100 text-blue-700' },
+                            paid: { label: 'Pagado', color: 'bg-green-100 text-green-700' },
+                            cancelled: { label: 'Cancelado', color: 'bg-gray-100 text-gray-500' },
+                          };
+                          const sc = statusConfig[bs.status] || { label: bs.status, color: 'bg-gray-100 text-gray-500' };
+                          const isPendingApproval = bs.status === 'pending_approval';
+
+                          return (
+                            <div key={bs.id} className="bg-white border border-teal-100 rounded-lg p-3 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-sm font-medium text-gray-800">
+                                    {bs.tour_supplements?.name} × {bs.quantity}
+                                  </span>
+                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sc.color}`}>{sc.label}</span>
+                                  {!bs.tour_supplements?.is_cancellable && bs.status === 'paid' && (
+                                    <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">No cancelable</span>
+                                  )}
+                                </div>
+                                {bs.total_paid != null && (
+                                  <span className="text-sm font-semibold text-teal-700">{formatCurrencyMXN(Number(bs.total_paid))}</span>
+                                )}
+                              </div>
+
+                              {bs.status === 'rejected' && bs.rejection_note && (
+                                <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1">
+                                  Motivo: {bs.rejection_note}
+                                </p>
+                              )}
+
+                              {isPendingApproval && (
+                                <div className="pt-1 space-y-2">
+                                  {supplementAction?.supplementId === bs.id && supplementAction.type === 'reject' ? (
+                                    <div className="space-y-2">
+                                      <textarea
+                                        value={supplementAction.rejectionNote}
+                                        onChange={(e) => setSupplementAction(prev => prev ? { ...prev, rejectionNote: e.target.value } : null)}
+                                        placeholder="Motivo del rechazo (opcional)"
+                                        className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 resize-none"
+                                        rows={2}
+                                      />
+                                      <div className="flex gap-2">
+                                        <button
+                                          onClick={() => handleRejectSupplementRequest(bs.id, supplementAction.rejectionNote)}
+                                          disabled={supplementAction.isSubmitting}
+                                          className="btn btn-sm bg-red-600 text-white hover:bg-red-700 text-xs px-3"
+                                        >
+                                          {supplementAction.isSubmitting ? 'Rechazando...' : 'Confirmar rechazo'}
+                                        </button>
+                                        <button
+                                          onClick={() => setSupplementAction(null)}
+                                          className="btn btn-sm btn-outline text-xs px-3"
+                                        >
+                                          Cancelar
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="flex gap-2">
+                                      <button
+                                        onClick={() => handleApproveSupplementRequest(bs.id)}
+                                        disabled={!!supplementAction}
+                                        className="btn btn-sm bg-teal-600 text-white hover:bg-teal-700 text-xs px-3 flex items-center gap-1"
+                                      >
+                                        <CheckCircle className="w-3 h-3" />
+                                        Aprobar (48h para pagar)
+                                      </button>
+                                      <button
+                                        onClick={() => setSupplementAction({ type: 'reject', supplementId: bs.id, isSubmitting: false, rejectionNote: '' })}
+                                        disabled={!!supplementAction}
+                                        className="btn btn-sm btn-outline text-red-600 border-red-300 hover:bg-red-50 text-xs px-3 flex items-center gap-1"
+                                      >
+                                        <XCircle className="w-3 h-3" />
+                                        Rechazar
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
