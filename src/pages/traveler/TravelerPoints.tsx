@@ -256,7 +256,7 @@ const TravelerPointsPage: React.FC = () => {
                   {(wallet?.balance || 0).toLocaleString('en-US')}
                 </div>
                 <div className="text-amber-100 text-sm">
-                  {formatCurrencyMXN(wallet?.balance || 0)} MXN de valor
+                  {formatCurrencyMXN((wallet?.balance || 0) / 100)} MXN de valor
                 </div>
               </div>
 
@@ -298,7 +298,7 @@ const TravelerPointsPage: React.FC = () => {
                       Tus puntos están acumulados pero bloqueados
                     </h4>
                     <p className="text-sm text-amber-800 mb-3">
-                      Tienes <strong>{(wallet.balance || 0).toLocaleString('en-US')} puntos</strong> acumulados (equivalente a <strong>{formatCurrencyMXN(wallet.balance || 0)} MXN</strong>), pero necesitas una membresía ToursRed+ activa para poder usarlos en tus reservas.
+                      Tienes <strong>{(wallet.balance || 0).toLocaleString('en-US')} puntos</strong> acumulados (equivalente a <strong>{formatCurrencyMXN((wallet.balance || 0) / 100)} MXN</strong>), pero necesitas una membresía ToursRed+ activa para poder usarlos en tus reservas.
                     </p>
                     <Link
                       to="/traveler/membership"
