@@ -193,7 +193,7 @@ Deno.serve(async (req) => {
               .maybeSingle();
 
             if (activeMembership) {
-              pointsEarned = Math.floor(subtotal * 100);
+              pointsEarned = Math.floor(subtotal);
               if (pointsEarned > 0) {
                 const { data: walletId } = await supabase.rpc('get_or_create_points_wallet', { p_user_id: userId });
                 if (walletId) {
