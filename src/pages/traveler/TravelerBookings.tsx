@@ -1445,6 +1445,17 @@ const TravelerBookings: React.FC = () => {
         body: JSON.stringify({ booking_id: booking.id, tour_supplement_id: supplement.id, quantity }),
       });
       const data = await res.json();
+
+      // 409 means an active request already exists — route to its payment flow
+      if (res.status === 409 && data.existing_id &&
+          (data.existing_status === 'pending_payment' || data.existing_status === 'approved')) {
+        const existingBs = (bookingSupplements[booking.id] || []).find((bs: any) => bs.id === data.existing_id)
+          || { id: data.existing_id, status: data.existing_status, quantity, unit_price: supplement.price, tour_supplements: supplement };
+        setSupplementPaymentModal(prev => ({ ...prev, open: false }));
+        await handlePayExistingSupplement(existingBs, booking);
+        return;
+      }
+
       if (!res.ok) throw new Error(data.error || 'Error solicitando suplemento');
 
       if (data.status === 'pending_payment' || data.status === 'approved') {
