@@ -76,6 +76,12 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!["pending_payment", "approved"].includes(suppReq.status)) {
+      // Already paid — return success so the redirect flow doesn't show an error
+      if (suppReq.status === "paid") {
+        return new Response(JSON.stringify({ success: true, already_paid: true }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       return new Response(JSON.stringify({ error: `Estado inválido para pago: ${suppReq.status}` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -327,12 +333,16 @@ Deno.serve(async (req: Request) => {
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // 4. MercadoPago (Brick)
+    // 4. MercadoPago (Brick direct charge OR redirect-confirmed)
     if (payment_method === "mercadopago") {
+      // No mp_form_data means the payment was confirmed via MP redirect (back_urls flow)
+      // Just finalize without charging again
       if (!mp_form_data) {
-        return new Response(JSON.stringify({ error: "mp_form_data es requerido para MercadoPago" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        const pointsEarned = await finalizePayment("mercadopago", null);
+        return new Response(JSON.stringify({
+          success: true, total_charged: totalToPay, points_earned: pointsEarned,
+          message: "Pago con MercadoPago confirmado.",
+        }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       const mpAccessToken = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN") || platformSettings?.mercadopago_access_token;

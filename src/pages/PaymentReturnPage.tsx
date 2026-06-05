@@ -56,7 +56,7 @@ export default function PaymentReturnPage() {
               }
             );
           } catch (_) { /* idempotent — ignore if already processed */ }
-          setTimeout(() => navigate(`/traveler/supplement-success?supplement_id=${bookingSupplementId}`), 2000);
+          setTimeout(() => navigate(`/supplement-success?supplement_id=${bookingSupplementId}`), 2000);
         } else if (bookingId) {
           setMessage('Pago exitoso. Tu reserva ha sido confirmada.');
           setTimeout(() => navigate(`/booking-success?booking_id=${bookingId}`), 2000);
@@ -166,7 +166,7 @@ export default function PaymentReturnPage() {
         setTimeout(() => navigate(`/gift-card/success?gift_card_id=${giftCardId}&provider=mercadopago`), 2000);
       } else if (bookingSupplementId) {
         setMessage('Pago del suplemento exitoso.');
-        setTimeout(() => navigate(`/traveler/supplement-success?supplement_id=${bookingSupplementId}`), 2000);
+        setTimeout(() => navigate(`/supplement-success?supplement_id=${bookingSupplementId}`), 2000);
       } else if (bookingId) {
         setMessage('Pago exitoso. Tu reserva ha sido confirmada.');
         setTimeout(() => navigate(`/booking-success?booking_id=${bookingId}`), 2000);

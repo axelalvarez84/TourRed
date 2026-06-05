@@ -135,6 +135,9 @@ export default function MercadoPagoBrick({
               if (mountedRef.current) setBrickReady(true);
             },
             onSubmit: async ({ formData }: any) => {
+              // null formData means MP is handling payment via internal redirect (wallet/credit)
+              // The back_urls flow in PaymentReturnPage will handle completion
+              if (!formData) return;
               try {
                 const { data: { session } } = await supabase.auth.getSession();
 
