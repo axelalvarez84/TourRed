@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X, CreditCard as Edit, UserCheck, XCircle, CalendarX, Check, Wallet, Lock, UserMinus, Car, Globe, Tag, Plus, AlertTriangle } from 'lucide-react';
 import SeatReselectionModal from '../../components/SeatReselectionModal';
 import { useAuth } from '../../context/AuthContext';
-import { getUserBookings, parseDateFromDB, supabase, calculateCancellationPolicy, processCancellation, calculatePartialCancellationPolicy, processPartialCancellation, PartialCancellationTraveler } from '../../lib/supabase';
+import { getUserBookings, getUserPastBookings, getUserCancelledBookings, parseDateFromDB, supabase, calculateCancellationPolicy, processCancellation, calculatePartialCancellationPolicy, processPartialCancellation, PartialCancellationTraveler } from '../../lib/supabase';
 import { Booking, PendingReschedule } from '../../types';
 import { format } from 'date-fns';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -221,6 +221,16 @@ const TravelerBookings: React.FC = () => {
     newTime: string;
   } | null>(null);
 
+  const [bookingTab, setBookingTab] = useState<'activas' | 'pasadas' | 'canceladas'>('activas');
+  const [pastBookings, setPastBookings] = useState<Booking[]>([]);
+  const [cancelledBookings, setCancelledBookings] = useState<Booking[]>([]);
+  const [isLoadingPast, setIsLoadingPast] = useState(false);
+  const [isLoadingCancelled, setIsLoadingCancelled] = useState(false);
+  const [pastLoaded, setPastLoaded] = useState(false);
+  const [cancelledLoaded, setCancelledLoaded] = useState(false);
+  const [pastOptionalServices, setPastOptionalServices] = useState<Record<string, any[]>>({});
+  const [pastSupplements, setPastSupplements] = useState<Record<string, any[]>>({});
+
   const cancellationFormPersistence = useFormPersistence(
     { cancellationReason: cancellationModal.cancellationReason },
     { key: `cancellation_${cancellationModal.booking?.id || 'temp'}`, expirationHours: 24 }
@@ -368,6 +378,61 @@ const TravelerBookings: React.FC = () => {
       setError(err.message || 'Error al cargar las reservas');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchPastBookings = async () => {
+    if (!user?.id || pastLoaded || isLoadingPast) return;
+    setIsLoadingPast(true);
+    try {
+      const { data, error } = await getUserPastBookings(user.id);
+      if (error) throw new Error(error.message);
+      const list = data || [];
+      setPastBookings(list);
+
+      if (list.length > 0) {
+        const ids = list.map((b: any) => b.id);
+        const [optRes, suppRes] = await Promise.all([
+          supabase.from('booking_optional_services').select('*, tour_optional_services(name, is_refundable)').in('booking_id', ids),
+          supabase.from('booking_supplements').select('*, tour_supplements(name, description, price, is_cancellable, requires_approval)').in('booking_id', ids).order('requested_at', { ascending: false }),
+        ]);
+        if (optRes.data) {
+          const grouped: Record<string, any[]> = {};
+          for (const bos of optRes.data) {
+            if (!grouped[bos.booking_id]) grouped[bos.booking_id] = [];
+            grouped[bos.booking_id].push(bos);
+          }
+          setPastOptionalServices(grouped);
+        }
+        if (suppRes.data) {
+          const grouped: Record<string, any[]> = {};
+          for (const bs of suppRes.data) {
+            if (!grouped[bs.booking_id]) grouped[bs.booking_id] = [];
+            grouped[bs.booking_id].push(bs);
+          }
+          setPastSupplements(grouped);
+        }
+      }
+      setPastLoaded(true);
+    } catch (err: any) {
+      console.error('Error cargando reservas pasadas:', err);
+    } finally {
+      setIsLoadingPast(false);
+    }
+  };
+
+  const fetchCancelledBookings = async () => {
+    if (!user?.id || cancelledLoaded || isLoadingCancelled) return;
+    setIsLoadingCancelled(true);
+    try {
+      const { data, error } = await getUserCancelledBookings(user.id);
+      if (error) throw new Error(error.message);
+      setCancelledBookings(data || []);
+      setCancelledLoaded(true);
+    } catch (err: any) {
+      console.error('Error cargando reservas canceladas:', err);
+    } finally {
+      setIsLoadingCancelled(false);
     }
   };
 
@@ -1609,12 +1674,50 @@ const TravelerBookings: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold">Mis Reservas</h1>
           <p className="text-gray-600 mt-1">
-            {bookings.length === 0 
-              ? 'No tienes reservas aún' 
-              : `${bookings.length} ${bookings.length === 1 ? 'reserva' : 'reservas'}`
-            }
+            {bookingTab === 'activas' && (bookings.length === 0
+              ? 'No tienes reservas activas'
+              : `${bookings.length} reserva${bookings.length === 1 ? '' : 's'} activa${bookings.length === 1 ? '' : 's'}`)}
+            {bookingTab === 'pasadas' && (isLoadingPast ? 'Cargando...' : `${pastBookings.length} reserva${pastBookings.length === 1 ? '' : 's'} pasada${pastBookings.length === 1 ? '' : 's'}`)}
+            {bookingTab === 'canceladas' && (isLoadingCancelled ? 'Cargando...' : `${cancelledBookings.length} reserva${cancelledBookings.length === 1 ? '' : 's'} cancelada${cancelledBookings.length === 1 ? '' : 's'}`)}
           </p>
         </div>
+      </div>
+
+      {/* Pestanas */}
+      <div className="flex border-b border-gray-200 mb-6">
+        <button
+          onClick={() => setBookingTab('activas')}
+          className={`px-5 py-3 text-sm font-medium transition-colors relative ${bookingTab === 'activas' ? 'text-primary-600 border-b-2 border-primary-600' : 'text-gray-500 hover:text-gray-800'}`}
+        >
+          Activas
+          {bookings.length > 0 && (
+            <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold rounded-full bg-primary-100 text-primary-700">
+              {bookings.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => { setBookingTab('pasadas'); fetchPastBookings(); }}
+          className={`px-5 py-3 text-sm font-medium transition-colors relative ${bookingTab === 'pasadas' ? 'text-primary-600 border-b-2 border-primary-600' : 'text-gray-500 hover:text-gray-800'}`}
+        >
+          Pasadas
+          {pastLoaded && pastBookings.length > 0 && (
+            <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold rounded-full bg-gray-100 text-gray-600">
+              {pastBookings.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => { setBookingTab('canceladas'); fetchCancelledBookings(); }}
+          className={`px-5 py-3 text-sm font-medium transition-colors relative ${bookingTab === 'canceladas' ? 'text-primary-600 border-b-2 border-primary-600' : 'text-gray-500 hover:text-gray-800'}`}
+        >
+          Canceladas
+          {cancelledLoaded && cancelledBookings.length > 0 && (
+            <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold rounded-full bg-red-100 text-red-600">
+              {cancelledBookings.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {error && (
@@ -1633,25 +1736,26 @@ const TravelerBookings: React.FC = () => {
         </div>
       )}
 
-      {bookings.length === 0 && !error ? (
-        <div className="bg-white rounded-lg shadow-md p-8 text-center">
-          <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold mb-2">No tienes reservas aún</h3>
-          <p className="text-gray-600 mb-6">
-            Cuando reserves un tour, aparecerá aquí con todos los detalles.
-          </p>
-          <Link to="/tours" className="btn btn-primary">
-            Explorar Tours
-          </Link>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {bookings.map((booking) => (
-            <div
-              key={booking.id}
-              id={`booking-${booking.id}`}
-              className={`bg-white rounded-lg shadow-md overflow-hidden transition-all duration-700 ${highlightedBookingId === booking.id ? 'ring-4 ring-blue-400 ring-offset-2' : ''}`}
-            >
+      {bookingTab === 'activas' && (
+        bookings.length === 0 && !error ? (
+          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+            <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2">No tienes reservas activas</h3>
+            <p className="text-gray-600 mb-6">
+              Cuando reserves un tour, aparecerá aquí con todos los detalles.
+            </p>
+            <Link to="/tours" className="btn btn-primary">
+              Explorar Tours
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {bookings.map((booking) => (
+              <div
+                key={booking.id}
+                id={`booking-${booking.id}`}
+                className={`bg-white rounded-lg shadow-md overflow-hidden transition-all duration-700 ${highlightedBookingId === booking.id ? 'ring-4 ring-blue-400 ring-offset-2' : ''}`}
+              >
               <div className="flex flex-col lg:flex-row">
                 {/* Tour Image */}
                 <div className="lg:w-1/3">
@@ -2284,7 +2388,152 @@ const TravelerBookings: React.FC = () => {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        )
+      )}
+
+      {/* Pestaña: Pasadas */}
+      {bookingTab === 'pasadas' && (
+        isLoadingPast ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-600"></div>
+          </div>
+        ) : pastBookings.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+            <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2 text-gray-600">Sin historial de reservas</h3>
+            <p className="text-gray-500">Aquí aparecerán los tours que ya hayan concluido.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {pastBookings.map((booking) => (
+              <div
+                key={booking.id}
+                id={`booking-${booking.id}`}
+                className={`bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden opacity-80 transition-all duration-700 ${highlightedBookingId === booking.id ? 'ring-4 ring-blue-400 ring-offset-2' : ''}`}
+              >
+                <div className="flex flex-col lg:flex-row">
+                  <div className="lg:w-1/4">
+                    <div className="relative h-36 lg:h-full">
+                      <img
+                        src={booking.tours?.image_url || 'https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg'}
+                        alt={booking.tours?.name || 'Tour'}
+                        className="w-full h-full object-cover grayscale-[30%]"
+                      />
+                      <div className="absolute top-3 left-3">
+                        {getStatusBadge(booking.status, booking.payment_status, (booking as any).approval_status, (booking as any).is_no_show)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="lg:w-3/4 p-5">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-700">{booking.tours?.name || 'Tour sin nombre'}</h3>
+                        <div className="flex items-center text-gray-500 text-sm mt-1 gap-3">
+                          <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{booking.tours?.destination || 'Destino no especificado'}</span>
+                          <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{(booking as any).selected_date ? formatDate((booking as any).selected_date) : formatDate(booking.booking_date)}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-gray-400">Código</div>
+                        <div className="text-sm font-bold text-blue-500 tracking-wide">{booking.booking_code}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-6 text-sm text-gray-600 mb-4">
+                      <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5 text-gray-400" />{booking.travelers_count} viajero{booking.travelers_count !== 1 ? 's' : ''}</span>
+                      <span className="flex items-center gap-1"><DollarSign className="h-3.5 w-3.5 text-gray-400" />{formatCurrencyMXN(booking.user_payment ?? booking.deposit_amount ?? 0)}</span>
+                      {booking.agencies?.name && <span className="text-gray-500">Operado por: <strong>{booking.agencies.name}</strong></span>}
+                    </div>
+                    {(pastOptionalServices[booking.id] || []).length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {pastOptionalServices[booking.id].map((bos: any) => !bos.is_cancelled && (
+                          <span key={bos.id} className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                            {bos.tour_optional_services?.name} ×{bos.quantity}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <Link to={`/tours/${booking.tour_id}`} className="btn btn-outline btn-sm flex items-center gap-1 text-sm py-1.5 px-3">
+                        <Eye className="h-3.5 w-3.5" />Ver Tour
+                      </Link>
+                      <button onClick={() => handleOpenTravelersModal(booking)} className="btn btn-outline btn-sm flex items-center gap-1 text-sm py-1.5 px-3">
+                        <UserCheck className="h-3.5 w-3.5" />Ver Acompañantes
+                      </button>
+                      {(booking.status === 'confirmed' || booking.status === 'completed') && (
+                        <button onClick={() => handleOpenReviewModal(booking)} className="btn btn-primary btn-sm flex items-center gap-1 text-sm py-1.5 px-3">
+                          <Star className="h-3.5 w-3.5" />Dejar Reseña
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* Pestaña: Canceladas */}
+      {bookingTab === 'canceladas' && (
+        isLoadingCancelled ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-600"></div>
+          </div>
+        ) : cancelledBookings.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+            <XCircle className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2 text-gray-600">Sin reservas canceladas</h3>
+            <p className="text-gray-500">Aquí aparecerán las reservas que hayas cancelado.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {cancelledBookings.map((booking) => (
+              <div
+                key={booking.id}
+                id={`booking-${booking.id}`}
+                className={`bg-white rounded-lg shadow-sm border border-red-50 overflow-hidden opacity-70 transition-all duration-700 ${highlightedBookingId === booking.id ? 'ring-4 ring-blue-400 ring-offset-2' : ''}`}
+              >
+                <div className="flex flex-col lg:flex-row">
+                  <div className="lg:w-1/4">
+                    <div className="relative h-36 lg:h-full">
+                      <img
+                        src={booking.tours?.image_url || 'https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg'}
+                        alt={booking.tours?.name || 'Tour'}
+                        className="w-full h-full object-cover grayscale"
+                      />
+                      <div className="absolute top-3 left-3">
+                        {getStatusBadge(booking.status, booking.payment_status, (booking as any).approval_status, (booking as any).is_no_show)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="lg:w-3/4 p-5">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-500">{booking.tours?.name || 'Tour sin nombre'}</h3>
+                        <div className="flex items-center text-gray-400 text-sm mt-1 gap-3">
+                          <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{booking.tours?.destination || 'Destino no especificado'}</span>
+                          <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{(booking as any).selected_date ? formatDate((booking as any).selected_date) : formatDate(booking.booking_date)}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-gray-400">Código</div>
+                        <div className="text-sm font-bold text-gray-400 tracking-wide">{booking.booking_code}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-6 text-sm text-gray-400 mb-3">
+                      <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{booking.travelers_count} viajero{booking.travelers_count !== 1 ? 's' : ''}</span>
+                      <span className="flex items-center gap-1"><DollarSign className="h-3.5 w-3.5" />{formatCurrencyMXN(booking.user_payment ?? booking.deposit_amount ?? 0)}</span>
+                    </div>
+                    <div className="p-3 bg-red-50 border border-red-100 rounded-md text-sm text-red-600">
+                      <strong>Reserva cancelada.</strong> Si tienes preguntas, contacta a nuestro equipo de soporte.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       )}
 
       {/* Travelers Modal */}

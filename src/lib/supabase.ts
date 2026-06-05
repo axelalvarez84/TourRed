@@ -745,53 +745,15 @@ export const createBooking = async (bookingData: any) => {
 
 export const getUserBookings = async (userId: string) => {
   try {
+    const today = new Date().toISOString().split('T')[0];
     const { data: bookings, error } = await supabase
       .from('bookings')
-      .select(`
-        id,
-        booking_code,
-        user_id,
-        tour_id,
-        agency_id,
-        booking_date,
-        status,
-        payment_status,
-        payment_method,
-        total_price,
-        deposit_amount,
-        user_payment,
-        service_charge,
-        travelers_count,
-        approval_status,
-        approval_notes,
-        approved_at,
-        is_no_show,
-        no_show_marked_at,
-        toursred_cash_used,
-        points_used,
-        points_earned,
-        has_pending_reschedule,
-        reschedule_response,
-        reschedule_responded_at,
-        has_pending_slot_reschedule,
-        slot_reschedule_response,
-        slot_reschedule_responded_at,
-        selected_date,
-        selected_time,
-        slot_id,
-        selected_seats,
-        previous_selected_seats,
-        needs_seat_reselection,
-        discount_amount,
-        discount_code_id,
-        discount_codes:discount_code_id(code, discount_type, discount_value),
-        created_at,
-        updated_at,
-        tours:tour_id(id, name, destination, image_url, start_date, end_date, name_changes_not_allowed, vehicle_map_type),
-        agencies:agency_id(id, name, contact_email)
-      `)
+      .select(BOOKING_SELECT_FIELDS)
       .eq('user_id', userId)
       .neq('status', 'draft')
+      .neq('status', 'cancelled')
+      .neq('status', 'completed')
+      .or(`tours.end_date.is.null,tours.end_date.gte.${today}`)
       .order('created_at', { ascending: false });
 
     if (error || !bookings) {
@@ -832,6 +794,94 @@ export const getUserBookings = async (userId: string) => {
     return { data: bookingsWithPaymentMethod, error: null };
   } catch (error: any) {
     console.error('❌ Error en getUserBookings:', error);
+    return { data: null, error };
+  }
+};
+
+const BOOKING_SELECT_FIELDS = `
+  id, booking_code, user_id, tour_id, agency_id, booking_date, status, payment_status,
+  payment_method, total_price, deposit_amount, user_payment, service_charge, travelers_count,
+  approval_status, approval_notes, approved_at, is_no_show, no_show_marked_at,
+  toursred_cash_used, points_used, points_earned, has_pending_reschedule, reschedule_response,
+  reschedule_responded_at, has_pending_slot_reschedule, slot_reschedule_response,
+  slot_reschedule_responded_at, selected_date, selected_time, slot_id, selected_seats,
+  previous_selected_seats, needs_seat_reselection, discount_amount, discount_code_id,
+  discount_codes:discount_code_id(code, discount_type, discount_value), created_at, updated_at,
+  tours:tour_id(id, name, destination, image_url, start_date, end_date, name_changes_not_allowed, vehicle_map_type),
+  agencies:agency_id(id, name, contact_email)
+`;
+
+export const getUserPastBookings = async (userId: string) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const { data: bookings, error } = await supabase
+      .from('bookings')
+      .select(BOOKING_SELECT_FIELDS)
+      .eq('user_id', userId)
+      .neq('status', 'draft')
+      .neq('status', 'cancelled')
+      .or(`status.eq.completed,tours.end_date.lt.${today}`)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error || !bookings) return { data: bookings, error };
+
+    const bookingIds = bookings.map((b: any) => b.id);
+    const { data: allTransactions } = await supabase
+      .from('payment_transactions')
+      .select('booking_id, payment_method_type, created_at')
+      .in('booking_id', bookingIds);
+
+    const transactionsByBooking: Record<string, any> = {};
+    (allTransactions || []).forEach((tx: any) => {
+      if (!transactionsByBooking[tx.booking_id] ||
+          new Date(tx.created_at) > new Date(transactionsByBooking[tx.booking_id].created_at)) {
+        transactionsByBooking[tx.booking_id] = tx;
+      }
+    });
+
+    const result = bookings.map((booking: any) => ({
+      ...booking,
+      payment_method: booking.payment_method || transactionsByBooking[booking.id]?.payment_method_type || null,
+    }));
+    return { data: result, error: null };
+  } catch (error: any) {
+    return { data: null, error };
+  }
+};
+
+export const getUserCancelledBookings = async (userId: string) => {
+  try {
+    const { data: bookings, error } = await supabase
+      .from('bookings')
+      .select(BOOKING_SELECT_FIELDS)
+      .eq('user_id', userId)
+      .eq('status', 'cancelled')
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error || !bookings) return { data: bookings, error };
+
+    const bookingIds = bookings.map((b: any) => b.id);
+    const { data: allTransactions } = await supabase
+      .from('payment_transactions')
+      .select('booking_id, payment_method_type, created_at')
+      .in('booking_id', bookingIds);
+
+    const transactionsByBooking: Record<string, any> = {};
+    (allTransactions || []).forEach((tx: any) => {
+      if (!transactionsByBooking[tx.booking_id] ||
+          new Date(tx.created_at) > new Date(transactionsByBooking[tx.booking_id].created_at)) {
+        transactionsByBooking[tx.booking_id] = tx;
+      }
+    });
+
+    const result = bookings.map((booking: any) => ({
+      ...booking,
+      payment_method: booking.payment_method || transactionsByBooking[booking.id]?.payment_method_type || null,
+    }));
+    return { data: result, error: null };
+  } catch (error: any) {
     return { data: null, error };
   }
 };
