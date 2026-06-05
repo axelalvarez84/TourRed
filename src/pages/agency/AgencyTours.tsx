@@ -211,6 +211,11 @@ const AgencyTours: React.FC = () => {
     success: false,
   });
 
+  const [tourListTab, setTourListTab] = useState<'activos' | 'finalizados'>('activos');
+  const [finishedTours, setFinishedTours] = useState<Tour[]>([]);
+  const [isLoadingFinished, setIsLoadingFinished] = useState(false);
+  const [finishedLoaded, setFinishedLoaded] = useState(false);
+
   const [tourType, setTourType] = useState<TourType>('excursion');
   const [receptivoModality, setReceptivoModality] = useState<ReceptivoModality>('compartido');
   const [receptivoTab, setReceptivoTab] = useState<'info' | 'horarios' | 'bloqueos' | 'calendario' | 'asientos'>('info');
@@ -446,6 +451,7 @@ const AgencyTours: React.FC = () => {
       }
 
       // Obtener tours de la agencia usando el ID resuelto
+      const today = new Date().toISOString().split('T')[0];
       const { data: toursData, error: toursError } = await supabase
         .from('tours')
         .select(`
@@ -453,6 +459,7 @@ const AgencyTours: React.FC = () => {
           agencies(id, name, rating, commission_rate)
         `)
         .eq('agency_id', resolvedAgencyId)
+        .or(`tour_type.eq.receptivo,end_date.gte.${today}`)
         .order('created_at', { ascending: false });
 
       if (toursError) {
@@ -467,6 +474,28 @@ const AgencyTours: React.FC = () => {
       setError(err.message || 'Error al cargar los tours');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchFinishedTours = async () => {
+    if (!resolvedAgencyId || finishedLoaded || isLoadingFinished) return;
+    setIsLoadingFinished(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from('tours')
+        .select(`*, agencies(id, name, rating, commission_rate)`)
+        .eq('agency_id', resolvedAgencyId)
+        .eq('tour_type', 'excursion')
+        .lt('end_date', today)
+        .order('end_date', { ascending: false })
+        .limit(100);
+      setFinishedTours((data as Tour[]) || []);
+      setFinishedLoaded(true);
+    } catch {
+      // silent
+    } finally {
+      setIsLoadingFinished(false);
     }
   };
 
@@ -2271,8 +2300,8 @@ const AgencyTours: React.FC = () => {
           <h1 className="text-3xl font-bold">Gestionar Tours</h1>
           <p className="text-gray-600 mt-1">
             {tours.length === 0
-              ? 'No tienes tours publicados aún'
-              : `${tours.length} ${tours.length === 1 ? 'tour publicado' : 'tours publicados'}`
+              ? 'No tienes tours activos aún'
+              : `${tours.length} ${tours.length === 1 ? 'tour activo' : 'tours activos'}`
             }
           </p>
         </div>
@@ -2300,6 +2329,45 @@ const AgencyTours: React.FC = () => {
       {error && (
         <div className="mb-6 bg-error-50 text-error-600 p-4 rounded-md">
           {error}
+        </div>
+      )}
+
+      {/* Tabs: Activos / Finalizados */}
+      {!isCreating && !editingTour && (
+        <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
+          <button
+            onClick={() => setTourListTab('activos')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+              tourListTab === 'activos'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Tours Activos
+            {tours.length > 0 && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${tourListTab === 'activos' ? 'bg-primary-100 text-primary-700' : 'bg-gray-200 text-gray-600'}`}>
+                {tours.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => {
+              setTourListTab('finalizados');
+              fetchFinishedTours();
+            }}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+              tourListTab === 'finalizados'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Historial
+            {finishedLoaded && finishedTours.length > 0 && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${tourListTab === 'finalizados' ? 'bg-gray-200 text-gray-700' : 'bg-gray-200 text-gray-600'}`}>
+                {finishedTours.length}
+              </span>
+            )}
+          </button>
         </div>
       )}
 
@@ -5251,12 +5319,72 @@ const AgencyTours: React.FC = () => {
       )}
 
       {/* Lista de Tours */}
-      {tours.length === 0 && !isLoading ? (
+      {tourListTab === 'finalizados' ? (
+        /* ---- Pestaña Historial ---- */
+        isLoadingFinished ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-600" />
+          </div>
+        ) : finishedTours.length === 0 && finishedLoaded ? (
+          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <MapPin className="h-8 w-8 text-gray-400" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Sin tours finalizados</h3>
+            <p className="text-gray-600">Aqui aparecerán los tours cuya fecha de fin ya pasó.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {finishedTours.map((tour) => (
+              <div key={tour.id} className="bg-white rounded-lg shadow-md overflow-hidden opacity-75">
+                <div className="relative h-48">
+                  <img
+                    src={tour.image_url}
+                    alt={tour.name}
+                    className="w-full h-full object-cover grayscale-[30%]"
+                    onError={(e) => { e.currentTarget.src = 'https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg'; }}
+                  />
+                  <div className="absolute top-2 right-2">
+                    {getStatusBadge(tour)}
+                  </div>
+                  <div className="absolute top-2 left-2">
+                    <span className="px-2 py-1 text-xs font-medium bg-black/60 text-white rounded">
+                      {getCategoryNames(tour.category)}
+                    </span>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <h3 className="text-lg font-semibold mb-2 line-clamp-1">{tour.name}</h3>
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-center text-sm text-gray-600">
+                      <MapPin className="h-4 w-4 mr-2" />
+                      <span>{tour.destination}</span>
+                    </div>
+                    <div className="flex items-center text-sm text-gray-600">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      <span>{formatDate(tour.start_date)} - {formatDate(tour.end_date)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center text-gray-600">
+                        <Users className="h-4 w-4 mr-2" />
+                        <span>Máx {tour.max_travelers}</span>
+                      </div>
+                      <span className="font-semibold text-primary-600">${tour.price?.toLocaleString()}</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400">Creado: {new Date(tour.created_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      ) : tours.length === 0 && !isLoading ? (
+        /* ---- Pestaña Activos vacía ---- */
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <MapPin className="h-8 w-8 text-gray-400" />
           </div>
-          <h3 className="text-xl font-semibold mb-2">No tienes tours publicados</h3>
+          <h3 className="text-xl font-semibold mb-2">No tienes tours activos</h3>
           <p className="text-gray-600 mb-6">
             Comienza creando tu primer tour para atraer viajeros a tu agencia.
           </p>
