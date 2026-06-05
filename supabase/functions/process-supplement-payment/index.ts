@@ -186,19 +186,21 @@ Deno.serve(async (req: Request) => {
         updated_at: new Date().toISOString(),
       }).eq("id", booking_supplement_id);
 
-      // Trigger CFDI async
+      // Trigger CFDI generation synchronously (catch errors so payment isn't affected)
       const { data: cfdiSettings } = await supabase
         .from("platform_settings")
         .select("pac_provider, pac_api_key_encrypted")
         .maybeSingle();
       if (cfdiSettings?.pac_provider && cfdiSettings.pac_provider !== "none" && cfdiSettings.pac_api_key_encrypted) {
-        EdgeRuntime.waitUntil(
-          fetch(`${supabaseUrl}/functions/v1/generate-supplement-cfdi`, {
+        try {
+          await fetch(`${supabaseUrl}/functions/v1/generate-supplement-cfdi`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${supabaseServiceKey}` },
             body: JSON.stringify({ booking_supplement_id }),
-          }).catch(() => {})
-        );
+          });
+        } catch (cfdiErr) {
+          console.error("CFDI generation error (non-fatal):", cfdiErr);
+        }
       }
 
       return pointsEarned;
