@@ -76,8 +76,31 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!["pending_payment", "approved"].includes(suppReq.status)) {
-      // Already paid — return success so the redirect flow doesn't show an error
       if (suppReq.status === "paid") {
+        // If paid but no CFDI yet, trigger generation now (handles constraint-fix backfill scenario)
+        const { data: existingCfdi } = await supabase
+          .from("cfdi_invoices")
+          .select("id")
+          .eq("booking_supplement_id", booking_supplement_id)
+          .eq("invoice_type", "supplement")
+          .maybeSingle();
+
+        if (!existingCfdi) {
+          const { data: cfdiSettings } = await supabase
+            .from("platform_settings")
+            .select("pac_provider, pac_api_key_encrypted")
+            .maybeSingle();
+          if (cfdiSettings?.pac_provider && cfdiSettings.pac_provider !== "none" && cfdiSettings.pac_api_key_encrypted) {
+            try {
+              await fetch(`${supabaseUrl}/functions/v1/generate-supplement-cfdi`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${supabaseServiceKey}` },
+                body: JSON.stringify({ booking_supplement_id }),
+              });
+            } catch (_) { /* non-fatal */ }
+          }
+        }
+
         return new Response(JSON.stringify({ success: true, already_paid: true }), {
           status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
