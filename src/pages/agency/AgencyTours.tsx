@@ -5373,6 +5373,18 @@ const AgencyTours: React.FC = () => {
                     </div>
                   </div>
                   <p className="text-xs text-gray-400">Creado: {new Date(tour.created_at).toLocaleDateString('es-MX', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                  {canCreate && (
+                    <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end">
+                      <button
+                        onClick={() => handleDuplicate(tour.id)}
+                        title="Duplicar tour"
+                        disabled={isSubmitting || duplicatingTour}
+                        className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
