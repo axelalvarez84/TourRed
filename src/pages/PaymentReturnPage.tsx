@@ -36,6 +36,27 @@ export default function PaymentReturnPage() {
         if (giftCardId) {
           setMessage('Pago exitoso. Tu tarjeta de regalo fue procesada.');
           setTimeout(() => navigate(`/gift-card/success?gift_card_id=${giftCardId}&provider=mercadopago`), 2000);
+        } else if (bookingSupplementId) {
+          setMessage('Pago del suplemento exitoso.');
+          const { data: { session } } = await supabase.auth.getSession();
+          try {
+            await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-supplement-payment`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                  'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                },
+                body: JSON.stringify({
+                  booking_supplement_id: bookingSupplementId,
+                  payment_method: 'mercadopago',
+                }),
+              }
+            );
+          } catch (_) { /* idempotent — ignore if already processed */ }
+          setTimeout(() => navigate(`/traveler/supplement-success?supplement_id=${bookingSupplementId}`), 2000);
         } else if (bookingId) {
           setMessage('Pago exitoso. Tu reserva ha sido confirmada.');
           setTimeout(() => navigate(`/booking-success?booking_id=${bookingId}`), 2000);
@@ -143,6 +164,9 @@ export default function PaymentReturnPage() {
       if (giftCardId) {
         setMessage('Pago exitoso. Tu tarjeta de regalo fue procesada.');
         setTimeout(() => navigate(`/gift-card/success?gift_card_id=${giftCardId}&provider=mercadopago`), 2000);
+      } else if (bookingSupplementId) {
+        setMessage('Pago del suplemento exitoso.');
+        setTimeout(() => navigate(`/traveler/supplement-success?supplement_id=${bookingSupplementId}`), 2000);
       } else if (bookingId) {
         setMessage('Pago exitoso. Tu reserva ha sido confirmada.');
         setTimeout(() => navigate(`/booking-success?booking_id=${bookingId}`), 2000);

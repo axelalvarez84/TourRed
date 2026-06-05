@@ -1414,6 +1414,7 @@ const TravelerBookings: React.FC = () => {
           },
           body: JSON.stringify({
             bookingId: booking.id,
+            supplementId: bookingSupplement.id,
             customerEmail: (await supabase.auth.getUser()).data.user?.email,
             amount: totalAmount,
             description: `Suplemento: ${bookingSupplement.tour_supplements?.name || 'Suplemento'}`,
@@ -1525,6 +1526,7 @@ const TravelerBookings: React.FC = () => {
             },
             body: JSON.stringify({
               bookingId: booking.id,
+              supplementId: data.booking_supplement_id,
               customerEmail: (await supabase.auth.getUser()).data.user?.email,
               amount: totalAmount,
               description: `Suplemento: ${supplement.name || 'Suplemento'}`,

@@ -36,9 +36,15 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { bookingId, customerEmail, amount, description, context } = await req.json();
+    const { bookingId, supplementId, customerEmail, amount, description, context } = await req.json();
 
-    if (!bookingId || !amount) {
+    if (!amount) {
+      return new Response(JSON.stringify({ error: "Datos incompletos" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (context !== "supplement" && !bookingId) {
       return new Response(JSON.stringify({ error: "Datos incompletos" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -81,6 +87,19 @@ Deno.serve(async (req: Request) => {
       ];
       successUrl = `${origin}/gift-card/success?gift_card_id=${bookingId}&provider=mercadopago`;
       cancelUrl = `${origin}/gift-cards`;
+    } else if (context === "supplement") {
+      items = [
+        {
+          id: supplementId,
+          title: description || "Suplemento - ToursRed",
+          description: "Pago de suplemento para reserva",
+          quantity: 1,
+          unit_price: Math.round(amount * 100) / 100,
+          currency_id: "MXN",
+        },
+      ];
+      successUrl = `${origin}/payment-return?provider=mercadopago&booking_supplement_id=${supplementId}&tr_status=success`;
+      cancelUrl = `${origin}/traveler/bookings`;
     } else {
       items = [
         {
@@ -105,16 +124,21 @@ Deno.serve(async (req: Request) => {
       if (settings?.mercadopago_public_key) mpPublicKey = settings.mercadopago_public_key;
     }
 
+    const externalReference = context === "supplement" ? supplementId : bookingId;
+    const pendingUrl = context === "supplement"
+      ? `${origin}/payment-return?provider=mercadopago&booking_supplement_id=${supplementId}&tr_status=pending`
+      : `${origin}/payment-return?provider=mercadopago&booking_id=${bookingId}&tr_status=pending`;
+
     const preferencePayload = {
       items,
       payer: customerEmail ? { email: customerEmail } : undefined,
       back_urls: {
         success: successUrl,
         failure: cancelUrl,
-        pending: `${origin}/payment-return?provider=mercadopago&booking_id=${bookingId}&tr_status=pending`,
+        pending: pendingUrl,
       },
       auto_return: "approved",
-      external_reference: bookingId,
+      external_reference: externalReference,
       notification_url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/mercadopago-webhook`,
       statement_descriptor: "TOURSRED",
       binary_mode: false,
