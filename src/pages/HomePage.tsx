@@ -8,7 +8,7 @@ import TourGridSection from '../components/TourGridSection';
 import MembershipSection from '../components/MembershipSection';
 import PreventasSection from '../components/PreventasSection';
 import { Tour } from '../types';
-import { getTours, getPopularTours } from '../lib/supabase';
+import { getTours, getPopularTours, supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useTourPromotionsBatch } from '../hooks/useSharedData';
 
@@ -17,6 +17,7 @@ const HomePage: React.FC = () => {
   const [popularTours, setPopularTours] = useState<Tour[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const [popularLoading, setPopularLoading] = useState(true);
+  const [heroBackground, setHeroBackground] = useState<string | null | undefined>(undefined);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -29,6 +30,15 @@ const HomePage: React.FC = () => {
       setPopularTours((data as Tour[]) || []);
       setPopularLoading(false);
     }).catch(() => setPopularLoading(false));
+
+    supabase
+      .from('platform_settings')
+      .select('hero_background_url')
+      .maybeSingle()
+      .then(({ data }) => {
+        setHeroBackground(data?.hero_background_url ?? null);
+      })
+      .catch(() => setHeroBackground(null));
   }, []);
 
   const allTourIds = useMemo(
@@ -40,15 +50,20 @@ const HomePage: React.FC = () => {
   return (
     <div>
       {/* Hero Section */}
-      <section className="relative bg-blue-900 text-white">
+      <section
+        className="relative bg-blue-900 text-white"
+        style={heroBackground ? { backgroundImage: `url(${heroBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+      >
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-900/80 to-blue-900/60"></div>
-          <img
-            src="https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg"
-            alt="Fondo de viaje"
-            loading="lazy"
-            className="w-full h-full object-cover opacity-60"
-          />
+          {!heroBackground && (
+            <img
+              src="https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg"
+              alt="Fondo de viaje"
+              loading="lazy"
+              className="w-full h-full object-cover opacity-60"
+            />
+          )}
         </div>
         <div className="relative container-custom py-24 md:py-36">
           <div className="max-w-3xl flex flex-col items-start">

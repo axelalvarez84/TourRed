@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard, Crown, Gift, Award, Users, Globe, FileText, Shield, BookOpen, Link, Unlink, RefreshCw, ExternalLink, Tag } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard, Crown, Gift, Award, Users, Globe, FileText, Shield, BookOpen, Link, Unlink, RefreshCw, ExternalLink, Tag, Image, Upload, RotateCcw, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../utils/formatCurrency';
 
@@ -51,6 +51,7 @@ interface PlatformSettings {
   odoo_database: string;
   travel_insurance_price_per_day_per_traveler: number;
   supplement_commission_percentage: number;
+  hero_background_url: string | null;
 }
 
 const AdminSettings: React.FC = () => {
@@ -101,6 +102,7 @@ const AdminSettings: React.FC = () => {
     odoo_database: '',
     travel_insurance_price_per_day_per_traveler: 79,
     supplement_commission_percentage: 10,
+    hero_background_url: null,
   });
   const [zohoStatus, setZohoStatus] = useState<{
     connected: boolean;
@@ -115,6 +117,10 @@ const AdminSettings: React.FC = () => {
   const [isCheckingZoho, setIsCheckingZoho] = useState(false);
   const [odooHealthy, setOdooHealthy] = useState<boolean | null>(null);
   const [isCheckingOdoo, setIsCheckingOdoo] = useState(false);
+  const [heroFile, setHeroFile] = useState<File | null>(null);
+  const [heroPreview, setHeroPreview] = useState<string | null>(null);
+  const [isUploadingHero, setIsUploadingHero] = useState(false);
+  const heroInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{
@@ -187,6 +193,66 @@ const AdminSettings: React.FC = () => {
       await supabase.functions.invoke('zoho-oauth-connect', { body: { action: 'disconnect' } });
       setZohoStatus({ connected: false });
       setMessage({ type: 'success', text: 'Zoho Books desconectado' });
+    } catch (err: any) {
+      setMessage({ type: 'error', text: `Error: ${err.message}` });
+    }
+  };
+
+  const handleHeroFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setHeroFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setHeroPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleHeroUpload = async () => {
+    if (!heroFile) return;
+    setIsUploadingHero(true);
+    try {
+      const ext = heroFile.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const path = `hero/background.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('platform-assets')
+        .upload(path, heroFile, { upsert: true, contentType: heroFile.type });
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage
+        .from('platform-assets')
+        .getPublicUrl(path);
+      const cacheBustedUrl = `${publicUrl}?v=${Date.now()}`;
+      const { error: updateError } = await supabase
+        .from('platform_settings')
+        .update({ hero_background_url: cacheBustedUrl })
+        .eq('id', platformSettings.id);
+      if (updateError) throw updateError;
+      setPlatformSettings(prev => ({ ...prev, hero_background_url: cacheBustedUrl }));
+      setHeroFile(null);
+      setHeroPreview(null);
+      if (heroInputRef.current) heroInputRef.current.value = '';
+      setMessage({ type: 'success', text: 'Imagen de fondo actualizada correctamente' });
+      setTimeout(() => setMessage({ type: null, text: '' }), 3000);
+    } catch (err: any) {
+      setMessage({ type: 'error', text: `Error al subir imagen: ${err.message}` });
+    } finally {
+      setIsUploadingHero(false);
+    }
+  };
+
+  const handleHeroRestore = async () => {
+    if (!confirm('¿Restaurar la imagen de fondo original? Se eliminara la imagen personalizada.')) return;
+    try {
+      const { error } = await supabase
+        .from('platform_settings')
+        .update({ hero_background_url: null })
+        .eq('id', platformSettings.id);
+      if (error) throw error;
+      setPlatformSettings(prev => ({ ...prev, hero_background_url: null }));
+      setHeroFile(null);
+      setHeroPreview(null);
+      if (heroInputRef.current) heroInputRef.current.value = '';
+      setMessage({ type: 'success', text: 'Imagen de fondo restaurada al original' });
+      setTimeout(() => setMessage({ type: null, text: '' }), 3000);
     } catch (err: any) {
       setMessage({ type: 'error', text: `Error: ${err.message}` });
     }
@@ -1611,6 +1677,111 @@ const AdminSettings: React.FC = () => {
               El adaptador existe en el codigo y puede activarse cuando se implementen las credenciales correspondientes.
             </div>
           )}
+        </div>
+
+        {/* Imagen de Fondo del Hero */}
+        <div className="bg-white shadow-md rounded-lg p-6 space-y-5">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <Image className="h-5 w-5 text-primary-600" />
+            Imagen de Fondo del Hero
+          </h2>
+          <p className="text-sm text-gray-500">
+            Personaliza la imagen de portada de la pagina principal. Cuando hay una imagen personalizada activa, la imagen original se deshabilita completamente para evitar parpadeos de carga.
+          </p>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Estado actual */}
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Imagen actual</p>
+              {platformSettings.hero_background_url ? (
+                <div className="relative rounded-lg overflow-hidden border border-gray-200 aspect-video bg-gray-100">
+                  <img
+                    src={platformSettings.hero_background_url}
+                    alt="Fondo del hero"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent flex items-end p-3">
+                    <span className="text-white text-xs font-medium bg-green-500/90 px-2 py-0.5 rounded-full">Imagen personalizada activa</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg overflow-hidden border border-gray-200 aspect-video bg-gray-100 flex items-center justify-center">
+                  <div className="text-center text-gray-400">
+                    <Image className="h-10 w-10 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">Usando imagen original de Pexels</p>
+                  </div>
+                </div>
+              )}
+              {platformSettings.hero_background_url && (
+                <button
+                  type="button"
+                  onClick={handleHeroRestore}
+                  className="mt-3 flex items-center gap-2 text-sm text-gray-500 hover:text-red-600 transition-colors"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Restaurar imagen original
+                </button>
+              )}
+            </div>
+
+            {/* Subir nueva imagen */}
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Subir nueva imagen</p>
+              <div
+                className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary-400 hover:bg-primary-50/30 transition-colors cursor-pointer"
+                onClick={() => heroInputRef.current?.click()}
+              >
+                {heroPreview ? (
+                  <div className="relative">
+                    <img src={heroPreview} alt="Preview" className="w-full aspect-video object-cover rounded-md" />
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setHeroFile(null); setHeroPreview(null); if (heroInputRef.current) heroInputRef.current.value = ''; }}
+                      className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full p-1 transition-colors"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                    <p className="text-sm text-gray-600 font-medium">Haz clic para seleccionar imagen</p>
+                    <p className="text-xs text-gray-400 mt-1">JPG, PNG o WEBP · Maximo 5 MB</p>
+                  </>
+                )}
+              </div>
+              <input
+                ref={heroInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                className="hidden"
+                onChange={handleHeroFileChange}
+              />
+              <div className="mt-3 bg-blue-50 border border-blue-100 rounded-md p-3 text-xs text-blue-700">
+                <p className="font-semibold mb-1">Dimensiones recomendadas:</p>
+                <ul className="space-y-0.5 list-disc ml-4">
+                  <li>Minimo: <strong>1920 × 1080 px</strong> (Full HD)</li>
+                  <li>Optimo: <strong>2560 × 1440 px</strong> para pantallas retina</li>
+                  <li>Formato: JPG calidad 80-85% · Peso maximo: 3 MB</li>
+                  <li>Ratio: 16:9 o mas panoramico</li>
+                </ul>
+              </div>
+              {heroFile && (
+                <button
+                  type="button"
+                  onClick={handleHeroUpload}
+                  disabled={isUploadingHero}
+                  className="mt-3 w-full flex items-center justify-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
+                >
+                  {isUploadingHero ? (
+                    <><Loader className="h-4 w-4 animate-spin" /> Subiendo imagen...</>
+                  ) : (
+                    <><Upload className="h-4 w-4" /> Subir y activar imagen</>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-end">
