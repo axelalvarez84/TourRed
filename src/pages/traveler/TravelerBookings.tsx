@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X, CreditCard as Edit, UserCheck, XCircle, CalendarX, Check, Wallet, Lock, UserMinus, Car, Globe, Tag, Plus, AlertTriangle } from 'lucide-react';
+import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X, CreditCard as Edit, UserCheck, XCircle, CalendarX, Check, Wallet, Lock, UserMinus, Car, Globe, Tag, Plus, AlertTriangle, ShoppingBag, Shield } from 'lucide-react';
 import SeatReselectionModal from '../../components/SeatReselectionModal';
 import { useAuth } from '../../context/AuthContext';
 import { getUserBookings, getUserPastBookings, getUserCancelledBookings, parseDateFromDB, supabase, calculateCancellationPolicy, processCancellation, calculatePartialCancellationPolicy, processPartialCancellation, PartialCancellationTraveler } from '../../lib/supabase';
@@ -70,6 +70,50 @@ const TravelerBookings: React.FC = () => {
   }>({
     open: false,
     bookingSupplement: null,
+    booking: null,
+    isProcessing: false,
+    error: '',
+    walletBalance: 0,
+    pointsBalance: 0,
+    pointsValueMxn: 0,
+    selectedMethod: 'stripe',
+  });
+  const [extrasModal, setExtrasModal] = useState<{
+    open: boolean;
+    booking: Booking | null;
+    activeTab: 'servicios' | 'seguro';
+    tourOptionalServices: any[];
+    existingBosIds: Set<string>;
+    insuranceAlreadyBought: boolean;
+    insuranceCost: number;
+    isLoading: boolean;
+  }>({
+    open: false,
+    booking: null,
+    activeTab: 'servicios',
+    tourOptionalServices: [],
+    existingBosIds: new Set(),
+    insuranceAlreadyBought: false,
+    insuranceCost: 0,
+    isLoading: false,
+  });
+  const [extrasPaymentModal, setExtrasPaymentModal] = useState<{
+    open: boolean;
+    type: 'optional_service' | 'insurance' | null;
+    item: any | null;
+    quantity: number;
+    booking: Booking | null;
+    isProcessing: boolean;
+    error: string;
+    walletBalance: number;
+    pointsBalance: number;
+    pointsValueMxn: number;
+    selectedMethod: 'toursred_cash' | 'points' | 'stripe' | 'mercadopago' | 'paypal';
+  }>({
+    open: false,
+    type: null,
+    item: null,
+    quantity: 1,
     booking: null,
     isProcessing: false,
     error: '',
@@ -1578,6 +1622,146 @@ const TravelerBookings: React.FC = () => {
     setSupplementsModal({ open: true, booking, activeTab });
   };
 
+  const handleOpenExtrasModal = async (booking: Booking) => {
+    setExtrasModal(prev => ({ ...prev, open: true, booking, isLoading: true, activeTab: 'servicios' }));
+    try {
+      const [optSvcsRes, bosRes] = await Promise.all([
+        supabase
+          .from('tour_optional_services')
+          .select('id, name, description, price_per_person, max_capacity, is_active, display_order')
+          .eq('tour_id', booking.tour_id)
+          .eq('is_active', true)
+          .order('display_order'),
+        supabase
+          .from('booking_optional_services')
+          .select('id, tour_optional_service_id, is_cancelled')
+          .eq('booking_id', booking.id),
+      ]);
+
+      const existingBosIds = new Set(
+        (bosRes.data || [])
+          .filter((bos: any) => !bos.is_cancelled)
+          .map((bos: any) => bos.tour_optional_service_id)
+      );
+
+      const alreadyBought = (booking as any).travel_insurance_included === true;
+      const insuranceCost = Number((booking as any).travel_insurance_cost || 0);
+
+      setExtrasModal(prev => ({
+        ...prev,
+        isLoading: false,
+        tourOptionalServices: optSvcsRes.data || [],
+        existingBosIds,
+        insuranceAlreadyBought: alreadyBought,
+        insuranceCost,
+        activeTab: (optSvcsRes.data || []).filter(
+          (s: any) => !existingBosIds.has(s.id)
+        ).length > 0 ? 'servicios' : 'seguro',
+      }));
+    } catch {
+      setExtrasModal(prev => ({ ...prev, isLoading: false }));
+    }
+  };
+
+  const handleOpenExtrasPayment = async (
+    type: 'optional_service' | 'insurance',
+    item: any,
+    booking: Booking
+  ) => {
+    const [walletRes, pointsRes] = await Promise.all([
+      supabase.from('toursred_cash_wallets').select('balance').eq('user_id', user!.id).maybeSingle(),
+      supabase.from('toursred_points_wallets').select('balance').eq('user_id', user!.id).maybeSingle(),
+    ]);
+    setExtrasModal(prev => ({ ...prev, open: false }));
+    setExtrasPaymentModal({
+      open: true,
+      type,
+      item,
+      quantity: 1,
+      booking,
+      isProcessing: false,
+      error: '',
+      walletBalance: walletRes.data?.balance ?? 0,
+      pointsBalance: pointsRes.data?.balance ?? 0,
+      pointsValueMxn: Math.floor((pointsRes.data?.balance ?? 0) / 100),
+      selectedMethod: 'stripe',
+    });
+  };
+
+  const handleProcessExtrasPayment = async () => {
+    const { type, item, quantity, booking, selectedMethod } = extrasPaymentModal;
+    if (!type || !item || !booking) return;
+
+    setExtrasPaymentModal(prev => ({ ...prev, isProcessing: true, error: '' }));
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+        'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+      };
+
+      const body = type === 'optional_service'
+        ? { booking_id: booking.id, type: 'optional_service', tour_optional_service_id: item.id, quantity, payment_method: selectedMethod }
+        : { booking_id: booking.id, type: 'insurance', payment_method: selectedMethod };
+
+      if (selectedMethod === 'mercadopago') {
+        const amount = type === 'optional_service'
+          ? Number(item.price_per_person) * quantity
+          : extrasModal.insuranceCost || Number((booking as any).travel_insurance_cost || 0);
+        const description = type === 'optional_service' ? `Servicio: ${item.name}` : 'Seguro de viaje';
+
+        const mpRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-mercadopago-preference`, {
+          method: 'POST', headers,
+          body: JSON.stringify({
+            bookingId: booking.id,
+            customerEmail: (await supabase.auth.getUser()).data.user?.email,
+            amount,
+            description,
+            context: 'extras',
+            extrasBody: body,
+          }),
+        });
+        const mpData = await mpRes.json();
+        if (!mpRes.ok || !mpData.success) throw new Error(mpData.error || 'Error al crear preferencia de MercadoPago');
+        setExtrasPaymentModal(prev => ({ ...prev, open: false, isProcessing: false }));
+        window.location.href = mpData.url || mpData.init_point;
+        return;
+      }
+
+      if (selectedMethod === 'paypal') {
+        const amount = type === 'optional_service'
+          ? Number(item.price_per_person) * quantity
+          : extrasModal.insuranceCost || Number((booking as any).travel_insurance_cost || 0);
+        const ppRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-paypal-order`, {
+          method: 'POST', headers,
+          body: JSON.stringify({ bookingId: booking.id, amount, description: type === 'optional_service' ? `Servicio: ${item.name}` : 'Seguro de viaje', context: 'extras', extrasBody: body }),
+        });
+        const ppData = await ppRes.json();
+        if (!ppRes.ok || !ppData.success) throw new Error(ppData.error || 'Error al crear orden de PayPal');
+        setExtrasPaymentModal(prev => ({ ...prev, open: false, isProcessing: false }));
+        window.location.href = ppData.url;
+        return;
+      }
+
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/purchase-post-booking-extras`, {
+        method: 'POST', headers, body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al procesar el pago');
+
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+
+      setExtrasPaymentModal(prev => ({ ...prev, open: false }));
+      await fetchBookings();
+    } catch (err: any) {
+      setExtrasPaymentModal(prev => ({ ...prev, isProcessing: false, error: err.message }));
+    }
+  };
+
   const handleRequestSupplement = async () => {
     const { supplement, booking, quantity, selectedMethod, cashToUse } = supplementPaymentModal;
     if (!supplement || !booking) return;
@@ -2072,6 +2256,16 @@ const TravelerBookings: React.FC = () => {
                         </button>
                       );
                     })()}
+
+                    {(booking.status === 'confirmed' || booking.status === 'pending') && (
+                      <button
+                        onClick={() => handleOpenExtrasModal(booking)}
+                        className="btn btn-outline flex items-center justify-center gap-2"
+                      >
+                        <ShoppingBag className="h-4 w-4" />
+                        Extras
+                      </button>
+                    )}
 
                     {booking.status === 'pending' &&
                      booking.payment_status !== 'succeeded' &&
@@ -4225,6 +4419,227 @@ const TravelerBookings: React.FC = () => {
                     className="btn flex-1 bg-teal-600 text-white hover:bg-teal-700"
                   >
                     {supplementDirectPayModal.isProcessing ? 'Procesando...' : 'Confirmar y pagar'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Extras Browse Modal */}
+      {extrasModal.open && extrasModal.booking && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <ShoppingBag className="w-5 h-5 text-teal-600" />
+                Extras para tu reserva
+              </h3>
+              <button onClick={() => setExtrasModal(prev => ({ ...prev, open: false }))} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex border-b border-gray-100 flex-shrink-0">
+              <button
+                onClick={() => setExtrasModal(prev => ({ ...prev, activeTab: 'servicios' }))}
+                className={`flex-1 py-3 text-sm font-medium transition-colors ${extrasModal.activeTab === 'servicios' ? 'border-b-2 border-teal-600 text-teal-700' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Servicios Opcionales
+              </button>
+              <button
+                onClick={() => setExtrasModal(prev => ({ ...prev, activeTab: 'seguro' }))}
+                className={`flex-1 py-3 text-sm font-medium transition-colors ${extrasModal.activeTab === 'seguro' ? 'border-b-2 border-teal-600 text-teal-700' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Seguro de Viaje
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-5">
+              {extrasModal.isLoading ? (
+                <div className="flex justify-center py-10">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-teal-600" />
+                </div>
+              ) : (
+                <>
+                  {extrasModal.activeTab === 'servicios' && (
+                    <div className="space-y-3">
+                      {extrasModal.tourOptionalServices.length === 0 ? (
+                        <p className="text-sm text-gray-500 text-center py-8">No hay servicios opcionales disponibles para este tour.</p>
+                      ) : (
+                        extrasModal.tourOptionalServices.map((svc: any) => {
+                          const alreadyAdded = extrasModal.existingBosIds.has(svc.id);
+                          return (
+                            <div key={svc.id} className={`rounded-xl p-4 border ${alreadyAdded ? 'bg-gray-50 border-gray-200 opacity-60' : 'bg-white border-gray-200 hover:border-teal-300 transition-colors'}`}>
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-gray-900 text-sm">{svc.name}</p>
+                                  {svc.description && <p className="text-xs text-gray-500 mt-0.5">{svc.description}</p>}
+                                  <p className="text-sm font-bold text-teal-700 mt-1.5">{formatCurrencyMXN(Number(svc.price_per_person))} / persona</p>
+                                </div>
+                                {alreadyAdded ? (
+                                  <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium flex-shrink-0">Incluido</span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleOpenExtrasPayment('optional_service', svc, extrasModal.booking!)}
+                                    className="btn btn-sm bg-teal-600 text-white hover:bg-teal-700 text-xs px-3 flex items-center gap-1 flex-shrink-0"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                    Agregar
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+
+                  {extrasModal.activeTab === 'seguro' && (
+                    <div>
+                      {extrasModal.insuranceAlreadyBought ? (
+                        <div className="flex flex-col items-center py-8 gap-3">
+                          <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center">
+                            <Shield className="w-7 h-7 text-green-600" />
+                          </div>
+                          <p className="font-semibold text-gray-900">Seguro de viaje incluido</p>
+                          <p className="text-sm text-gray-500 text-center">Ya tienes el seguro de asistencia en viaje para esta reserva.</p>
+                        </div>
+                      ) : extrasModal.insuranceCost > 0 ? (
+                        <div className="space-y-4">
+                          <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                            <div className="flex items-start gap-3">
+                              <Shield className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <p className="font-semibold text-gray-900">Seguro de asistencia en viaje</p>
+                                <p className="text-sm text-gray-600 mt-1">Protege tu viaje con cobertura de asistencia medica y cancelacion.</p>
+                                <p className="text-xl font-bold text-blue-700 mt-3">{formatCurrencyMXN(extrasModal.insuranceCost)}</p>
+                                <p className="text-xs text-gray-500">Total para {(extrasModal.booking as any)?.travelers_count || 1} viajero(s)</p>
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleOpenExtrasPayment('insurance', { name: 'Seguro de viaje', price: extrasModal.insuranceCost }, extrasModal.booking!)}
+                            className="w-full btn bg-blue-600 text-white hover:bg-blue-700 flex items-center justify-center gap-2"
+                          >
+                            <Shield className="w-4 h-4" />
+                            Contratar seguro
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500 text-center py-8">El seguro de viaje no esta disponible para esta reserva.</p>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Extras Payment Modal */}
+      {extrasPaymentModal.open && extrasPaymentModal.item && extrasPaymentModal.booking && (() => {
+        const isService = extrasPaymentModal.type === 'optional_service';
+        const unitPrice = isService ? Number(extrasPaymentModal.item.price_per_person) : Number(extrasPaymentModal.item.price);
+        const totalAmount = isService ? unitPrice * extrasPaymentModal.quantity : unitPrice;
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-100">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    {isService ? <ShoppingBag className="w-5 h-5 text-teal-600" /> : <Shield className="w-5 h-5 text-blue-600" />}
+                    {isService ? 'Agregar servicio' : 'Contratar seguro'}
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setExtrasPaymentModal(prev => ({ ...prev, open: false }));
+                      setExtrasModal(prev => ({ ...prev, open: true }));
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className={`rounded-xl p-4 ${isService ? 'bg-teal-50' : 'bg-blue-50'}`}>
+                  <p className="font-semibold text-gray-900">{extrasPaymentModal.item.name}</p>
+                  {isService && (
+                    <div className="flex items-center gap-3 mt-2">
+                      <label className="text-sm text-gray-600">Cantidad:</label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setExtrasPaymentModal(prev => ({ ...prev, quantity: Math.max(1, prev.quantity - 1) }))}
+                          className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100"
+                          disabled={extrasPaymentModal.quantity <= 1}
+                        >-</button>
+                        <span className="text-sm font-semibold w-6 text-center">{extrasPaymentModal.quantity}</span>
+                        <button
+                          onClick={() => setExtrasPaymentModal(prev => ({ ...prev, quantity: prev.quantity + 1 }))}
+                          className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100"
+                        >+</button>
+                      </div>
+                    </div>
+                  )}
+                  <p className={`text-lg font-bold mt-2 ${isService ? 'text-teal-700' : 'text-blue-700'}`}>{formatCurrencyMXN(totalAmount)}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Metodo de pago</label>
+                  <div className="space-y-2">
+                    {[
+                      { id: 'stripe', label: 'Tarjeta de credito / debito' },
+                      { id: 'toursred_cash', label: `ToursRed Cash (Saldo: ${formatCurrencyMXN(extrasPaymentModal.walletBalance)})` },
+                      { id: 'points', label: `Puntos ToursRed (${extrasPaymentModal.pointsBalance} pts = ${formatCurrencyMXN(extrasPaymentModal.pointsValueMxn)})` },
+                      { id: 'mercadopago', label: 'MercadoPago' },
+                      { id: 'paypal', label: 'PayPal' },
+                    ].map(method => (
+                      <label key={method.id} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="extras_payment_method"
+                          value={method.id}
+                          checked={extrasPaymentModal.selectedMethod === method.id}
+                          onChange={() => setExtrasPaymentModal(prev => ({ ...prev, selectedMethod: method.id as any }))}
+                          className="w-4 h-4 text-teal-600"
+                        />
+                        <span className="text-sm text-gray-700">{method.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {extrasPaymentModal.error && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                    {extrasPaymentModal.error}
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setExtrasPaymentModal(prev => ({ ...prev, open: false }));
+                      setExtrasModal(prev => ({ ...prev, open: true }));
+                    }}
+                    className="btn btn-outline flex-1"
+                    disabled={extrasPaymentModal.isProcessing}
+                  >
+                    Volver
+                  </button>
+                  <button
+                    onClick={handleProcessExtrasPayment}
+                    disabled={extrasPaymentModal.isProcessing}
+                    className={`btn flex-1 text-white ${isService ? 'bg-teal-600 hover:bg-teal-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                  >
+                    {extrasPaymentModal.isProcessing ? 'Procesando...' : 'Confirmar y pagar'}
                   </button>
                 </div>
               </div>
