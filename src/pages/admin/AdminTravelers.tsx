@@ -113,9 +113,9 @@ export default function AdminTravelers() {
         (travelersData || []).map(async (traveler) => {
           const { data: bookingsData } = await supabase
             .from('bookings')
-            .select('total_price, service_charge, created_at, payment_status')
+            .select('total_price, service_charge, created_at, payment_status, status')
             .eq('user_id', traveler.id)
-            .eq('payment_status', 'succeeded');
+            .neq('status', 'draft');
 
           const totalBookings = bookingsData?.length || 0;
           const totalSpent = bookingsData?.reduce((sum, b) => sum + Number(b.total_price || 0), 0) || 0;
