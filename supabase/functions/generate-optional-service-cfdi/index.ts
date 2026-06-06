@@ -168,7 +168,7 @@ Deno.serve(async (req: Request) => {
       .select("pac_provider, pac_api_key_encrypted, pac_organization_id, cfdi_serie_booking, pac_issuer_rfc")
       .maybeSingle();
 
-    if (!settings || settings.pac_provider === "none" || !settings.pac_api_key_encrypted) {
+    if (!settings || settings.pac_provider === "none") {
       return new Response(JSON.stringify({ error: "PAC no configurado" }), {
         status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

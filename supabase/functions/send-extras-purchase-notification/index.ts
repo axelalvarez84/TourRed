@@ -93,7 +93,7 @@ Deno.serve(async (req: Request) => {
         selected_date, travel_insurance_cost,
         tours:tour_id(
           name, destination, start_date, end_date, image_url,
-          agencies(name, email)
+          agencies(name, contact_email)
         ),
         users:user_id(first_name, last_name, email)
       `)
@@ -113,7 +113,7 @@ Deno.serve(async (req: Request) => {
     const travelerName = [user?.first_name, user?.last_name].filter(Boolean).join(" ") || "Viajero";
     const travelerEmail = user?.email || "";
     const agencyName = agency?.name || "Agencia";
-    const agencyEmail = agency?.email || "";
+    const agencyEmail = agency?.contact_email || "";
     const tourName = tour?.name || "Tour";
 
     const refDate = booking.selected_date || tour?.start_date;
