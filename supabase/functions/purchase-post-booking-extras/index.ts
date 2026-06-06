@@ -293,15 +293,17 @@ Deno.serve(async (req: Request) => {
       }
 
       // Send notification emails (traveler + insurance team or agency)
-      fetch(`${supabaseUrl}/functions/v1/send-extras-purchase-notification`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${supabaseServiceKey}` },
-        body: JSON.stringify({
-          booking_id,
-          extra_type: type,
-          bos_id: bookingOptionalServiceId,
-        }),
-      }).catch(() => {});
+      EdgeRuntime.waitUntil(
+        fetch(`${supabaseUrl}/functions/v1/send-extras-purchase-notification`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${supabaseServiceKey}` },
+          body: JSON.stringify({
+            booking_id,
+            extra_type: type,
+            bos_id: bookingOptionalServiceId,
+          }),
+        }).catch((e) => console.error("send-extras-purchase-notification error:", e))
+      );
 
       // Trigger CFDI generation
       const cfdiFunction = type === "optional_service"
@@ -313,11 +315,13 @@ Deno.serve(async (req: Request) => {
         : { booking_id, service_charge: netServiceCharge, total_paid: totalToPay, payment_method: method };
 
       if (platformSettings?.pac_provider && platformSettings.pac_provider !== "none") {
-        fetch(`${supabaseUrl}/functions/v1/${cfdiFunction}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${supabaseServiceKey}` },
-          body: JSON.stringify(cfdiBody),
-        }).catch(() => {});
+        EdgeRuntime.waitUntil(
+          fetch(`${supabaseUrl}/functions/v1/${cfdiFunction}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${supabaseServiceKey}` },
+            body: JSON.stringify(cfdiBody),
+          }).catch((e) => console.error(`${cfdiFunction} error:`, e))
+        );
       }
 
       return pointsEarned;
