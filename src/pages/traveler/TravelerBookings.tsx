@@ -288,12 +288,31 @@ const TravelerBookings: React.FC = () => {
         throw new Error(error.message);
       }
 
-      setBookings(data || []);
+      // Client-side split: bookings whose tour date (or selected_date) already passed
+      // go to "Pasadas" immediately, without waiting for the lazy-load tab click
+      const today = new Date().toISOString().split('T')[0];
+      const activeList: Booking[] = [];
+      const expiredList: Booking[] = [];
+      for (const b of (data || [])) {
+        const refDate = (b as any).selected_date || (b as any).tours?.end_date;
+        if (refDate && refDate < today) {
+          expiredList.push(b);
+        } else {
+          activeList.push(b);
+        }
+      }
+      setBookings(activeList);
+      if (expiredList.length > 0) {
+        setPastBookings(prev => {
+          const existingIds = new Set(prev.map((x: any) => x.id));
+          return [...prev, ...expiredList.filter((x: any) => !existingIds.has(x.id))];
+        });
+      }
 
-      if (data && data.length > 0) {
-        const ids = data.map((b: any) => b.id);
-        const bookingsWithReschedule = data.filter((b: any) => b.has_pending_reschedule);
-        const bookingsWithSlotReschedule = data.filter((b: any) => b.has_pending_slot_reschedule);
+      if (data && data.length > 0 && activeList.length > 0) {
+        const ids = activeList.map((b: any) => b.id);
+        const bookingsWithReschedule = activeList.filter((b: any) => b.has_pending_reschedule);
+        const bookingsWithSlotReschedule = activeList.filter((b: any) => b.has_pending_slot_reschedule);
 
         const [optSvcsResult, , slotReschedulesResult] = await Promise.all([
           supabase
@@ -344,7 +363,7 @@ const TravelerBookings: React.FC = () => {
 
         // Load available tour supplements for active bookings
         const activeTourIds = [...new Set(
-          data.filter((b: any) => ['confirmed', 'pending'].includes(b.status)).map((b: any) => b.tour_id)
+          activeList.filter((b: any) => ['confirmed', 'pending'].includes(b.status)).map((b: any) => b.tour_id)
         )];
         if (activeTourIds.length > 0) {
           const { data: tourSupData } = await supabase
@@ -387,11 +406,21 @@ const TravelerBookings: React.FC = () => {
     try {
       const { data, error } = await getUserPastBookings(user.id);
       if (error) throw new Error(error.message);
-      const list = data || [];
-      setPastBookings(list);
+      const completedList = data || [];
 
-      if (list.length > 0) {
-        const ids = list.map((b: any) => b.id);
+      // Merge completed bookings with expired-active ones already pre-loaded
+      setPastBookings(prev => {
+        const completedIds = new Set(completedList.map((x: any) => x.id));
+        const expiredKept = prev.filter((x: any) => !completedIds.has(x.id));
+        return [...completedList, ...expiredKept].sort((a: any, b: any) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      });
+
+      // Fetch optional services and supplements for the completed ones
+      // (expired-active ones were already handled in the initial fetchBookings)
+      if (completedList.length > 0) {
+        const ids = completedList.map((b: any) => b.id);
         const [optRes, suppRes] = await Promise.all([
           supabase.from('booking_optional_services').select('*, tour_optional_services(name, is_refundable)').in('booking_id', ids),
           supabase.from('booking_supplements').select('*, tour_supplements(name, description, price, is_cancellable, requires_approval)').in('booking_id', ids).order('requested_at', { ascending: false }),
@@ -1701,7 +1730,7 @@ const TravelerBookings: React.FC = () => {
           className={`px-5 py-3 text-sm font-medium transition-colors relative ${bookingTab === 'pasadas' ? 'text-primary-600 border-b-2 border-primary-600' : 'text-gray-500 hover:text-gray-800'}`}
         >
           Pasadas
-          {pastLoaded && pastBookings.length > 0 && (
+          {pastBookings.length > 0 && (
             <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold rounded-full bg-gray-100 text-gray-600">
               {pastBookings.length}
             </span>
