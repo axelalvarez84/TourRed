@@ -62,6 +62,10 @@ const AgencyBookings: React.FC = () => {
   const [reportData, setReportData] = useState<any>(null);
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [agencyName, setAgencyName] = useState<string>('');
+  const [bookingTab, setBookingTab] = useState<'activas' | 'pasadas' | 'canceladas'>('activas');
+  const [activeBookings, setActiveBookings] = useState<Booking[]>([]);
+  const [pastBookings, setPastBookings] = useState<Booking[]>([]);
+  const [cancelledBookings, setCancelledBookings] = useState<Booking[]>([]);
 
   useEffect(() => {
     if (!agencyLoading && resolvedAgencyId) {
@@ -71,6 +75,21 @@ const AgencyBookings: React.FC = () => {
       setIsLoading(false);
     }
   }, [resolvedAgencyId, agencyLoading]);
+
+  const isBookingActive = (booking: any): boolean => {
+    if (booking.status === 'cancelled') return false;
+    const dateStr = booking.selected_date || booking.tours?.end_date;
+    if (!dateStr) return true;
+    try {
+      const d = dateStr.includes('T') ? new Date(dateStr) : parseDateFromDB(dateStr);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      d.setHours(0, 0, 0, 0);
+      return d >= today;
+    } catch {
+      return true;
+    }
+  };
 
   const fetchAgencyData = async (currentAgencyId: string) => {
     try {
@@ -92,10 +111,18 @@ const AgencyBookings: React.FC = () => {
         throw new Error(bookingsError.message);
       }
 
-      setBookings(bookingsData || []);
+      const allBookings = bookingsData || [];
+      setBookings(allBookings);
 
-      if (bookingsData && bookingsData.length > 0) {
-        const ids = bookingsData.map((b: any) => b.id);
+      const active = allBookings.filter((b: any) => isBookingActive(b));
+      const past = allBookings.filter((b: any) => b.status !== 'cancelled' && !isBookingActive(b));
+      const cancelled = allBookings.filter((b: any) => b.status === 'cancelled');
+      setActiveBookings(active);
+      setPastBookings(past);
+      setCancelledBookings(cancelled);
+
+      if (allBookings.length > 0) {
+        const ids = allBookings.map((b: any) => b.id);
         const { data: optSvcs } = await supabase
           .from('booking_optional_services')
           .select(`*, tour_optional_services(name, is_refundable)`)
@@ -306,6 +333,13 @@ const AgencyBookings: React.FC = () => {
     );
   };
 
+  const updateBookingInAllArrays = (bookingId: string, updater: (b: Booking) => Booking) => {
+    setBookings(prev => prev.map(b => b.id === bookingId ? updater(b) : b));
+    setActiveBookings(prev => prev.map(b => b.id === bookingId ? updater(b) : b));
+    setPastBookings(prev => prev.map(b => b.id === bookingId ? updater(b) : b));
+    setCancelledBookings(prev => prev.map(b => b.id === bookingId ? updater(b) : b));
+  };
+
   const handleApprovalAction = async (bookingId: string, action: 'approve' | 'reject', notes?: string) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -332,21 +366,17 @@ const AgencyBookings: React.FC = () => {
       const now = new Date().toISOString();
 
       // Actualizar el estado local
-      setBookings(bookings.map(booking =>
-        booking.id === bookingId
-          ? {
-              ...booking,
-              approval_status: approvalStatus as any,
-              approval_notes: notes || null,
-              approved_at: action === 'approve' ? now : null,
-              approved_by: user?.id,
-              ...(result.auto_confirmed ? {
-                payment_status: 'succeeded',
-                status: 'confirmed',
-              } : {}),
-            }
-          : booking
-      ));
+      updateBookingInAllArrays(bookingId, booking => ({
+        ...booking,
+        approval_status: approvalStatus as any,
+        approval_notes: notes || null,
+        approved_at: action === 'approve' ? now : null,
+        approved_by: user?.id,
+        ...(result.auto_confirmed ? {
+          payment_status: 'succeeded',
+          status: 'confirmed',
+        } : {}),
+      }));
 
       // Enviar email de notificación al viajero
       try {
@@ -468,11 +498,7 @@ const AgencyBookings: React.FC = () => {
       }
 
       // Actualizar el estado local
-      setBookings(bookings.map(booking =>
-        booking.id === bookingId
-          ? { ...booking, status: newStatus as any }
-          : booking
-      ));
+      updateBookingInAllArrays(bookingId, booking => ({ ...booking, status: newStatus as any }));
 
       console.log(`✅ Estado de reserva ${bookingId} actualizado a:`, newStatus);
     } catch (err: any) {
@@ -513,16 +539,12 @@ const AgencyBookings: React.FC = () => {
       }
 
       // Actualizar el estado local
-      setBookings(bookings.map(booking =>
-        booking.id === bookingId
-          ? {
-              ...booking,
-              is_no_show: true,
-              no_show_marked_at: new Date().toISOString(),
-              no_show_marked_by: user?.id
-            }
-          : booking
-      ));
+      updateBookingInAllArrays(bookingId, booking => ({
+        ...booking,
+        is_no_show: true,
+        no_show_marked_at: new Date().toISOString(),
+        no_show_marked_by: user?.id
+      }));
 
       console.log(`✅ Reserva ${bookingId} marcada como No Show`);
 
@@ -596,7 +618,7 @@ const AgencyBookings: React.FC = () => {
 
   const handleReviewSuccess = () => {
     handleCloseReviewModal();
-    fetchAgencyData();
+    if (resolvedAgencyId) fetchAgencyData(resolvedAgencyId);
   };
 
   const handleOpenContactModal = (booking: Booking) => {
@@ -730,7 +752,7 @@ const AgencyBookings: React.FC = () => {
       alert(`Reserva cancelada exitosamente.\n\nEl viajero ha recibido un reembolso de $${formatCurrency(result.refund_amount ?? 0)} en su ToursRed Cash.`);
 
       handleCloseCancelBookingModal();
-      fetchAgencyData();
+      if (resolvedAgencyId) fetchAgencyData(resolvedAgencyId);
 
     } catch (err: any) {
       console.error('Error cancelando reserva:', err);
@@ -882,9 +904,14 @@ const AgencyBookings: React.FC = () => {
     }
   }, [activeTab, agencyId]);
 
-  // Filtrar reservas
-  const filteredBookings = bookings.filter(booking => {
-    const matchesSearch = 
+  // Filtrar reservas según sub-tab activo
+  const currentTabBookings =
+    bookingTab === 'activas' ? activeBookings :
+    bookingTab === 'pasadas' ? pastBookings :
+    cancelledBookings;
+
+  const filteredBookings = currentTabBookings.filter(booking => {
+    const matchesSearch =
       booking.tours?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       booking.tours?.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
       booking.users?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -892,7 +919,7 @@ const AgencyBookings: React.FC = () => {
       booking.users?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       booking.id.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus = statusFilter === 'all' || booking.status === statusFilter;
+    const matchesStatus = bookingTab === 'canceladas' || statusFilter === 'all' || booking.status === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
@@ -905,7 +932,10 @@ const AgencyBookings: React.FC = () => {
     completed: bookings.filter(b => b.status === 'completed').length,
     totalRevenue: bookings
       .filter(b => b.payment_status === 'succeeded')
-      .reduce((sum, b) => sum + (b.deposit_amount || 0), 0)
+      .reduce((sum, b) => sum + (b.deposit_amount || 0), 0),
+    activas: activeBookings.length,
+    pasadas: pastBookings.length,
+    canceladas: cancelledBookings.length,
   };
 
   if (isLoading) {
@@ -985,7 +1015,7 @@ const AgencyBookings: React.FC = () => {
             <p className="font-medium">Error al cargar reservas</p>
             <p className="text-sm">{error}</p>
             <button
-              onClick={fetchAgencyData}
+              onClick={() => resolvedAgencyId && fetchAgencyData(resolvedAgencyId)}
               className="text-sm underline mt-1 hover:no-underline"
             >
               Intentar de nuevo
@@ -996,29 +1026,78 @@ const AgencyBookings: React.FC = () => {
 
       {activeTab === 'bookings' && (
         <>
-          {/* Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <div className="text-2xl font-bold text-primary-600">{stats.total}</div>
-          <div className="text-sm text-gray-500">Total Reservas</div>
-        </div>
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <div className="text-2xl font-bold text-green-600">{stats.confirmed}</div>
-          <div className="text-sm text-gray-500">Confirmadas</div>
-        </div>
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
-          <div className="text-sm text-gray-500">Pendientes</div>
-        </div>
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <div className="text-2xl font-bold text-blue-600">{stats.completed}</div>
-          <div className="text-sm text-gray-500">Completadas</div>
-        </div>
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <div className="text-2xl font-bold text-accent-600">{formatCurrencyMXN(stats.totalRevenue)}</div>
-          <div className="text-sm text-gray-500">Ingresos Recibidos</div>
-        </div>
-      </div>
+          {/* Estadísticas — fila 1: globales */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-3">
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <div className="text-2xl font-bold text-primary-600">{stats.total}</div>
+              <div className="text-sm text-gray-500">Total Reservas</div>
+            </div>
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <div className="text-2xl font-bold text-green-600">{stats.confirmed}</div>
+              <div className="text-sm text-gray-500">Confirmadas</div>
+            </div>
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
+              <div className="text-sm text-gray-500">Pendientes</div>
+            </div>
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <div className="text-2xl font-bold text-blue-600">{stats.completed}</div>
+              <div className="text-sm text-gray-500">Completadas</div>
+            </div>
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <div className="text-2xl font-bold text-accent-600">{formatCurrencyMXN(stats.totalRevenue)}</div>
+              <div className="text-sm text-gray-500">Ingresos Recibidos</div>
+            </div>
+          </div>
+
+          {/* Estadísticas — fila 2: por estado temporal */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div
+              onClick={() => setBookingTab('activas')}
+              className={`rounded-lg shadow-md p-4 cursor-pointer border-2 transition-colors ${bookingTab === 'activas' ? 'border-emerald-500 bg-emerald-50' : 'border-transparent bg-white hover:bg-gray-50'}`}
+            >
+              <div className="text-2xl font-bold text-emerald-600">{stats.activas}</div>
+              <div className="text-sm text-gray-500">Activas</div>
+            </div>
+            <div
+              onClick={() => setBookingTab('pasadas')}
+              className={`rounded-lg shadow-md p-4 cursor-pointer border-2 transition-colors ${bookingTab === 'pasadas' ? 'border-slate-500 bg-slate-50' : 'border-transparent bg-white hover:bg-gray-50'}`}
+            >
+              <div className="text-2xl font-bold text-slate-600">{stats.pasadas}</div>
+              <div className="text-sm text-gray-500">Pasadas</div>
+            </div>
+            <div
+              onClick={() => setBookingTab('canceladas')}
+              className={`rounded-lg shadow-md p-4 cursor-pointer border-2 transition-colors ${bookingTab === 'canceladas' ? 'border-red-400 bg-red-50' : 'border-transparent bg-white hover:bg-gray-50'}`}
+            >
+              <div className="text-2xl font-bold text-red-500">{stats.canceladas}</div>
+              <div className="text-sm text-gray-500">Canceladas</div>
+            </div>
+          </div>
+
+          {/* Sub-tabs: Activas / Pasadas / Canceladas */}
+          <div className="mb-4 border-b border-gray-200">
+            <nav className="-mb-px flex space-x-6">
+              <button
+                onClick={() => setBookingTab('activas')}
+                className={`py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${bookingTab === 'activas' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+              >
+                Activas ({stats.activas})
+              </button>
+              <button
+                onClick={() => setBookingTab('pasadas')}
+                className={`py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${bookingTab === 'pasadas' ? 'border-slate-500 text-slate-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+              >
+                Pasadas ({stats.pasadas})
+              </button>
+              <button
+                onClick={() => setBookingTab('canceladas')}
+                className={`py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${bookingTab === 'canceladas' ? 'border-red-400 text-red-500' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+              >
+                Canceladas ({stats.canceladas})
+              </button>
+            </nav>
+          </div>
 
       {/* Filtros */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">
@@ -1035,20 +1114,21 @@ const AgencyBookings: React.FC = () => {
               />
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <Filter className="h-4 w-4 text-gray-400" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            >
-              <option value="all">Todas las reservas</option>
-              <option value="pending">Pendientes</option>
-              <option value="confirmed">Confirmadas</option>
-              <option value="completed">Completadas</option>
-              <option value="cancelled">Canceladas</option>
-            </select>
-          </div>
+          {bookingTab !== 'canceladas' && (
+            <div className="flex items-center space-x-2">
+              <Filter className="h-4 w-4 text-gray-400" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="all">Todos los estados</option>
+                <option value="pending">Pendientes</option>
+                <option value="confirmed">Confirmadas</option>
+                <option value="completed">Completadas</option>
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1057,12 +1137,18 @@ const AgencyBookings: React.FC = () => {
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
           <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold mb-2">
-            {bookings.length === 0 ? 'No tienes reservas aún' : 'No se encontraron reservas'}
+            {bookings.length === 0 ? 'No tienes reservas aún' :
+             bookingTab === 'activas' ? 'No hay reservas activas' :
+             bookingTab === 'pasadas' ? 'No hay reservas pasadas' :
+             'No hay reservas canceladas'}
           </h3>
           <p className="text-gray-600 mb-6">
-            {bookings.length === 0 
+            {bookings.length === 0
               ? 'Las reservas de tus tours aparecerán aquí cuando los viajeros hagan reservas.'
-              : 'Intenta ajustar los filtros de búsqueda.'
+              : searchTerm || statusFilter !== 'all' ? 'Intenta ajustar los filtros de búsqueda.'
+              : bookingTab === 'activas' ? 'Las reservas con fecha de tour pendiente aparecerán aquí.'
+              : bookingTab === 'pasadas' ? 'Las reservas de tours que ya ocurrieron aparecerán aquí.'
+              : 'Las reservas canceladas aparecerán aquí.'
             }
           </p>
           {bookings.length === 0 && (
