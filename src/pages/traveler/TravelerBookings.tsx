@@ -1645,7 +1645,33 @@ const TravelerBookings: React.FC = () => {
       );
 
       const alreadyBought = (booking as any).travel_insurance_included === true;
-      const insuranceCost = Number((booking as any).travel_insurance_cost || 0);
+      let insuranceCost = Number((booking as any).travel_insurance_cost || 0);
+
+      // Si el booking no tiene costo de seguro guardado, calcularlo desde platform_settings
+      if (!alreadyBought && insuranceCost === 0) {
+        const { data: settingsRow } = await supabase
+          .from('platform_settings')
+          .select('travel_insurance_price_per_day_per_traveler')
+          .limit(1)
+          .maybeSingle();
+        const pricePerDay = Number(settingsRow?.travel_insurance_price_per_day_per_traveler || 0);
+        if (pricePerDay > 0) {
+          const startDate = booking.selected_date || booking.tours?.start_date;
+          const endDate = booking.tours?.end_date;
+          let tourDays = 1;
+          if (startDate && endDate) {
+            try {
+              const start = new Date(startDate.includes('T') ? startDate : startDate + 'T00:00:00');
+              const end = new Date(endDate.includes('T') ? endDate : endDate + 'T00:00:00');
+              const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+              tourDays = Math.max(1, diff + 1);
+            } catch {
+              tourDays = 1;
+            }
+          }
+          insuranceCost = Math.round(pricePerDay * tourDays * Math.max(1, booking.travelers_count || 1) * 100) / 100;
+        }
+      }
 
       setExtrasModal(prev => ({
         ...prev,
