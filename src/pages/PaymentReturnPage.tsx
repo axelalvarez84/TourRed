@@ -19,6 +19,8 @@ export default function PaymentReturnPage() {
   // Post-booking extras (insurance / optional_service)
   const extraType = searchParams.get('extra_type'); // 'insurance' | 'optional_service'
   const extraBosId = searchParams.get('bos_id');
+  const extraTourOptionalServiceId = searchParams.get('tour_optional_service_id');
+  const extraQuantity = searchParams.get('quantity');
 
   // Our custom status param, but MercadoPago may override 'status' with its own value
   // Use 'tr_status' as our param to avoid conflicts, falling back to 'status' for backwards compat
@@ -150,6 +152,16 @@ export default function PaymentReturnPage() {
 
         if (extraType && bookingId) {
           // Post-booking extra via PayPal
+          const extrasBody: Record<string, unknown> = {
+            booking_id: bookingId,
+            type: extraType,
+            payment_method: 'paypal',
+            paypal_order_id: paypalOrderId,
+          };
+          if (extraType === 'optional_service' && extraTourOptionalServiceId) {
+            extrasBody.tour_optional_service_id = extraTourOptionalServiceId;
+            extrasBody.quantity = Number(extraQuantity) || 1;
+          }
           const extrasResponse = await fetch(
             `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/purchase-post-booking-extras`,
             {
@@ -159,12 +171,7 @@ export default function PaymentReturnPage() {
                 'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
                 'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
               },
-              body: JSON.stringify({
-                booking_id: bookingId,
-                type: extraType,
-                payment_method: 'paypal',
-                paypal_order_id: paypalOrderId,
-              }),
+              body: JSON.stringify(extrasBody),
             }
           );
           const extrasResult = await extrasResponse.json();

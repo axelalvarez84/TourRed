@@ -44,7 +44,7 @@ Deno.serve(async (req: Request) => {
     );
 
     const authHeader = req.headers.get("Authorization");
-    const { bookingId, amount, description, context } = await req.json();
+    const { bookingId, amount, description, context, extrasBody } = await req.json();
 
     if (context !== "gift_card") {
       if (!authHeader) {
@@ -107,9 +107,17 @@ Deno.serve(async (req: Request) => {
     } else if (context === "supplement") {
       returnUrl = `${origin}/payment-return?provider=paypal&booking_supplement_id=${bookingId}&status=success`;
       cancelUrl = `${origin}/traveler/bookings`;
+    } else if (context === 'extras') {
+      const extraType = extrasBody?.type || 'insurance';
+      let returnParams = `provider=paypal&booking_id=${bookingId}&extra_type=${extraType}&tr_status=success`;
+      if (extraType === 'optional_service' && extrasBody?.tour_optional_service_id) {
+        returnParams += `&tour_optional_service_id=${extrasBody.tour_optional_service_id}&quantity=${extrasBody.quantity || 1}`;
+      }
+      returnUrl = `${origin}/payment-return?${returnParams}`;
+      cancelUrl = `${origin}/traveler/bookings`;
     } else {
-      returnUrl = `${origin}/payment-return?provider=paypal&booking_id=${bookingId}&status=success`;
-      cancelUrl = `${origin}/payment-return?provider=paypal&booking_id=${bookingId}&status=cancel`;
+      returnUrl = `${origin}/payment-return?provider=paypal&booking_id=${bookingId}&tr_status=success`;
+      cancelUrl = `${origin}/payment-return?provider=paypal&booking_id=${bookingId}&tr_status=cancel`;
     }
 
     const accessToken = await getPayPalAccessToken(paypalClientId, paypalClientSecret, isSandbox);
@@ -170,7 +178,7 @@ Deno.serve(async (req: Request) => {
         .from("gift_cards")
         .update({ paypal_order_id: order.id })
         .eq("id", bookingId);
-    } else if (context !== "supplement") {
+    } else if (context !== "supplement" && context !== "extras") {
       await supabase
         .from("bookings")
         .update({ paypal_order_id: order.id })
