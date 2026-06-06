@@ -18,6 +18,7 @@ import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import TravelerDashboard from './pages/traveler/TravelerDashboard';
 import TravelerBookings from './pages/traveler/TravelerBookings';
 import SupplementSuccessPage from './pages/traveler/SupplementSuccessPage';
+import ExtrasSuccessPage from './pages/traveler/ExtrasSuccessPage';
 import TravelerProfile from './pages/traveler/TravelerProfile';
 import TravelerMembership from './pages/traveler/TravelerMembership';
 import MembershipCheckout from './pages/traveler/MembershipCheckout';
@@ -154,6 +155,7 @@ const App: React.FC = () => {
           <Route path="/booking-pending/:bookingId" element={<BookingPendingPage />} />
           <Route path="/booking-travelers/:bookingId" element={<TravelersInfoPage />} />
           <Route path="/supplement-success" element={<SupplementSuccessPage />} />
+          <Route path="/extras-success" element={<ExtrasSuccessPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/gift-cards" element={<GiftCardsPage />} />
           <Route path="/gift-card/redeem" element={<GiftCardRedeemPage />} />

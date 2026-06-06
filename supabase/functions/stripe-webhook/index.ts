@@ -259,6 +259,170 @@ Deno.serve(async (req) => {
           break;
         }
 
+        // Handle post-booking extra payment (insurance or optional service)
+        const paymentForExtra = session.metadata?.payment_for === 'post_booking_extra';
+        if (paymentForExtra) {
+          const extraType = session.metadata?.extra_type; // 'insurance' | 'optional_service'
+          const extraBookingId = session.metadata?.booking_id;
+          const extraBosId = session.metadata?.booking_optional_service_id;
+          const extraUserId = session.metadata?.user_id;
+          const extraPaymentStatus = session.payment_status;
+
+          console.log(`post_booking_extra checkout completed: type=${extraType}, booking=${extraBookingId}, bos=${extraBosId}, status=${extraPaymentStatus}`);
+
+          if (extraPaymentStatus === 'paid' && extraUserId && extraBookingId) {
+            const { data: platformSettings } = await supabase
+              .from('platform_settings')
+              .select(`
+                service_charge_percentage, travel_insurance_price_per_day_per_traveler,
+                pac_provider, pac_api_key_encrypted
+              `)
+              .maybeSingle();
+
+            const serviceChargePct = platformSettings?.service_charge_percentage ?? 5;
+
+            let subtotal = 0;
+
+            if (extraType === 'insurance') {
+              // Recalculate insurance cost
+              const { data: bk } = await supabase
+                .from('bookings')
+                .select('travelers_count, count_adultos, count_ninos, count_infantes, count_adultos_mayores, selected_date, tours:tour_id(start_date, end_date)')
+                .eq('id', extraBookingId)
+                .maybeSingle();
+
+              const pricePerDay = parseFloat(platformSettings?.travel_insurance_price_per_day_per_traveler ?? '79');
+              const tourData = (bk?.tours as any);
+              const refDate = bk?.selected_date || tourData?.start_date;
+              const endDate = tourData?.end_date;
+              let tourDays = 1;
+              if (refDate && endDate) {
+                const start = new Date(refDate);
+                const end = new Date(endDate);
+                tourDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+              }
+              const totalTravelers = Math.max(
+                1,
+                (bk?.travelers_count || 0) ||
+                ((bk?.count_adultos || 0) + (bk?.count_ninos || 0) + (bk?.count_infantes || 0) + (bk?.count_adultos_mayores || 0))
+              );
+              subtotal = parseFloat((pricePerDay * tourDays * totalTravelers).toFixed(2));
+
+              // Update booking with insurance
+              await supabase.from('bookings').update({
+                travel_insurance_included: true,
+                travel_insurance_cost: subtotal,
+                updated_at: new Date().toISOString(),
+              }).eq('id', extraBookingId);
+              console.log(`✅ Insurance activated for booking ${extraBookingId}, cost=${subtotal}`);
+
+              // Notify insurance team
+              EdgeRuntime.waitUntil(
+                fetch(`${supabaseUrl}/functions/v1/send-travel-insurance-notification`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabaseServiceKey}` },
+                  body: JSON.stringify({
+                    booking_id: extraBookingId,
+                    total_travelers: totalTravelers,
+                    tour_days: tourDays,
+                    insurance_cost: subtotal,
+                    insurance_discount_amount: 0,
+                    insurance_effective_cost: subtotal,
+                  }),
+                }).catch(() => {})
+              );
+
+            } else if (extraType === 'optional_service' && extraBosId) {
+              // Get BOS subtotal
+              const { data: bosRec } = await supabase
+                .from('booking_optional_services')
+                .select('subtotal, unit_price, quantity')
+                .eq('id', extraBosId)
+                .maybeSingle();
+              subtotal = parseFloat((bosRec?.subtotal || Number(bosRec?.unit_price) * (bosRec?.quantity ?? 1)).toString());
+              console.log(`✅ Optional service BOS ${extraBosId} confirmed via Stripe, subtotal=${subtotal}`);
+            }
+
+            // Apply membership exemption
+            const grossServiceCharge = parseFloat((subtotal * serviceChargePct / 100).toFixed(2));
+            const { data: exemptionResult } = await supabase.rpc('get_available_service_fee_exemption', { p_user_id: extraUserId });
+            const exemptionAvailable = parseFloat(exemptionResult ?? '0');
+            const exemptionApplied = Math.min(exemptionAvailable, grossServiceCharge);
+
+            if (exemptionApplied > 0) {
+              const { data: membership } = await supabase
+                .from('memberships')
+                .select('id, service_fee_exemption_used')
+                .eq('user_id', extraUserId)
+                .eq('status', 'active')
+                .maybeSingle();
+              if (membership) {
+                await supabase.from('memberships').update({
+                  service_fee_exemption_used: (Number(membership.service_fee_exemption_used) || 0) + exemptionApplied,
+                }).eq('id', membership.id);
+              }
+            }
+
+            // Award points if member
+            const { data: activeMembership } = await supabase
+              .from('memberships')
+              .select('id')
+              .eq('user_id', extraUserId)
+              .eq('status', 'active')
+              .gt('current_period_end', new Date().toISOString())
+              .maybeSingle();
+
+            if (activeMembership && subtotal > 0) {
+              const pointsEarned = Math.floor(subtotal);
+              const { data: walletId } = await supabase.rpc('get_or_create_points_wallet', { p_user_id: extraUserId });
+              if (walletId) {
+                const { data: pWallet } = await supabase
+                  .from('toursred_points_wallets')
+                  .select('id, balance, total_earned')
+                  .eq('id', walletId)
+                  .maybeSingle();
+                if (pWallet) {
+                  const newBalance = pWallet.balance + pointsEarned;
+                  await supabase.from('toursred_points_transactions').insert({
+                    wallet_id: walletId,
+                    user_id: extraUserId,
+                    amount: pointsEarned,
+                    balance_after: newBalance,
+                    type: 'earned',
+                    description: `Puntos por extra (Stripe): ${extraType === 'insurance' ? 'Seguro de viaje' : 'Servicio opcional'}`,
+                    reference_id: extraBosId || extraBookingId,
+                    reference_type: extraType === 'insurance' ? 'insurance_payment' : 'optional_service_payment',
+                    expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                  });
+                  await supabase.from('toursred_points_wallets').update({
+                    balance: newBalance,
+                    total_earned: pWallet.total_earned + pointsEarned,
+                  }).eq('id', walletId);
+                }
+              }
+            }
+
+            // Trigger CFDI async
+            if (platformSettings?.pac_provider && platformSettings.pac_provider !== 'none' && platformSettings.pac_api_key_encrypted) {
+              const cfdiFunction = extraType === 'optional_service'
+                ? 'generate-optional-service-cfdi'
+                : 'generate-post-booking-insurance-cfdi';
+              const cfdiBody = extraType === 'optional_service'
+                ? { booking_optional_service_id: extraBosId, service_charge: parseFloat((grossServiceCharge - exemptionApplied).toFixed(2)), total_paid: session.amount_total / 100, payment_method: 'stripe' }
+                : { booking_id: extraBookingId, service_charge: parseFloat((grossServiceCharge - exemptionApplied).toFixed(2)), total_paid: session.amount_total / 100, payment_method: 'stripe' };
+
+              EdgeRuntime.waitUntil(
+                fetch(`${supabaseUrl}/functions/v1/${cfdiFunction}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabaseServiceKey}` },
+                  body: JSON.stringify(cfdiBody),
+                }).catch(() => {})
+              );
+            }
+          }
+          break;
+        }
+
         if (!bookingId) {
           console.error("No booking ID or gift card ID in session metadata");
           break;

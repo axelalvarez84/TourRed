@@ -447,8 +447,8 @@ Deno.serve(async (req: Request) => {
       const origin = req.headers.get("origin") || req.headers.get("referer")?.split("/").slice(0, 3).join("/") || "https://toursred.com";
 
       const successUrl = type === "insurance"
-        ? `${origin}/traveler/bookings?extra_paid=insurance&booking_id=${booking_id}`
-        : `${origin}/traveler/bookings?extra_paid=optional_service&bos_id=${bookingOptionalServiceId}`;
+        ? `${origin}/extras-success?type=insurance&booking_id=${booking_id}`
+        : `${origin}/extras-success?type=optional_service&bos_id=${bookingOptionalServiceId}&booking_id=${booking_id}`;
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ["card"],

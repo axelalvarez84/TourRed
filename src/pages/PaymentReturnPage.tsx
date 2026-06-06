@@ -16,6 +16,9 @@ export default function PaymentReturnPage() {
   const giftCardId = searchParams.get('gift_card_id');
   const bookingSupplementId = searchParams.get('booking_supplement_id');
   const paypalOrderId = searchParams.get('token');
+  // Post-booking extras (insurance / optional_service)
+  const extraType = searchParams.get('extra_type'); // 'insurance' | 'optional_service'
+  const extraBosId = searchParams.get('bos_id');
 
   // Our custom status param, but MercadoPago may override 'status' with its own value
   // Use 'tr_status' as our param to avoid conflicts, falling back to 'status' for backwards compat
@@ -57,6 +60,32 @@ export default function PaymentReturnPage() {
             );
           } catch (_) { /* idempotent — ignore if already processed */ }
           setTimeout(() => navigate(`/supplement-success?supplement_id=${bookingSupplementId}`), 2000);
+        } else if (extraType && bookingId) {
+          // Post-booking extra (insurance or optional service) via MercadoPago
+          setMessage('Pago del extra exitoso.');
+          const { data: { session } } = await supabase.auth.getSession();
+          try {
+            await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/purchase-post-booking-extras`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                  'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                },
+                body: JSON.stringify({
+                  booking_id: bookingId,
+                  type: extraType,
+                  payment_method: 'mercadopago',
+                }),
+              }
+            );
+          } catch (_) { /* idempotent */ }
+          const successUrl = extraType === 'insurance'
+            ? `/extras-success?type=insurance&booking_id=${bookingId}`
+            : `/extras-success?type=optional_service&bos_id=${extraBosId}&booking_id=${bookingId}`;
+          setTimeout(() => navigate(successUrl), 2000);
         } else if (bookingId) {
           setMessage('Pago exitoso. Tu reserva ha sido confirmada.');
           setTimeout(() => navigate(`/booking-success?booking_id=${bookingId}`), 2000);
@@ -119,6 +148,41 @@ export default function PaymentReturnPage() {
           return;
         }
 
+        if (extraType && bookingId) {
+          // Post-booking extra via PayPal
+          const extrasResponse = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/purchase-post-booking-extras`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+              },
+              body: JSON.stringify({
+                booking_id: bookingId,
+                type: extraType,
+                payment_method: 'paypal',
+                paypal_order_id: paypalOrderId,
+              }),
+            }
+          );
+          const extrasResult = await extrasResponse.json();
+          if (extrasResult.success) {
+            setStatus('success');
+            setMessage('Pago del extra exitoso.');
+            const bosIdResult = extrasResult.booking_optional_service_id || extraBosId;
+            const successUrl = extraType === 'insurance'
+              ? `/extras-success?type=insurance&booking_id=${bookingId}`
+              : `/extras-success?type=optional_service&bos_id=${bosIdResult}&booking_id=${bookingId}`;
+            setTimeout(() => navigate(successUrl), 2000);
+          } else {
+            setStatus('error');
+            setMessage(extrasResult.error || 'Hubo un problema al confirmar tu pago. Contacta soporte si el cargo fue aplicado.');
+          }
+          return;
+        }
+
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/capture-paypal-order`,
           {
@@ -167,6 +231,12 @@ export default function PaymentReturnPage() {
       } else if (bookingSupplementId) {
         setMessage('Pago del suplemento exitoso.');
         setTimeout(() => navigate(`/supplement-success?supplement_id=${bookingSupplementId}`), 2000);
+      } else if (extraType && bookingId) {
+        setMessage('Pago del extra exitoso.');
+        const successUrl = extraType === 'insurance'
+          ? `/extras-success?type=insurance&booking_id=${bookingId}`
+          : `/extras-success?type=optional_service&bos_id=${extraBosId}&booking_id=${bookingId}`;
+        setTimeout(() => navigate(successUrl), 2000);
       } else if (bookingId) {
         setMessage('Pago exitoso. Tu reserva ha sido confirmada.');
         setTimeout(() => navigate(`/booking-success?booking_id=${bookingId}`), 2000);
