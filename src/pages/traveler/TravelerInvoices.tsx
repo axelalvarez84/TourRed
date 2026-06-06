@@ -26,7 +26,7 @@ const downloadCfdi = async (cfdiId: string, fileType: 'xml' | 'pdf') => {
 
 interface CfdiInvoice {
   id: string;
-  invoice_type: 'booking' | 'commission' | 'membership' | 'checkin_wallet' | 'supplement';
+  invoice_type: 'booking' | 'commission' | 'membership' | 'checkin_wallet' | 'supplement' | 'post_booking_insurance' | 'optional_service';
   uuid_fiscal: string | null;
   folio: string | null;
   serie: string | null;
@@ -43,8 +43,10 @@ interface CfdiInvoice {
   membership_id: string | null;
   checkin_charge_id: string | null;
   booking_supplement_id: string | null;
+  booking_optional_service_id: string | null;
   bookings?: { booking_code: string | null; travel_insurance_included: boolean | null; travel_insurance_cost: number | null; tours?: { name: string } | null } | null;
   booking_supplements?: { tour_supplements?: { name: string } | null } | null;
+  booking_optional_services?: { tour_optional_service?: { name: string } | null } | null;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -156,7 +158,53 @@ const TravelerInvoices: React.FC = () => {
         );
       }
 
-      const all = [...bookingMine, ...membershipMine, ...checkinMine, ...supplementMine].sort(
+      // Facturas de seguro post-reserva del viajero
+      const { data: insuranceInvoices } = await supabase
+        .from('cfdi_invoices')
+        .select(`id, invoice_type, uuid_fiscal, folio, serie, receptor_rfc, subtotal, iva_amount, total, status, xml_url, pdf_url, stamped_at, created_at, booking_id, membership_id, checkin_charge_id, booking_supplement_id, booking_optional_service_id, bookings(booking_code, travel_insurance_included, travel_insurance_cost, tours(name))`)
+        .eq('invoice_type', 'post_booking_insurance')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      const insuranceMine: CfdiInvoice[] = [];
+      if (insuranceInvoices) {
+        await Promise.all(
+          insuranceInvoices.map(async (inv) => {
+            if (!inv.booking_id) return;
+            const { data: booking } = await supabase
+              .from('bookings')
+              .select('user_id')
+              .eq('id', inv.booking_id)
+              .maybeSingle();
+            if (booking?.user_id === user.id) insuranceMine.push(inv as CfdiInvoice);
+          })
+        );
+      }
+
+      // Facturas de servicios opcionales del viajero
+      const { data: optionalInvoices } = await supabase
+        .from('cfdi_invoices')
+        .select(`id, invoice_type, uuid_fiscal, folio, serie, receptor_rfc, subtotal, iva_amount, total, status, xml_url, pdf_url, stamped_at, created_at, booking_id, membership_id, checkin_charge_id, booking_supplement_id, booking_optional_service_id, bookings(booking_code, travel_insurance_included, travel_insurance_cost, tours(name))`)
+        .eq('invoice_type', 'optional_service')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      const optionalMine: CfdiInvoice[] = [];
+      if (optionalInvoices) {
+        await Promise.all(
+          optionalInvoices.map(async (inv) => {
+            if (!inv.booking_id) return;
+            const { data: booking } = await supabase
+              .from('bookings')
+              .select('user_id')
+              .eq('id', inv.booking_id)
+              .maybeSingle();
+            if (booking?.user_id === user.id) optionalMine.push(inv as CfdiInvoice);
+          })
+        );
+      }
+
+      const all = [...bookingMine, ...membershipMine, ...checkinMine, ...supplementMine, ...insuranceMine, ...optionalMine].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       setInvoices(all);
@@ -242,9 +290,12 @@ const TravelerInvoices: React.FC = () => {
             const isMembership = inv.invoice_type === 'membership';
             const isCheckin = inv.invoice_type === 'checkin_wallet';
             const isSupplement = inv.invoice_type === 'supplement';
+            const isInsurance = inv.invoice_type === 'post_booking_insurance';
+            const isOptional = inv.invoice_type === 'optional_service';
             const hasInsurance = inv.invoice_type === 'booking' && booking?.travel_insurance_included && (booking?.travel_insurance_cost ?? 0) > 0;
             const insuranceCost = hasInsurance ? (booking?.travel_insurance_cost ?? 0) : 0;
             const supplementName = (inv.booking_supplements as any)?.tour_supplements?.name;
+            const optionalServiceName = (inv.booking_optional_services as any)?.tour_optional_service?.name;
 
             return (
               <div
@@ -252,7 +303,7 @@ const TravelerInvoices: React.FC = () => {
                 className="bg-white rounded-xl border border-gray-200 hover:border-primary-200 hover:shadow-sm transition-all p-4 flex items-center gap-4"
               >
                 <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${
-                  isMembership ? 'bg-amber-100' : isCheckin ? 'bg-teal-100' : isSupplement ? 'bg-purple-100' : 'bg-primary-100'
+                  isMembership ? 'bg-amber-100' : isCheckin ? 'bg-teal-100' : isSupplement ? 'bg-purple-100' : isInsurance ? 'bg-emerald-100' : isOptional ? 'bg-orange-100' : 'bg-primary-100'
                 }`}>
                   {isMembership
                     ? <Star className="h-5 w-5 text-amber-600" />
@@ -260,6 +311,10 @@ const TravelerInvoices: React.FC = () => {
                     ? <Wallet className="h-5 w-5 text-teal-600" />
                     : isSupplement
                     ? <Package className="h-5 w-5 text-purple-600" />
+                    : isInsurance
+                    ? <Shield className="h-5 w-5 text-emerald-600" />
+                    : isOptional
+                    ? <Package className="h-5 w-5 text-orange-600" />
                     : <FileText className="h-5 w-5 text-primary-600" />
                   }
                 </div>
@@ -288,9 +343,21 @@ const TravelerInvoices: React.FC = () => {
                         Suplemento
                       </span>
                     )}
-                    {!isMembership && !isCheckin && !isSupplement && (
+                    {!isMembership && !isCheckin && !isSupplement && !isInsurance && !isOptional && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
                         Reserva
+                      </span>
+                    )}
+                    {isInsurance && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                        <Shield className="h-3 w-3" />
+                        Seguro de viaje
+                      </span>
+                    )}
+                    {isOptional && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                        <Package className="h-3 w-3" />
+                        Servicio adicional
                       </span>
                     )}
                     {bookingCode && (
@@ -299,7 +366,7 @@ const TravelerInvoices: React.FC = () => {
                       </span>
                     )}
                   </div>
-                  {tourName && !isSupplement && (
+                  {tourName && !isSupplement && !isInsurance && !isOptional && (
                     <div className="text-sm font-semibold text-gray-800 truncate">{tourName}</div>
                   )}
                   {isMembership && !tourName && (
@@ -311,6 +378,18 @@ const TravelerInvoices: React.FC = () => {
                   {isSupplement && (
                     <div className="text-sm font-semibold text-gray-800">
                       {supplementName ? `Suplemento: ${supplementName}` : 'Suplemento adicional'}
+                      {tourName && <span className="font-normal text-gray-500"> · {tourName}</span>}
+                    </div>
+                  )}
+                  {isInsurance && (
+                    <div className="text-sm font-semibold text-gray-800">
+                      Seguro de asistencia de viaje
+                      {tourName && <span className="font-normal text-gray-500"> · {tourName}</span>}
+                    </div>
+                  )}
+                  {isOptional && (
+                    <div className="text-sm font-semibold text-gray-800">
+                      {optionalServiceName ? `Servicio: ${optionalServiceName}` : 'Servicio adicional'}
                       {tourName && <span className="font-normal text-gray-500"> · {tourName}</span>}
                     </div>
                   )}
