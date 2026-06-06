@@ -283,44 +283,25 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // If optional_service: mark payment on booking_optional_services (no status field, just it's inserted)
-      // If insurance: update booking
+      // If insurance: update booking record
       if (type === "insurance") {
         await supabase.from("bookings").update({
           travel_insurance_included: true,
           travel_insurance_cost: subtotal,
           updated_at: new Date().toISOString(),
         }).eq("id", booking_id);
-
-        // Notify insurance team
-        const tourData = booking.tours as any;
-        const refDate = booking.selected_date || tourData?.start_date;
-        const endDate = tourData?.end_date;
-        let tourDays = 1;
-        if (refDate && endDate) {
-          const start = new Date(refDate);
-          const end = new Date(endDate);
-          const diffMs = end.getTime() - start.getTime();
-          tourDays = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1);
-        }
-        const totalTravelers = Math.max(
-          1,
-          (booking.travelers_count || 0) ||
-          ((booking.count_adultos || 0) + (booking.count_ninos || 0) +
-           (booking.count_infantes || 0) + (booking.count_adultos_mayores || 0))
-        );
-
-        supabase.functions.invoke("send-travel-insurance-notification", {
-          body: {
-            booking_id,
-            total_travelers: totalTravelers,
-            tour_days: tourDays,
-            insurance_cost: subtotal,
-            insurance_discount_amount: 0,
-            insurance_effective_cost: subtotal,
-          },
-        }).catch(() => {});
       }
+
+      // Send notification emails (traveler + insurance team or agency)
+      fetch(`${supabaseUrl}/functions/v1/send-extras-purchase-notification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${supabaseServiceKey}` },
+        body: JSON.stringify({
+          booking_id,
+          extra_type: type,
+          bos_id: bookingOptionalServiceId,
+        }),
+      }).catch(() => {});
 
       // Trigger CFDI generation
       const cfdiFunction = type === "optional_service"
@@ -331,7 +312,7 @@ Deno.serve(async (req: Request) => {
         ? { booking_optional_service_id: bookingOptionalServiceId, service_charge: netServiceCharge, total_paid: totalToPay, payment_method: method }
         : { booking_id, service_charge: netServiceCharge, total_paid: totalToPay, payment_method: method };
 
-      if (platformSettings?.pac_provider && platformSettings.pac_provider !== "none" && platformSettings.pac_api_key_encrypted) {
+      if (platformSettings?.pac_provider && platformSettings.pac_provider !== "none") {
         fetch(`${supabaseUrl}/functions/v1/${cfdiFunction}`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${supabaseServiceKey}` },

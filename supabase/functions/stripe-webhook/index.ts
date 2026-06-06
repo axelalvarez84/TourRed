@@ -316,19 +316,12 @@ Deno.serve(async (req) => {
               }).eq('id', extraBookingId);
               console.log(`✅ Insurance activated for booking ${extraBookingId}, cost=${subtotal}`);
 
-              // Notify insurance team
+              // Notify traveler + insurance team with complete data
               EdgeRuntime.waitUntil(
-                fetch(`${supabaseUrl}/functions/v1/send-travel-insurance-notification`, {
+                fetch(`${supabaseUrl}/functions/v1/send-extras-purchase-notification`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabaseServiceKey}` },
-                  body: JSON.stringify({
-                    booking_id: extraBookingId,
-                    total_travelers: totalTravelers,
-                    tour_days: tourDays,
-                    insurance_cost: subtotal,
-                    insurance_discount_amount: 0,
-                    insurance_effective_cost: subtotal,
-                  }),
+                  body: JSON.stringify({ booking_id: extraBookingId, extra_type: 'insurance' }),
                 }).catch(() => {})
               );
 
@@ -341,6 +334,15 @@ Deno.serve(async (req) => {
                 .maybeSingle();
               subtotal = parseFloat((bosRec?.subtotal || Number(bosRec?.unit_price) * (bosRec?.quantity ?? 1)).toString());
               console.log(`✅ Optional service BOS ${extraBosId} confirmed via Stripe, subtotal=${subtotal}`);
+
+              // Notify traveler + agency
+              EdgeRuntime.waitUntil(
+                fetch(`${supabaseUrl}/functions/v1/send-extras-purchase-notification`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabaseServiceKey}` },
+                  body: JSON.stringify({ booking_id: extraBookingId, extra_type: 'optional_service', bos_id: extraBosId }),
+                }).catch(() => {})
+              );
             }
 
             // Apply membership exemption
@@ -403,7 +405,7 @@ Deno.serve(async (req) => {
             }
 
             // Trigger CFDI async
-            if (platformSettings?.pac_provider && platformSettings.pac_provider !== 'none' && platformSettings.pac_api_key_encrypted) {
+            if (platformSettings?.pac_provider && platformSettings.pac_provider !== 'none') {
               const cfdiFunction = extraType === 'optional_service'
                 ? 'generate-optional-service-cfdi'
                 : 'generate-post-booking-insurance-cfdi';
