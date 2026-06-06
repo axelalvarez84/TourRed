@@ -745,7 +745,6 @@ export const createBooking = async (bookingData: any) => {
 
 export const getUserBookings = async (userId: string) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
     const { data: bookings, error } = await supabase
       .from('bookings')
       .select(BOOKING_SELECT_FIELDS)
@@ -753,7 +752,6 @@ export const getUserBookings = async (userId: string) => {
       .neq('status', 'draft')
       .neq('status', 'cancelled')
       .neq('status', 'completed')
-      .or(`tours.end_date.is.null,tours.end_date.gte.${today}`)
       .order('created_at', { ascending: false });
 
     if (error || !bookings) {
@@ -813,14 +811,11 @@ const BOOKING_SELECT_FIELDS = `
 
 export const getUserPastBookings = async (userId: string) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
     const { data: bookings, error } = await supabase
       .from('bookings')
       .select(BOOKING_SELECT_FIELDS)
       .eq('user_id', userId)
-      .neq('status', 'draft')
-      .neq('status', 'cancelled')
-      .or(`status.eq.completed,tours.end_date.lt.${today}`)
+      .eq('status', 'completed')
       .order('created_at', { ascending: false })
       .limit(100);
 
