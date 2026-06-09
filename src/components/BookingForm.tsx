@@ -886,11 +886,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     return min;
   }, [hasPaymentPlan, selectedPaymentMode, payPlanMode, installmentDefs, totalPrice, depositAmount, isReceptivo, selectedSlotDate, tour.start_date]);
 
-  const effectiveDepositAmount = tourPaymentOption === 'full_upfront'
-    ? totalPrice
-    : (hasPaymentPlan && selectedPaymentMode === 'plan'
-        ? (isHighRisk ? totalPrice : paymentPlanMinimum)
-        : depositAmount);
+  const effectiveDepositAmount =
+    (tourPaymentOption === 'full_upfront' || (hasPaymentPlan && selectedPaymentMode === 'full'))
+      ? totalPrice
+      : (hasPaymentPlan && selectedPaymentMode === 'plan'
+          ? (isHighRisk ? totalPrice : paymentPlanMinimum)
+          : depositAmount);
 
   const paymentSchedule = React.useMemo(() => {
     if (!hasPaymentPlan || payPlanMode !== 'installments' || installmentDefs.length === 0) return [];
@@ -1341,7 +1342,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           <div className="text-2xl font-bold text-primary-600">{formatCurrencyMXN(tour.price)}</div>
         )}
         <div className="text-sm text-gray-500 mt-1">
-          {tourPaymentOption === 'full_upfront'
+          {(tourPaymentOption === 'full_upfront' || (hasPaymentPlan && selectedPaymentMode === 'full'))
             ? `Pago total: ${formatCurrencyMXN(totalPrice)} (100%)`
             : hasPaymentPlan && selectedPaymentMode === 'plan'
               ? payPlanMode === 'free_form'
@@ -2785,7 +2786,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                 <span className="text-gray-600">
                   {hasPaymentPlan && selectedPaymentMode === 'plan'
                     ? payPlanMode === 'free_form' ? 'Abono inicial (libre)' : 'Mínimo al reservar'
-                    : `Depósito (${effectiveDepositPercentage}%)`}:
+                    : (tourPaymentOption === 'full_upfront' || (hasPaymentPlan && selectedPaymentMode === 'full'))
+                      ? 'Pago total (100%)'
+                      : `Depósito (${effectiveDepositPercentage}%)`}:
                 </span>
                 <span className="font-medium">{formatCurrencyMXN(effectiveDepositAmount)}</span>
               </div>
