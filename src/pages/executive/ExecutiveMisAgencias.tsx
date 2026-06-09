@@ -56,7 +56,7 @@ export default function ExecutiveMisAgencias() {
 
       const [toursRes, bookingsRes, commissionsRes] = await Promise.all([
         supabase.from('tours').select('agency_id').in('agency_id', agencyIds),
-        supabase.from('bookings').select('agency_id').in('agency_id', agencyIds).eq('payment_status', 'paid'),
+        supabase.from('bookings').select('agency_id').in('agency_id', agencyIds).eq('payment_status', 'succeeded'),
         supabase.from('commission_records').select('agency_id, platform_total_revenue').in('agency_id', agencyIds),
       ]);
 
