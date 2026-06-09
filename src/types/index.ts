@@ -105,6 +105,7 @@ export interface InstallmentDefinition {
   pct_of_total: number;
   days_before_departure?: number;
   days_after_booking?: number;
+  specific_date?: string;
 }
 
 export interface BookingPaymentPlan {

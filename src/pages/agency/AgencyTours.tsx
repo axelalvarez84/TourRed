@@ -292,7 +292,16 @@ const AgencyTours: React.FC = () => {
   const [hasDraft, setHasDraft] = useState(false);
   const [optionalServices, setOptionalServices] = useState<OptionalService[]>([]);
   const [supplements, setSupplements] = useState<TourSupplement[]>([]);
-  const [installmentDefs, setInstallmentDefs] = useState<InstallmentDefinition[]>([]);
+  type VencimientoMode = 'dias_reserva' | 'dias_salida' | 'fecha_especifica';
+  interface InstallmentDefDraft {
+    label: string;
+    pct_of_total: string;
+    days_after_booking: string;
+    days_before_departure: string;
+    specific_date: string;
+    _vencimiento_mode: VencimientoMode;
+  }
+  const [installmentDefs, setInstallmentDefs] = useState<InstallmentDefDraft[]>([]);
   const [paymentOptionsEnabled, setPaymentOptionsEnabled] = useState(false);
 
   const [schedulesDraft, setSchedulesDraft] = useState<ScheduleDraft[]>([]);
@@ -704,7 +713,17 @@ const AgencyTours: React.FC = () => {
       late_payment_penalty_pct: String((tour as any).late_payment_penalty_pct ?? 0),
       late_payment_penalty_fixed: String((tour as any).late_payment_penalty_fixed ?? 0),
     });
-    setInstallmentDefs(((tour as any).installment_definitions || []).filter((_: any, i: number) => i > 0));
+    setInstallmentDefs(((tour as any).installment_definitions || []).filter((_: any, i: number) => i > 0).map((d: any): InstallmentDefDraft => {
+      const mode: VencimientoMode = d.specific_date ? 'fecha_especifica' : d.days_before_departure !== undefined ? 'dias_salida' : 'dias_reserva';
+      return {
+        label: d.label || '',
+        pct_of_total: String(d.pct_of_total ?? ''),
+        days_after_booking: String(d.days_after_booking ?? ''),
+        days_before_departure: String(d.days_before_departure ?? ''),
+        specific_date: d.specific_date || '',
+        _vencimiento_mode: mode,
+      };
+    }));
     setPaymentOptionsEnabled(((tour as any).payment_option || 'standard') !== 'standard');
     setSelectedDestinations(selectedDest);
     setIncludes(tour.includes && tour.includes.length > 0 ? tour.includes : ['']);
@@ -1865,7 +1884,12 @@ const AgencyTours: React.FC = () => {
         installment_definitions: ((formData.payment_option === 'payment_plan' || formData.payment_option === 'both') && formData.payment_plan_mode === 'installments')
           ? [
               { label: 'Anticipo', pct_of_total: parseFloat(formData.deposit_percentage) || 0, days_after_booking: 0 },
-              ...installmentDefs,
+              ...installmentDefs.map(d => {
+                const base = { label: d.label, pct_of_total: parseFloat(d.pct_of_total) || 0 };
+                if (d._vencimiento_mode === 'fecha_especifica') return { ...base, specific_date: d.specific_date || undefined };
+                if (d._vencimiento_mode === 'dias_salida') return { ...base, days_before_departure: parseInt(d.days_before_departure) || 0 };
+                return { ...base, days_after_booking: parseInt(d.days_after_booking) || 0 };
+              }),
             ]
           : null,
         late_payment_grace_days: (formData.payment_option === 'payment_plan' || formData.payment_option === 'both') ? Math.max(0, parseInt(formData.late_payment_grace_days) || 5) : null,
@@ -4504,7 +4528,7 @@ const AgencyTours: React.FC = () => {
                           <h4 className="text-sm font-semibold text-gray-700">Parcialidades</h4>
                           <button
                             type="button"
-                            onClick={() => setInstallmentDefs([...installmentDefs, { label: `Parcialidad ${installmentDefs.length + 2}`, pct_of_total: 0, days_after_booking: 0 }])}
+                            onClick={() => setInstallmentDefs([...installmentDefs, { label: `Parcialidad ${installmentDefs.length + 2}`, pct_of_total: '', days_after_booking: '', days_before_departure: '', specific_date: '', _vencimiento_mode: 'dias_reserva' }])}
                             className="text-xs text-sky-600 hover:text-sky-800 font-medium flex items-center gap-1"
                           >
                             <Plus className="w-3.5 h-3.5" /> Agregar parcialidad
@@ -4553,7 +4577,7 @@ const AgencyTours: React.FC = () => {
                                 <Minus className="w-4 h-4" />
                               </button>
                             </div>
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-2 gap-2">
                               <div>
                                 <label className="text-xs text-gray-500 mb-0.5 block">% del total</label>
                                 <input
@@ -4563,21 +4587,7 @@ const AgencyTours: React.FC = () => {
                                   value={def.pct_of_total}
                                   onChange={(e) => {
                                     const next = [...installmentDefs];
-                                    next[idx] = { ...next[idx], pct_of_total: parseFloat(e.target.value) || 0 };
-                                    setInstallmentDefs(next);
-                                  }}
-                                  className="input input-sm text-xs w-full"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-xs text-gray-500 mb-0.5 block">Días tras reserva</label>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={def.days_after_booking ?? ''}
-                                  onChange={(e) => {
-                                    const next = [...installmentDefs];
-                                    next[idx] = { ...next[idx], days_after_booking: parseInt(e.target.value) || 0, days_before_departure: undefined };
+                                    next[idx] = { ...next[idx], pct_of_total: e.target.value };
                                     setInstallmentDefs(next);
                                   }}
                                   className="input input-sm text-xs w-full"
@@ -4585,27 +4595,83 @@ const AgencyTours: React.FC = () => {
                                 />
                               </div>
                               <div>
-                                <label className="text-xs text-gray-500 mb-0.5 block">Días antes salida</label>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={def.days_before_departure ?? ''}
-                                  onChange={(e) => {
-                                    const next = [...installmentDefs];
-                                    const val = e.target.value === '' ? undefined : parseInt(e.target.value);
-                                    next[idx] = { ...next[idx], days_before_departure: val, days_after_booking: val !== undefined ? undefined : 0 };
-                                    setInstallmentDefs(next);
-                                  }}
-                                  className="input input-sm text-xs w-full"
-                                  placeholder="—"
-                                />
+                                <label className="text-xs text-gray-500 mb-1 block">Vencimiento</label>
+                                <div className="flex rounded-lg overflow-hidden border border-gray-200 text-xs">
+                                  {(['dias_reserva', 'dias_salida', 'fecha_especifica'] as const).map((mode) => (
+                                    <button
+                                      key={mode}
+                                      type="button"
+                                      onClick={() => {
+                                        const next = [...installmentDefs];
+                                        next[idx] = { ...next[idx], _vencimiento_mode: mode };
+                                        setInstallmentDefs(next);
+                                      }}
+                                      className={`flex-1 py-1 px-1.5 transition-colors ${def._vencimiento_mode === mode ? 'bg-sky-500 text-white font-semibold' : 'bg-white text-gray-500 hover:bg-gray-100'}`}
+                                    >
+                                      {mode === 'dias_reserva' ? 'Días reserva' : mode === 'dias_salida' ? 'Días salida' : 'Fecha'}
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
                             </div>
+                            <div>
+                              {def._vencimiento_mode === 'dias_reserva' && (
+                                <div>
+                                  <label className="text-xs text-gray-500 mb-0.5 block">Días tras la reserva</label>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    value={def.days_after_booking}
+                                    onChange={(e) => {
+                                      const next = [...installmentDefs];
+                                      next[idx] = { ...next[idx], days_after_booking: e.target.value };
+                                      setInstallmentDefs(next);
+                                    }}
+                                    className="input input-sm text-xs w-full"
+                                    placeholder="Ej: 30"
+                                  />
+                                </div>
+                              )}
+                              {def._vencimiento_mode === 'dias_salida' && (
+                                <div>
+                                  <label className="text-xs text-gray-500 mb-0.5 block">Días antes de la salida</label>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    value={def.days_before_departure}
+                                    onChange={(e) => {
+                                      const next = [...installmentDefs];
+                                      next[idx] = { ...next[idx], days_before_departure: e.target.value };
+                                      setInstallmentDefs(next);
+                                    }}
+                                    className="input input-sm text-xs w-full"
+                                    placeholder="Ej: 15"
+                                  />
+                                </div>
+                              )}
+                              {def._vencimiento_mode === 'fecha_especifica' && (
+                                <div>
+                                  <label className="text-xs text-gray-500 mb-0.5 block">Fecha de vencimiento</label>
+                                  <input
+                                    type="date"
+                                    value={def.specific_date}
+                                    onChange={(e) => {
+                                      const next = [...installmentDefs];
+                                      next[idx] = { ...next[idx], specific_date: e.target.value };
+                                      setInstallmentDefs(next);
+                                    }}
+                                    className="input input-sm text-xs w-full"
+                                  />
+                                </div>
+                              )}
+                            </div>
                             <p className="text-xs text-gray-400">
-                              {def.days_before_departure !== undefined
-                                ? `Vence ${def.days_before_departure} día(s) antes de la salida`
-                                : `Vence ${def.days_after_booking ?? 0} día(s) después de la reserva`}
-                              {' · '}{def.pct_of_total}% del total
+                              {def._vencimiento_mode === 'fecha_especifica'
+                                ? def.specific_date ? `Vence el ${def.specific_date}` : 'Sin fecha definida'
+                                : def._vencimiento_mode === 'dias_salida'
+                                ? `Vence ${def.days_before_departure || '?'} día(s) antes de la salida`
+                                : `Vence ${def.days_after_booking || '?'} día(s) después de la reserva`}
+                              {' · '}{def.pct_of_total || 0}% del total
                             </p>
                           </div>
                         ))}
@@ -4613,7 +4679,7 @@ const AgencyTours: React.FC = () => {
                         {(() => {
                           const depositPct = parseFloat(formData.deposit_percentage) || 0;
                           const remaining = Math.round((100 - depositPct) * 100) / 100;
-                          const assigned = installmentDefs.reduce((s, d) => s + d.pct_of_total, 0);
+                          const assigned = installmentDefs.reduce((s, d) => s + (parseFloat(d.pct_of_total) || 0), 0);
                           const total = depositPct + assigned;
                           const isValid = Math.abs(total - 100) < 0.01;
                           return (
