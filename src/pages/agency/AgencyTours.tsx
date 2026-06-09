@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAgencyId } from '../../hooks/useAgencyId';
 import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination, getTourCategories } from '../../lib/supabase';
-import { Plus, Search, X, CreditCard as Edit, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban, ShoppingBag, Info, Percent, Route, RefreshCw, Layers, Car, Globe, AlertTriangle, Bus } from 'lucide-react';
+import { Plus, Search, X, CreditCard, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban, ShoppingBag, Info, Percent, Route, RefreshCw, Layers, Car, Globe, AlertTriangle, Bus, Pencil } from 'lucide-react';
 import { VehicleMapType } from '../../types/seats';
 import TourPromotionsManager from '../../components/TourPromotionsManager';
 import AgencyScheduleManager from '../../components/receptivo/AgencyScheduleManager';
@@ -52,7 +52,7 @@ interface TourLanguage {
   extra_cost: string;
   cost_type: 'por_persona' | 'fijo';
 }
-import { Tour, Destination, DeparturePoint } from '../../types';
+import { Tour, Destination, DeparturePoint, PaymentOption, PaymentPlanMode, InstallmentDefinition } from '../../types';
 import { format } from 'date-fns';
 import ImageUploader from '../../components/ImageUploader';
 import DeparturePointSelector from '../../components/DeparturePointSelector';
@@ -270,6 +270,12 @@ const AgencyTours: React.FC = () => {
     preventa_precio_especial: false,
     preventa_tipo_descuento: 'porcentaje' as 'monto' | 'porcentaje',
     preventa_descuento_valor: '',
+    payment_option: 'full_upfront' as PaymentOption,
+    full_payment_days_before_departure: '15',
+    payment_plan_mode: 'installments' as PaymentPlanMode,
+    late_payment_grace_days: '5',
+    late_payment_penalty_pct: '0',
+    late_payment_penalty_fixed: '0',
   });
 
   const VEHICLE_OPTIONS: { type: VehicleMapType; label: string; capacity: number; description: string }[] = [
@@ -286,6 +292,7 @@ const AgencyTours: React.FC = () => {
   const [hasDraft, setHasDraft] = useState(false);
   const [optionalServices, setOptionalServices] = useState<OptionalService[]>([]);
   const [supplements, setSupplements] = useState<TourSupplement[]>([]);
+  const [installmentDefs, setInstallmentDefs] = useState<InstallmentDefinition[]>([]);
 
   const [schedulesDraft, setSchedulesDraft] = useState<ScheduleDraft[]>([]);
   const [scheduleForm, setScheduleForm] = useState<ScheduleDraft>({
@@ -681,7 +688,14 @@ const AgencyTours: React.FC = () => {
       preventa_precio_especial: (tour as any).preventa_precio_especial || false,
       preventa_tipo_descuento: ((tour as any).preventa_tipo_descuento || 'porcentaje') as 'monto' | 'porcentaje',
       preventa_descuento_valor: (tour as any).preventa_descuento_valor?.toString() || '',
+      payment_option: ((tour as any).payment_option || 'full_upfront') as PaymentOption,
+      full_payment_days_before_departure: String((tour as any).full_payment_days_before_departure ?? 15),
+      payment_plan_mode: ((tour as any).payment_plan_mode || 'installments') as PaymentPlanMode,
+      late_payment_grace_days: String((tour as any).late_payment_grace_days ?? 5),
+      late_payment_penalty_pct: String((tour as any).late_payment_penalty_pct ?? 0),
+      late_payment_penalty_fixed: String((tour as any).late_payment_penalty_fixed ?? 0),
     });
+    setInstallmentDefs((tour as any).installment_definitions || []);
     setSelectedDestinations(selectedDest);
     setIncludes(tour.includes && tour.includes.length > 0 ? tour.includes : ['']);
     setExcludes(tour.excludes && tour.excludes.length > 0 ? tour.excludes : ['']);
@@ -1833,6 +1847,17 @@ const AgencyTours: React.FC = () => {
         preventa_tipo_descuento: (formData.preventa_activa && formData.preventa_precio_especial) ? formData.preventa_tipo_descuento : null,
         preventa_descuento_valor: (formData.preventa_activa && formData.preventa_precio_especial && formData.preventa_descuento_valor)
           ? parseFloat(formData.preventa_descuento_valor) : null,
+        payment_option: formData.payment_option,
+        full_payment_days_before_departure: formData.payment_option !== 'payment_plan'
+          ? Math.max(15, parseInt(formData.full_payment_days_before_departure) || 15)
+          : null,
+        payment_plan_mode: formData.payment_option !== 'full_upfront' ? formData.payment_plan_mode : null,
+        installment_definitions: (formData.payment_option !== 'full_upfront' && formData.payment_plan_mode === 'installments')
+          ? installmentDefs
+          : null,
+        late_payment_grace_days: Math.max(0, parseInt(formData.late_payment_grace_days) || 5),
+        late_payment_penalty_pct: parseFloat(formData.late_payment_penalty_pct) || 0,
+        late_payment_penalty_fixed: parseFloat(formData.late_payment_penalty_fixed) || 0,
       };
 
       let tourId: string;
@@ -2949,7 +2974,7 @@ const AgencyTours: React.FC = () => {
                                     }}
                                     className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                                   >
-                                    <Edit className="w-3.5 h-3.5" />
+                                    <Pencil className="w-3.5 h-3.5" />
                                   </button>
                                   <button
                                     type="button"
@@ -4335,6 +4360,264 @@ const AgencyTours: React.FC = () => {
               </div>
             )}
 
+            {/* SECCIÓN PLAN DE PAGOS Y LIQUIDACIÓN */}
+            <div className={`bg-white rounded-xl shadow-sm border-2 overflow-hidden transition-all ${
+              formData.payment_option !== 'full_upfront' ? 'border-sky-400' : 'border-gray-200'
+            }`}>
+              <div className={`px-5 py-4 flex items-center justify-between ${
+                formData.payment_option !== 'full_upfront' ? 'bg-sky-50' : 'bg-gray-50'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    formData.payment_option !== 'full_upfront' ? 'bg-sky-600 text-white' : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    <CreditCard className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className={`font-semibold text-sm ${formData.payment_option !== 'full_upfront' ? 'text-sky-900' : 'text-gray-700'}`}>
+                      Plan de Pagos y Liquidación
+                    </h3>
+                    <p className={`text-xs ${formData.payment_option !== 'full_upfront' ? 'text-sky-700' : 'text-gray-500'}`}>
+                      Define cómo los viajeros liquidan el total de su reserva
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-5 py-4 space-y-4">
+                {/* Opción de pago */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Modalidad de pago</label>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    {[
+                      { value: 'full_upfront', label: 'Pago total anticipado', desc: 'El viajero debe pagar el 100% antes de la salida' },
+                      { value: 'payment_plan', label: 'Plan de pagos', desc: 'El viajero puede pagar en parcialidades' },
+                      { value: 'both', label: 'Ambas opciones', desc: 'El viajero elige entre pago total o plan de pagos' },
+                    ].map(opt => (
+                      <label key={opt.value} className={`flex flex-col gap-1 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        formData.payment_option === opt.value
+                          ? 'border-sky-500 bg-sky-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}>
+                        <input
+                          type="radio"
+                          className="sr-only"
+                          checked={formData.payment_option === opt.value}
+                          onChange={() => setFormData({ ...formData, payment_option: opt.value as PaymentOption })}
+                        />
+                        <span className={`text-sm font-semibold ${formData.payment_option === opt.value ? 'text-sky-800' : 'text-gray-700'}`}>{opt.label}</span>
+                        <span className="text-xs text-gray-500">{opt.desc}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Días de liquidación anticipada */}
+                {(formData.payment_option === 'full_upfront' || formData.payment_option === 'both') && (
+                  <div className="max-w-xs">
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Días antes de salida para liquidar
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={15}
+                        value={formData.full_payment_days_before_departure}
+                        onChange={(e) => setFormData({ ...formData, full_payment_days_before_departure: e.target.value })}
+                        className="input pr-14"
+                        placeholder="15"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs">días</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Mínimo 15 días</p>
+                  </div>
+                )}
+
+                {/* Modo de plan de pagos */}
+                {(formData.payment_option === 'payment_plan' || formData.payment_option === 'both') && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Modo del plan de pagos</label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {[
+                          { value: 'installments', label: 'Parcialidades programadas', desc: 'Define fechas y montos exactos de cada pago' },
+                          { value: 'free_form', label: 'Abonos libres', desc: 'El viajero abona lo que quiera cuando quiera' },
+                        ].map(opt => (
+                          <label key={opt.value} className={`flex flex-col gap-1 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                            formData.payment_plan_mode === opt.value
+                              ? 'border-sky-500 bg-sky-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}>
+                            <input
+                              type="radio"
+                              className="sr-only"
+                              checked={formData.payment_plan_mode === opt.value}
+                              onChange={() => setFormData({ ...formData, payment_plan_mode: opt.value as PaymentPlanMode })}
+                            />
+                            <span className={`text-sm font-semibold ${formData.payment_plan_mode === opt.value ? 'text-sky-800' : 'text-gray-700'}`}>{opt.label}</span>
+                            <span className="text-xs text-gray-500">{opt.desc}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Parcialidades programadas */}
+                    {formData.payment_plan_mode === 'installments' && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-semibold text-gray-700">Parcialidades</h4>
+                          <button
+                            type="button"
+                            onClick={() => setInstallmentDefs([...installmentDefs, { label: `Parcialidad ${installmentDefs.length + 1}`, pct_of_total: 0, days_after_booking: 0 }])}
+                            className="text-xs text-sky-600 hover:text-sky-800 font-medium flex items-center gap-1"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Agregar parcialidad
+                          </button>
+                        </div>
+
+                        {installmentDefs.length === 0 && (
+                          <p className="text-xs text-gray-400 italic">Sin parcialidades — agrega al menos una (anticipo).</p>
+                        )}
+
+                        {installmentDefs.map((def, idx) => (
+                          <div key={idx} className="bg-gray-50 rounded-lg p-3 space-y-2 border border-gray-200">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-gray-500 w-5">{idx + 1}.</span>
+                              <input
+                                type="text"
+                                value={def.label}
+                                onChange={(e) => {
+                                  const next = [...installmentDefs];
+                                  next[idx] = { ...next[idx], label: e.target.value };
+                                  setInstallmentDefs(next);
+                                }}
+                                placeholder="Etiqueta (ej: Anticipo)"
+                                className="input input-sm flex-1 text-xs"
+                              />
+                              <button type="button" onClick={() => setInstallmentDefs(installmentDefs.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-600 flex-shrink-0">
+                                <Minus className="w-4 h-4" />
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <label className="text-xs text-gray-500 mb-0.5 block">% del total</label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={100}
+                                  value={def.pct_of_total}
+                                  onChange={(e) => {
+                                    const next = [...installmentDefs];
+                                    next[idx] = { ...next[idx], pct_of_total: parseFloat(e.target.value) || 0 };
+                                    setInstallmentDefs(next);
+                                  }}
+                                  className="input input-sm text-xs w-full"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs text-gray-500 mb-0.5 block">Días tras reserva</label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={def.days_after_booking ?? ''}
+                                  onChange={(e) => {
+                                    const next = [...installmentDefs];
+                                    next[idx] = { ...next[idx], days_after_booking: parseInt(e.target.value) || 0, days_before_departure: undefined };
+                                    setInstallmentDefs(next);
+                                  }}
+                                  className="input input-sm text-xs w-full"
+                                  placeholder="0"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs text-gray-500 mb-0.5 block">Días antes salida</label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={def.days_before_departure ?? ''}
+                                  onChange={(e) => {
+                                    const next = [...installmentDefs];
+                                    const val = e.target.value === '' ? undefined : parseInt(e.target.value);
+                                    next[idx] = { ...next[idx], days_before_departure: val, days_after_booking: val !== undefined ? undefined : 0 };
+                                    setInstallmentDefs(next);
+                                  }}
+                                  className="input input-sm text-xs w-full"
+                                  placeholder="—"
+                                />
+                              </div>
+                            </div>
+                            <p className="text-xs text-gray-400">
+                              {def.days_before_departure !== undefined
+                                ? `Vence ${def.days_before_departure} día(s) antes de la salida`
+                                : `Vence ${def.days_after_booking ?? 0} día(s) después de la reserva`}
+                              {' · '}{def.pct_of_total}% del total
+                            </p>
+                          </div>
+                        ))}
+
+                        {installmentDefs.length > 0 && (
+                          <p className={`text-xs font-medium ${installmentDefs.reduce((s, d) => s + d.pct_of_total, 0) === 100 ? 'text-green-600' : 'text-orange-500'}`}>
+                            Total: {installmentDefs.reduce((s, d) => s + d.pct_of_total, 0)}% {installmentDefs.reduce((s, d) => s + d.pct_of_total, 0) === 100 ? '✓' : '(debe sumar 100%)'}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Penalización por pago tardío */}
+                {formData.payment_option !== 'full_upfront' && (
+                  <div className="border-t border-gray-100 pt-4 space-y-3">
+                    <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-orange-500" />
+                      Configuración de pagos tardíos
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Días de gracia</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={formData.late_payment_grace_days}
+                          onChange={(e) => setFormData({ ...formData, late_payment_grace_days: e.target.value })}
+                          className="input input-sm w-full"
+                          placeholder="5"
+                        />
+                        <p className="text-xs text-gray-400 mt-0.5">Días tras vencimiento sin penalización</p>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Penalización (%)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.5}
+                          value={formData.late_payment_penalty_pct}
+                          onChange={(e) => setFormData({ ...formData, late_payment_penalty_pct: e.target.value })}
+                          className="input input-sm w-full"
+                          placeholder="0"
+                        />
+                        <p className="text-xs text-gray-400 mt-0.5">% del monto de la parcialidad</p>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Penalización fija ($)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={formData.late_payment_penalty_fixed}
+                          onChange={(e) => setFormData({ ...formData, late_payment_penalty_fixed: e.target.value })}
+                          className="input input-sm w-full"
+                          placeholder="0"
+                        />
+                        <p className="text-xs text-gray-400 mt-0.5">Monto fijo en MXN (si % = 0)</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* SECCIÓN PREVENTA EXCLUSIVA */}
             <div className={`bg-white rounded-xl shadow-sm border-2 overflow-hidden transition-all ${
               formData.preventa_activa ? 'border-amber-400' : 'border-gray-200'
@@ -5523,7 +5806,7 @@ const AgencyTours: React.FC = () => {
                         title="Editar tour"
                         disabled={isSubmitting || isCreating || editingTour || duplicatingTour}
                       >
-                        <Edit className="h-4 w-4" />
+                        <Pencil className="h-4 w-4" />
                       </button>
                     )}
                     {(tour as any).vehicle_map_type && (

@@ -95,6 +95,67 @@ export type TourType = 'excursion' | 'receptivo';
 export type ReceptivoModality = 'compartido' | 'privado';
 export type CancellationPolicy = 'flexible' | 'moderada' | 'estricta' | 'no_reembolsable';
 export type SlotStatus = 'activo' | 'lleno' | 'bloqueado' | 'cancelado' | 'completado';
+export type PaymentOption = 'full_upfront' | 'payment_plan' | 'both';
+export type PaymentPlanMode = 'free_form' | 'installments';
+export type PaymentPlanStatus = 'active' | 'completed' | 'cancelled' | 'defaulted';
+export type InstallmentStatus = 'pending' | 'partially_paid' | 'paid' | 'overdue' | 'overdue_grace' | 'waived' | 'cancelled';
+
+export interface InstallmentDefinition {
+  label: string;
+  pct_of_total: number;
+  days_before_departure?: number;
+  days_after_booking?: number;
+}
+
+export interface BookingPaymentPlan {
+  id: string;
+  booking_id: string;
+  mode: PaymentPlanMode | 'full_upfront';
+  total_plan_amount: number;
+  total_amount_paid: number;
+  pending_balance: number;
+  status: PaymentPlanStatus;
+  paid_100_pct_at_booking: boolean;
+  created_at: string;
+  updated_at: string;
+  installments?: BookingPaymentPlanInstallment[];
+}
+
+export interface BookingPaymentPlanInstallment {
+  id: string;
+  plan_id: string;
+  booking_id: string;
+  installment_number: number;
+  label: string;
+  amount_due: number;
+  amount_paid: number;
+  due_date: string;
+  status: InstallmentStatus;
+  penalty_applied: number;
+  late_payment_penalty_apply_once: boolean;
+  cfdi_invoice_id?: string;
+  paid_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BookingPaymentPlanTransaction {
+  id: string;
+  plan_id: string;
+  booking_id: string;
+  user_id: string;
+  amount: number;
+  service_charge: number;
+  total_charged: number;
+  payment_provider: string;
+  provider_transaction_id?: string;
+  membership_exemption_used: boolean;
+  points_earned: number;
+  status: 'pending' | 'completed' | 'failed' | 'refunded';
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface Tour {
   id: string;
@@ -168,6 +229,13 @@ export interface Tour {
   commission_rate_override?: number | null;
   commission_override_expires_at?: string | null;
   commission_override_reason?: string | null;
+  payment_option?: PaymentOption;
+  full_payment_days_before_departure?: number;
+  payment_plan_mode?: PaymentPlanMode;
+  installment_definitions?: InstallmentDefinition[];
+  late_payment_grace_days?: number;
+  late_payment_penalty_pct?: number;
+  late_payment_penalty_fixed?: number;
 }
 
 export interface TourSchedule {
@@ -283,6 +351,11 @@ export interface Booking {
   preventa_comision_descuento?: number;
   travel_insurance_included?: boolean;
   travel_insurance_cost?: number;
+  has_payment_plan?: boolean;
+  payment_plan_total?: number;
+  payment_plan_paid?: number;
+  payment_plan_status?: PaymentPlanStatus;
+  payment_plan?: BookingPaymentPlan;
 }
 
 export interface BookingTraveler {
@@ -320,7 +393,7 @@ export interface FrequentCompanion {
 export interface Notification {
   id: string;
   user_id: string;
-  type: 'booking_pending_approval' | 'booking_approved' | 'booking_rejected' | 'booking_confirmed' | 'booking_cancelled' | 'message_received' | 'tour_updated' | 'system_announcement' | 'tour_rescheduled' | 'referral_signup' | 'referral_completed' | 'referral_bonus_earned';
+  type: 'booking_pending_approval' | 'booking_approved' | 'booking_rejected' | 'booking_confirmed' | 'booking_cancelled' | 'message_received' | 'tour_updated' | 'system_announcement' | 'tour_rescheduled' | 'referral_signup' | 'referral_completed' | 'referral_bonus_earned' | 'payment_plan_reminder' | 'payment_plan_overdue' | 'payment_plan_overdue_critical' | 'payment_plan_paid';
   title: string;
   message: string;
   data?: any;

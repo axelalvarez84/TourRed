@@ -855,7 +855,42 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     agencyCommission = totalPrice * (agencyCommissionPercentage / 100);
   }
 
-  const membershipMonthlyPrice = membershipPrices?.monthlyPrice || 49;
+  // Plan de pagos: calcular el mínimo requerido al reservar
+  const tourPaymentOption = (tour as any).payment_option || 'full_upfront';
+  const hasPaymentPlan = tourPaymentOption !== 'full_upfront';
+  const [selectedPaymentMode, setSelectedPaymentMode] = React.useState<'full' | 'plan'>(
+    tourPaymentOption === 'payment_plan' ? 'plan' : 'full'
+  );
+  const payPlanMode = (tour as any).payment_plan_mode || 'installments';
+  const installmentDefs: any[] = (tour as any).installment_definitions || [];
+
+  const paymentPlanMinimum = React.useMemo(() => {
+    if (!hasPaymentPlan || selectedPaymentMode !== 'plan') return depositAmount;
+    if (payPlanMode === 'free_form') return 0;
+    const bookingDate = new Date();
+    const departureDate = isReceptivo && selectedSlotDate ? selectedSlotDate : (tour.start_date ? new Date(tour.start_date) : null);
+    let min = 0;
+    for (const def of installmentDefs) {
+      let dueDate: Date | null = null;
+      if (def.days_after_booking !== undefined) {
+        dueDate = new Date(bookingDate);
+        dueDate.setDate(dueDate.getDate() + def.days_after_booking);
+      } else if (def.days_before_departure !== undefined && departureDate) {
+        dueDate = new Date(departureDate);
+        dueDate.setDate(dueDate.getDate() - def.days_before_departure);
+      }
+      if (dueDate && dueDate <= bookingDate) {
+        min += Math.round(totalPrice * (def.pct_of_total / 100) * 100) / 100;
+      }
+    }
+    return min;
+  }, [hasPaymentPlan, selectedPaymentMode, payPlanMode, installmentDefs, totalPrice, depositAmount, isReceptivo, selectedSlotDate, tour.start_date]);
+
+  const effectiveDepositAmount = hasPaymentPlan && selectedPaymentMode === 'plan'
+    ? (isHighRisk ? totalPrice : paymentPlanMinimum)
+    : depositAmount;
+
+
   const membershipAnnualPrice = membershipPrices?.annualPrice || 490;
 
   const fullServiceCharge = totalPrice * (serviceChargePercentage / 100);
@@ -899,7 +934,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     ? (selectedMembershipPlan === 'monthly' ? membershipMonthlyPrice : membershipAnnualPrice)
     : 0;
 
-  let userPayment = depositAmount + serviceCharge;
+  let userPayment = effectiveDepositAmount + serviceCharge;
 
   if (appliedDiscount && !isServiceFeeDiscount && appliedDiscount.discount_applies_to === 'payment_amount') {
     discountAmount = calculateDiscountAmount(userPayment);
@@ -1017,7 +1052,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         agency_id: tour.agency_id,
         travelers_count: totalTravelers,
         total_price: totalPrice,
-        deposit_amount: depositAmount,
+        deposit_amount: effectiveDepositAmount,
         commission_amount: agencyCommission,
         service_charge: serviceCharge,
         user_payment: userPayment + effectiveInsuranceCost,
@@ -1283,8 +1318,46 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           <div className="text-2xl font-bold text-primary-600">{formatCurrencyMXN(tour.price)}</div>
         )}
         <div className="text-sm text-gray-500 mt-1">
-          Depósito: {formatCurrencyMXN(depositAmount)} ({effectiveDepositPercentage}%)
+          {hasPaymentPlan && selectedPaymentMode === 'plan'
+            ? payPlanMode === 'free_form'
+              ? 'Plan de pagos: abonos libres'
+              : `Mínimo al reservar: ${formatCurrencyMXN(paymentPlanMinimum)}`
+            : `Depósito: ${formatCurrencyMXN(depositAmount)} (${effectiveDepositPercentage}%)`
+          }
         </div>
+
+        {/* Selector de modo de pago */}
+        {hasPaymentPlan && !isHighRisk && (
+          <div className="mt-3 flex gap-2">
+            {(tourPaymentOption === 'both' || tourPaymentOption === 'full_upfront') && (
+              <button
+                type="button"
+                onClick={() => setSelectedPaymentMode('full')}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium border-2 transition-all ${
+                  selectedPaymentMode === 'full'
+                    ? 'border-primary-500 bg-primary-50 text-primary-800'
+                    : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}
+              >
+                Pago total anticipado
+              </button>
+            )}
+            {(tourPaymentOption === 'both' || tourPaymentOption === 'payment_plan') && (
+              <button
+                type="button"
+                onClick={() => setSelectedPaymentMode('plan')}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium border-2 transition-all ${
+                  selectedPaymentMode === 'plan'
+                    ? 'border-sky-500 bg-sky-50 text-sky-800'
+                    : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}
+              >
+                Plan de pagos
+              </button>
+            )}
+          </div>
+        )}
+
       </div>
 
       {isHighRisk && (
@@ -2623,8 +2696,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                 </>
               )}
               <div className="flex justify-between text-sm mt-1">
-                <span className="text-gray-600">Depósito ({effectiveDepositPercentage}%):</span>
-                <span className="font-medium">{formatCurrencyMXN(depositAmount)}</span>
+                <span className="text-gray-600">
+                  {hasPaymentPlan && selectedPaymentMode === 'plan'
+                    ? payPlanMode === 'free_form' ? 'Abono inicial (libre)' : 'Mínimo al reservar'
+                    : `Depósito (${effectiveDepositPercentage}%)`}:
+                </span>
+                <span className="font-medium">{formatCurrencyMXN(effectiveDepositAmount)}</span>
               </div>
 
               {(() => {

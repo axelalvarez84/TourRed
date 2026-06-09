@@ -3,6 +3,7 @@ import { Calendar, MapPin, Users, DollarSign, Clock, Eye, Mail, Phone, CheckCirc
 import { useAuth } from '../../context/AuthContext';
 import { formatCurrency, formatCurrencyMXN } from '../../utils/formatCurrency';
 import { getAgencyBookings, getTourBookingReport, supabase, parseDateFromDB } from '../../lib/supabase';
+import PaymentPlanCalendar from '../../components/PaymentPlanCalendar';
 import { Booking } from '../../types';
 import { format } from 'date-fns';
 import { Link, useNavigate } from 'react-router-dom';
@@ -1765,6 +1766,13 @@ const AgencyBookings: React.FC = () => {
                       <p className="text-sm text-yellow-800">
                         <strong>Reagendamiento pendiente:</strong> Has solicitado un cambio de fecha para este tour. Esperando la respuesta del viajero.
                       </p>
+                    </div>
+                  )}
+
+                  {/* Plan de Pagos (vista agencia, solo lectura) */}
+                  {(booking as any).has_payment_plan && (
+                    <div className="mt-4">
+                      <PaymentPlanCalendar bookingId={booking.id} agencyView={true} />
                     </div>
                   )}
 

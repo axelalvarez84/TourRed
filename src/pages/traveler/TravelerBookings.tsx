@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X, CreditCard as Edit, UserCheck, XCircle, CalendarX, Check, Wallet, Lock, UserMinus, Car, Globe, Tag, Plus, AlertTriangle, ShoppingBag, Shield } from 'lucide-react';
 import SeatReselectionModal from '../../components/SeatReselectionModal';
+import PaymentPlanCalendar from '../../components/PaymentPlanCalendar';
 import { useAuth } from '../../context/AuthContext';
 import { getUserBookings, getUserPastBookings, getUserCancelledBookings, parseDateFromDB, supabase, calculateCancellationPolicy, processCancellation, calculatePartialCancellationPolicy, processPartialCancellation, PartialCancellationTraveler } from '../../lib/supabase';
 import { Booking, PendingReschedule } from '../../types';
@@ -2341,6 +2342,13 @@ const TravelerBookings: React.FC = () => {
                       </div>
                     )}
                   </div>
+
+                  {/* Plan de Pagos */}
+                  {(booking as any).has_payment_plan && (
+                    <div className="mt-4">
+                      <PaymentPlanCalendar bookingId={booking.id} />
+                    </div>
+                  )}
 
                   {/* Reschedule Banner */}
                   {booking.has_pending_reschedule && pendingReschedules[booking.id] && (
