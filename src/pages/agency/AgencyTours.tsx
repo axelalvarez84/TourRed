@@ -704,7 +704,7 @@ const AgencyTours: React.FC = () => {
       late_payment_penalty_pct: String((tour as any).late_payment_penalty_pct ?? 0),
       late_payment_penalty_fixed: String((tour as any).late_payment_penalty_fixed ?? 0),
     });
-    setInstallmentDefs((tour as any).installment_definitions || []);
+    setInstallmentDefs(((tour as any).installment_definitions || []).filter((_: any, i: number) => i > 0));
     setPaymentOptionsEnabled(((tour as any).payment_option || 'standard') !== 'standard');
     setSelectedDestinations(selectedDest);
     setIncludes(tour.includes && tour.includes.length > 0 ? tour.includes : ['']);
@@ -1863,7 +1863,10 @@ const AgencyTours: React.FC = () => {
           : null,
         payment_plan_mode: (formData.payment_option === 'payment_plan' || formData.payment_option === 'both') ? formData.payment_plan_mode : null,
         installment_definitions: ((formData.payment_option === 'payment_plan' || formData.payment_option === 'both') && formData.payment_plan_mode === 'installments')
-          ? installmentDefs
+          ? [
+              { label: 'Anticipo', pct_of_total: parseFloat(formData.deposit_percentage) || 0, days_after_booking: 0 },
+              ...installmentDefs,
+            ]
           : null,
         late_payment_grace_days: (formData.payment_option === 'payment_plan' || formData.payment_option === 'both') ? Math.max(0, parseInt(formData.late_payment_grace_days) || 5) : null,
         late_payment_penalty_pct: (formData.payment_option === 'payment_plan' || formData.payment_option === 'both') ? parseFloat(formData.late_payment_penalty_pct) || 0 : null,
@@ -4501,21 +4504,40 @@ const AgencyTours: React.FC = () => {
                           <h4 className="text-sm font-semibold text-gray-700">Parcialidades</h4>
                           <button
                             type="button"
-                            onClick={() => setInstallmentDefs([...installmentDefs, { label: `Parcialidad ${installmentDefs.length + 1}`, pct_of_total: 0, days_after_booking: 0 }])}
+                            onClick={() => setInstallmentDefs([...installmentDefs, { label: `Parcialidad ${installmentDefs.length + 2}`, pct_of_total: 0, days_after_booking: 0 }])}
                             className="text-xs text-sky-600 hover:text-sky-800 font-medium flex items-center gap-1"
                           >
                             <Plus className="w-3.5 h-3.5" /> Agregar parcialidad
                           </button>
                         </div>
 
+                        {/* Fila fija: Anticipo (al reservar) — derivada del % de anticipo del tour */}
+                        {(() => {
+                          const depositPct = parseFloat(formData.deposit_percentage) || 0;
+                          return (
+                            <div className="bg-sky-50 rounded-lg p-3 space-y-1 border border-sky-200">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-sky-600 w-5">1.</span>
+                                <span className="text-sm font-medium text-sky-800 flex-1">Anticipo (al reservar)</span>
+                                <span className="text-xs text-sky-600 bg-sky-100 rounded px-2 py-0.5">Automático</span>
+                              </div>
+                              <p className="text-xs text-sky-600 pl-7">
+                                {depositPct > 0
+                                  ? `${depositPct}% del total · Vence al reservar (día 0)`
+                                  : 'Configura el % de anticipo en la sección de precios arriba'}
+                              </p>
+                            </div>
+                          );
+                        })()}
+
                         {installmentDefs.length === 0 && (
-                          <p className="text-xs text-gray-400 italic">Sin parcialidades — agrega al menos una (anticipo).</p>
+                          <p className="text-xs text-gray-400 italic">Sin parcialidades adicionales — agrega pagos para el saldo restante.</p>
                         )}
 
                         {installmentDefs.map((def, idx) => (
                           <div key={idx} className="bg-gray-50 rounded-lg p-3 space-y-2 border border-gray-200">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-gray-500 w-5">{idx + 1}.</span>
+                              <span className="text-xs font-semibold text-gray-500 w-5">{idx + 2}.</span>
                               <input
                                 type="text"
                                 value={def.label}
@@ -4524,7 +4546,7 @@ const AgencyTours: React.FC = () => {
                                   next[idx] = { ...next[idx], label: e.target.value };
                                   setInstallmentDefs(next);
                                 }}
-                                placeholder="Etiqueta (ej: Anticipo)"
+                                placeholder="Etiqueta (ej: Segundo pago)"
                                 className="input input-sm flex-1 text-xs"
                               />
                               <button type="button" onClick={() => setInstallmentDefs(installmentDefs.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-600 flex-shrink-0">
@@ -4588,11 +4610,20 @@ const AgencyTours: React.FC = () => {
                           </div>
                         ))}
 
-                        {installmentDefs.length > 0 && (
-                          <p className={`text-xs font-medium ${installmentDefs.reduce((s, d) => s + d.pct_of_total, 0) === 100 ? 'text-green-600' : 'text-orange-500'}`}>
-                            Total: {installmentDefs.reduce((s, d) => s + d.pct_of_total, 0)}% {installmentDefs.reduce((s, d) => s + d.pct_of_total, 0) === 100 ? '✓' : '(debe sumar 100%)'}
-                          </p>
-                        )}
+                        {(() => {
+                          const depositPct = parseFloat(formData.deposit_percentage) || 0;
+                          const remaining = Math.round((100 - depositPct) * 100) / 100;
+                          const assigned = installmentDefs.reduce((s, d) => s + d.pct_of_total, 0);
+                          const total = depositPct + assigned;
+                          const isValid = Math.abs(total - 100) < 0.01;
+                          return (
+                            <div className={`text-xs font-medium p-2 rounded-lg ${isValid ? 'text-green-700 bg-green-50' : 'text-orange-600 bg-orange-50'}`}>
+                              <span>Anticipo: {depositPct}%</span>
+                              {installmentDefs.length > 0 && <span> + Parcialidades: {assigned}%</span>}
+                              <span> = {total}% {isValid ? '✓' : `(debe sumar 100% — faltan ${Math.round((remaining - assigned) * 100) / 100}%)`}</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
