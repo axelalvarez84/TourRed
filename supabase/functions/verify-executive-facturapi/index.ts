@@ -37,7 +37,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { executive_id, api_key, organization_id } = await req.json();
+    const { executive_id, api_key } = await req.json();
     if (!executive_id || !api_key) {
       return new Response(JSON.stringify({ error: "executive_id and api_key are required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -71,11 +71,10 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Validate the API key against FacturAPI
-    const headers: Record<string, string> = { Authorization: `Bearer ${api_key}` };
-    if (organization_id) headers["X-Organization-Id"] = organization_id;
-
-    const facturapiRes = await fetch("https://www.facturapi.io/v2/organizations", { headers });
+    // Validate the API key using /v2/profile — works for single-org and multi-org accounts
+    const facturapiRes = await fetch("https://www.facturapi.io/v2/profile", {
+      headers: { Authorization: `Bearer ${api_key}` },
+    });
 
     if (!facturapiRes.ok) {
       const errText = await facturapiRes.text();
@@ -85,21 +84,24 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const orgsData = await facturapiRes.json();
-    const orgList = Array.isArray(orgsData.data ?? orgsData) ? (orgsData.data ?? orgsData) : [];
+    const profileData = await facturapiRes.json();
 
     await supabase
       .from("account_executives")
       .update({
         facturapi_api_key_encrypted: api_key,
-        facturapi_organization_id: organization_id || null,
+        facturapi_organization_id: null,
         facturapi_configured_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", executive_id);
 
     return new Response(
-      JSON.stringify({ success: true, organizations_count: orgList.length, message: "FacturAPI configurado correctamente" }),
+      JSON.stringify({
+        success: true,
+        livemode: profileData.livemode ?? null,
+        message: "FacturAPI configurado correctamente",
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {

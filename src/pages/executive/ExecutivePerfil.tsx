@@ -72,7 +72,6 @@ export default function ExecutivePerfil() {
   const [isSavingBank, setIsSavingBank] = useState(false);
 
   const [facturApiKey, setFacturApiKey] = useState('');
-  const [facturOrgId, setFacturOrgId] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [isVerifyingFacturapi, setIsVerifyingFacturapi] = useState(false);
 
@@ -114,7 +113,6 @@ export default function ExecutivePerfil() {
           setBankName(data.bank_name || '');
           setBankAccountNumber(data.bank_account_number || '');
           setBankClabe(data.bank_clabe || '');
-          setFacturOrgId(data.facturapi_organization_id || '');
 
           if (data.profile_photo_url) {
             const { data: signed } = await supabase.storage
@@ -219,12 +217,12 @@ export default function ExecutivePerfil() {
         {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ executive_id: profile.id, api_key: facturApiKey.trim(), organization_id: facturOrgId.trim() || null }),
+          body: JSON.stringify({ executive_id: profile.id, api_key: facturApiKey.trim() }),
         }
       );
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Error al verificar.');
-      setProfile(p => p ? { ...p, facturapi_configured: true, facturapi_organization_id: facturOrgId.trim() || null, facturapi_configured_at: new Date().toISOString() } : p);
+      setProfile(p => p ? { ...p, facturapi_configured: true, facturapi_configured_at: new Date().toISOString() } : p);
       setFacturApiKey('');
       showMsg('success', 'FacturAPI configurado y verificado correctamente.', 'facturapi');
     } catch (e: any) {
@@ -411,8 +409,8 @@ export default function ExecutivePerfil() {
             <ol className="text-sm text-blue-800 space-y-1.5 list-decimal list-inside">
               <li>Crea una cuenta gratuita en FacturAPI y registra tu RFC como organización emisora</li>
               <li>Sube tu CSD (Certificado de Sello Digital) directamente en el portal de FacturAPI</li>
-              <li>Copia tu <strong>API Key</strong> y (opcionalmente) el <strong>Organization ID</strong></li>
-              <li>Pega los datos aquí y presiona "Verificar y guardar"</li>
+              <li>Copia tu <strong>API Key</strong> de FacturAPI</li>
+              <li>Pégala aquí y presiona "Verificar y guardar"</li>
             </ol>
             <a href="https://www.facturapi.io" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-blue-700 hover:text-blue-900 font-medium">
               Ir a FacturAPI <ExternalLink className="h-3 w-3" />
@@ -450,10 +448,6 @@ export default function ExecutivePerfil() {
                 </button>
               </div>
               <p className="text-xs text-gray-400 mt-1">Tu API Key nunca se muestra de nuevo por seguridad.</p>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">Organization ID (opcional)</label>
-              <input type="text" value={facturOrgId} onChange={e => setFacturOrgId(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-violet-500" placeholder="Requerido si tienes múltiples organizaciones en FacturAPI" />
             </div>
           </div>
 

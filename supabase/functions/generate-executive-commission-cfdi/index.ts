@@ -17,15 +17,11 @@ interface CfdiResult {
   stamped_at: string;
 }
 
-async function facturapiStamp(apiKey: string, orgId: string, body: Record<string, unknown>): Promise<CfdiResult> {
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${apiKey}`,
-    "Content-Type": "application/json",
-  };
-  if (orgId) headers["X-Organization-Id"] = orgId;
-
+async function facturapiStamp(apiKey: string, body: Record<string, unknown>): Promise<CfdiResult> {
   const res = await fetch("https://www.facturapi.io/v2/invoices", {
-    method: "POST", headers, body: JSON.stringify(body),
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
@@ -192,7 +188,7 @@ Deno.serve(async (req: Request) => {
 
     let cfdiResult: CfdiResult;
     try {
-      cfdiResult = await facturapiStamp(exec.facturapi_api_key_encrypted, exec.facturapi_organization_id || "", facturapiBody);
+      cfdiResult = await facturapiStamp(exec.facturapi_api_key_encrypted, facturapiBody);
     } catch (stampError) {
       return new Response(
         JSON.stringify({ error: "Error al timbrar con FacturAPI", detail: String(stampError) }),
