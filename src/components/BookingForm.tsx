@@ -892,6 +892,27 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         ? (isHighRisk ? totalPrice : paymentPlanMinimum)
         : depositAmount);
 
+  const paymentSchedule = React.useMemo(() => {
+    if (!hasPaymentPlan || payPlanMode !== 'installments' || installmentDefs.length === 0) return [];
+    const bookingDate = new Date();
+    const departureDate = isReceptivo && selectedSlotDate ? selectedSlotDate : (tour.start_date ? new Date(tour.start_date) : null);
+    return installmentDefs.map((def: any, idx: number) => {
+      const amount = Math.round(totalPrice * (def.pct_of_total / 100) * 100) / 100;
+      let dueDate: Date | null = null;
+      if (def.specific_date) {
+        dueDate = new Date(def.specific_date + 'T12:00:00');
+      } else if (def.days_after_booking !== undefined) {
+        dueDate = new Date(bookingDate);
+        dueDate.setDate(dueDate.getDate() + (def.days_after_booking || 0));
+      } else if (def.days_before_departure !== undefined && departureDate) {
+        dueDate = new Date(departureDate);
+        dueDate.setDate(dueDate.getDate() - def.days_before_departure);
+      }
+      const isToday = dueDate ? dueDate <= bookingDate : false;
+      return { idx, label: def.label || `Pago ${idx + 1}`, amount, dueDate, isToday, pct: def.pct_of_total };
+    });
+  }, [hasPaymentPlan, payPlanMode, installmentDefs, totalPrice, isReceptivo, selectedSlotDate, tour.start_date]);
+
 
   const membershipAnnualPrice = membershipPrices?.annualPrice || 490;
 
@@ -1359,6 +1380,67 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                 Plan de pagos
               </button>
             )}
+          </div>
+        )}
+
+        {/* Calendario de pagos — modo plan de pagos, parcialidades programadas */}
+        {hasPaymentPlan && selectedPaymentMode === 'plan' && !isHighRisk && payPlanMode === 'installments' && paymentSchedule.length > 0 && (
+          <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 overflow-hidden">
+            <div className="px-3 py-2 bg-sky-100 flex items-center gap-1.5 border-b border-sky-200">
+              <Calendar className="w-3.5 h-3.5 text-sky-600" />
+              <span className="text-xs font-semibold text-sky-800">Calendario de pagos</span>
+            </div>
+            <div className="divide-y divide-sky-100">
+              {paymentSchedule.map((row) => (
+                <div key={row.idx} className={`flex items-center justify-between px-3 py-2 ${row.isToday ? 'bg-sky-100' : ''}`}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${row.isToday ? 'bg-sky-500 text-white' : 'bg-white border border-sky-300 text-sky-600'}`}>
+                      {row.idx + 1}
+                    </div>
+                    <div className="min-w-0">
+                      <p className={`text-xs font-semibold truncate ${row.isToday ? 'text-sky-900' : 'text-gray-700'}`}>{row.label}</p>
+                      <p className="text-xs text-gray-400">
+                        {row.isToday
+                          ? 'Se cobra al reservar'
+                          : row.dueDate
+                            ? format(row.dueDate, "d 'de' MMMM, yyyy", { locale: es })
+                            : 'Fecha por confirmar'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0 ml-2">
+                    <p className={`text-sm font-bold ${row.isToday ? 'text-sky-700' : 'text-gray-800'}`}>{row.amount.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}</p>
+                    <p className="text-xs text-gray-400">{row.pct}%</p>
+                  </div>
+                </div>
+              ))}
+              <div className="flex items-center justify-between px-3 py-2 bg-white">
+                <span className="text-xs font-semibold text-gray-500">Total del tour</span>
+                <span className="text-sm font-bold text-gray-800">{totalPrice.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Info abonos libres */}
+        {hasPaymentPlan && selectedPaymentMode === 'plan' && !isHighRisk && payPlanMode === 'free_form' && (
+          <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3 flex gap-2">
+            <Info className="w-4 h-4 text-sky-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-semibold text-sky-800">Plan de abonos libres</p>
+              <p className="text-xs text-sky-700 mt-0.5">Puedes abonar la cantidad que quieras, cuando quieras, siempre que liquides el total antes de la fecha de salida del tour.</p>
+            </div>
+          </div>
+        )}
+
+        {/* Pago total anticipado — confirmación */}
+        {(tourPaymentOption === 'full_upfront' || (hasPaymentPlan && selectedPaymentMode === 'full')) && (
+          <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 flex gap-2">
+            <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-semibold text-emerald-800">Pago total al reservar</p>
+              <p className="text-xs text-emerald-700 mt-0.5">Se cargará el 100% del tour ({totalPrice.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })}) en este momento. No se requieren pagos adicionales.</p>
+            </div>
           </div>
         )}
 
