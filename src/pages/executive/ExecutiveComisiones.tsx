@@ -250,15 +250,24 @@ export default function ExecutiveComisiones() {
     } finally { setIsSaving(false); }
   };
 
-  const downloadCfdiXml = async (url: string, uuid: string | null) => {
+  const openExecutiveFile = async (commissionId: string, fileType: 'xml' | 'pdf', uuid?: string | null) => {
     try {
-      const res = await fetch(url);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/download-executive-cfdi?commission_id=${commissionId}&file_type=${fileType}`;
+      const res = await fetch(proxyUrl, { headers: { Authorization: `Bearer ${session.access_token}` } });
+      if (!res.ok) return;
       const blob = await res.blob();
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = uuid ? `CFDI-${uuid}.xml` : 'CFDI.xml';
-      a.click();
-      URL.revokeObjectURL(a.href);
+      const objectUrl = URL.createObjectURL(blob);
+      if (fileType === 'pdf') {
+        window.open(objectUrl, '_blank');
+      } else {
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = uuid ? `CFDI-${uuid}.xml` : `CFDI-${commissionId}.xml`;
+        a.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 5000);
     } catch { /* silenciar error */ }
   };
 
@@ -399,10 +408,10 @@ export default function ExecutiveComisiones() {
                       <td className="px-4 py-3">
                         {comm.cfdi_xml_url ? (
                           <div className="flex items-center gap-1">
-                            <a href={comm.cfdi_xml_url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors" title="Abrir XML"><ExternalLink className="h-3.5 w-3.5" /></a>
-                            <button onClick={() => downloadCfdiXml(comm.cfdi_xml_url!, comm.cfdi_uuid_fiscal)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Descargar XML"><Download className="h-3.5 w-3.5" /></button>
+                            <button onClick={() => openExecutiveFile(comm.id, 'xml', comm.cfdi_uuid_fiscal)} className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors" title="Descargar XML"><ExternalLink className="h-3.5 w-3.5" /></button>
+                            <button onClick={() => openExecutiveFile(comm.id, 'xml', comm.cfdi_uuid_fiscal)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Descargar XML"><Download className="h-3.5 w-3.5" /></button>
                             <button onClick={() => setCfdiViewerUrl(comm.cfdi_xml_url)} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Ver representación gráfica"><FileText className="h-3.5 w-3.5" /></button>
-                            {comm.cfdi_pdf_url && <a href={comm.cfdi_pdf_url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Ver PDF"><Receipt className="h-3.5 w-3.5" /></a>}
+                            {comm.cfdi_pdf_url && <button onClick={() => openExecutiveFile(comm.id, 'pdf')} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Ver PDF"><Receipt className="h-3.5 w-3.5" /></button>}
                           </div>
                         ) : comm.status === 'pending' ? (
                           <div className="flex items-center gap-1">
@@ -450,8 +459,8 @@ export default function ExecutiveComisiones() {
                   </div>
                 </div>
                 <div className="flex gap-3 mb-4">
-                  <a href={generatedResult.xml_url} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"><Download className="h-4 w-4" /> Descargar XML</a>
-                  <a href={generatedResult.pdf_url} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"><Receipt className="h-4 w-4" /> Ver PDF</a>
+                  <button onClick={() => openExecutiveFile(selectedIds[0] || cfdiModal!.id, 'xml', generatedResult.uuid_fiscal)} className="flex-1 flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"><Download className="h-4 w-4" /> Descargar XML</button>
+                  <button onClick={() => openExecutiveFile(selectedIds[0] || cfdiModal!.id, 'pdf')} className="flex-1 flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"><Receipt className="h-4 w-4" /> Ver PDF</button>
                 </div>
                 <div className="flex justify-end">
                   <button onClick={() => { closeModal(); setSelectedIds([]); }} className="px-5 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors">Cerrar</button>
