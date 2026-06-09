@@ -86,35 +86,16 @@ Deno.serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
-    const token = authHeader.replace("Bearer ", "");
-
-    // Validate the user JWT using the anon key client (correct JWT verification)
-    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    });
-    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
-
-    if (userError || !user) {
-      console.error("Token validation error:", userError);
-      return new Response(
-        JSON.stringify({ success: false, error: "Invalid token" }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 401,
-        }
-      );
-    }
-
-    // Use service role for database operations
+    // Use service role for all database operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")
       .select(`
         id,
+        user_id,
         tour_id,
         travelers_count,
         tours (
@@ -191,7 +172,7 @@ Deno.serve(async (req) => {
     let { data: customers, error: customerError } = await supabase
       .from("stripe_customers")
       .select("customer_id")
-      .eq("user_id", user.id)
+      .eq("user_id", booking.user_id)
       .maybeSingle();
 
     if (customerError) {
@@ -199,19 +180,19 @@ Deno.serve(async (req) => {
     }
 
     let customerId;
-    
+
     if (!customers) {
       const { data: userProfile } = await supabase
         .from("users")
         .select("first_name, last_name, email")
-        .eq("id", user.id)
+        .eq("id", booking.user_id)
         .single();
 
       const customer = await stripe.customers.create({
-        email: user.email,
+        email: userProfile?.email,
         name: userProfile ? `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() : undefined,
         metadata: {
-          user_id: user.id,
+          user_id: booking.user_id,
         },
       });
 
@@ -220,7 +201,7 @@ Deno.serve(async (req) => {
       const { error: insertError } = await supabase
         .from("stripe_customers")
         .insert({
-          user_id: user.id,
+          user_id: booking.user_id,
           customer_id: customer.id,
         });
 
@@ -300,7 +281,7 @@ Deno.serve(async (req) => {
       ];
       sessionConfig.subscription_data = {
         metadata: {
-          user_id: user.id,
+          user_id: booking.user_id,
           booking_id: bookingId,
         },
       };
