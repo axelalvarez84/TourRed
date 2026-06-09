@@ -2344,7 +2344,7 @@ const TravelerBookings: React.FC = () => {
                   </div>
 
                   {/* Plan de Pagos */}
-                  {(booking as any).has_payment_plan && (
+                  {((booking as any).has_payment_plan || (booking as any).payment_plan_status === 'active') && (
                     <div className="mt-4">
                       <PaymentPlanCalendar bookingId={booking.id} />
                     </div>
