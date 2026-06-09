@@ -66,7 +66,7 @@ export default function AdminEjecutivosComisiones() {
   const loadCommissions = useCallback(async () => {
     setIsLoading(true);
     try {
-      let query = supabase
+      const { data } = await supabase
         .from('executive_commissions')
         .select(`
           id, executive_id, agency_id, commission_type, amount,
@@ -78,19 +78,16 @@ export default function AdminEjecutivosComisiones() {
           agencies(name)
         `)
         .order('created_at', { ascending: false });
-
-      if (statusFilter !== 'all') query = query.eq('status', statusFilter);
-
-      const { data } = await query;
       setCommissions((data as any[]) || []);
     } finally {
       setIsLoading(false);
     }
-  }, [statusFilter]);
+  }, []);
 
   useEffect(() => { loadCommissions(); }, [loadCommissions]);
 
   const filteredCommissions = commissions.filter(c => {
+    if (statusFilter !== 'all' && c.status !== statusFilter) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     const execName = `${c.account_executives?.first_name} ${c.account_executives?.last_name}`.toLowerCase();
@@ -208,6 +205,7 @@ export default function AdminEjecutivosComisiones() {
   };
 
   const STATUS_TABS: { key: StatusFilter; label: string }[] = [
+    { key: 'invoiced', label: 'CFDI Enviado' },
     { key: 'approved', label: 'Aprobados' },
     { key: 'paid', label: 'Pagados' },
     { key: 'pending', label: 'Pendientes' },
