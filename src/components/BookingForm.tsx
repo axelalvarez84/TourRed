@@ -856,8 +856,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   }
 
   // Plan de pagos: calcular el mínimo requerido al reservar
-  const tourPaymentOption = (tour as any).payment_option || 'full_upfront';
-  const hasPaymentPlan = tourPaymentOption !== 'full_upfront';
+  const tourPaymentOption = (tour as any).payment_option || 'standard';
+  const hasPaymentPlan = tourPaymentOption !== 'standard' && tourPaymentOption !== 'full_upfront';
   const [selectedPaymentMode, setSelectedPaymentMode] = React.useState<'full' | 'plan'>(
     tourPaymentOption === 'payment_plan' ? 'plan' : 'full'
   );
@@ -886,9 +886,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     return min;
   }, [hasPaymentPlan, selectedPaymentMode, payPlanMode, installmentDefs, totalPrice, depositAmount, isReceptivo, selectedSlotDate, tour.start_date]);
 
-  const effectiveDepositAmount = hasPaymentPlan && selectedPaymentMode === 'plan'
-    ? (isHighRisk ? totalPrice : paymentPlanMinimum)
-    : depositAmount;
+  const effectiveDepositAmount = tourPaymentOption === 'full_upfront'
+    ? totalPrice
+    : (hasPaymentPlan && selectedPaymentMode === 'plan'
+        ? (isHighRisk ? totalPrice : paymentPlanMinimum)
+        : depositAmount);
 
 
   const membershipAnnualPrice = membershipPrices?.annualPrice || 490;
@@ -1318,11 +1320,13 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           <div className="text-2xl font-bold text-primary-600">{formatCurrencyMXN(tour.price)}</div>
         )}
         <div className="text-sm text-gray-500 mt-1">
-          {hasPaymentPlan && selectedPaymentMode === 'plan'
-            ? payPlanMode === 'free_form'
-              ? 'Plan de pagos: abonos libres'
-              : `Mínimo al reservar: ${formatCurrencyMXN(paymentPlanMinimum)}`
-            : `Depósito: ${formatCurrencyMXN(depositAmount)} (${effectiveDepositPercentage}%)`
+          {tourPaymentOption === 'full_upfront'
+            ? `Pago total: ${formatCurrencyMXN(totalPrice)} (100%)`
+            : hasPaymentPlan && selectedPaymentMode === 'plan'
+              ? payPlanMode === 'free_form'
+                ? 'Plan de pagos: abonos libres'
+                : `Mínimo al reservar: ${formatCurrencyMXN(paymentPlanMinimum)}`
+              : `Depósito: ${formatCurrencyMXN(depositAmount)} (${effectiveDepositPercentage}%)`
           }
         </div>
 

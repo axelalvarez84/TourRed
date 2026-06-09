@@ -270,7 +270,7 @@ const AgencyTours: React.FC = () => {
     preventa_precio_especial: false,
     preventa_tipo_descuento: 'porcentaje' as 'monto' | 'porcentaje',
     preventa_descuento_valor: '',
-    payment_option: 'full_upfront' as PaymentOption,
+    payment_option: 'standard' as PaymentOption,
     full_payment_days_before_departure: '15',
     payment_plan_mode: 'installments' as PaymentPlanMode,
     late_payment_grace_days: '5',
@@ -293,6 +293,7 @@ const AgencyTours: React.FC = () => {
   const [optionalServices, setOptionalServices] = useState<OptionalService[]>([]);
   const [supplements, setSupplements] = useState<TourSupplement[]>([]);
   const [installmentDefs, setInstallmentDefs] = useState<InstallmentDefinition[]>([]);
+  const [paymentOptionsEnabled, setPaymentOptionsEnabled] = useState(false);
 
   const [schedulesDraft, setSchedulesDraft] = useState<ScheduleDraft[]>([]);
   const [scheduleForm, setScheduleForm] = useState<ScheduleDraft>({
@@ -553,7 +554,15 @@ const AgencyTours: React.FC = () => {
       preventa_precio_especial: false,
       preventa_tipo_descuento: 'porcentaje' as 'monto' | 'porcentaje',
       preventa_descuento_valor: '',
+      payment_option: 'standard' as PaymentOption,
+      full_payment_days_before_departure: '15',
+      payment_plan_mode: 'installments' as PaymentPlanMode,
+      late_payment_grace_days: '5',
+      late_payment_penalty_pct: '0',
+      late_payment_penalty_fixed: '0',
     });
+    setInstallmentDefs([]);
+    setPaymentOptionsEnabled(false);
     setSelectedDestinations([]);
     setSearchQuery('');
     setSearchResults([]);
@@ -688,7 +697,7 @@ const AgencyTours: React.FC = () => {
       preventa_precio_especial: (tour as any).preventa_precio_especial || false,
       preventa_tipo_descuento: ((tour as any).preventa_tipo_descuento || 'porcentaje') as 'monto' | 'porcentaje',
       preventa_descuento_valor: (tour as any).preventa_descuento_valor?.toString() || '',
-      payment_option: ((tour as any).payment_option || 'full_upfront') as PaymentOption,
+      payment_option: ((tour as any).payment_option || 'standard') as PaymentOption,
       full_payment_days_before_departure: String((tour as any).full_payment_days_before_departure ?? 15),
       payment_plan_mode: ((tour as any).payment_plan_mode || 'installments') as PaymentPlanMode,
       late_payment_grace_days: String((tour as any).late_payment_grace_days ?? 5),
@@ -696,6 +705,7 @@ const AgencyTours: React.FC = () => {
       late_payment_penalty_fixed: String((tour as any).late_payment_penalty_fixed ?? 0),
     });
     setInstallmentDefs((tour as any).installment_definitions || []);
+    setPaymentOptionsEnabled(((tour as any).payment_option || 'standard') !== 'standard');
     setSelectedDestinations(selectedDest);
     setIncludes(tour.includes && tour.includes.length > 0 ? tour.includes : ['']);
     setExcludes(tour.excludes && tour.excludes.length > 0 ? tour.excludes : ['']);
@@ -1848,16 +1858,16 @@ const AgencyTours: React.FC = () => {
         preventa_descuento_valor: (formData.preventa_activa && formData.preventa_precio_especial && formData.preventa_descuento_valor)
           ? parseFloat(formData.preventa_descuento_valor) : null,
         payment_option: formData.payment_option,
-        full_payment_days_before_departure: formData.payment_option !== 'payment_plan'
+        full_payment_days_before_departure: (formData.payment_option === 'full_upfront' || formData.payment_option === 'both')
           ? Math.max(15, parseInt(formData.full_payment_days_before_departure) || 15)
           : null,
-        payment_plan_mode: formData.payment_option !== 'full_upfront' ? formData.payment_plan_mode : null,
-        installment_definitions: (formData.payment_option !== 'full_upfront' && formData.payment_plan_mode === 'installments')
+        payment_plan_mode: (formData.payment_option === 'payment_plan' || formData.payment_option === 'both') ? formData.payment_plan_mode : null,
+        installment_definitions: ((formData.payment_option === 'payment_plan' || formData.payment_option === 'both') && formData.payment_plan_mode === 'installments')
           ? installmentDefs
           : null,
-        late_payment_grace_days: Math.max(0, parseInt(formData.late_payment_grace_days) || 5),
-        late_payment_penalty_pct: parseFloat(formData.late_payment_penalty_pct) || 0,
-        late_payment_penalty_fixed: parseFloat(formData.late_payment_penalty_fixed) || 0,
+        late_payment_grace_days: (formData.payment_option === 'payment_plan' || formData.payment_option === 'both') ? Math.max(0, parseInt(formData.late_payment_grace_days) || 5) : null,
+        late_payment_penalty_pct: (formData.payment_option === 'payment_plan' || formData.payment_option === 'both') ? parseFloat(formData.late_payment_penalty_pct) || 0 : null,
+        late_payment_penalty_fixed: (formData.payment_option === 'payment_plan' || formData.payment_option === 'both') ? parseFloat(formData.late_payment_penalty_fixed) || 0 : null,
       };
 
       let tourId: string;
@@ -4362,28 +4372,51 @@ const AgencyTours: React.FC = () => {
 
             {/* SECCIÓN PLAN DE PAGOS Y LIQUIDACIÓN */}
             <div className={`bg-white rounded-xl shadow-sm border-2 overflow-hidden transition-all ${
-              formData.payment_option !== 'full_upfront' ? 'border-sky-400' : 'border-gray-200'
+              paymentOptionsEnabled ? 'border-sky-400' : 'border-gray-200'
             }`}>
               <div className={`px-5 py-4 flex items-center justify-between ${
-                formData.payment_option !== 'full_upfront' ? 'bg-sky-50' : 'bg-gray-50'
+                paymentOptionsEnabled ? 'bg-sky-50' : 'bg-gray-50'
               }`}>
                 <div className="flex items-center gap-3">
                   <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    formData.payment_option !== 'full_upfront' ? 'bg-sky-600 text-white' : 'bg-gray-200 text-gray-500'
+                    paymentOptionsEnabled ? 'bg-sky-600 text-white' : 'bg-gray-200 text-gray-500'
                   }`}>
                     <CreditCard className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className={`font-semibold text-sm ${formData.payment_option !== 'full_upfront' ? 'text-sky-900' : 'text-gray-700'}`}>
-                      Plan de Pagos y Liquidación
+                    <h3 className={`font-semibold text-sm ${paymentOptionsEnabled ? 'text-sky-900' : 'text-gray-700'}`}>
+                      Plan de Pagos y Liquidación Avanzada
                     </h3>
-                    <p className={`text-xs ${formData.payment_option !== 'full_upfront' ? 'text-sky-700' : 'text-gray-500'}`}>
-                      Define cómo los viajeros liquidan el total de su reserva
+                    <p className={`text-xs ${paymentOptionsEnabled ? 'text-sky-700' : 'text-gray-500'}`}>
+                      {paymentOptionsEnabled
+                        ? 'Opciones avanzadas activas — configura la modalidad de pago'
+                        : 'Por defecto: anticipo al reservar, resto el día del tour a la agencia'}
                     </p>
                   </div>
                 </div>
+                {/* Toggle switch */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !paymentOptionsEnabled;
+                    setPaymentOptionsEnabled(next);
+                    if (!next) {
+                      setFormData({ ...formData, payment_option: 'standard' as PaymentOption });
+                    } else {
+                      setFormData({ ...formData, payment_option: 'full_upfront' as PaymentOption });
+                    }
+                  }}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${
+                    paymentOptionsEnabled ? 'bg-sky-500' : 'bg-gray-300'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    paymentOptionsEnabled ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
               </div>
 
+              {paymentOptionsEnabled && (
               <div className="px-5 py-4 space-y-4">
                 {/* Opción de pago */}
                 <div>
@@ -4566,7 +4599,7 @@ const AgencyTours: React.FC = () => {
                 )}
 
                 {/* Penalización por pago tardío */}
-                {formData.payment_option !== 'full_upfront' && (
+                {(formData.payment_option === 'payment_plan' || formData.payment_option === 'both') && (
                   <div className="border-t border-gray-100 pt-4 space-y-3">
                     <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 text-orange-500" />
@@ -4616,6 +4649,7 @@ const AgencyTours: React.FC = () => {
                   </div>
                 )}
               </div>
+              )}
             </div>
 
             {/* SECCIÓN PREVENTA EXCLUSIVA */}
