@@ -71,8 +71,8 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Validate the API key using /v2/profile — works for single-org and multi-org accounts
-    const facturapiRes = await fetch("https://www.facturapi.io/v2/profile", {
+    // Validate the API key by listing invoices — endpoint guaranteed to exist
+    const facturapiRes = await fetch("https://www.facturapi.io/v2/invoices?limit=1", {
       headers: { Authorization: `Bearer ${api_key}` },
     });
 
