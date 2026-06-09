@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  DollarSign, CheckCircle, XCircle, Clock, Eye, Download,
-  AlertCircle, X, Filter, Search, FileText, ChevronDown, Play, Calendar, ExternalLink
+  DollarSign, CheckCircle, XCircle, Eye, Download,
+  AlertCircle, X, Search, FileText, Play, Calendar
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrencyMXN } from '../../utils/formatCurrency';
-import CfdiViewerModal from '../../components/CfdiViewerModal';
 
 interface Commission {
   id: string;
@@ -56,7 +55,6 @@ export default function AdminEjecutivosComisiones() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [cfdiViewerUrl, setCfdiViewerUrl] = useState<string | null>(null);
 
   // Estado para generación de comisiones mensuales
   const currentDate = new Date();
@@ -163,17 +161,24 @@ export default function AdminEjecutivosComisiones() {
     }
   };
 
-  const downloadCfdiXml = async (url: string, uuid: string | null) => {
+  const openExecutiveFile = async (commissionId: string, fileType: 'xml' | 'pdf', uuid?: string | null) => {
     try {
-      const res = await fetch(url);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/download-executive-cfdi?commission_id=${commissionId}&file_type=${fileType}`;
+      const res = await fetch(proxyUrl, { headers: { Authorization: `Bearer ${session.access_token}` } });
+      if (!res.ok) return;
       const blob = await res.blob();
-      const filename = uuid ? `CFDI-${uuid}.xml` : 'CFDI.xml';
       const objectUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = objectUrl;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(objectUrl);
+      if (fileType === 'pdf') {
+        window.open(objectUrl, '_blank');
+      } else {
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = uuid ? `CFDI-${uuid}.xml` : `CFDI-${commissionId}.xml`;
+        a.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 5000);
     } catch {
       // silenciar error de descarga
     }
@@ -391,26 +396,17 @@ export default function AdminEjecutivosComisiones() {
                       <td className="px-4 py-3">
                         {comm.cfdi_xml_url ? (
                           <div className="flex items-center gap-1">
-                            <a
-                              href={comm.cfdi_xml_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                              title="Abrir XML"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </a>
                             <button
-                              onClick={() => downloadCfdiXml(comm.cfdi_xml_url!, comm.cfdi_uuid_fiscal)}
+                              onClick={() => openExecutiveFile(comm.id, 'xml', comm.cfdi_uuid_fiscal)}
                               className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                               title="Descargar XML"
                             >
                               <Download className="h-3.5 w-3.5" />
                             </button>
                             <button
-                              onClick={() => setCfdiViewerUrl(comm.cfdi_xml_url)}
+                              onClick={() => openExecutiveFile(comm.id, 'pdf', comm.cfdi_uuid_fiscal)}
                               className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Ver representación gráfica"
+                              title="Ver/Descargar PDF"
                             >
                               <FileText className="h-3.5 w-3.5" />
                             </button>
@@ -640,9 +636,6 @@ export default function AdminEjecutivosComisiones() {
         </div>
       )}
 
-      {cfdiViewerUrl && (
-        <CfdiViewerModal xmlUrl={cfdiViewerUrl} onClose={() => setCfdiViewerUrl(null)} />
-      )}
     </div>
   );
 }
