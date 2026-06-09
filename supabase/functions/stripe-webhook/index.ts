@@ -770,6 +770,109 @@ Deno.serve(async (req) => {
                   headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
                   body: JSON.stringify({ booking_id: bookingId }),
                 }).catch((err) => console.error('Error triggering booking accounting sync:', err));
+
+                // Create payment plan if selected_payment_mode === 'plan'
+                try {
+                  const { data: bkForPlan } = await supabase
+                    .from('bookings')
+                    .select(`
+                      id, selected_payment_mode, total_price, deposit_amount,
+                      tours:tour_id(payment_option, payment_plan_mode, installment_definitions, start_date, full_payment_days_before_departure)
+                    `)
+                    .eq('id', bookingId)
+                    .maybeSingle();
+
+                  if (bkForPlan?.selected_payment_mode === 'plan') {
+                    const tour = bkForPlan.tours as any;
+                    const totalPrice = parseFloat(bkForPlan.total_price) || 0;
+                    const depositPaid = parseFloat(bkForPlan.deposit_amount) || 0;
+                    const defs: any[] = tour?.installment_definitions || [];
+
+                    if (defs.length > 0) {
+                      const { data: existingPlan } = await supabase
+                        .from('booking_payment_plans')
+                        .select('id')
+                        .eq('booking_id', bookingId)
+                        .maybeSingle();
+
+                      if (!existingPlan) {
+                        const { data: plan, error: planErr } = await supabase
+                          .from('booking_payment_plans')
+                          .insert({
+                            booking_id: bookingId,
+                            mode: 'installments',
+                            total_plan_amount: totalPrice,
+                            total_amount_paid: depositPaid,
+                            status: 'active',
+                            paid_100_pct_at_booking: false,
+                          })
+                          .select('id')
+                          .single();
+
+                        if (planErr || !plan) {
+                          console.error('Error creating payment plan:', planErr);
+                        } else {
+                          const bookingDate = new Date();
+                          const departureDate = tour?.start_date ? new Date(tour.start_date) : null;
+                          const daysBeforeDeparture = tour?.full_payment_days_before_departure || 15;
+
+                          const installments = defs.map((def: any, idx: number) => {
+                            const amount = Math.round(totalPrice * (def.pct_of_total / 100) * 100) / 100;
+                            let dueDate: Date;
+                            if (def.specific_date) {
+                              dueDate = new Date(def.specific_date + 'T12:00:00');
+                            } else if (def.days_before_departure !== undefined && departureDate) {
+                              dueDate = new Date(departureDate);
+                              dueDate.setDate(dueDate.getDate() - def.days_before_departure);
+                            } else {
+                              dueDate = new Date(bookingDate);
+                              dueDate.setDate(dueDate.getDate() + (def.days_after_booking || 0));
+                            }
+
+                            const isFirstInstallment = idx === 0;
+                            const amountPaidForThisInstallment = isFirstInstallment ? Math.min(depositPaid, amount) : 0;
+                            const isPaid = isFirstInstallment && amountPaidForThisInstallment >= amount;
+
+                            return {
+                              plan_id: plan.id,
+                              booking_id: bookingId,
+                              installment_number: idx + 1,
+                              label: def.label || `Pago ${idx + 1}`,
+                              amount_due: amount,
+                              amount_paid: amountPaidForThisInstallment,
+                              due_date: dueDate.toISOString().split('T')[0],
+                              status: isPaid ? 'paid' : 'pending',
+                              paid_at: isPaid ? new Date().toISOString() : null,
+                            };
+                          });
+
+                          const { error: instErr } = await supabase
+                            .from('booking_payment_plan_installments')
+                            .insert(installments);
+
+                          if (instErr) {
+                            console.error('Error creating installments:', instErr);
+                          } else {
+                            await supabase
+                              .from('bookings')
+                              .update({
+                                has_payment_plan: true,
+                                payment_plan_status: 'active',
+                                payment_plan_total: totalPrice,
+                                payment_plan_paid: depositPaid,
+                              })
+                              .eq('id', bookingId);
+                            console.log(`✅ Payment plan created for booking ${bookingId} with ${installments.length} installments`);
+                          }
+                        }
+                      } else {
+                        console.log(`Payment plan already exists for booking ${bookingId}, skipping`);
+                      }
+                    }
+                  }
+                } catch (planErr) {
+                  console.error('Error creating payment plan for booking:', planErr);
+                }
               })()
             );
           }

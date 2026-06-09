@@ -1115,6 +1115,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         travel_insurance_cost: effectiveInsuranceCost,
         insurance_discount_code_id: appliedInsuranceDiscount?.code_id || null,
         insurance_discount_amount: insuranceDiscountAmount,
+        selected_payment_mode: hasPaymentPlan ? selectedPaymentMode : 'standard',
       };
 
       console.log('📝 Creando reserva con datos:', bookingData);
