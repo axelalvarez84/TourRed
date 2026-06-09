@@ -1892,9 +1892,9 @@ const AgencyTours: React.FC = () => {
               }),
             ]
           : null,
-        late_payment_grace_days: (formData.payment_option === 'payment_plan' || formData.payment_option === 'both') ? Math.max(0, parseInt(formData.late_payment_grace_days) || 5) : null,
-        late_payment_penalty_pct: (formData.payment_option === 'payment_plan' || formData.payment_option === 'both') ? parseFloat(formData.late_payment_penalty_pct) || 0 : null,
-        late_payment_penalty_fixed: (formData.payment_option === 'payment_plan' || formData.payment_option === 'both') ? parseFloat(formData.late_payment_penalty_fixed) || 0 : null,
+        late_payment_grace_days: (formData.payment_option === 'payment_plan' || formData.payment_option === 'both') ? Math.max(0, parseInt(formData.late_payment_grace_days) || 5) : 5,
+        late_payment_penalty_pct: (formData.payment_option === 'payment_plan' || formData.payment_option === 'both') ? parseFloat(formData.late_payment_penalty_pct) || 0 : 0,
+        late_payment_penalty_fixed: (formData.payment_option === 'payment_plan' || formData.payment_option === 'both') ? parseFloat(formData.late_payment_penalty_fixed) || 0 : 0,
       };
 
       let tourId: string;
