@@ -255,7 +255,7 @@ Deno.serve(async (req: Request) => {
               await supabase.rpc("confirm_featured_slot_payment", {
                 p_slot_id: slotId,
                 p_payment_id: paypalTransactionId ?? orderId,
-                p_provider: "paypal",
+                p_payment_provider: "paypal",
                 p_total: totalPaid,
               });
               EdgeRuntime.waitUntil(
@@ -313,7 +313,7 @@ Deno.serve(async (req: Request) => {
         await supabase.rpc("confirm_featured_slot_payment", {
           p_slot_id: slotId,
           p_payment_id: paypalTransactionId ?? orderId,
-          p_provider: "paypal",
+          p_payment_provider: "paypal",
           p_total: totalPaid,
         });
         EdgeRuntime.waitUntil(

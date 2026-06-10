@@ -161,7 +161,7 @@ Deno.serve(async (req: Request) => {
         const { error: rpcError } = await supabase.rpc("confirm_featured_slot_payment", {
           p_slot_id: featuredSlot.id,
           p_payment_id: String(notificationId),
-          p_provider: "mercadopago",
+          p_payment_provider: "mercadopago",
           p_total: totalPaid,
         });
         if (rpcError) {

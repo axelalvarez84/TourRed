@@ -436,7 +436,7 @@ Deno.serve(async (req) => {
             const { error: confirmErr } = await supabase.rpc('confirm_featured_slot_payment', {
               p_slot_id: featuredSlotId,
               p_payment_id: session.payment_intent as string ?? session.id,
-              p_provider: 'stripe',
+              p_payment_provider: 'stripe',
               p_total: totalPaid,
             });
 
