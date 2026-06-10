@@ -295,6 +295,9 @@ Deno.serve(async (req: Request) => {
           })
           .eq("id", externalReference);
 
+        // Poliza contable: venta de gift card
+        await supabase.rpc("create_accounting_entry_for_gift_card_sale", { p_gift_card_id: externalReference });
+
         try {
           await fetch(
             `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-gift-card-email`,

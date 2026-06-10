@@ -62,6 +62,9 @@ async function activateGiftCard(supabase: any, giftCardId: string, paypalTransac
 
   if (error) {
     console.error("Error updating gift card:", error);
+  } else {
+    // Poliza contable: venta de gift card
+    await supabase.rpc("create_accounting_entry_for_gift_card_sale", { p_gift_card_id: giftCardId });
   }
 
   EdgeRuntime.waitUntil(

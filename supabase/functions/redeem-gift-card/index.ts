@@ -261,6 +261,9 @@ Deno.serve(async (req: Request) => {
 
       if (updateGiftCardError) {
         console.error("Error updating gift card:", updateGiftCardError);
+      } else {
+        // Poliza contable: canje de gift card
+        await supabase.rpc("create_accounting_entry_for_gift_card_redemption", { p_gift_card_id: giftCard.id });
       }
 
       await supabase.from("gift_card_redemption_attempts").insert({

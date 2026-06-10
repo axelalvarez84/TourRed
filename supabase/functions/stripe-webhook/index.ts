@@ -1011,6 +1011,9 @@ Deno.serve(async (req) => {
           } else {
             console.log(`Successfully updated gift card ${giftCardId}`);
 
+            // Poliza contable: venta de gift card
+            await supabase.rpc('create_accounting_entry_for_gift_card_sale', { p_gift_card_id: giftCardId });
+
             const discountCode = paymentIntent.metadata?.discount_code;
             if (discountCode) {
               try {

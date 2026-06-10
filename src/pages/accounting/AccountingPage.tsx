@@ -5,7 +5,7 @@ import {
   Plus, AlertCircle, CheckCircle, Clock, Search, Calendar,
   BookMarked, ArrowUpRight, ArrowDownLeft, Users, Building2,
   X, ChevronDown, ChevronUp, Settings, PenLine, Trash2, Send,
-  Pencil, ToggleLeft, ToggleRight, Filter
+  Pencil, ToggleLeft, ToggleRight, Filter, CreditCard, Gift, RotateCcw, Ban
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -183,6 +183,16 @@ const AccountingPage: React.FC = () => {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [entryFilter, setEntryFilter] = useState<'all' | 'ingreso' | 'egreso' | 'diario'>('all');
 
+  // Gift card accounting summary
+  const [gcSummary, setGcSummary] = useState<{
+    pending_balance: number;
+    sold_count: number;
+    redeemed_count: number;
+    expired_count: number;
+    expiration_income: number;
+  } | null>(null);
+  const [loadingGcSummary, setLoadingGcSummary] = useState(false);
+
   // Manual entries tab
   const [manualEntries, setManualEntries] = useState<AccountingEntry[]>([]);
   const [loadingManual, setLoadingManual] = useState(false);
@@ -283,6 +293,14 @@ const AccountingPage: React.FC = () => {
     setLoadingManual(false);
   }, [year, month]);
 
+  // ── Load gift card accounting summary
+  const loadGcSummary = useCallback(async () => {
+    setLoadingGcSummary(true);
+    const { data } = await supabase.rpc('get_gift_card_accounting_summary');
+    setGcSummary(data ?? null);
+    setLoadingGcSummary(false);
+  }, []);
+
   const handleConfirmEntry = async (id: string) => {
     setConfirmingId(id);
     const { error } = await supabase
@@ -322,6 +340,10 @@ const AccountingPage: React.FC = () => {
   useEffect(() => {
     if (activeTab === 'catalog') loadAccountBalances();
   }, [activeTab, loadAccountBalances]);
+
+  useEffect(() => {
+    if (activeTab === 'overview') loadGcSummary();
+  }, [activeTab, loadGcSummary]);
 
   // ── Toggle entry detail
   const toggleEntry = async (entryId: string) => {
@@ -561,6 +583,60 @@ const AccountingPage: React.FC = () => {
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Gift Cards accounting summary */}
+                <div className="bg-white rounded-xl border border-gray-200 p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <CreditCard className="w-5 h-5 text-rose-500" />
+                    <h3 className="font-semibold text-gray-800">Tarjetas de Regalo — Posicion contable</h3>
+                    {loadingGcSummary && <RefreshCw className="w-3.5 h-3.5 text-gray-400 animate-spin ml-auto" />}
+                  </div>
+                  {gcSummary ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                      <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
+                        <p className="text-xs text-amber-600 font-medium mb-1">Saldo pendiente (218-12)</p>
+                        <p className="text-lg font-bold text-amber-800">{fmt(gcSummary.pending_balance)}</p>
+                        <p className="text-xs text-amber-500 mt-0.5">Pasivo por canjear</p>
+                      </div>
+                      <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-3">
+                        <div className="flex items-center gap-1 mb-1">
+                          <Gift className="w-3.5 h-3.5 text-emerald-600" />
+                          <p className="text-xs text-emerald-600 font-medium">Vendidas</p>
+                        </div>
+                        <p className="text-lg font-bold text-emerald-800">{gcSummary.sold_count}</p>
+                        <p className="text-xs text-emerald-500 mt-0.5">Polizas de venta</p>
+                      </div>
+                      <div className="bg-sky-50 border border-sky-100 rounded-lg p-3">
+                        <div className="flex items-center gap-1 mb-1">
+                          <RotateCcw className="w-3.5 h-3.5 text-sky-600" />
+                          <p className="text-xs text-sky-600 font-medium">Canjeadas</p>
+                        </div>
+                        <p className="text-lg font-bold text-sky-800">{gcSummary.redeemed_count}</p>
+                        <p className="text-xs text-sky-500 mt-0.5">Canje a monedero</p>
+                      </div>
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                        <div className="flex items-center gap-1 mb-1">
+                          <Ban className="w-3.5 h-3.5 text-gray-500" />
+                          <p className="text-xs text-gray-500 font-medium">Vencidas</p>
+                        </div>
+                        <p className="text-lg font-bold text-gray-700">{gcSummary.expired_count}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">Procesadas por cron</p>
+                      </div>
+                      <div className="bg-rose-50 border border-rose-100 rounded-lg p-3">
+                        <div className="flex items-center gap-1 mb-1">
+                          <TrendingUp className="w-3.5 h-3.5 text-rose-600" />
+                          <p className="text-xs text-rose-600 font-medium">Ingresos x venc. (4090)</p>
+                        </div>
+                        <p className="text-lg font-bold text-rose-800">{fmt(gcSummary.expiration_income)}</p>
+                        <p className="text-xs text-rose-500 mt-0.5">Reconocido en resultados</p>
+                      </div>
+                    </div>
+                  ) : (
+                    !loadingGcSummary && (
+                      <p className="text-sm text-gray-400 text-center py-6">Sin datos de tarjetas de regalo</p>
+                    )
+                  )}
                 </div>
 
                 {/* Recent entries */}
