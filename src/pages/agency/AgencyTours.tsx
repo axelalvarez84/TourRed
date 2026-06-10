@@ -5982,117 +5982,126 @@ const AgencyTours: React.FC = () => {
                   {tour.description}
                 </p>
 
-                {/* Acciones */}
-                <div className="flex justify-between items-center pt-3 border-t">
-                  <div className="text-xs text-gray-500">
-                    Creado: {formatDate(tour.created_at)}
+                {/* Acciones — 2 filas */}
+                <div className="pt-3 border-t space-y-1.5">
+                  {/* Fila 1: ver · editar · asientos · destacar · duplicar */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-400">
+                      Creado: {formatDate(tour.created_at)}
+                    </span>
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        onClick={() => window.open(`/tours/${tour.id}`, '_blank')}
+                        className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
+                        title="Ver tour"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => handleEdit(tour)}
+                          className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
+                          title="Editar tour"
+                          disabled={isSubmitting || isCreating || editingTour || duplicatingTour}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      )}
+                      {(tour as any).vehicle_map_type && (
+                        <button
+                          onClick={() => setSeatMapModal({ open: true, tour })}
+                          className="p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="Gestionar asientos"
+                          disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour}
+                        >
+                          <Bus className="h-4 w-4" />
+                        </button>
+                      )}
+                      {canCreate && (
+                        <button
+                          onClick={() => handleOpenFeatured(tour)}
+                          className="p-1.5 text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded transition-colors"
+                          title="Destacar tour"
+                          disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour}
+                        >
+                          <Sparkles className="h-4 w-4" />
+                        </button>
+                      )}
+                      {canCreate && (
+                        <button
+                          onClick={() => handleDuplicate(tour)}
+                          className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
+                          title="Duplicar tour"
+                          disabled={isSubmitting || isCreating || editingTour || duplicatingTour}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => window.open(`/tours/${tour.id}`, '_blank')}
-                      className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
-                      title="Ver tour"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    {canEdit && (
-                      <button
-                        onClick={() => handleEdit(tour)}
-                        className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
-                        title="Editar tour"
-                        disabled={isSubmitting || isCreating || editingTour || duplicatingTour}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                    )}
-                    {(tour as any).vehicle_map_type && (
-                      <button
-                        onClick={() => setSeatMapModal({ open: true, tour })}
-                        className="p-2 text-blue-500 hover:text-blue-700 transition-colors"
-                        title="Gestionar asientos"
-                        disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour}
-                      >
-                        <Bus className="h-4 w-4" />
-                      </button>
-                    )}
-                    {canEdit && tour.tour_type === 'receptivo' ? (
-                      <>
+
+                  {/* Fila 2: reagendar · cancelar · eliminar (solo cuando hay permisos) */}
+                  {(canEdit || canDelete) && (
+                    <div className="flex items-center justify-end gap-0.5">
+                      {canEdit && tour.tour_type === 'receptivo' ? (
+                        <>
+                          <button
+                            onClick={() => handleOpenReceptivoActions(tour, 'slot-reschedule')}
+                            className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors"
+                            title="Reagendar un slot especifico"
+                            disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour || !!tour.cancelled_by_agency}
+                          >
+                            <CalendarX className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleOpenReceptivoActions(tour, 'slot-cancel')}
+                            className="p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded transition-colors"
+                            title="Cancelar un slot especifico"
+                            disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour || !!tour.cancelled_by_agency}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleOpenReceptivoActions(tour, 'full-cancel')}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Cancelar tour completo (dejar de operar)"
+                            disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour || !!tour.cancelled_by_agency}
+                          >
+                            <Ban className="h-4 w-4" />
+                          </button>
+                        </>
+                      ) : canEdit ? (
+                        <>
+                          <button
+                            onClick={() => handleOpenReschedule(tour)}
+                            className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors"
+                            title="Reagendar tour"
+                            disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour || new Date(tour.start_date) < new Date() || !!tour.cancelled_by_agency}
+                          >
+                            <CalendarX className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleOpenCancel(tour)}
+                            className="p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded transition-colors"
+                            title="Cancelar tour completo"
+                            disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour || new Date(tour.start_date) <= new Date() || !!tour.cancelled_by_agency}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </button>
+                        </>
+                      ) : null}
+                      {canDelete && (
                         <button
-                          onClick={() => handleOpenReceptivoActions(tour, 'slot-reschedule')}
-                          className="p-2 text-gray-400 hover:text-amber-600 transition-colors"
-                          title="Reagendar un slot especifico"
-                          disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour || !!tour.cancelled_by_agency}
+                          onClick={() => handleDelete(tour.id, tour.name)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Eliminar tour"
+                          disabled={isSubmitting || duplicatingTour}
                         >
-                          <CalendarX className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => handleOpenReceptivoActions(tour, 'slot-cancel')}
-                          className="p-2 text-gray-400 hover:text-orange-600 transition-colors"
-                          title="Cancelar un slot especifico"
-                          disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour || !!tour.cancelled_by_agency}
-                        >
-                          <XCircle className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleOpenReceptivoActions(tour, 'full-cancel')}
-                          className="p-2 text-gray-400 hover:text-red-700 transition-colors"
-                          title="Cancelar tour completo (dejar de operar)"
-                          disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour || !!tour.cancelled_by_agency}
-                        >
-                          <Ban className="h-4 w-4" />
-                        </button>
-                      </>
-                    ) : canEdit ? (
-                      <>
-                        <button
-                          onClick={() => handleOpenReschedule(tour)}
-                          className="p-2 text-gray-400 hover:text-amber-600 transition-colors"
-                          title="Reagendar tour"
-                          disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour || new Date(tour.start_date) < new Date() || !!tour.cancelled_by_agency}
-                        >
-                          <CalendarX className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleOpenCancel(tour)}
-                          className="p-2 text-gray-400 hover:text-orange-600 transition-colors"
-                          title="Cancelar tour completo"
-                          disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour || new Date(tour.start_date) <= new Date() || !!tour.cancelled_by_agency}
-                        >
-                          <XCircle className="h-4 w-4" />
-                        </button>
-                      </>
-                    ) : null}
-                    {canCreate && (
-                      <button
-                        onClick={() => handleOpenFeatured(tour)}
-                        className="p-2 text-gray-400 hover:text-amber-500 transition-colors"
-                        title="Destacar tour"
-                        disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour}
-                      >
-                        <Sparkles className="h-4 w-4" />
-                      </button>
-                    )}
-                    {canCreate && (
-                      <button
-                        onClick={() => handleDuplicate(tour)}
-                        className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
-                        title="Duplicar tour"
-                        disabled={isSubmitting || isCreating || editingTour || duplicatingTour}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </button>
-                    )}
-                    {canDelete && (
-                      <button
-                        onClick={() => handleDelete(tour.id, tour.name)}
-                        className="p-2 text-gray-400 hover:text-error-600 transition-colors"
-                        title="Eliminar tour"
-                        disabled={isSubmitting || duplicatingTour}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
