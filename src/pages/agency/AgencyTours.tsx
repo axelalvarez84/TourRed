@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAgencyId } from '../../hooks/useAgencyId';
-import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination, getTourCategories } from '../../lib/supabase';
-import { Plus, Search, X, CreditCard, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban, ShoppingBag, Info, Percent, Route, RefreshCw, Layers, Car, Globe, AlertTriangle, Bus, Pencil } from 'lucide-react';
+import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination, getTourCategories, getFeaturedPlans, getAgencyFeaturedSlots, joinFeaturedWaitlist } from '../../lib/supabase';
+import { Plus, Search, X, CreditCard, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban, ShoppingBag, Info, Percent, Route, RefreshCw, Layers, Car, Globe, AlertTriangle, Bus, Pencil, Sparkles, Star, TrendingUp, CheckCircle, Loader2 } from 'lucide-react';
 import { VehicleMapType } from '../../types/seats';
 import TourPromotionsManager from '../../components/TourPromotionsManager';
 import AgencyScheduleManager from '../../components/receptivo/AgencyScheduleManager';
@@ -150,6 +150,28 @@ const AgencyTours: React.FC = () => {
     open: boolean;
     tour: Tour | null;
   }>({ open: false, tour: null });
+
+  const [featuredModal, setFeaturedModal] = useState<{
+    open: boolean;
+    tour: Tour | null;
+    plans: any[];
+    activeSlot: any | null;
+    isLoading: boolean;
+    isSubmitting: boolean;
+    selectedPlanId: string;
+    error: string;
+    success: string;
+  }>({
+    open: false,
+    tour: null,
+    plans: [],
+    activeSlot: null,
+    isLoading: false,
+    isSubmitting: false,
+    selectedPlanId: '',
+    error: '',
+    success: '',
+  });
 
   const [receptivoActionsModal, setReceptivoActionsModal] = useState<{
     open: boolean;
@@ -900,6 +922,49 @@ const AgencyTours: React.FC = () => {
     resetForm();
     setError('');
     setEditingTourHasActiveBookings(false);
+  };
+
+  const handleOpenFeatured = async (tour: Tour) => {
+    if (!resolvedAgencyId) return;
+    setFeaturedModal({ open: true, tour, plans: [], activeSlot: null, isLoading: true, isSubmitting: false, selectedPlanId: '', error: '', success: '' });
+    const [plansRes, slotsRes] = await Promise.all([
+      getFeaturedPlans(),
+      getAgencyFeaturedSlots(resolvedAgencyId),
+    ]);
+    const activeSlot = (slotsRes.data || []).find((s: any) => s.tour_id === tour.id && s.status === 'active') ?? null;
+    setFeaturedModal(prev => ({
+      ...prev,
+      plans: plansRes.data || [],
+      activeSlot,
+      isLoading: false,
+      selectedPlanId: plansRes.data?.[0]?.id ?? '',
+    }));
+  };
+
+  const handleActivateFeatured = async () => {
+    if (!featuredModal.tour || !featuredModal.selectedPlanId || !resolvedAgencyId) return;
+    setFeaturedModal(prev => ({ ...prev, isSubmitting: true, error: '' }));
+    const { error } = await supabase.rpc('activate_featured_slot', {
+      p_tour_id: featuredModal.tour.id,
+      p_agency_id: resolvedAgencyId,
+      p_plan_id: featuredModal.selectedPlanId,
+    });
+    if (error) {
+      setFeaturedModal(prev => ({ ...prev, isSubmitting: false, error: error.message }));
+    } else {
+      setFeaturedModal(prev => ({ ...prev, isSubmitting: false, success: 'Tour destacado activado correctamente.' }));
+    }
+  };
+
+  const handleJoinWaitlist = async () => {
+    if (!featuredModal.tour || !featuredModal.selectedPlanId || !resolvedAgencyId) return;
+    setFeaturedModal(prev => ({ ...prev, isSubmitting: true, error: '' }));
+    const { error } = await joinFeaturedWaitlist(featuredModal.tour.id, featuredModal.selectedPlanId, resolvedAgencyId);
+    if (error) {
+      setFeaturedModal(prev => ({ ...prev, isSubmitting: false, error: error.message }));
+    } else {
+      setFeaturedModal(prev => ({ ...prev, isSubmitting: false, success: 'Te has unido a la lista de espera. Te notificaremos cuando haya un lugar disponible.' }));
+    }
   };
 
   const handleDelete = async (tourId: string, tourName: string) => {
@@ -5999,6 +6064,16 @@ const AgencyTours: React.FC = () => {
                     ) : null}
                     {canCreate && (
                       <button
+                        onClick={() => handleOpenFeatured(tour)}
+                        className="p-2 text-gray-400 hover:text-amber-500 transition-colors"
+                        title="Destacar tour"
+                        disabled={isSubmitting || isCreating || !!editingTour || !!duplicatingTour}
+                      >
+                        <Sparkles className="h-4 w-4" />
+                      </button>
+                    )}
+                    {canCreate && (
+                      <button
                         onClick={() => handleDuplicate(tour)}
                         className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
                         title="Duplicar tour"
@@ -6022,6 +6097,163 @@ const AgencyTours: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Modal de Destacar Tour */}
+      {featuredModal.open && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-amber-400 to-amber-500 p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-bold text-lg">Destacar Tour</h3>
+                    <p className="text-amber-100 text-xs truncate max-w-[220px]">{featuredModal.tour?.name}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setFeaturedModal(prev => ({ ...prev, open: false }))}
+                  className="text-white/80 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-5">
+              {featuredModal.isLoading ? (
+                <div className="flex items-center justify-center py-10 gap-2 text-gray-400">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="text-sm">Cargando planes...</span>
+                </div>
+              ) : featuredModal.success ? (
+                <div className="text-center py-8">
+                  <div className="w-14 h-14 bg-green-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                    <CheckCircle className="w-7 h-7 text-green-500" />
+                  </div>
+                  <p className="text-gray-900 font-semibold mb-1">Listo</p>
+                  <p className="text-gray-500 text-sm">{featuredModal.success}</p>
+                  <button
+                    onClick={() => setFeaturedModal(prev => ({ ...prev, open: false }))}
+                    className="mt-5 px-5 py-2 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700 transition-colors"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Active slot info */}
+                  {featuredModal.activeSlot && (
+                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+                      <Star className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm">
+                        <p className="font-semibold text-amber-800">Este tour ya esta destacado</p>
+                        <p className="text-amber-700">
+                          Plan: {featuredModal.activeSlot.featured_plans?.name} &middot;
+                          Vence: {new Date(featuredModal.activeSlot.expires_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </p>
+                        {featuredModal.activeSlot.featured_tour_stats && (
+                          <div className="flex gap-4 mt-1.5 text-xs text-amber-600">
+                            <span>{featuredModal.activeSlot.featured_tour_stats.impressions ?? 0} impresiones</span>
+                            <span>{featuredModal.activeSlot.featured_tour_stats.clicks ?? 0} clics</span>
+                            <span>{featuredModal.activeSlot.featured_tour_stats.bookings_generated ?? 0} reservas</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* What is featured */}
+                  <div className="mb-4 p-3 bg-blue-50 rounded-xl text-xs text-blue-700 space-y-1">
+                    <p className="font-semibold text-blue-800 flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5" /> Que incluye destacar tu tour</p>
+                    <ul className="space-y-0.5 pl-5 list-disc">
+                      <li>Aparece primero en la seccion "Tours Destacados" del inicio</li>
+                      <li>Se muestra primero en busquedas que coincidan con tu tour</li>
+                      <li>Badge dorado visible para todos los viajeros</li>
+                    </ul>
+                  </div>
+
+                  {/* Plan selector */}
+                  {!featuredModal.activeSlot && (
+                    <>
+                      <p className="text-sm font-semibold text-gray-700 mb-3">Elige un plan:</p>
+                      <div className="space-y-2 mb-4">
+                        {featuredModal.plans.map((plan: any) => (
+                          <label
+                            key={plan.id}
+                            className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${featuredModal.selectedPlanId === plan.id ? 'border-amber-400 bg-amber-50' : 'border-gray-100 hover:border-amber-200'}`}
+                          >
+                            <input
+                              type="radio"
+                              name="plan"
+                              value={plan.id}
+                              checked={featuredModal.selectedPlanId === plan.id}
+                              onChange={() => setFeaturedModal(prev => ({ ...prev, selectedPlanId: plan.id }))}
+                              className="accent-amber-500"
+                            />
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-gray-900 text-sm">{plan.name}</span>
+                                <span className="font-bold text-amber-600 text-sm">${plan.price.toLocaleString('es-MX')} MXN</span>
+                              </div>
+                              <p className="text-xs text-gray-500">{plan.duration_days} dias de visibilidad destacada</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {featuredModal.error && (
+                    <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                      {featuredModal.error.includes('max') || featuredModal.error.includes('50')
+                        ? (
+                          <>
+                            <p className="font-semibold mb-1">No hay lugares disponibles</p>
+                            <p>Todos los espacios de tours destacados estan ocupados. Puedes unirte a la lista de espera y te notificaremos cuando se libere un espacio.</p>
+                          </>
+                        ) : featuredModal.error}
+                    </div>
+                  )}
+
+                  {!featuredModal.activeSlot && (
+                    <div className="flex gap-2">
+                      {featuredModal.error?.includes('max') || featuredModal.error?.includes('50') ? (
+                        <button
+                          onClick={handleJoinWaitlist}
+                          disabled={featuredModal.isSubmitting || !featuredModal.selectedPlanId}
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-semibold disabled:opacity-50 transition-colors"
+                        >
+                          {featuredModal.isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckSquare className="w-4 h-4" />}
+                          Unirme a la lista de espera
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleActivateFeatured}
+                          disabled={featuredModal.isSubmitting || !featuredModal.selectedPlanId}
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50 transition-all shadow-sm"
+                        >
+                          {featuredModal.isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                          Destacar tour ahora
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setFeaturedModal(prev => ({ ...prev, open: false }))}
+                        className="px-4 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
