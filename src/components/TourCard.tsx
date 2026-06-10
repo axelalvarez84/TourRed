@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Star, Users, Building, Heart, Tag, RefreshCw, Crown } from 'lucide-react';
+import { MapPin, Calendar, Star, Users, Building, Heart, Tag, RefreshCw, Crown, Sparkles } from 'lucide-react';
 import { Tour } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
+import { supabase, trackFeaturedImpression, trackFeaturedClick } from '../lib/supabase';
 import { formatCurrency } from '../utils/formatCurrency';
 
 interface TourPromo {
@@ -25,12 +25,45 @@ interface TourCardProps {
   showDistance?: boolean;
   activePromo?: TourPromo | null;
   compact?: boolean;
+  isFeaturedTour?: boolean;
+  featuredSlotId?: string;
 }
 
-const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance = false, activePromo = null, compact = false }) => {
+const TourCard: React.FC<TourCardProps> = ({
+  tour, className = '', showDistance = false, activePromo = null,
+  compact = false, isFeaturedTour = false, featuredSlotId,
+}) => {
   const { user } = useAuth();
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const cardRef = useRef<HTMLDivElement | HTMLAnchorElement>(null);
+  const impressionTracked = useRef(false);
+
+  // Track impression only when card enters viewport (IntersectionObserver)
+  useEffect(() => {
+    if (!isFeaturedTour || !featuredSlotId || impressionTracked.current) return;
+    const el = cardRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !impressionTracked.current) {
+          impressionTracked.current = true;
+          trackFeaturedImpression(featuredSlotId);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.5 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isFeaturedTour, featuredSlotId]);
+
+  const handleFeaturedClick = useCallback(() => {
+    if (isFeaturedTour && featuredSlotId) {
+      sessionStorage.setItem('featuredReferral', featuredSlotId);
+      trackFeaturedClick(featuredSlotId);
+    }
+  }, [isFeaturedTour, featuredSlotId]);
 
   const formatDistance = (meters: number) => {
     const km = meters / 1000;
@@ -131,8 +164,12 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
 
     return (
       <Link
+        ref={cardRef as React.RefObject<HTMLAnchorElement>}
         to={`/tours/${tour.id}`}
-        className={`group bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col transition-all hover:shadow-md hover:-translate-y-0.5 animate-fade-in ${className}`}
+        onClick={handleFeaturedClick}
+        className={`group bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col transition-all hover:shadow-md hover:-translate-y-0.5 animate-fade-in ${
+          isFeaturedTour ? 'border-amber-300 ring-1 ring-amber-200' : 'border-gray-100'
+        } ${className}`}
       >
         <div className="relative overflow-hidden aspect-[3/4]">
           <img
@@ -143,7 +180,13 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
           />
           {/* Badges */}
           <div className="absolute top-1.5 left-1.5 flex flex-col gap-1">
-            {tour.is_featured && (
+            {isFeaturedTour && (
+              <span className="bg-gradient-to-r from-amber-400 to-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none flex items-center gap-0.5 shadow-sm">
+                <Sparkles className="w-2 h-2" />
+                Destacado
+              </span>
+            )}
+            {!isFeaturedTour && tour.is_featured && (
               <span className="bg-accent-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded leading-none">Dest.</span>
             )}
             {activePromo && (
@@ -193,7 +236,13 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
   }
 
   return (
-    <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 group animate-fade-in ${className}`}>
+    <div
+      ref={cardRef as React.RefObject<HTMLDivElement>}
+      className={`bg-white rounded-2xl shadow-sm border overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 group animate-fade-in ${
+        isFeaturedTour ? 'border-amber-300 ring-1 ring-amber-200' : 'border-gray-100'
+      } ${className}`}
+    >
+      <Link to={`/tours/${tour.id}`} onClick={handleFeaturedClick} className="block">
       <div className="relative overflow-hidden aspect-[4/3]">
         <img
           src={tour.image_url || 'https://images.pexels.com/photos/2245436/pexels-photo-2245436.png'}
@@ -201,21 +250,27 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
           loading="lazy"
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
-        {tour.is_featured && (
+        {isFeaturedTour && (
+          <div className="absolute top-2 left-2 bg-gradient-to-r from-amber-400 to-amber-500 text-white text-xs font-semibold px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
+            <Sparkles className="w-3 h-3" />
+            Tour Destacado
+          </div>
+        )}
+        {!isFeaturedTour && tour.is_featured && (
           <div className="absolute top-2 left-2 bg-accent-500 text-white text-xs font-semibold px-2 py-1 rounded">
             Destacado
           </div>
         )}
         {tour.tour_type === 'receptivo' && (
-          <div className={`absolute ${tour.is_featured ? 'top-9' : 'top-2'} left-2 flex items-center gap-1 bg-teal-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm`}>
+          <div className={`absolute ${(isFeaturedTour || tour.is_featured) ? 'top-9' : 'top-2'} left-2 flex items-center gap-1 bg-teal-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm`}>
             <RefreshCw className="w-2.5 h-2.5" />
             {tour.receptivo_modality === 'privado' ? 'Privado' : 'Receptivo'}
           </div>
         )}
         {activePromo && (
           <div className={`absolute left-2 flex items-center gap-1 text-white text-xs font-bold px-2 py-1 rounded shadow-md ${
-            tour.is_featured && tour.tour_type === 'receptivo' ? 'top-16' :
-            tour.is_featured || tour.tour_type === 'receptivo' ? 'top-9' : 'top-2'
+            (isFeaturedTour || tour.is_featured) && tour.tour_type === 'receptivo' ? 'top-16' :
+            (isFeaturedTour || tour.is_featured) || tour.tour_type === 'receptivo' ? 'top-9' : 'top-2'
           } ${
             activePromo.promotion_type === '2x1' ? 'bg-rose-600' :
             activePromo.promotion_type === '3x2' ? 'bg-orange-500' :
@@ -240,7 +295,7 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
             tour.preventa_fin && tour.preventa_fin >= today
           );
           if (!isEnPreventa) return null;
-          const badgesCount = (tour.is_featured ? 1 : 0) + (tour.tour_type === 'receptivo' ? 1 : 0) + (activePromo ? 1 : 0);
+          const badgesCount = ((isFeaturedTour || tour.is_featured) ? 1 : 0) + (tour.tour_type === 'receptivo' ? 1 : 0) + (activePromo ? 1 : 0);
           const topOffset = badgesCount === 0 ? 'top-2' : badgesCount === 1 ? 'top-9' : badgesCount === 2 ? 'top-16' : 'top-[5.75rem]';
           return (
             <div className={`absolute left-2 ${topOffset} flex items-center gap-1 bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm`}>
@@ -251,7 +306,7 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
         })()}
         {user && (
           <button
-            onClick={handleSaveToggle}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSaveToggle(e); }}
             disabled={isSaving}
             className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:shadow-lg transition-all disabled:opacity-50"
             title={isSaved ? 'Quitar de guardados' : 'Guardar tour'}
@@ -264,7 +319,8 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
           </button>
         )}
       </div>
-      
+      </Link>
+
       <div className="p-4">
         <div className="flex justify-between items-start mb-2">
           <h3 className="text-lg font-semibold text-gray-900 line-clamp-1">{tour.name}</h3>
@@ -275,7 +331,7 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
             </span>
           </div>
         </div>
-        
+
         <div className="space-y-2 mb-2">
           <div className="flex items-center text-gray-500 text-sm">
             <MapPin className="w-4 h-4 mr-1" />
@@ -325,14 +381,14 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
             <span>{formatDate(tour.start_date)} - {formatDate(tour.end_date)}</span>
           </div>
         )}
-        
+
         {tour.max_travelers && (
           <div className="flex items-center text-gray-500 text-sm mb-3">
             <Users className="w-4 h-4 mr-1" />
             <span>Máximo {tour.max_travelers} viajeros</span>
           </div>
         )}
-        
+
         <div className="border-t border-gray-100 pt-3 flex items-center justify-between">
           <div>
             <span className="text-sm text-gray-500">Desde</span>
@@ -356,7 +412,7 @@ const TourCard: React.FC<TourCardProps> = ({ tour, className = '', showDistance 
             })()}
           </div>
 
-          <Link to={`/tours/${tour.id}`} className="btn btn-primary">
+          <Link to={`/tours/${tour.id}`} onClick={handleFeaturedClick} className="btn btn-primary">
             Ver Detalles
           </Link>
         </div>

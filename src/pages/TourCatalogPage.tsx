@@ -4,7 +4,7 @@ import { Filter, MapPin, ChevronRight, ChevronLeft, X, SlidersHorizontal, Buildi
 import SearchBox from '../components/SearchBox';
 import TourCard from '../components/TourCard';
 import { Tour, SearchFilters } from '../types';
-import { getTours, supabase } from '../lib/supabase';
+import { getTours, getActiveFeaturedTours, supabase } from '../lib/supabase';
 import { useTourPromotionsBatch } from '../hooks/useSharedData';
 
 const PAGE_SIZE = 20;
@@ -13,6 +13,8 @@ const TourCatalogPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [tours, setTours] = useState<Tour[]>([]);
+  const [featuredSlotMapCatalog, setFeaturedSlotMapCatalog] = useState<Record<string, string>>({});
+  const [featuredCount, setFeaturedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
@@ -109,30 +111,64 @@ const TourCatalogPage: React.FC = () => {
           })) || [];
           setTours(transformedTours);
           setTotalCount(transformedTours.length);
+          setFeaturedSlotMapCatalog({});
+          setFeaturedCount(0);
         } else {
           const offset = (currentPage - 1) * PAGE_SIZE;
-          const { data, error, count } = await getTours({
-            tourName: initialFilters.tourName || null,
-            destination: initialFilters.destination || null,
-            category: initialFilters.category || null,
-            startDate: initialFilters.startDate || null,
-            endDate: initialFilters.endDate || null,
-            agency: initialFilters.agency || null,
-            minPrice: initialFilters.minPrice || null,
-            maxPrice: initialFilters.maxPrice || null,
-            petFriendly: initialFilters.petFriendly || null,
-            departurePoint: initialFilters.departurePoint || null,
-            tourType: initialFilters.tourType || null,
-            limit: PAGE_SIZE,
-            offset,
-          });
+          const [toursResult, featuredResult] = await Promise.all([
+            getTours({
+              tourName: initialFilters.tourName || null,
+              destination: initialFilters.destination || null,
+              category: initialFilters.category || null,
+              startDate: initialFilters.startDate || null,
+              endDate: initialFilters.endDate || null,
+              agency: initialFilters.agency || null,
+              minPrice: initialFilters.minPrice || null,
+              maxPrice: initialFilters.maxPrice || null,
+              petFriendly: initialFilters.petFriendly || null,
+              departurePoint: initialFilters.departurePoint || null,
+              tourType: initialFilters.tourType || null,
+              limit: PAGE_SIZE,
+              offset,
+            }),
+            activeFilterCount > 0 ? getActiveFeaturedTours() : Promise.resolve({ data: [], slotMap: {}, error: null }),
+          ]);
+
+          const { data, error, count } = toursResult;
           if (error) throw new Error(error.message);
+
+          if (activeFilterCount > 0 && featuredResult.data.length > 0) {
+            const queryTerms = [
+              initialFilters.tourName,
+              initialFilters.destination,
+              initialFilters.category,
+            ].filter(Boolean).map((s) => s!.toLowerCase());
+
+            const matchingFeatured = featuredResult.data.filter((t) => {
+              if (!queryTerms.length) return false;
+              const haystack = `${t.name} ${t.destination} ${Array.isArray(t.category) ? t.category.join(' ') : (t.category || '')}`.toLowerCase();
+              return queryTerms.some((q) => haystack.includes(q));
+            });
+
+            if (matchingFeatured.length > 0) {
+              const featuredIds = new Set(matchingFeatured.map((t) => t.id));
+              const organic = (data || []).filter((t) => !featuredIds.has(t.id));
+              setTours([...matchingFeatured, ...organic]);
+              setFeaturedSlotMapCatalog(featuredResult.slotMap);
+              setFeaturedCount(matchingFeatured.length);
+              setTotalCount((count ?? data?.length ?? 0) + matchingFeatured.length);
+              return;
+            }
+          }
+
           setTours(data || []);
+          setFeaturedSlotMapCatalog({});
+          setFeaturedCount(0);
           setTotalCount(count ?? data?.length ?? 0);
         }
       } catch (err: any) {
         setError(err.message || 'Error al cargar los tours');
-        setTours([]); setTotalCount(0);
+        setTours([]); setTotalCount(0); setFeaturedSlotMapCatalog({}); setFeaturedCount(0);
       } finally {
         setIsLoading(false);
       }
@@ -391,9 +427,27 @@ const TourCatalogPage: React.FC = () => {
             ) : (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-                  {filteredTours.map((tour) => (
-                    <TourCard key={tour.id} tour={tour} showDistance={hasGeoSearch} activePromo={promotionsMap[tour.id] ?? null} />
-                  ))}
+                  {featuredCount > 0 && (
+                    <div className="col-span-full flex items-center gap-2 mb-1">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 text-xs font-semibold rounded-full border border-amber-200">
+                        Tours Destacados primero
+                      </span>
+                      <span className="text-xs text-gray-400">{featuredCount} destacado{featuredCount !== 1 ? 's' : ''} coinciden con tu búsqueda</span>
+                    </div>
+                  )}
+                  {filteredTours.map((tour) => {
+                    const slotId = featuredSlotMapCatalog[tour.id];
+                    return (
+                      <TourCard
+                        key={tour.id}
+                        tour={tour}
+                        showDistance={hasGeoSearch}
+                        activePromo={promotionsMap[tour.id] ?? null}
+                        isFeaturedTour={!!slotId}
+                        featuredSlotId={slotId}
+                      />
+                    );
+                  })}
                 </div>
 
                 {!hasGeoSearch && totalPages > 1 && (

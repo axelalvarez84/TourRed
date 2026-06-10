@@ -239,6 +239,62 @@ export interface Tour {
   late_payment_penalty_fixed?: number;
 }
 
+// ── Featured Tours System ──────────────────────────────────────
+export interface FeaturedPlan {
+  id: string;
+  name: string;
+  duration_days: number;
+  price: number;
+  is_active: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FeaturedTourSlot {
+  id: string;
+  tour_id: string;
+  agency_id: string;
+  plan_id: string;
+  status: 'active' | 'expired' | 'cancelled';
+  starts_at: string;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+  featured_plans?: FeaturedPlan;
+  featured_tour_stats?: FeaturedTourStats;
+  tours?: Tour;
+  agencies?: Agency;
+}
+
+export interface FeaturedWaitlistEntry {
+  id: string;
+  tour_id: string;
+  agency_id: string;
+  plan_id: string;
+  position: number;
+  status: 'waiting' | 'notified' | 'paid' | 'skipped' | 'expired';
+  notified_at?: string;
+  created_at: string;
+  updated_at: string;
+  featured_plans?: FeaturedPlan;
+  tours?: Tour;
+  agencies?: Agency;
+}
+
+export interface FeaturedTourStats {
+  id: string;
+  slot_id: string;
+  impressions: number;
+  clicks: number;
+  bookings_generated: number;
+  first_impression_at?: string;
+  last_impression_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+// ─────────────────────────────────────────────────────────────
+
 export interface TourSchedule {
   id: string;
   tour_id: string;

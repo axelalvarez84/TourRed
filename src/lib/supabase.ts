@@ -576,7 +576,7 @@ export const getTours = async (filters: any = {}) => {
   }
 };
 
-export const getPopularTours = async (limit = 50) => {
+export const getPopularTours = async (limit = 20) => {
   try {
     const today = new Date().toISOString().split('T')[0];
     const { data, error } = await supabase
@@ -596,23 +596,237 @@ export const getPopularTours = async (limit = 50) => {
         category,
         tour_type,
         agencies(id, name, rating, is_active),
-        bookings(id)
+        bookings(id, status)
       `)
       .or(`end_date.gte.${today},end_date.is.null`)
-      .eq('agencies.is_active', true)
-      .neq('bookings.status', 'cancelled')
-      .limit(limit);
+      .limit(200);
 
     if (error) return { data: [], error };
 
-    const withCounts = (data ?? [])
+    // 70% confirmed bookings + 30% agency rating, max 3 per agency
+    const normalized = (data ?? [])
       .filter((t: any) => t.agencies?.is_active !== false)
-      .map((t: any) => ({ ...t, booking_count: Array.isArray(t.bookings) ? t.bookings.length : 0 }))
-      .sort((a: any, b: any) => b.booking_count - a.booking_count);
+      .map((t: any) => {
+        const confirmedBookings = Array.isArray(t.bookings)
+          ? t.bookings.filter((b: any) => b.status !== 'cancelled').length
+          : 0;
+        const agencyRating = t.agencies?.rating ?? 0;
+        return { ...t, booking_count: confirmedBookings, _score: confirmedBookings * 0.7 + agencyRating * 0.3 };
+      })
+      .sort((a: any, b: any) => b._score - a._score);
 
-    return { data: withCounts, error: null };
+    // Cap max 3 per agency
+    const agencyCounts: Record<string, number> = {};
+    const capped: any[] = [];
+    for (const t of normalized) {
+      const aid = t.agency_id;
+      agencyCounts[aid] = (agencyCounts[aid] || 0) + 1;
+      if (agencyCounts[aid] <= 3) capped.push(t);
+      if (capped.length >= limit) break;
+    }
+
+    return { data: capped, error: null };
   } catch (error: any) {
     return { data: [], error };
+  }
+};
+
+// Returns tours with active paid featured slots (expires_at > NOW())
+export const getActiveFeaturedTours = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('featured_tour_slots')
+      .select(`
+        id,
+        tour_id,
+        agency_id,
+        expires_at,
+        tours(
+          id,
+          name,
+          image_url,
+          destination,
+          start_date,
+          end_date,
+          price,
+          max_travelers,
+          is_featured,
+          agency_id,
+          pet_friendly,
+          category,
+          tour_type,
+          preventa_activa,
+          preventa_inicio,
+          preventa_fin,
+          preventa_precio_especial,
+          preventa_tipo_descuento,
+          preventa_descuento_valor,
+          agencies(id, name, rating, is_active)
+        )
+      `)
+      .eq('status', 'active')
+      .gt('expires_at', new Date().toISOString())
+      .limit(50);
+
+    if (error) return { data: [], slotMap: {}, error };
+
+    const slotMap: Record<string, string> = {};
+    const tours: any[] = [];
+
+    for (const slot of data ?? []) {
+      const tour = (slot as any).tours;
+      if (!tour || tour.agencies?.is_active === false) continue;
+      slotMap[tour.id] = slot.id;
+      tours.push({ ...tour, _featured_slot_id: slot.id });
+    }
+
+    return { data: tours, slotMap, error: null };
+  } catch (error: any) {
+    return { data: [], slotMap: {}, error };
+  }
+};
+
+// Returns newest tours chronologically, max 3 per agency
+export const getNewTours = async (limit = 20) => {
+  try {
+    const { data, error } = await supabase
+      .from('tours')
+      .select(`
+        id,
+        name,
+        image_url,
+        destination,
+        start_date,
+        end_date,
+        price,
+        max_travelers,
+        is_featured,
+        agency_id,
+        pet_friendly,
+        category,
+        tour_type,
+        created_at,
+        preventa_activa,
+        preventa_inicio,
+        preventa_fin,
+        preventa_precio_especial,
+        preventa_tipo_descuento,
+        preventa_descuento_valor,
+        agencies(id, name, rating, is_active)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(200);
+
+    if (error) return { data: [], error };
+
+    const agencyCounts: Record<string, number> = {};
+    const capped: any[] = [];
+    for (const t of data ?? []) {
+      if ((t as any).agencies?.is_active === false) continue;
+      const aid = (t as any).agency_id;
+      agencyCounts[aid] = (agencyCounts[aid] || 0) + 1;
+      if (agencyCounts[aid] <= 3) capped.push(t);
+      if (capped.length >= limit) break;
+    }
+
+    return { data: capped, error: null };
+  } catch (error: any) {
+    return { data: [], error };
+  }
+};
+
+export const getFeaturedPlans = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('featured_plans')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order');
+    return { data: data ?? [], error };
+  } catch (error: any) {
+    return { data: [], error };
+  }
+};
+
+export const getAgencyFeaturedSlots = async (agencyId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('featured_tour_slots')
+      .select(`
+        *,
+        featured_plans(id, name, duration_days, price),
+        featured_tour_stats(impressions, clicks, bookings_generated),
+        tours(id, name, destination, image_url)
+      `)
+      .eq('agency_id', agencyId)
+      .order('created_at', { ascending: false });
+    return { data: data ?? [], error };
+  } catch (error: any) {
+    return { data: [], error };
+  }
+};
+
+export const getAgencyFeaturedWaitlist = async (agencyId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('featured_tour_waitlist')
+      .select(`*, featured_plans(id, name, duration_days, price), tours(id, name, destination)`)
+      .eq('agency_id', agencyId)
+      .in('status', ['waiting', 'notified'])
+      .order('created_at', { ascending: false });
+    return { data: data ?? [], error };
+  } catch (error: any) {
+    return { data: [], error };
+  }
+};
+
+// Track featured tour impression via DB function (called by IntersectionObserver)
+export const trackFeaturedImpression = async (slotId: string) => {
+  try {
+    await supabase.rpc('increment_featured_stat', { p_slot_id: slotId, p_field: 'impressions' });
+  } catch (_) { /* non-critical */ }
+};
+
+export const trackFeaturedClick = async (slotId: string) => {
+  try {
+    await supabase.rpc('increment_featured_stat', { p_slot_id: slotId, p_field: 'clicks' });
+  } catch (_) { /* non-critical */ }
+};
+
+export const trackFeaturedBooking = async (slotId: string) => {
+  try {
+    await supabase.rpc('increment_featured_stat', { p_slot_id: slotId, p_field: 'bookings_generated' });
+  } catch (_) { /* non-critical */ }
+};
+
+export const joinFeaturedWaitlist = async (tourId: string, planId: string, agencyId: string) => {
+  try {
+    const { data: existing } = await supabase
+      .from('featured_tour_waitlist')
+      .select('id')
+      .eq('tour_id', tourId)
+      .eq('agency_id', agencyId)
+      .in('status', ['waiting', 'notified'])
+      .maybeSingle();
+
+    if (existing) return { error: new Error('Ya estás en la lista de espera para este tour') };
+
+    const { data: last } = await supabase
+      .from('featured_tour_waitlist')
+      .select('position')
+      .eq('tour_id', tourId)
+      .order('position', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const nextPosition = ((last as any)?.position ?? 0) + 1;
+    const { error } = await supabase
+      .from('featured_tour_waitlist')
+      .insert({ tour_id: tourId, agency_id: agencyId, plan_id: planId, position: nextPosition });
+
+    return { error };
+  } catch (error: any) {
+    return { error };
   }
 };
 

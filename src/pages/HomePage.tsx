@@ -8,28 +8,37 @@ import TourGridSection from '../components/TourGridSection';
 import MembershipSection from '../components/MembershipSection';
 import PreventasSection from '../components/PreventasSection';
 import { Tour } from '../types';
-import { getTours, getPopularTours, supabase } from '../lib/supabase';
+import { getActiveFeaturedTours, getPopularTours, getNewTours, supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useTourPromotionsBatch } from '../hooks/useSharedData';
 
 const HomePage: React.FC = () => {
   const [featuredTours, setFeaturedTours] = useState<Tour[]>([]);
+  const [featuredSlotMap, setFeaturedSlotMap] = useState<Record<string, string>>({});
   const [popularTours, setPopularTours] = useState<Tour[]>([]);
+  const [newTours, setNewTours] = useState<Tour[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const [popularLoading, setPopularLoading] = useState(true);
+  const [newToursLoading, setNewToursLoading] = useState(true);
   const [heroBackground, setHeroBackground] = useState<string | null | undefined>(undefined);
   const { user } = useAuth();
 
   useEffect(() => {
-    getTours({ limit: 50 }).then(({ data }) => {
-      setFeaturedTours(data || []);
+    getActiveFeaturedTours().then(({ data, slotMap }) => {
+      setFeaturedTours((data as Tour[]) || []);
+      setFeaturedSlotMap(slotMap || {});
       setFeaturedLoading(false);
     }).catch(() => setFeaturedLoading(false));
 
-    getPopularTours(50).then(({ data }) => {
+    getPopularTours(20).then(({ data }) => {
       setPopularTours((data as Tour[]) || []);
       setPopularLoading(false);
     }).catch(() => setPopularLoading(false));
+
+    getNewTours(20).then(({ data }) => {
+      setNewTours((data as Tour[]) || []);
+      setNewToursLoading(false);
+    }).catch(() => setNewToursLoading(false));
 
     supabase
       .from('platform_settings')
@@ -42,8 +51,8 @@ const HomePage: React.FC = () => {
   }, []);
 
   const allTourIds = useMemo(
-    () => [...new Set([...featuredTours.map(t => t.id), ...popularTours.map(t => t.id)])],
-    [featuredTours, popularTours]
+    () => [...new Set([...featuredTours.map(t => t.id), ...popularTours.map(t => t.id), ...newTours.map(t => t.id)])],
+    [featuredTours, popularTours, newTours]
   );
   const { data: promotionsMap = {} } = useTourPromotionsBatch(allTourIds);
 
@@ -84,14 +93,30 @@ const HomePage: React.FC = () => {
       {/* Preventas Exclusivas */}
       <PreventasSection />
 
-      {/* Featured Tours */}
+      {/* Tours Destacados (paid) — hidden when no active slots */}
       <TourGridSection
         title="Tours Destacados"
-        subtitle="Seleccionados por nuestro equipo entre las mejores opciones disponibles"
+        subtitle="Tours con visibilidad premium seleccionados por agencias verificadas"
         tours={featuredTours}
         isLoading={featuredLoading}
         promotionsMap={promotionsMap}
-        bgClass="bg-blue-50"
+        bgClass="bg-amber-50"
+        maxRows={4}
+        hideIfEmpty
+        viewAllLink="/tours"
+        featuredSlotMap={featuredSlotMap}
+      />
+
+      {/* Nuevos Tours */}
+      <TourGridSection
+        title="Nuevos Tours"
+        subtitle="Las últimas incorporaciones al catálogo de ToursRed"
+        tours={newTours}
+        isLoading={newToursLoading}
+        promotionsMap={promotionsMap}
+        bgClass="bg-white"
+        maxRows={4}
+        viewAllLink="/tours"
       />
 
       {/* Popular Tours */}
@@ -101,7 +126,9 @@ const HomePage: React.FC = () => {
         tours={popularTours}
         isLoading={popularLoading}
         promotionsMap={promotionsMap}
-        bgClass="bg-white"
+        bgClass="bg-blue-50"
+        maxRows={4}
+        viewAllLink="/tours"
       />
 
       {/* Categories Section */}
