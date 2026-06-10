@@ -186,7 +186,7 @@ Deno.serve(async (req: Request) => {
     if (provider === "paypal") {
       const { data: settings } = await supabase
         .from("platform_settings")
-        .select("paypal_client_id, paypal_client_secret, paypal_sandbox_mode")
+        .select("paypal_client_id, paypal_client_secret, paypal_sandbox")
         .maybeSingle();
 
       if (!settings?.paypal_client_id || !settings?.paypal_client_secret) {
@@ -196,7 +196,7 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      const paypalBase = settings.paypal_sandbox_mode
+      const paypalBase = settings.paypal_sandbox
         ? "https://api-m.sandbox.paypal.com"
         : "https://api-m.paypal.com";
 

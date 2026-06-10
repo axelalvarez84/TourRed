@@ -180,7 +180,7 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { orderId, bookingId, context, giftCardId } = await req.json();
+    const { orderId, bookingId, context, giftCardId, slotId } = await req.json();
 
     if (!orderId) {
       return new Response(JSON.stringify({ error: "order_id requerido" }), {
@@ -250,7 +250,25 @@ Deno.serve(async (req: Request) => {
             const referenceId = giftCardId || bookingId || orderDetails.purchase_units?.[0]?.reference_id;
             const paypalTransactionId = orderDetails.purchase_units?.[0]?.payments?.captures?.[0]?.id || null;
 
-            if (context === "gift_card" && referenceId) {
+            if (context === "featured_slot" && slotId) {
+              const totalPaid = parseFloat(orderDetails.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.value ?? "0");
+              await supabase.rpc("confirm_featured_slot_payment", {
+                p_slot_id: slotId,
+                p_payment_id: paypalTransactionId ?? orderId,
+                p_provider: "paypal",
+                p_total: totalPaid,
+              });
+              EdgeRuntime.waitUntil(
+                fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-featured-slot-cfdi`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                  },
+                  body: JSON.stringify({ slot_id: slotId }),
+                }).catch((err) => console.error("Error triggering featured slot CFDI (paypal already captured):", err))
+              );
+            } else if (context === "gift_card" && referenceId) {
               await activateGiftCard(supabase, referenceId, paypalTransactionId);
             } else if (referenceId) {
               await confirmBooking(supabase, referenceId, paypalTransactionId);
@@ -290,7 +308,25 @@ Deno.serve(async (req: Request) => {
       const referenceId = giftCardId || bookingId || captureData.purchase_units?.[0]?.reference_id;
       const paypalTransactionId = captureData.purchase_units?.[0]?.payments?.captures?.[0]?.id || null;
 
-      if (context === "gift_card" && referenceId) {
+      if (context === "featured_slot" && slotId) {
+        const totalPaid = parseFloat(captureData.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.value ?? "0");
+        await supabase.rpc("confirm_featured_slot_payment", {
+          p_slot_id: slotId,
+          p_payment_id: paypalTransactionId ?? orderId,
+          p_provider: "paypal",
+          p_total: totalPaid,
+        });
+        EdgeRuntime.waitUntil(
+          fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-featured-slot-cfdi`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            },
+            body: JSON.stringify({ slot_id: slotId }),
+          }).catch((err) => console.error("Error triggering featured slot CFDI (paypal):", err))
+        );
+      } else if (context === "gift_card" && referenceId) {
         await activateGiftCard(supabase, referenceId, paypalTransactionId);
       } else if (referenceId) {
         await confirmBooking(supabase, referenceId, paypalTransactionId);

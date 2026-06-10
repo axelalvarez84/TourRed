@@ -148,6 +148,42 @@ Deno.serve(async (req: Request) => {
     }
 
     if (status === "approved") {
+      // Check if this is a featured slot payment first
+      const { data: featuredSlot } = await supabase
+        .from("featured_tour_slots")
+        .select("id, status, total_amount")
+        .eq("id", externalReference)
+        .eq("status", "pending_payment")
+        .maybeSingle();
+
+      if (featuredSlot) {
+        const totalPaid = Number(featuredSlot.total_amount ?? 0);
+        const { error: rpcError } = await supabase.rpc("confirm_featured_slot_payment", {
+          p_slot_id: featuredSlot.id,
+          p_payment_id: String(notificationId),
+          p_provider: "mercadopago",
+          p_total: totalPaid,
+        });
+        if (rpcError) {
+          console.error("Error confirming featured slot payment (MP):", rpcError);
+        } else {
+          fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-featured-slot-cfdi`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+              },
+              body: JSON.stringify({ slot_id: featuredSlot.id }),
+            }
+          ).catch((err) => console.error("Error triggering featured slot CFDI (MP):", err));
+        }
+        return new Response(JSON.stringify({ received: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const { data: booking } = await supabase
         .from("bookings")
         .select("id, user_id, payment_status")
