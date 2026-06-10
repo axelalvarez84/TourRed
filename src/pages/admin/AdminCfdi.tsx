@@ -28,9 +28,10 @@ const downloadCfdi = async (cfdiId: string, fileType: 'xml' | 'pdf') => {
 
 interface CfdiInvoice {
   id: string;
-  invoice_type: 'booking' | 'commission' | 'membership' | 'checkin_wallet';
+  invoice_type: 'booking' | 'commission' | 'membership' | 'checkin_wallet' | 'featured_slot';
   booking_id: string | null;
   payout_id: string | null;
+  featured_slot_id: string | null;
   agency_id: string | null;
   pac_provider: string;
   uuid_fiscal: string | null;
@@ -84,7 +85,7 @@ const AdminCfdi: React.FC = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
   const [cancelModal, setCancelModal] = useState<{ cfdi: CfdiInvoice | null; motivo: string; uuidSustitucion: string }>({
     cfdi: null, motivo: '01', uuidSustitucion: ''
   });
@@ -140,17 +141,22 @@ const AdminCfdi: React.FC = () => {
     return matchSearch && matchStatus && matchType;
   });
 
-  const handleRetryAll = async () => {
-    setIsRetrying(true);
+  const handleRetryCfdi = async (cfdiId: string) => {
+    setRetryingId(cfdiId);
     try {
-      const { data, error } = await supabase.functions.invoke('retry-failed-cfdi', { body: {} });
+      const { data, error } = await supabase.functions.invoke('retry-failed-cfdi', { body: { cfdi_id: cfdiId } });
       if (error) throw error;
-      setMessage({ type: 'success', text: `Reintento completado: ${data.succeeded} exitosos, ${data.failed} fallidos.` });
+      const result = data?.results?.[0];
+      if (result?.success) {
+        setMessage({ type: 'success', text: 'CFDI reintentado exitosamente.' });
+      } else {
+        setMessage({ type: 'error', text: result?.error ?? 'El reintento falló.' });
+      }
       await fetchData();
     } catch (err) {
       setMessage({ type: 'error', text: String(err) });
     } finally {
-      setIsRetrying(false);
+      setRetryingId(null);
     }
   };
 
@@ -176,8 +182,6 @@ const AdminCfdi: React.FC = () => {
     }
   };
 
-  const errorCount = invoices.filter(i => i.status === 'error').length;
-
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-7xl mx-auto">
@@ -198,16 +202,6 @@ const AdminCfdi: React.FC = () => {
               <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
               Actualizar
             </button>
-            {errorCount > 0 && (
-              <button
-                onClick={handleRetryAll}
-                disabled={isRetrying}
-                className="btn btn-primary"
-              >
-                <RotateCcw className={`h-4 w-4 mr-2 ${isRetrying ? 'animate-spin' : ''}`} />
-                {isRetrying ? 'Reintentando...' : `Reintentar errores (${errorCount})`}
-              </button>
-            )}
           </div>
         </div>
 
@@ -270,6 +264,7 @@ const AdminCfdi: React.FC = () => {
             <option value="checkin_wallet">Cobro en Check-in</option>
             <option value="commission">Comisión (Agencia)</option>
             <option value="membership">Membresía</option>
+            <option value="featured_slot">Tour Destacado</option>
           </select>
         </div>
 
@@ -326,6 +321,8 @@ const AdminCfdi: React.FC = () => {
                               ? 'bg-emerald-100 text-emerald-700'
                               : inv.invoice_type === 'checkin_wallet'
                               ? 'bg-teal-100 text-teal-700'
+                              : inv.invoice_type === 'featured_slot'
+                              ? 'bg-purple-100 text-purple-700'
                               : 'bg-amber-100 text-amber-700'
                           }`}>
                             {inv.invoice_type === 'booking'
@@ -334,6 +331,8 @@ const AdminCfdi: React.FC = () => {
                               ? 'Membresía'
                               : inv.invoice_type === 'checkin_wallet'
                               ? 'Check-in'
+                              : inv.invoice_type === 'featured_slot'
+                              ? 'Destacado'
                               : 'Comisión'}
                           </span>
                           {agencyName && <div className="text-xs text-gray-400 mt-0.5 truncate max-w-24">{agencyName}</div>}
@@ -386,6 +385,16 @@ const AdminCfdi: React.FC = () => {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
+                            {inv.status === 'error' && inv.retry_count < 3 && (
+                              <button
+                                onClick={() => handleRetryCfdi(inv.id)}
+                                disabled={retryingId === inv.id}
+                                className="p-1.5 text-gray-500 hover:text-warning-600 hover:bg-warning-50 rounded transition-colors"
+                                title="Reintentar timbrado"
+                              >
+                                <RotateCcw className={`h-3.5 w-3.5 ${retryingId === inv.id ? 'animate-spin' : ''}`} />
+                              </button>
+                            )}
                             {inv.status === 'stamped' && (
                               <button
                                 onClick={() => downloadCfdi(inv.id, 'xml')}
