@@ -425,6 +425,37 @@ Deno.serve(async (req) => {
           break;
         }
 
+        // Handle featured slot payment
+        const featuredSlotId = session.metadata?.featured_slot_id;
+        if (featuredSlotId) {
+          const slotPaymentStatus = session.payment_status;
+          console.log(`checkout.session.completed: featured slot ${featuredSlotId}, status: ${slotPaymentStatus}`);
+
+          if (slotPaymentStatus === 'paid') {
+            const totalPaid = (session.amount_total ?? 0) / 100;
+            const { error: confirmErr } = await supabase.rpc('confirm_featured_slot_payment', {
+              p_slot_id: featuredSlotId,
+              p_payment_id: session.payment_intent as string ?? session.id,
+              p_provider: 'stripe',
+              p_total: totalPaid,
+            });
+
+            if (confirmErr) {
+              console.error(`Error confirming featured slot: ${confirmErr.message}`);
+            } else {
+              console.log(`✅ Featured slot ${featuredSlotId} confirmed`);
+              EdgeRuntime.waitUntil(
+                fetch(`${supabaseUrl}/functions/v1/generate-featured-slot-cfdi`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabaseServiceKey}` },
+                  body: JSON.stringify({ slot_id: featuredSlotId }),
+                }).catch(() => {})
+              );
+            }
+          }
+          break;
+        }
+
         if (!bookingId) {
           console.error("No booking ID or gift card ID in session metadata");
           break;

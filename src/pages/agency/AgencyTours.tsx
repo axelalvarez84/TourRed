@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAgencyId } from '../../hooks/useAgencyId';
 import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination, getTourCategories, getFeaturedPlans, getAgencyFeaturedSlots, joinFeaturedWaitlist } from '../../lib/supabase';
-import { Plus, Search, X, CreditCard, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban, ShoppingBag, Info, Percent, Route, RefreshCw, Layers, Car, Globe, AlertTriangle, Bus, Pencil, Sparkles, Star, TrendingUp, CheckCircle, Loader2 } from 'lucide-react';
+import { Plus, Search, X, CreditCard, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban, ShoppingBag, Info, Percent, Route, RefreshCw, Layers, Car, Globe, AlertTriangle, Bus, Pencil, Sparkles, Star, TrendingUp, CheckCircle, Loader2, Lock } from 'lucide-react';
 import { VehicleMapType } from '../../types/seats';
 import TourPromotionsManager from '../../components/TourPromotionsManager';
 import AgencyScheduleManager from '../../components/receptivo/AgencyScheduleManager';
@@ -161,6 +161,10 @@ const AgencyTours: React.FC = () => {
     selectedPlanId: string;
     error: string;
     success: string;
+    // payment flow
+    step: 'plan' | 'payment' | 'done';
+    pendingSlotId: string;
+    selectedProvider: 'stripe' | 'mercadopago' | 'paypal';
   }>({
     open: false,
     tour: null,
@@ -171,6 +175,9 @@ const AgencyTours: React.FC = () => {
     selectedPlanId: '',
     error: '',
     success: '',
+    step: 'plan',
+    pendingSlotId: '',
+    selectedProvider: 'stripe',
   });
 
   const [receptivoActionsModal, setReceptivoActionsModal] = useState<{
@@ -926,7 +933,7 @@ const AgencyTours: React.FC = () => {
 
   const handleOpenFeatured = async (tour: Tour) => {
     if (!resolvedAgencyId) return;
-    setFeaturedModal({ open: true, tour, plans: [], activeSlot: null, isLoading: true, isSubmitting: false, selectedPlanId: '', error: '', success: '' });
+    setFeaturedModal({ open: true, tour, plans: [], activeSlot: null, isLoading: true, isSubmitting: false, selectedPlanId: '', error: '', success: '', step: 'plan', pendingSlotId: '', selectedProvider: 'stripe' });
     const [plansRes, slotsRes] = await Promise.all([
       getFeaturedPlans(),
       getAgencyFeaturedSlots(resolvedAgencyId),
@@ -944,7 +951,7 @@ const AgencyTours: React.FC = () => {
   const handleActivateFeatured = async () => {
     if (!featuredModal.tour || !featuredModal.selectedPlanId || !resolvedAgencyId) return;
     setFeaturedModal(prev => ({ ...prev, isSubmitting: true, error: '' }));
-    const { error } = await supabase.rpc('activate_featured_slot', {
+    const { data: slotId, error } = await supabase.rpc('activate_featured_slot', {
       p_tour_id: featuredModal.tour.id,
       p_agency_id: resolvedAgencyId,
       p_plan_id: featuredModal.selectedPlanId,
@@ -952,7 +959,33 @@ const AgencyTours: React.FC = () => {
     if (error) {
       setFeaturedModal(prev => ({ ...prev, isSubmitting: false, error: error.message }));
     } else {
-      setFeaturedModal(prev => ({ ...prev, isSubmitting: false, success: 'Tour destacado activado correctamente.' }));
+      setFeaturedModal(prev => ({ ...prev, isSubmitting: false, step: 'payment', pendingSlotId: slotId as string }));
+    }
+  };
+
+  const handlePayFeaturedSlot = async () => {
+    if (!featuredModal.pendingSlotId) return;
+    setFeaturedModal(prev => ({ ...prev, isSubmitting: true, error: '' }));
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const origin = window.location.origin;
+      const res = await supabase.functions.invoke('create-featured-slot-checkout', {
+        body: {
+          slot_id: featuredModal.pendingSlotId,
+          provider: featuredModal.selectedProvider,
+          success_url: `${origin}/agency/featured-slot-success?slot_id=${featuredModal.pendingSlotId}`,
+          cancel_url: `${origin}/agency/tours`,
+        },
+      });
+      if (res.error) throw new Error(res.error.message);
+      const url = res.data?.url;
+      if (url) {
+        window.location.href = url;
+      } else {
+        throw new Error('No se recibio URL de pago');
+      }
+    } catch (err: any) {
+      setFeaturedModal(prev => ({ ...prev, isSubmitting: false, error: err.message || 'Error al iniciar el pago' }));
     }
   };
 
@@ -6140,7 +6173,7 @@ const AgencyTours: React.FC = () => {
                   <Loader2 className="w-5 h-5 animate-spin" />
                   <span className="text-sm">Cargando planes...</span>
                 </div>
-              ) : featuredModal.success ? (
+              ) : featuredModal.step === 'done' ? (
                 <div className="text-center py-8">
                   <div className="w-14 h-14 bg-green-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
                     <CheckCircle className="w-7 h-7 text-green-500" />
@@ -6154,7 +6187,82 @@ const AgencyTours: React.FC = () => {
                     Cerrar
                   </button>
                 </div>
+              ) : featuredModal.step === 'payment' ? (
+                /* ── Paso 2: Seleccionar proveedor de pago ── */
+                <>
+                  <div className="mb-5">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 text-xs font-bold flex items-center justify-center">2</div>
+                      <p className="font-semibold text-gray-800 text-sm">Elige como pagar</p>
+                    </div>
+                    {/* Plan summary */}
+                    {(() => {
+                      const plan = featuredModal.plans.find(p => p.id === featuredModal.selectedPlanId);
+                      return plan ? (
+                        <div className="mt-2 px-3 py-2 bg-amber-50 border border-amber-100 rounded-lg text-sm flex items-center justify-between">
+                          <span className="text-amber-800 font-medium">{plan.name} — {plan.duration_days} dias</span>
+                          <span className="font-bold text-amber-700">${plan.price.toLocaleString('es-MX')} MXN</span>
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+
+                  {/* Provider selector */}
+                  <div className="space-y-2 mb-5">
+                    {([
+                      { id: 'stripe', label: 'Tarjeta / OXXO / Transferencia', sub: 'Visa, Mastercard, OXXO, transferencia bancaria' },
+                      { id: 'mercadopago', label: 'MercadoPago', sub: 'Tarjeta, efectivo, transferencia SPEI' },
+                      { id: 'paypal', label: 'PayPal', sub: 'Cuenta PayPal o tarjeta de credito/debito' },
+                    ] as { id: 'stripe' | 'mercadopago' | 'paypal'; label: string; sub: string }[]).map(p => (
+                      <label
+                        key={p.id}
+                        className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${featuredModal.selectedProvider === p.id ? 'border-primary-400 bg-primary-50' : 'border-gray-100 hover:border-primary-200'}`}
+                      >
+                        <input
+                          type="radio"
+                          name="provider"
+                          value={p.id}
+                          checked={featuredModal.selectedProvider === p.id}
+                          onChange={() => setFeaturedModal(prev => ({ ...prev, selectedProvider: p.id }))}
+                          className="accent-primary-600"
+                        />
+                        <div>
+                          <div className="font-semibold text-gray-900 text-sm">{p.label}</div>
+                          <div className="text-xs text-gray-500">{p.sub}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-4">
+                    <Lock className="w-3.5 h-3.5" /> Pago seguro — no se guardan datos de tarjeta en nuestros servidores
+                  </div>
+
+                  {featuredModal.error && (
+                    <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                      {featuredModal.error}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handlePayFeaturedSlot}
+                      disabled={featuredModal.isSubmitting}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50 transition-all shadow-sm"
+                    >
+                      {featuredModal.isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+                      Pagar y destacar tour
+                    </button>
+                    <button
+                      onClick={() => setFeaturedModal(prev => ({ ...prev, step: 'plan', error: '' }))}
+                      className="px-4 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      Atras
+                    </button>
+                  </div>
+                </>
               ) : (
+                /* ── Paso 1: Elegir plan ── */
                 <>
                   {/* Active slot info */}
                   {featuredModal.activeSlot && (
@@ -6190,7 +6298,10 @@ const AgencyTours: React.FC = () => {
                   {/* Plan selector */}
                   {!featuredModal.activeSlot && (
                     <>
-                      <p className="text-sm font-semibold text-gray-700 mb-3">Elige un plan:</p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 text-xs font-bold flex items-center justify-center">1</div>
+                        <p className="text-sm font-semibold text-gray-700">Elige un plan:</p>
+                      </div>
                       <div className="space-y-2 mb-4">
                         {featuredModal.plans.map((plan: any) => (
                           <label
@@ -6248,7 +6359,7 @@ const AgencyTours: React.FC = () => {
                           className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50 transition-all shadow-sm"
                         >
                           {featuredModal.isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                          Destacar tour ahora
+                          Continuar al pago
                         </button>
                       )}
                       <button

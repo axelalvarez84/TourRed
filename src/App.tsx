@@ -103,6 +103,7 @@ import ExecutiveMisAgencias from './pages/executive/ExecutiveMisAgencias';
 import ExecutiveComisiones from './pages/executive/ExecutiveComisiones';
 import ExecutivePerfil from './pages/executive/ExecutivePerfil';
 import AdminFeaturedTours from './pages/admin/AdminFeaturedTours';
+import FeaturedSlotSuccessPage from './pages/agency/FeaturedSlotSuccessPage';
 import AdminBookings from './pages/admin/AdminBookings';
 import AdminBookingsCleanup from './pages/admin/AdminBookingsCleanup';
 import AdminServiceDesk from './pages/admin/AdminServiceDesk';
@@ -262,6 +263,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.AGENCY]}>
                 <AgencyDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/agency/featured-slot-success"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.AGENCY]}>
+                <FeaturedSlotSuccessPage />
               </ProtectedRoute>
             }
           />
