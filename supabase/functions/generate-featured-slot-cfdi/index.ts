@@ -144,7 +144,7 @@ Deno.serve(async (req: Request) => {
         subtotal, tax_amount, total_amount, payment_confirmed_at,
         featured_plans (name, duration_days, price),
         agencies (
-          id, name, rfc, razon_social, regimen_fiscal,
+          id, name, rfc, razon_social, regimen_fiscal, domicilio_fiscal, postal_code,
           users (rfc, razon_social, regimen_fiscal, uso_cfdi, codigo_postal_fiscal)
         )
       `)
@@ -186,7 +186,12 @@ Deno.serve(async (req: Request) => {
 
     const agencyRfc = (agency?.rfc as string) || "";
     const agencyRazon = (agency?.razon_social as string) || (agency?.name as string) || "";
-    const agencyCP = (agencyUser?.codigo_postal_fiscal as string) || fallbackCP;
+    // Buscar CP fiscal: primero en usuario vinculado, luego en domicilio_fiscal de la agencia, luego postal_code de la agencia
+    const agencyCP =
+      (agencyUser?.codigo_postal_fiscal as string) ||
+      (agency?.domicilio_fiscal as string) ||
+      (agency?.postal_code as string) ||
+      fallbackCP;
 
     if (agencyRfc && agencyRfc.length >= 12) {
       receptorRfc = agencyRfc;
