@@ -162,7 +162,7 @@ Deno.serve(async (req: Request) => {
     // Cargar configuracion de plataforma
     const { data: settings } = await supabase
       .from("platform_settings")
-      .select("pac_provider, pac_api_key_encrypted, pac_organization_id, cfdi_serie_booking, pac_sandbox_mode, pac_issuer_rfc")
+      .select("pac_provider, pac_api_key_encrypted, pac_organization_id, cfdi_serie_booking, pac_sandbox_mode, pac_issuer_rfc, pac_issuer_zip")
       .maybeSingle();
 
     if (!settings || settings.pac_provider === "none" || !settings.pac_api_key_encrypted) {
@@ -174,9 +174,10 @@ Deno.serve(async (req: Request) => {
 
     const agency = slot.agencies as Record<string, unknown>;
     const plan = slot.featured_plans as Record<string, unknown>;
+    const agencyUser = (agency?.users as Record<string, unknown>) || {};
 
     // Determinar datos fiscales del receptor (agencia)
-    const issuerPostalCode = "06600";
+    const fallbackCP = (settings as any)?.pac_issuer_zip || "06600";
     let receptorRfc: string;
     let receptorNombre: string;
     let receptorRegimen: string;
@@ -185,19 +186,20 @@ Deno.serve(async (req: Request) => {
 
     const agencyRfc = (agency?.rfc as string) || "";
     const agencyRazon = (agency?.razon_social as string) || (agency?.name as string) || "";
+    const agencyCP = (agencyUser?.codigo_postal_fiscal as string) || fallbackCP;
 
     if (agencyRfc && agencyRfc.length >= 12) {
       receptorRfc = agencyRfc;
       receptorNombre = agencyRazon;
-      receptorRegimen = (agency?.regimen_fiscal as string) || "626";
-      receptorUsoCfdi = "G03";
-      receptorCP = issuerPostalCode;
+      receptorRegimen = (agency?.regimen_fiscal as string) || (agencyUser?.regimen_fiscal as string) || "626";
+      receptorUsoCfdi = (agencyUser?.uso_cfdi as string) || "G03";
+      receptorCP = agencyCP;
     } else {
       receptorRfc = "XAXX010101000";
       receptorNombre = agencyRazon || "SIN NOMBRE";
       receptorRegimen = "616";
       receptorUsoCfdi = "S01";
-      receptorCP = issuerPostalCode;
+      receptorCP = agencyCP;
     }
 
     const total = Number(slot.total_amount ?? plan?.price ?? 0);
