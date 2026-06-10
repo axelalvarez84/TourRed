@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building, MapPin, Calendar, TrendingUp, Activity, BarChart2, ArrowRight } from 'lucide-react';
+import { Users, Building, MapPin, Calendar, TrendingUp, Activity, BarChart2, ArrowRight, FileSpreadsheet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 
@@ -309,7 +309,7 @@ const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Acceso rápido a métricas por tour */}
-      <div className="mt-6">
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Link
           to="/admin/tour-metrics"
           className="flex items-center justify-between w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl p-5 hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm group"
@@ -321,6 +321,22 @@ const AdminDashboard: React.FC = () => {
             <div>
               <p className="font-semibold text-base">Metricas por Tour</p>
               <p className="text-blue-100 text-sm mt-0.5">Reservas, viajeros, ingresos y ocupacion por cada tour</p>
+            </div>
+          </div>
+          <ArrowRight size={20} className="opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+        </Link>
+
+        <Link
+          to="/admin/reporte-maestro"
+          className="flex items-center justify-between w-full bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-xl p-5 hover:from-emerald-700 hover:to-teal-800 transition-all shadow-sm group"
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-2.5 bg-white/20 rounded-lg">
+              <FileSpreadsheet size={22} />
+            </div>
+            <div>
+              <p className="font-semibold text-base">Reporte Maestro</p>
+              <p className="text-emerald-100 text-sm mt-0.5">Log completo de todos los ingresos y egresos de la plataforma</p>
             </div>
           </div>
           <ArrowRight size={20} className="opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
