@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, User, LogOut, Search, MessageCircle, ChevronDown, LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation, Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent, DollarSign, Gift, Megaphone, Ticket, BadgePercent, Send, ArrowLeftRight, FileText, FilePlus2, BookOpen, Headphones as HeadphonesIcon, TicketCheck, ShoppingBag, Trash2, Bus, BarChart2, Briefcase } from 'lucide-react';
+import { Menu, X, User, LogOut, Search, MessageCircle, ChevronDown, LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation, Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent, DollarSign, Gift, Megaphone, Ticket, BadgePercent, Sparkles, Send, ArrowLeftRight, FileText, FilePlus2, BookOpen, Headphones as HeadphonesIcon, TicketCheck, ShoppingBag, Trash2, Bus, BarChart2, Briefcase } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import { useAuth } from '../context/AuthContext';
 import { signOut, supabase } from '../lib/supabase';
@@ -219,6 +219,7 @@ const NavBar: React.FC = () => {
     if (isSuperAdmin || permissions?.canManageDiscountCodes)
       comercialItems.push({ to: '/admin/discount-codes', label: 'Codigos Descuento', icon: <Percent className="h-4 w-4" /> });
     comercialItems.push({ to: '/admin/promotions', label: 'Promociones', icon: <BadgePercent className="h-4 w-4" /> });
+    comercialItems.push({ to: '/admin/featured-tours', label: 'Tours Destacados', icon: <Sparkles className="h-4 w-4" /> });
     comercialItems.push({ to: '/admin/referrals', label: 'Referidos', icon: <Gift className="h-4 w-4" /> });
 
     if (comercialItems.length > 0)
