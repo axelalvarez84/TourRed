@@ -714,6 +714,7 @@ export const getNewTours = async (limit = 20) => {
         preventa_descuento_valor,
         agencies(id, name, rating, is_active)
       `)
+      .or(`end_date.gte.${formatDateForDB(new Date())},end_date.is.null`)
       .order('created_at', { ascending: false })
       .limit(200);
 
