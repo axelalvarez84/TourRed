@@ -136,6 +136,8 @@ function typeColor(t: string): string {
 const TABS = [
   { id: 'overview', label: 'Resumen', icon: BarChart2 },
   { id: 'entries', label: 'Polizas', icon: List },
+  { id: 'libro_diario', label: 'Libro Diario', icon: BookMarked },
+  { id: 'libro_mayor', label: 'Libro Mayor', icon: BookOpen },
   { id: 'manual', label: 'Movimientos', icon: PenLine },
   { id: 'balance_sheet', label: 'Balance General', icon: Layers },
   { id: 'income', label: 'Estado de Resultados', icon: TrendingUp },
@@ -182,6 +184,19 @@ const AccountingPage: React.FC = () => {
   const [deleteConfirm, setDeleteConfirm] = useState<ChartAccount | null>(null);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [entryFilter, setEntryFilter] = useState<'all' | 'ingreso' | 'egreso' | 'diario'>('all');
+
+  // Libro Mayor
+  const [selectedLedgerAccount, setSelectedLedgerAccount] = useState<string | null>(null);
+  const [ledgerLines, setLedgerLines] = useState<Array<{
+    entry_date: string;
+    entry_number: string;
+    description: string;
+    debit: number;
+    credit: number;
+  }>>([]);
+  const [loadingLedger, setLoadingLedger] = useState(false);
+  const [ledgerSearch, setLedgerSearch] = useState('');
+  const [mayorView, setMayorView] = useState<'ledger' | 'trial'>('ledger');
 
   // Gift card accounting summary
   const [gcSummary, setGcSummary] = useState<{
@@ -301,6 +316,28 @@ const AccountingPage: React.FC = () => {
     setLoadingGcSummary(false);
   }, []);
 
+  // ── Load ledger lines for a specific account
+  const loadLedgerLines = useCallback(async (accountCode: string) => {
+    setLoadingLedger(true);
+    const { data } = await supabase
+      .from('accounting_entry_lines')
+      .select('debit, credit, description, accounting_entries!inner(entry_number, entry_date, period_year, period_month, is_posted)')
+      .eq('account_code', accountCode)
+      .eq('accounting_entries.period_year', year)
+      .eq('accounting_entries.period_month', month)
+      .eq('accounting_entries.is_posted', true)
+      .order('accounting_entries(entry_date)', { ascending: true });
+    const rows = (data ?? []).map((r: any) => ({
+      entry_date: r.accounting_entries.entry_date,
+      entry_number: r.accounting_entries.entry_number,
+      description: r.description,
+      debit: r.debit ?? 0,
+      credit: r.credit ?? 0,
+    }));
+    setLedgerLines(rows);
+    setLoadingLedger(false);
+  }, [year, month]);
+
   const handleConfirmEntry = async (id: string) => {
     setConfirmingId(id);
     const { error } = await supabase
@@ -344,6 +381,17 @@ const AccountingPage: React.FC = () => {
   useEffect(() => {
     if (activeTab === 'overview') loadGcSummary();
   }, [activeTab, loadGcSummary]);
+
+  useEffect(() => {
+    if (activeTab === 'libro_diario') loadEntries();
+  }, [activeTab, loadEntries]);
+
+  useEffect(() => {
+    if (activeTab === 'libro_mayor') {
+      loadAccountBalances();
+      loadReports();
+    }
+  }, [activeTab, loadAccountBalances, loadReports]);
 
   // ── Toggle entry detail
   const toggleEntry = async (entryId: string) => {
@@ -734,6 +782,316 @@ const AccountingPage: React.FC = () => {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── LIBRO DIARIO ── */}
+        {activeTab === 'libro_diario' && (
+          <div className="space-y-4">
+            {/* Filter + totals header */}
+            <div className="flex flex-wrap gap-3 items-center justify-between">
+              <div className="flex gap-2">
+                {(['all','ingreso','egreso','diario'] as const).map(f => (
+                  <button key={f} onClick={() => setEntryFilter(f)}
+                    className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${entryFilter === f ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    {f === 'all' ? 'Todas' : f.charAt(0).toUpperCase() + f.slice(1)}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400">{MONTHS[month-1]} {year} — {entries.filter(e => entryFilter === 'all' || e.entry_type === entryFilter).length} polizas</p>
+            </div>
+
+            {loadingEntries ? <LoadingSpinner /> : (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="text-left px-4 py-3 font-semibold text-gray-600 w-24">Fecha</th>
+                      <th className="text-left px-4 py-3 font-semibold text-gray-600 w-28">Poliza</th>
+                      <th className="text-left px-4 py-3 font-semibold text-gray-600">Cuenta / Concepto</th>
+                      <th className="text-right px-4 py-3 font-semibold text-gray-600 w-32">Debe</th>
+                      <th className="text-right px-4 py-3 font-semibold text-gray-600 w-32">Haber</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entries
+                      .filter(e => entryFilter === 'all' || e.entry_type === entryFilter)
+                      .map(entry => {
+                        const lines = entryLines[entry.id] ?? [];
+                        const isExpanded = expandedEntry === entry.id;
+                        return (
+                          <React.Fragment key={entry.id}>
+                            {/* Entry header row */}
+                            <tr
+                              className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer select-none"
+                              onClick={() => toggleEntry(entry.id)}
+                            >
+                              <td className="px-4 py-2.5 text-gray-600 text-xs">{entry.entry_date}</td>
+                              <td className="px-4 py-2.5">
+                                <span className="font-mono text-xs font-medium text-sky-700">{entry.entry_number}</span>
+                              </td>
+                              <td className="px-4 py-2.5">
+                                <div className="flex items-center gap-2">
+                                  {entryTypeIcon(entry.entry_type)}
+                                  <span className="font-medium text-gray-800">{entry.description}</span>
+                                  {entry.source_type && entry.source_type !== 'manual' && (
+                                    <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{entry.source_type}</span>
+                                  )}
+                                  {!entry.is_posted && (
+                                    <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Borrador</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-2.5 text-right text-gray-400 text-xs">
+                                {isExpanded ? <ChevronUp className="w-3.5 h-3.5 ml-auto" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto" />}
+                              </td>
+                              <td className="px-4 py-2.5" />
+                            </tr>
+                            {/* Entry lines */}
+                            {isExpanded && lines.map((line, idx) => (
+                              <tr key={line.id} className={`border-b border-gray-50 ${idx % 2 === 0 ? 'bg-sky-50/40' : 'bg-white'}`}>
+                                <td className="px-4 py-2" />
+                                <td className="px-4 py-2" />
+                                <td className="px-4 py-2 pl-10">
+                                  <p className="text-xs font-medium text-gray-700">{line.account_code} — {line.description}</p>
+                                </td>
+                                <td className="px-4 py-2 text-right font-mono text-xs text-gray-700">
+                                  {line.debit > 0 ? fmt(line.debit) : ''}
+                                </td>
+                                <td className="px-4 py-2 text-right font-mono text-xs text-gray-700">
+                                  {line.credit > 0 ? fmt(line.credit) : ''}
+                                </td>
+                              </tr>
+                            ))}
+                          </React.Fragment>
+                        );
+                      })}
+                    {entries.filter(e => entryFilter === 'all' || e.entry_type === entryFilter).length === 0 && (
+                      <tr><td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-400">Sin polizas en este periodo</td></tr>
+                    )}
+                  </tbody>
+                  {/* Totals footer from expanded lines */}
+                  {(() => {
+                    const visibleEntries = entries.filter(e => entryFilter === 'all' || e.entry_type === entryFilter);
+                    const allLines = visibleEntries.flatMap(e => entryLines[e.id] ?? []);
+                    const totalDebit = allLines.reduce((s, l) => s + (l.debit ?? 0), 0);
+                    const totalCredit = allLines.reduce((s, l) => s + (l.credit ?? 0), 0);
+                    if (allLines.length === 0) return null;
+                    return (
+                      <tfoot>
+                        <tr className="bg-gray-50 border-t-2 border-gray-300 font-semibold">
+                          <td colSpan={3} className="px-4 py-3 text-sm text-gray-700">Total del periodo (polizas expandidas)</td>
+                          <td className="px-4 py-3 text-right font-mono text-sm text-gray-800">{fmt(totalDebit)}</td>
+                          <td className="px-4 py-3 text-right font-mono text-sm text-gray-800">{fmt(totalCredit)}</td>
+                        </tr>
+                        {Math.abs(totalDebit - totalCredit) > 0.01 && (
+                          <tr className="bg-red-50">
+                            <td colSpan={5} className="px-4 py-2 text-center text-xs text-red-600 font-medium">
+                              Diferencia: {fmt(Math.abs(totalDebit - totalCredit))} — revisa las polizas marcadas
+                            </td>
+                          </tr>
+                        )}
+                      </tfoot>
+                    );
+                  })()}
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── LIBRO MAYOR ── */}
+        {activeTab === 'libro_mayor' && (
+          <div className="space-y-4">
+            {/* Sub-view toggle */}
+            <div className="flex gap-2">
+              <button onClick={() => setMayorView('ledger')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${mayorView === 'ledger' ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                Libro Mayor
+              </button>
+              <button onClick={() => setMayorView('trial')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${mayorView === 'trial' ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                Balanza de Comprobacion
+              </button>
+            </div>
+
+            {mayorView === 'ledger' && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Account list */}
+                <div className="bg-white rounded-xl border border-gray-200 p-4 lg:col-span-1">
+                  <h3 className="font-semibold text-gray-800 mb-3">Cuentas con movimientos</h3>
+                  <input
+                    value={ledgerSearch}
+                    onChange={e => setLedgerSearch(e.target.value)}
+                    placeholder="Buscar cuenta..."
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg mb-3 outline-none focus:border-sky-400"
+                  />
+                  {(loadingBalances || loadingReports) ? <LoadingSpinner /> : (
+                    <div className="space-y-1 max-h-[520px] overflow-y-auto">
+                      {accountBalances
+                        .filter(a => a.period_debit !== 0 || a.period_credit !== 0)
+                        .filter(a => ledgerSearch === '' || a.code.includes(ledgerSearch) || a.name.toLowerCase().includes(ledgerSearch.toLowerCase()))
+                        .map(a => (
+                          <button
+                            key={a.code}
+                            onClick={() => { setSelectedLedgerAccount(a.code); loadLedgerLines(a.code); }}
+                            className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${selectedLedgerAccount === a.code ? 'bg-sky-50 border border-sky-200' : 'hover:bg-gray-50'}`}
+                          >
+                            <div className="flex justify-between items-start gap-1">
+                              <div>
+                                <span className="font-mono text-xs text-gray-400">{a.code}</span>
+                                <p className="font-medium text-gray-700 text-xs leading-tight">{a.name}</p>
+                              </div>
+                              <span className={`text-xs font-semibold whitespace-nowrap ${a.period_balance >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                {fmt(Math.abs(a.period_balance))}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      {accountBalances.filter(a => a.period_debit !== 0 || a.period_credit !== 0).length === 0 && (
+                        <p className="text-xs text-gray-400 text-center py-6">Sin movimientos en este periodo</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Ledger detail */}
+                <div className="bg-white rounded-xl border border-gray-200 lg:col-span-2">
+                  {!selectedLedgerAccount ? (
+                    <div className="flex items-center justify-center h-64 text-sm text-gray-400">
+                      Selecciona una cuenta para ver sus movimientos
+                    </div>
+                  ) : (
+                    <>
+                      <div className="px-5 py-4 border-b border-gray-100">
+                        {(() => {
+                          const acct = accountBalances.find(a => a.code === selectedLedgerAccount);
+                          return (
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-mono text-sm text-gray-400">{selectedLedgerAccount}</p>
+                                <h3 className="font-semibold text-gray-800">{acct?.name ?? ''}</h3>
+                              </div>
+                              <div className="flex gap-6 text-sm">
+                                <div className="text-center">
+                                  <p className="text-xs text-gray-400">Cargos</p>
+                                  <p className="font-semibold text-gray-700">{fmt(acct?.period_debit ?? 0)}</p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-xs text-gray-400">Abonos</p>
+                                  <p className="font-semibold text-gray-700">{fmt(acct?.period_credit ?? 0)}</p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-xs text-gray-400">Saldo</p>
+                                  <p className={`font-bold ${(acct?.period_balance ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmt(Math.abs(acct?.period_balance ?? 0))}</p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      {loadingLedger ? <div className="p-6"><LoadingSpinner /></div> : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="bg-gray-50 border-b border-gray-200">
+                                <th className="text-left px-4 py-3 font-semibold text-gray-600 w-20">Fecha</th>
+                                <th className="text-left px-4 py-3 font-semibold text-gray-600 w-28">Poliza</th>
+                                <th className="text-left px-4 py-3 font-semibold text-gray-600">Concepto</th>
+                                <th className="text-right px-4 py-3 font-semibold text-gray-600 w-28">Cargo</th>
+                                <th className="text-right px-4 py-3 font-semibold text-gray-600 w-28">Abono</th>
+                                <th className="text-right px-4 py-3 font-semibold text-gray-600 w-28">Saldo</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(() => {
+                                const nature = accountBalances.find(a => a.code === selectedLedgerAccount)?.nature ?? 'deudora';
+                                let running = 0;
+                                return ledgerLines.map((line, i) => {
+                                  if (nature === 'deudora') running += line.debit - line.credit;
+                                  else running += line.credit - line.debit;
+                                  return (
+                                    <tr key={i} className={`border-b border-gray-50 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+                                      <td className="px-4 py-2.5 text-xs text-gray-500">{line.entry_date}</td>
+                                      <td className="px-4 py-2.5 font-mono text-xs text-sky-700">{line.entry_number}</td>
+                                      <td className="px-4 py-2.5 text-xs text-gray-700">{line.description}</td>
+                                      <td className="px-4 py-2.5 text-right font-mono text-xs text-gray-700">{line.debit > 0 ? fmt(line.debit) : ''}</td>
+                                      <td className="px-4 py-2.5 text-right font-mono text-xs text-gray-700">{line.credit > 0 ? fmt(line.credit) : ''}</td>
+                                      <td className={`px-4 py-2.5 text-right font-mono text-xs font-semibold ${running >= 0 ? 'text-gray-800' : 'text-red-500'}`}>{fmt(Math.abs(running))}</td>
+                                    </tr>
+                                  );
+                                });
+                              })()}
+                              {ledgerLines.length === 0 && (
+                                <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">Sin movimientos para esta cuenta en el periodo</td></tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {mayorView === 'trial' && (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100">
+                  <h3 className="font-semibold text-gray-800">Balanza de Comprobacion — {MONTHS[month-1]} {year}</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Saldos de apertura + movimientos del periodo + saldos de cierre</p>
+                </div>
+                {loadingReports ? <div className="p-6"><LoadingSpinner /></div> : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600">
+                          <th className="text-left px-4 py-3">Cuenta</th>
+                          <th className="text-right px-4 py-3">Apertura Debe</th>
+                          <th className="text-right px-4 py-3">Apertura Haber</th>
+                          <th className="text-right px-4 py-3 bg-sky-50">Periodo Debe</th>
+                          <th className="text-right px-4 py-3 bg-sky-50">Periodo Haber</th>
+                          <th className="text-right px-4 py-3 bg-emerald-50">Cierre Debe</th>
+                          <th className="text-right px-4 py-3 bg-emerald-50">Cierre Haber</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {trialBalance.map((row, i) => (
+                          <tr key={row.code} className={`border-b border-gray-50 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                            <td className="px-4 py-2.5">
+                              <p className="font-medium text-gray-700 text-xs">{row.name}</p>
+                              <p className="font-mono text-xs text-gray-400">{row.code}</p>
+                            </td>
+                            <td className="px-4 py-2.5 text-right font-mono text-xs text-gray-600">{row.opening_debit > 0 ? fmt(row.opening_debit) : ''}</td>
+                            <td className="px-4 py-2.5 text-right font-mono text-xs text-gray-600">{row.opening_credit > 0 ? fmt(row.opening_credit) : ''}</td>
+                            <td className="px-4 py-2.5 text-right font-mono text-xs text-sky-700 bg-sky-50/30">{row.period_debit > 0 ? fmt(row.period_debit) : ''}</td>
+                            <td className="px-4 py-2.5 text-right font-mono text-xs text-sky-700 bg-sky-50/30">{row.period_credit > 0 ? fmt(row.period_credit) : ''}</td>
+                            <td className="px-4 py-2.5 text-right font-mono text-xs text-emerald-700 bg-emerald-50/30">{row.closing_debit > 0 ? fmt(row.closing_debit) : ''}</td>
+                            <td className="px-4 py-2.5 text-right font-mono text-xs text-emerald-700 bg-emerald-50/30">{row.closing_credit > 0 ? fmt(row.closing_credit) : ''}</td>
+                          </tr>
+                        ))}
+                        {trialBalance.length === 0 && (
+                          <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-400">Sin movimientos en este periodo</td></tr>
+                        )}
+                      </tbody>
+                      {trialBalance.length > 0 && (
+                        <tfoot>
+                          <tr className="bg-gray-100 border-t-2 border-gray-300 font-semibold text-xs">
+                            <td className="px-4 py-3 text-gray-700">Totales</td>
+                            <td className="px-4 py-3 text-right font-mono text-gray-800">{fmt(trialBalance.reduce((s,r) => s + r.opening_debit, 0))}</td>
+                            <td className="px-4 py-3 text-right font-mono text-gray-800">{fmt(trialBalance.reduce((s,r) => s + r.opening_credit, 0))}</td>
+                            <td className="px-4 py-3 text-right font-mono text-sky-800 bg-sky-50">{fmt(trialBalance.reduce((s,r) => s + r.period_debit, 0))}</td>
+                            <td className="px-4 py-3 text-right font-mono text-sky-800 bg-sky-50">{fmt(trialBalance.reduce((s,r) => s + r.period_credit, 0))}</td>
+                            <td className="px-4 py-3 text-right font-mono text-emerald-800 bg-emerald-50">{fmt(trialBalance.reduce((s,r) => s + r.closing_debit, 0))}</td>
+                            <td className="px-4 py-3 text-right font-mono text-emerald-800 bg-emerald-50">{fmt(trialBalance.reduce((s,r) => s + r.closing_credit, 0))}</td>
+                          </tr>
+                        </tfoot>
+                      )}
+                    </table>
+                  </div>
+                )}
               </div>
             )}
           </div>
