@@ -105,7 +105,12 @@ const DaysProgress: React.FC<{ startsAt: string; expiresAt: string }> = ({ start
 };
 
 const ActiveSlotCard: React.FC<{ slot: FeaturedSlot }> = ({ slot }) => {
-  const stats = slot.featured_tour_stats ?? { impressions: 0, clicks: 0, bookings_generated: 0 };
+  const rawStats = slot.featured_tour_stats;
+  const stats = {
+    impressions: rawStats?.impressions ?? 0,
+    clicks: rawStats?.clicks ?? 0,
+    bookings_generated: rawStats?.bookings_generated ?? 0,
+  };
   const plan = slot.featured_plans;
   const tour = slot.tours;
   const remaining = differenceInDays(parseISO(slot.expires_at), new Date());
@@ -240,7 +245,12 @@ const ActiveSlotCard: React.FC<{ slot: FeaturedSlot }> = ({ slot }) => {
 const HistoryRow: React.FC<{ slot: FeaturedSlot; isExpanded: boolean; onToggle: () => void }> = ({
   slot, isExpanded, onToggle
 }) => {
-  const stats = slot.featured_tour_stats ?? { impressions: 0, clicks: 0, bookings_generated: 0 };
+  const rawStats = slot.featured_tour_stats;
+  const stats = {
+    impressions: rawStats?.impressions ?? 0,
+    clicks: rawStats?.clicks ?? 0,
+    bookings_generated: rawStats?.bookings_generated ?? 0,
+  };
   const plan = slot.featured_plans;
   const tour = slot.tours;
   const ctr = stats.impressions > 0 ? ((stats.clicks / stats.impressions) * 100).toFixed(1) : '-';
