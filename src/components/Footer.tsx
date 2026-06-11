@@ -55,7 +55,7 @@ const Footer: React.FC = () => {
           {/* Col 1: Brand */}
           <div className="col-span-2 sm:col-span-1">
             <div className="flex items-center mb-4">
-              <img src="/Logo_Transparente.jpg" alt="ToursRed Logo" loading="lazy" className="h-12 w-auto" />
+              <img src="/Logo_Transparente.jpg" alt="ToursRed Logo" loading="lazy" className="h-16 w-auto" />
             </div>
             <p className="text-gray-400 text-sm mb-4">
               Descubre destinos extraordinarios y experiencias inolvidables con nuestros socios de viaje de confianza.
