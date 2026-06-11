@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle, Calendar, MapPin, Users, DollarSign, ArrowRight, CreditCard, Mail, Wallet, Award, Ticket, Tag, Bus, ShieldCheck } from 'lucide-react';
-import { supabase, parseDateFromDB } from '../lib/supabase';
+import { supabase, parseDateFromDB, trackFeaturedBooking } from '../lib/supabase';
 import { Booking, Tour } from '../types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -27,6 +27,11 @@ const BookingSuccessPage: React.FC = () => {
     const bookingId = searchParams.get('booking_id');
     if (bookingId) {
       fetchBookingDetails(bookingId);
+      const featuredSlotId = sessionStorage.getItem('featuredReferral');
+      if (featuredSlotId) {
+        trackFeaturedBooking(featuredSlotId);
+        sessionStorage.removeItem('featuredReferral');
+      }
     } else {
       setError('ID de reserva no encontrado');
       setIsLoading(false);

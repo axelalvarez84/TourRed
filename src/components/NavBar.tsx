@@ -308,6 +308,7 @@ const NavBar: React.FC = () => {
         { to: '/agency/financials', label: 'Finanzas' },
         { to: '/agency/invoices', label: 'Facturas' },
         { to: '/agency/staff', label: 'Coordinadores' },
+        { to: '/agency/featured-tours', label: 'Tours Destacados' },
         { to: '/agency/soporte', label: 'Soporte' },
       ];
     }
