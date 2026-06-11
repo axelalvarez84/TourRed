@@ -371,7 +371,7 @@ const AdminReporteMaestro: React.FC = () => {
         const { data: penalties } = await supabase
           .from('cancellation_penalty_records')
           .select('id, platform_amount, gross_penalty, created_at, agencies(name)')
-          .eq('status', 'paid')
+          .in('status', ['paid', 'processed'])
           .gte('created_at', desde)
           .lte('created_at', hasta)
           .order('created_at', { ascending: false });
