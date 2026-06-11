@@ -23,9 +23,20 @@ interface FeaturedSlot {
   payment_confirmed_at: string | null;
   created_at: string;
   featured_plans: { id: string; name: string; duration_days: number; price: number } | null;
-  featured_tour_stats: { impressions: number; clicks: number; bookings_generated: number } | null;
+  featured_tour_stats: { impressions: number; clicks: number; bookings_generated: number } | { impressions: number; clicks: number; bookings_generated: number }[] | null;
   tours: { id: string; name: string; destination: string; image_url: string } | null;
 }
+
+const resolveStats = (raw: FeaturedSlot['featured_tour_stats']) => {
+  if (!raw) return { impressions: 0, clicks: 0, bookings_generated: 0 };
+  const s = Array.isArray(raw) ? raw[0] : raw;
+  if (!s) return { impressions: 0, clicks: 0, bookings_generated: 0 };
+  return {
+    impressions: s.impressions ?? 0,
+    clicks: s.clicks ?? 0,
+    bookings_generated: s.bookings_generated ?? 0,
+  };
+};
 
 const StatusBadge: React.FC<{ status: FeaturedSlot['status'] }> = ({ status }) => {
   const map = {
@@ -105,12 +116,7 @@ const DaysProgress: React.FC<{ startsAt: string; expiresAt: string }> = ({ start
 };
 
 const ActiveSlotCard: React.FC<{ slot: FeaturedSlot }> = ({ slot }) => {
-  const rawStats = slot.featured_tour_stats;
-  const stats = {
-    impressions: rawStats?.impressions ?? 0,
-    clicks: rawStats?.clicks ?? 0,
-    bookings_generated: rawStats?.bookings_generated ?? 0,
-  };
+  const stats = resolveStats(slot.featured_tour_stats);
   const plan = slot.featured_plans;
   const tour = slot.tours;
   const remaining = differenceInDays(parseISO(slot.expires_at), new Date());
@@ -245,12 +251,7 @@ const ActiveSlotCard: React.FC<{ slot: FeaturedSlot }> = ({ slot }) => {
 const HistoryRow: React.FC<{ slot: FeaturedSlot; isExpanded: boolean; onToggle: () => void }> = ({
   slot, isExpanded, onToggle
 }) => {
-  const rawStats = slot.featured_tour_stats;
-  const stats = {
-    impressions: rawStats?.impressions ?? 0,
-    clicks: rawStats?.clicks ?? 0,
-    bookings_generated: rawStats?.bookings_generated ?? 0,
-  };
+  const stats = resolveStats(slot.featured_tour_stats);
   const plan = slot.featured_plans;
   const tour = slot.tours;
   const ctr = stats.impressions > 0 ? ((stats.clicks / stats.impressions) * 100).toFixed(1) : '-';
@@ -332,9 +333,9 @@ const AgencyFeaturedTours: React.FC = () => {
   const activeSlots = slots.filter(s => s.status === 'active');
   const historySlots = slots.filter(s => s.status !== 'active' && s.status !== 'pending_payment');
 
-  const totalImpressions = activeSlots.reduce((a, s) => a + (s.featured_tour_stats?.impressions ?? 0), 0);
-  const totalClicks = activeSlots.reduce((a, s) => a + (s.featured_tour_stats?.clicks ?? 0), 0);
-  const totalBookings = activeSlots.reduce((a, s) => a + (s.featured_tour_stats?.bookings_generated ?? 0), 0);
+  const totalImpressions = activeSlots.reduce((a, s) => a + resolveStats(s.featured_tour_stats).impressions, 0);
+  const totalClicks = activeSlots.reduce((a, s) => a + resolveStats(s.featured_tour_stats).clicks, 0);
+  const totalBookings = activeSlots.reduce((a, s) => a + resolveStats(s.featured_tour_stats).bookings_generated, 0);
 
   if (isLoading) {
     return (
