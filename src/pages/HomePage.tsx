@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Compass, Search, Award, CreditCard, Users, Plane, Globe, Clock, Palmtree, Ship } from 'lucide-react';
+import { Compass, Search, Award, CreditCard, Users, Plane, Globe, Clock, Palmtree, Ship, Building2, FileCheck, MapPin, Handshake, ShieldCheck, Lock } from 'lucide-react';
 import SearchBox from '../components/SearchBox';
 import CategoryList from '../components/CategoryList';
 import FeaturedDestinations from '../components/FeaturedDestinations';
@@ -314,6 +314,70 @@ const HomePage: React.FC = () => {
 
       {/* Membership Section */}
       <MembershipSection />
+
+      {/* Confia en ToursRed */}
+      <section className="py-16 bg-white border-t border-b border-blue-100">
+        <div className="container-custom">
+          <div className="text-center mb-12">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full uppercase tracking-wider mb-4">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Empresa Verificada
+            </span>
+            <h2 className="text-3xl md:text-4xl font-bold text-blue-900 mb-3">Confia en ToursRed</h2>
+            <p className="text-gray-500 max-w-xl mx-auto text-base">
+              Tu viaje respaldado por una empresa formalmente registrada y reconocida por organismos turisticos oficiales.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-5xl mx-auto">
+            {[
+              {
+                icon: Building2,
+                title: 'Empresa legalmente constituida en Mexico',
+                desc: 'Sociedad registrada y operando conforme a la legislacion mexicana.',
+              },
+              {
+                icon: FileCheck,
+                title: 'Registro Nacional de Turismo (RNT)',
+                desc: 'Inscritos ante SECTUR como prestador de servicios turisticos.',
+              },
+              {
+                icon: MapPin,
+                title: 'Cedula Turistica de la Ciudad de Mexico',
+                desc: 'Autorizados por la Secretaria de Turismo de la CDMX.',
+              },
+              {
+                icon: Handshake,
+                title: 'Afiliados a AMAV',
+                desc: 'Miembro de la Asociacion Mexicana de Agencias de Viajes.',
+              },
+              {
+                icon: Award,
+                title: 'Marca registrada ante el IMPI',
+                desc: 'ToursRed es una marca protegida legalmente en Mexico.',
+              },
+              {
+                icon: Lock,
+                title: 'Pagos seguros y protegidos',
+                desc: 'Procesamiento mediante plataformas certificadas.',
+              },
+            ].map(({ icon: Icon, title, desc }) => (
+              <div
+                key={title}
+                className="flex items-start gap-4 p-5 rounded-xl border border-blue-100 bg-blue-50/40 hover:bg-blue-50 hover:border-blue-200 hover:shadow-sm transition-all duration-200"
+              >
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <Icon className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-blue-900 text-sm leading-snug mb-1">{title}</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">{desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* How It Works */}
       <section className="py-12 bg-blue-100">
