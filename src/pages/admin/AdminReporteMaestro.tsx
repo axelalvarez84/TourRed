@@ -107,7 +107,7 @@ const AdminReporteMaestro: React.FC = () => {
       if (filters.tipo === 'todos' || filters.tipo === 'ingreso') {
         const { data: bookings } = await supabase
           .from('bookings')
-          .select('id, booking_code, paid_at, total_price, platform_revenue, service_charge, payment_method, agencies(name), tours(name)')
+          .select('id, booking_code, paid_at, total_price, platform_revenue, service_charge, travel_insurance_cost, travel_insurance_included, payment_method, agencies(name), tours(name)')
           .eq('payment_status', 'succeeded')
           .gte('paid_at', desde)
           .lte('paid_at', hasta)
@@ -284,25 +284,26 @@ const AdminReporteMaestro: React.FC = () => {
       // 6. Comisiones de ejecutivos (egresos)
       if (filters.tipo === 'todos' || filters.tipo === 'egreso') {
         const { data: comms } = await supabase
-          .from('commission_records')
-          .select('id, agency_net_amount, processed_at, created_at, agencies(name), tours(name)')
+          .from('executive_commissions')
+          .select('id, amount, commission_type, paid_at, created_at, agencies(name), users!executive_id(first_name, last_name)')
           .eq('status', 'paid')
-          .gte('processed_at', desde)
-          .lte('processed_at', hasta)
-          .order('processed_at', { ascending: false });
+          .gte('paid_at', desde)
+          .lte('paid_at', hasta)
+          .order('paid_at', { ascending: false });
 
         (comms ?? []).forEach((c: any) => {
-          const monto = Number(c.agency_net_amount ?? 0);
+          const monto = Number(c.amount ?? 0);
           if (monto <= 0) return;
+          const executive = c.users ? `${c.users.first_name} ${c.users.last_name}` : '';
           collected.push({
             id: c.id,
-            fecha: c.processed_at ?? c.created_at,
+            fecha: c.paid_at ?? c.created_at,
             tipo: 'egreso',
             categoria: 'comision_ejecutivo',
-            descripcion: `Comision - ${c.tours?.name ?? 'Tour'}`,
+            descripcion: `Comision ejecutivo - ${c.commission_type ?? 'General'}`,
             referencia: c.id.substring(0, 8),
             monto,
-            entidad: c.agencies?.name,
+            entidad: executive || c.agencies?.name,
           });
         });
       }
