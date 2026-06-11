@@ -297,16 +297,14 @@ const AgencyDashboard: React.FC = () => {
             <div>
               <h3 className="font-medium text-blue-900 mb-2">Sistema de Pagos y Comisiones</h3>
               <div className="text-sm text-blue-800 space-y-2">
-                <p><strong>Cómo funciona:</strong></p>
+                <p><strong>Como funciona:</strong></p>
                 <ul className="list-disc list-inside space-y-1 ml-4">
-                  <li>Los viajeros pagan un depósito + 3% de cargo por servicio</li>
-                  <li>La plataforma retiene 10% del precio total como comisión</li>
-                  <li>Tú recibes el depósito menos la comisión de la plataforma</li>
-                  <li>El saldo restante lo cobras directamente al cliente</li>
+                  <li>Los viajeros pagan un deposito + un cargo por servicio de la plataforma</li>
+                  <li>La plataforma retiene el porcentaje de comision acordado por contrato</li>
+                  <li>El pago a tu agencia se realiza automaticamente 3 dias despues de finalizar el tour</li>
                 </ul>
                 <p className="mt-3">
-                  <strong>Configuración de Stripe:</strong> Para recibir pagos automáticamente, 
-                  el administrador debe configurar Stripe Connect para transferir tu parte.
+                  Asegurate de tener tu <strong>cuenta bancaria configurada en tu perfil</strong> para recibir los pagos sin retrasos.
                 </p>
               </div>
             </div>
