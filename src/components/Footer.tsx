@@ -196,7 +196,7 @@ const Footer: React.FC = () => {
                   src="/LogoAMAV.jpeg"
                   alt="AMAV Ciudad de México"
                   loading="lazy"
-                  className="h-12 w-auto"
+                  className="h-14 w-auto"
                 />
               </a>
             </div>
