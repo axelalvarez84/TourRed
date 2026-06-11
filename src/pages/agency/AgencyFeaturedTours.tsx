@@ -357,13 +357,24 @@ const AgencyFeaturedTours: React.FC = () => {
             </h1>
             <p className="text-gray-500 text-sm mt-1">Seguimiento de visibilidad y rendimiento de tus inversiones en destacados</p>
           </div>
-          <Link
-            to="/agency/tours"
-            className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors"
-          >
-            <Sparkles className="h-4 w-4" />
-            Destacar Nuevo Tour
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={loadSlots}
+              disabled={isLoading}
+              className="inline-flex items-center gap-2 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium px-3 py-2.5 rounded-xl text-sm transition-colors"
+              title="Actualizar estadísticas"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              Actualizar
+            </button>
+            <Link
+              to="/agency/tours"
+              className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors"
+            >
+              <Sparkles className="h-4 w-4" />
+              Destacar Nuevo Tour
+            </Link>
+          </div>
         </div>
 
         {/* Summary KPIs (only when has active slots) */}
