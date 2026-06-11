@@ -175,12 +175,12 @@ const Footer: React.FC = () => {
             {/* Logos institucionales */}
             <div className="flex items-center gap-6 flex-wrap justify-center sm:justify-start">
               {/* SECTUR + RNT */}
-              <div className="flex items-center gap-3">
+              <a href="https://rnt-consulta.sectur.gob.mx/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
                 <img
                   src="/SECTUR.png"
                   alt="Secretaría de Turismo"
                   loading="lazy"
-                  className="h-14 w-auto"
+                  className="h-16 w-auto"
                   style={{ filter: 'brightness(0) invert(1)', opacity: 0.65 }}
                 />
                 <div>
@@ -188,17 +188,17 @@ const Footer: React.FC = () => {
                   <p className="text-gray-400 text-xs leading-tight">Turismo</p>
                   <p className="text-gray-300 text-xs font-medium mt-0.5">RNT: 04090165582a1</p>
                 </div>
-              </div>
+              </a>
 
               {/* AMAV */}
-              <div className="bg-white rounded-md px-2 py-1">
+              <a href="https://amavmexico.mx/socios/tours-red/" target="_blank" rel="noopener noreferrer" className="bg-white rounded-md px-2 py-1 hover:opacity-80 transition-opacity">
                 <img
                   src="/LogoAMAV.jpeg"
                   alt="AMAV Ciudad de México"
                   loading="lazy"
                   className="h-12 w-auto"
                 />
-              </div>
+              </a>
             </div>
 
             {/* Copyright */}
