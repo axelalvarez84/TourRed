@@ -23,6 +23,7 @@ type MovementCategory =
   | 'suplemento'
   | 'servicio_opcional'
   | 'cobro_checkin'
+  | 'tour_destacado'
   | 'contable_manual'
   | 'pago_agencia'
   | 'comision_ejecutivo'
@@ -58,6 +59,7 @@ const CATEGORY_LABELS: Record<MovementCategory, string> = {
   suplemento: 'Suplemento/Extra',
   servicio_opcional: 'Servicio Opcional',
   cobro_checkin: 'Cobro en Checkin',
+  tour_destacado: 'Tour Destacado',
   contable_manual: 'Entrada Contable Manual',
   pago_agencia: 'Pago a Agencia',
   comision_ejecutivo: 'Comision Ejecutivo',
@@ -67,7 +69,7 @@ const CATEGORY_LABELS: Record<MovementCategory, string> = {
 
 const INCOME_CATEGORIES: MovementCategory[] = [
   'reserva', 'seguro_viaje', 'membresia', 'tarjeta_regalo',
-  'cargo_servicio', 'suplemento', 'servicio_opcional', 'cobro_checkin', 'contable_manual',
+  'cargo_servicio', 'suplemento', 'servicio_opcional', 'cobro_checkin', 'tour_destacado', 'contable_manual',
 ];
 const EXPENSE_CATEGORIES: MovementCategory[] = [
   'pago_agencia', 'comision_ejecutivo', 'penalidad_cancelacion', 'egreso_manual',
@@ -292,7 +294,34 @@ const AdminReporteMaestro: React.FC = () => {
         });
       }
 
-      // 7. Entradas contables manuales (ingresos y egresos)
+      // 7. Tours destacados (ingresos de agencias por posicionamiento)
+      if (filters.tipo === 'todos' || filters.tipo === 'ingreso') {
+        const { data: featured } = await supabase
+          .from('featured_tour_slots')
+          .select('id, total_amount, payment_confirmed_at, agencies(name), tours(name), featured_plans(name)')
+          .not('payment_confirmed_at', 'is', null)
+          .gte('payment_confirmed_at', desde)
+          .lte('payment_confirmed_at', hasta)
+          .order('payment_confirmed_at', { ascending: false });
+
+        (featured ?? []).forEach((f: any) => {
+          const monto = Number(f.total_amount ?? 0);
+          if (monto <= 0) return;
+          const plan = f.featured_plans?.name ?? 'Plan';
+          collected.push({
+            id: f.id,
+            fecha: f.payment_confirmed_at,
+            tipo: 'ingreso',
+            categoria: 'tour_destacado',
+            descripcion: `Tour destacado - ${plan} - ${f.tours?.name ?? 'Tour'}`,
+            referencia: f.id.substring(0, 8),
+            monto,
+            entidad: f.agencies?.name,
+          });
+        });
+      }
+
+      // 8. Entradas contables manuales (ingresos y egresos)
       {
         let query = supabase
           .from('accounting_entries')
@@ -342,7 +371,7 @@ const AdminReporteMaestro: React.FC = () => {
         }
       }
 
-      // 8. Pagos a agencias (egresos)
+      // 9. Pagos a agencias (egresos)
       if (filters.tipo === 'todos' || filters.tipo === 'egreso') {
         const { data: payouts } = await supabase
           .from('agency_payouts')
@@ -366,7 +395,7 @@ const AdminReporteMaestro: React.FC = () => {
         });
       }
 
-      // 9. Comisiones de ejecutivos (egresos)
+      // 10. Comisiones de ejecutivos (egresos)
       if (filters.tipo === 'todos' || filters.tipo === 'egreso') {
         const { data: comms } = await supabase
           .from('executive_commissions')
@@ -393,7 +422,7 @@ const AdminReporteMaestro: React.FC = () => {
         });
       }
 
-      // 10. Penalidades por cancelacion (ingresos para plataforma)
+      // 11. Penalidades por cancelacion (ingresos para plataforma)
       if (filters.tipo === 'todos' || filters.tipo === 'ingreso') {
         const { data: penalties } = await supabase
           .from('cancellation_penalty_records')
