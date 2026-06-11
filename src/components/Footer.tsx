@@ -180,7 +180,7 @@ const Footer: React.FC = () => {
                   src="/SECTUR.png"
                   alt="Secretaría de Turismo"
                   loading="lazy"
-                  className="h-10 w-auto"
+                  className="h-14 w-auto"
                   style={{ filter: 'brightness(0) invert(1)', opacity: 0.65 }}
                 />
                 <div>
@@ -196,7 +196,7 @@ const Footer: React.FC = () => {
                   src="/LogoAMAV.jpeg"
                   alt="AMAV Ciudad de México"
                   loading="lazy"
-                  className="h-9 w-auto"
+                  className="h-12 w-auto"
                 />
               </div>
             </div>
