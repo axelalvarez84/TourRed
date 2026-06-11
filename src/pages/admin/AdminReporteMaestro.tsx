@@ -343,7 +343,7 @@ const AdminReporteMaestro: React.FC = () => {
       if (filters.tipo === 'todos' || filters.tipo === 'egreso') {
         const { data: comms } = await supabase
           .from('executive_commissions')
-          .select('id, amount, commission_type, paid_at, created_at, agencies(name), users!executive_id(first_name, last_name)')
+          .select('id, amount, commission_type, paid_at, created_at, agencies(name), account_executives(first_name, last_name)')
           .eq('status', 'paid')
           .gte('paid_at', desde)
           .lte('paid_at', hasta)
@@ -352,7 +352,7 @@ const AdminReporteMaestro: React.FC = () => {
         (comms ?? []).forEach((c: any) => {
           const monto = Number(c.amount ?? 0);
           if (monto <= 0) return;
-          const executive = c.users ? `${c.users.first_name} ${c.users.last_name}` : '';
+          const executive = c.account_executives ? `${c.account_executives.first_name} ${c.account_executives.last_name}` : '';
           collected.push({
             id: c.id,
             fecha: c.paid_at ?? c.created_at,
