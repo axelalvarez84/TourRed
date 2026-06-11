@@ -367,20 +367,16 @@ const AgencyDashboard: React.FC = () => {
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4 flex items-center">
             <CreditCard className="h-5 w-5 mr-2" />
-            Configuración de Pagos Automáticos
+            Pagos a tu Agencia
           </h2>
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <h3 className="font-medium text-yellow-900 mb-2">Próximos Pasos para Recibir Pagos</h3>
+            <h3 className="font-medium text-yellow-900 mb-2">Como funciona el pago a tu agencia</h3>
             <div className="text-sm text-yellow-800 space-y-2">
-              <p>Para recibir pagos automáticamente, necesitas:</p>
-              <ol className="list-decimal list-inside space-y-1 ml-4">
-                <li>Crear una cuenta de Stripe Connect</li>
-                <li>Vincular tu cuenta bancaria</li>
-                <li>Configurar las transferencias automáticas</li>
-              </ol>
-              <p className="mt-3">
-                <strong>Mientras tanto:</strong> Los clientes pagan el depósito a la plataforma, 
-                y tú cobras el saldo restante directamente.
+              <p>
+                Los pagos se realizan de forma <strong>automatica 3 dias despues de finalizar cada tour</strong>.
+              </p>
+              <p>
+                Para recibirlos, asegurate de tener configurada tu <strong>cuenta bancaria en tu perfil de la plataforma</strong>.
               </p>
             </div>
           </div>
