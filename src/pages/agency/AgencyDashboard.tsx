@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, MapPin, Calendar, Users, DollarSign, Activity, AlertCircle, CreditCard, Crown, Clock, Tag } from 'lucide-react';
+import { Plus, MapPin, Calendar, Users, DollarSign, Activity, AlertCircle, CreditCard, Crown, Clock, Tag, Sparkles, Eye, MousePointerClick, Share2, ArrowRight, BarChart2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAgencyId } from '../../hooks/useAgencyId';
 import { formatCurrency, formatCurrencyMXN } from '../../utils/formatCurrency';
@@ -380,6 +380,85 @@ const AgencyDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Promocion Tours Destacados */}
+      <div className="mb-8 rounded-2xl overflow-hidden shadow-sm border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-orange-50">
+        {/* Header del banner */}
+        <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 rounded-xl p-2">
+              <Sparkles className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-white font-bold text-lg leading-tight">Tours Destacados</h2>
+              <p className="text-amber-100 text-sm">Dale a tus tours la visibilidad que merecen</p>
+            </div>
+          </div>
+          <a
+            href="/agency/featured-tours"
+            className="inline-flex items-center gap-2 bg-white text-amber-700 hover:bg-amber-50 font-semibold px-4 py-2 rounded-xl text-sm transition-colors shrink-0"
+          >
+            Ver mis destacados
+            <ArrowRight className="h-4 w-4" />
+          </a>
+        </div>
+
+        {/* Beneficios */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-amber-100">
+          {/* Beneficio 1 */}
+          <div className="flex items-start gap-4 px-6 py-5">
+            <div className="bg-amber-100 rounded-xl p-2.5 shrink-0 mt-0.5">
+              <Eye className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900 text-sm mb-1">Maxima Visibilidad</h3>
+              <p className="text-gray-500 text-xs leading-relaxed">
+                Tu tour aparece destacado en el <strong className="text-gray-700">hero principal</strong> y en los primeros lugares de los resultados de busqueda, captando la atencion de mas viajeros.
+              </p>
+            </div>
+          </div>
+
+          {/* Beneficio 2 */}
+          <div className="flex items-start gap-4 px-6 py-5">
+            <div className="bg-blue-100 rounded-xl p-2.5 shrink-0 mt-0.5">
+              <BarChart2 className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900 text-sm mb-1">Estadisticas en Tiempo Real</h3>
+              <p className="text-gray-500 text-xs leading-relaxed">
+                Accede a metricas detalladas: <strong className="text-gray-700">impresiones, clics y reservas generadas</strong>. Mide el retorno de tu inversion y optimiza tu estrategia.
+              </p>
+            </div>
+          </div>
+
+          {/* Beneficio 3 */}
+          <div className="flex items-start gap-4 px-6 py-5">
+            <div className="bg-green-100 rounded-xl p-2.5 shrink-0 mt-0.5">
+              <Share2 className="h-5 w-5 text-green-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900 text-sm mb-1">Difusion en Redes Sociales</h3>
+              <p className="text-gray-500 text-xs leading-relaxed">
+                Los tours destacados se <strong className="text-gray-700">comparten en las redes sociales de ToursRed</strong>, ampliando tu alcance a una audiencia aun mayor de forma organica.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* CTA footer */}
+        <div className="bg-amber-50 border-t border-amber-100 px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p className="text-xs text-amber-700 font-medium">
+            Planes desde precios accesibles — disponibles por tiempo y slots limitados.
+          </p>
+          <a
+            href="/agency/tours"
+            className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold px-4 py-2 rounded-xl text-sm transition-colors"
+          >
+            <Sparkles className="h-4 w-4" />
+            Destacar un Tour Ahora
+          </a>
+        </div>
+      </div>
 
       {/* Preventas Activas */}
       {preventaStats.length > 0 && (
