@@ -180,7 +180,7 @@ const Footer: React.FC = () => {
                   src="/SECTUR.png"
                   alt="Secretaría de Turismo"
                   loading="lazy"
-                  className="h-16 w-auto"
+                  className="h-18 w-auto"
                   style={{ filter: 'brightness(0) invert(1)', opacity: 0.65 }}
                 />
                 <div>
