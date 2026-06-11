@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Compass, Facebook, Instagram, Linkedin, Mail, Phone } from 'lucide-react';
+import { Facebook, Instagram, Linkedin, Mail, Phone } from 'lucide-react';
 
 const Footer: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -23,9 +23,7 @@ const Footer: React.FC = () => {
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/subscribe-newsletter`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: email.trim() }),
         }
       );
@@ -51,15 +49,18 @@ const Footer: React.FC = () => {
   return (
     <footer className="bg-blue-900 text-white pt-12 pb-8">
       <div className="container-custom">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div>
+        {/* 5-column grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-6">
+
+          {/* Col 1: Brand */}
+          <div className="col-span-2 sm:col-span-1">
             <div className="flex items-center mb-4">
               <img src="/Logo_Transparente.jpg" alt="ToursRed Logo" loading="lazy" className="h-12 w-auto" />
             </div>
-            <p className="text-gray-400 mb-4">
+            <p className="text-gray-400 text-sm mb-4">
               Descubre destinos extraordinarios y experiencias inolvidables con nuestros socios de viaje de confianza.
             </p>
-            <div className="flex space-x-4">
+            <div className="flex space-x-3">
               <a href="https://www.facebook.com/ToursRedMX" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
                 <Facebook className="h-5 w-5" />
               </a>
@@ -67,7 +68,7 @@ const Footer: React.FC = () => {
                 <Instagram className="h-5 w-5" />
               </a>
               <a href="https://www.tiktok.com/@toursredmx" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
-                <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/tiktok.svg" alt="TikTok" loading="lazy" className="h-5 w-5" />
+                <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/tiktok.svg" alt="TikTok" loading="lazy" className="h-5 w-5" style={{ filter: 'invert(0.6)' }} />
               </a>
               <a href="https://www.linkedin.com/company/toursredmx" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
                 <Linkedin className="h-5 w-5" />
@@ -80,68 +81,66 @@ const Footer: React.FC = () => {
             </div>
           </div>
 
+          {/* Col 2: Enlaces Rápidos */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">Enlaces Rápidos</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-wide mb-4 text-white">Enlaces Rápidos</h3>
             <ul className="space-y-2">
+              <li><Link to="/" className="text-gray-400 hover:text-white transition-colors text-sm">Inicio</Link></li>
+              <li><Link to="/tours" className="text-gray-400 hover:text-white transition-colors text-sm">Tours</Link></li>
+              <li><Link to="/about" className="text-gray-400 hover:text-white transition-colors text-sm">Nosotros</Link></li>
+              <li><Link to="/contact" className="text-gray-400 hover:text-white transition-colors text-sm">Contacto</Link></li>
+            </ul>
+          </div>
+
+          {/* Col 3: Para Viajeros */}
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wide mb-4 text-white">Para Viajeros</h3>
+            <ul className="space-y-2">
+              <li><Link to="/login" className="text-gray-400 hover:text-white transition-colors text-sm">Iniciar Sesión</Link></li>
+              <li><Link to="/signup" className="text-gray-400 hover:text-white transition-colors text-sm">Registrarse</Link></li>
+              <li><Link to="/gift-cards" className="text-gray-400 hover:text-white transition-colors text-sm">Tarjetas de Regalo</Link></li>
+              <li><Link to="/booking-guide" className="text-gray-400 hover:text-white transition-colors text-sm">Cómo Reservar</Link></li>
+              <li><Link to="/faq" className="text-gray-400 hover:text-white transition-colors text-sm">Preguntas Frecuentes</Link></li>
+            </ul>
+          </div>
+
+          {/* Col 4: Aviso Legal */}
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wide mb-4 text-white">Aviso Legal</h3>
+            <ul className="space-y-2">
+              <li><Link to="/aviso-privacidad" className="text-gray-400 hover:text-white transition-colors text-sm">Aviso de Privacidad</Link></li>
+              <li><Link to="/terminos-servicio" className="text-gray-400 hover:text-white transition-colors text-sm">Términos de Servicio</Link></li>
+              <li><Link to="/politica-cookies" className="text-gray-400 hover:text-white transition-colors text-sm">Política de Cookies</Link></li>
               <li>
-                <Link to="/" className="text-gray-400 hover:text-white transition-colors">Inicio</Link>
-              </li>
-              <li>
-                <Link to="/tours" className="text-gray-400 hover:text-white transition-colors">Tours</Link>
-              </li>
-              <li>
-                <Link to="/about" className="text-gray-400 hover:text-white transition-colors">Nosotros</Link>
-              </li>
-              <li>
-                <Link to="/contact" className="text-gray-400 hover:text-white transition-colors">Contacto</Link>
+                <button
+                  onClick={() => { localStorage.removeItem('cookie_consent'); window.location.reload(); }}
+                  className="text-gray-400 hover:text-white transition-colors text-sm text-left"
+                >
+                  Preferencias de Cookies
+                </button>
               </li>
             </ul>
           </div>
 
+          {/* Col 5: Contáctanos */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">Para Viajeros</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link to="/login" className="text-gray-400 hover:text-white transition-colors">Iniciar Sesión</Link>
-              </li>
-              <li>
-                <Link to="/signup" className="text-gray-400 hover:text-white transition-colors">Registrarse</Link>
-              </li>
-              <li>
-                <Link to="/gift-cards" className="text-gray-400 hover:text-white transition-colors">Tarjetas de Regalo</Link>
-              </li>
-              <li>
-                <Link to="/booking-guide" className="text-gray-400 hover:text-white transition-colors">Cómo Reservar</Link>
-              </li>
-              <li>
-                <Link to="/faq" className="text-gray-400 hover:text-white transition-colors">Preguntas Frecuentes</Link>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Contáctanos</h3>
-            <ul className="space-y-2">
+            <h3 className="text-sm font-semibold uppercase tracking-wide mb-4 text-white">Contáctanos</h3>
+            <ul className="space-y-2 mb-4">
               <li className="flex items-center">
-                <Mail className="h-5 w-5 text-gray-400 mr-2" />
-                <a href="mailto:contacto@toursred.com" className="text-gray-400 hover:text-white transition-colors">
+                <Mail className="h-4 w-4 text-gray-400 mr-2 shrink-0" />
+                <a href="mailto:contacto@toursred.com" className="text-gray-400 hover:text-white transition-colors text-sm">
                   contacto@toursred.com
                 </a>
               </li>
               <li className="flex items-center">
-                <Phone className="h-5 w-5 text-gray-400 mr-2" />
-                <a
-                  href="https://wa.me/525547127668"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
+                <Phone className="h-4 w-4 text-gray-400 mr-2 shrink-0" />
+                <a href="https://wa.me/525547127668" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors text-sm">
                   +52 55 47127668
                 </a>
               </li>
             </ul>
-            <div className="mt-4">
-              <h4 className="text-sm font-semibold mb-2">Suscríbete a nuestro boletín</h4>
+            <div>
+              <h4 className="text-xs font-semibold mb-2 text-gray-300">Suscríbete a nuestro boletín</h4>
               <form onSubmit={handleSubscribe}>
                 <div className="flex">
                   <input
@@ -150,14 +149,14 @@ const Footer: React.FC = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={isLoading}
-                    className="px-3 py-2 rounded-l-md w-full text-gray-900 text-sm disabled:opacity-50"
+                    className="px-3 py-2 rounded-l-md w-full text-gray-900 text-xs disabled:opacity-50"
                   />
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="bg-primary-600 px-3 py-2 rounded-r-md text-white font-medium text-sm hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-primary-600 px-3 py-2 rounded-r-md text-white font-medium text-xs hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                   >
-                    {isLoading ? 'Enviando...' : 'Suscribirse'}
+                    {isLoading ? '...' : 'Suscribirse'}
                   </button>
                 </div>
                 {message && (
@@ -169,32 +168,43 @@ const Footer: React.FC = () => {
             </div>
           </div>
         </div>
-        
-        <div className="border-t border-blue-800 mt-8 pt-6">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <p className="text-gray-400 text-sm">
-              &copy; {new Date().getFullYear()} ToursRed. Todos los derechos reservados.
-            </p>
-            <div className="flex flex-wrap gap-4 mt-4 md:mt-0 justify-center">
-              <Link to="/aviso-privacidad" className="text-gray-400 hover:text-white text-sm transition-colors">
-                Aviso de Privacidad
-              </Link>
-              <Link to="/terminos-servicio" className="text-gray-400 hover:text-white text-sm transition-colors">
-                Términos de Servicio
-              </Link>
-              <Link to="/politica-cookies" className="text-gray-400 hover:text-white text-sm transition-colors">
-                Política de Cookies
-              </Link>
-              <button
-                onClick={() => {
-                  localStorage.removeItem('cookie_consent');
-                  window.location.reload();
-                }}
-                className="text-gray-400 hover:text-white text-sm transition-colors"
-              >
-                Preferencias de Cookies
-              </button>
+
+        {/* Bottom bar */}
+        <div className="border-t border-blue-800 mt-8 pt-5">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            {/* Logos institucionales */}
+            <div className="flex items-center gap-6 flex-wrap justify-center sm:justify-start">
+              {/* SECTUR + RNT */}
+              <div className="flex items-center gap-3">
+                <img
+                  src="/SECTUR.png"
+                  alt="Secretaría de Turismo"
+                  loading="lazy"
+                  className="h-10 w-auto"
+                  style={{ filter: 'brightness(0) invert(1)', opacity: 0.65 }}
+                />
+                <div>
+                  <p className="text-gray-400 text-xs leading-tight">Registro Nacional de</p>
+                  <p className="text-gray-400 text-xs leading-tight">Turismo</p>
+                  <p className="text-gray-300 text-xs font-medium mt-0.5">RNT: 04090165582a1</p>
+                </div>
+              </div>
+
+              {/* AMAV */}
+              <div className="bg-white rounded-md px-2 py-1">
+                <img
+                  src="/LogoAMAV.jpeg"
+                  alt="AMAV Ciudad de México"
+                  loading="lazy"
+                  className="h-9 w-auto"
+                />
+              </div>
             </div>
+
+            {/* Copyright */}
+            <p className="text-gray-400 text-xs text-center sm:text-right">
+              &copy; {new Date().getFullYear()} TOURS RED GLOBAL SAS DE CV. Todos los derechos reservados.
+            </p>
           </div>
         </div>
       </div>
