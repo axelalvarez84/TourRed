@@ -199,6 +199,16 @@ const Footer: React.FC = () => {
                   className="h-14 w-auto"
                 />
               </a>
+
+              {/* FEMATUR */}
+              <a href="https://fematur.org" target="_blank" rel="noopener noreferrer" className="bg-white rounded-md px-2 py-1 hover:opacity-80 transition-opacity">
+                <img
+                  src="/LogoFematur.jpg"
+                  alt="FEMATUR"
+                  loading="lazy"
+                  className="h-14 w-auto"
+                />
+              </a>
             </div>
 
             {/* Copyright */}
