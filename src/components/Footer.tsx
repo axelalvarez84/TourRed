@@ -201,7 +201,7 @@ const Footer: React.FC = () => {
               </a>
 
               {/* FEMATUR */}
-              <a href="https://fematur.com" target="_blank" rel="noopener noreferrer" className="bg-white rounded-md px-2 py-1 hover:opacity-80 transition-opacity">
+              <a href="https://fematur.org" target="_blank" rel="noopener noreferrer" className="bg-white rounded-md px-2 py-1 hover:opacity-80 transition-opacity">
                 <img
                   src="/LogoFematur.jpg"
                   alt="FEMATUR"
