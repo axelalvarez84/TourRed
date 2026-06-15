@@ -506,6 +506,7 @@ export const getTours = async (filters: any = {}) => {
       pet_friendly,
       category,
       tour_type,
+      activity_type,
       agencies(id, name, rating, is_active)
     `;
 
@@ -554,6 +555,14 @@ export const getTours = async (filters: any = {}) => {
       query = query.eq('pet_friendly', true);
     } else if (filters.petFriendly === 'false') {
       query = query.eq('pet_friendly', false);
+    }
+
+    if (filters.tourType) {
+      query = query.eq('tour_type', filters.tourType);
+    }
+
+    if (filters.activityType) {
+      query = query.eq('activity_type', filters.activityType);
     }
 
     if (filters.includeInactiveAgencies !== true) {

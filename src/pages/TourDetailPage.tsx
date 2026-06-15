@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Users, Building, Star, Clock, Globe, MessageCircle, ChevronLeft, ChevronRight, CreditCard as Edit, Heart, ExternalLink, Share2, RefreshCw, Lock, Car, AlertTriangle } from 'lucide-react';
+import { MapPin, Calendar, Users, Building, Star, Clock, Globe, MessageCircle, ChevronLeft, ChevronRight, CreditCard as Edit, Heart, ExternalLink, Share2, RefreshCw, Lock, Car, AlertTriangle, Sparkles, Tag, Bus } from 'lucide-react';
 import BookingForm from '../components/BookingForm';
 import AgencyReviews from '../components/AgencyReviews';
 import ShareTourModal from '../components/ShareTourModal';
@@ -780,6 +780,163 @@ const TourDetailPage: React.FC = () => {
                       </>
                     )}
 
+                    {/* Detalles de Experiencia */}
+                    {tour.tour_type === 'receptivo' && (tour as any).activity_type === 'experience' && (
+                      <>
+                        <h3 className="text-lg font-semibold mt-6 mb-3 flex items-center gap-2">
+                          <Sparkles className="h-5 w-5 text-violet-600" />
+                          Lo que Vivirás
+                        </h3>
+                        <div className="space-y-3">
+                          {(tour as any).unique_experience && (
+                            <p className="text-sm text-gray-700 bg-violet-50 border border-violet-200 rounded-lg p-4">
+                              {(tour as any).unique_experience}
+                            </p>
+                          )}
+                          {Array.isArray((tour as any).experience_environment) && (tour as any).experience_environment.length > 0 && (
+                            <div>
+                              <p className="text-sm font-medium text-gray-700 mb-2">Ambiente:</p>
+                              <div className="flex flex-wrap gap-2">
+                                {(tour as any).experience_environment.map((env: string, idx: number) => (
+                                  <span key={idx} className="px-3 py-1 bg-violet-100 text-violet-700 rounded-full text-xs font-medium">{env}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {(tour as any).participation_level && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-700">Participación:</span>
+                              <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium capitalize">
+                                {(tour as any).participation_level}
+                              </span>
+                            </div>
+                          )}
+                          {(tour as any).local_host && (
+                            <div className="flex items-center gap-2 text-sm text-gray-700">
+                              <span className="w-5 h-5 bg-violet-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">✓</span>
+                              Dirigida por anfitrión local
+                            </div>
+                          )}
+                          {(tour as any).special_requirements && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                              <p className="text-xs font-semibold text-amber-700 mb-1">Requisitos del participante:</p>
+                              <p className="text-sm text-amber-800">{(tour as any).special_requirements}</p>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Detalles del Traslado */}
+                    {tour.tour_type === 'receptivo' && (tour as any).activity_type === 'transport' && (
+                      <>
+                        <h3 className="text-lg font-semibold mt-6 mb-3 flex items-center gap-2">
+                          <Bus className="h-5 w-5 text-blue-600" />
+                          Detalles del Traslado
+                        </h3>
+                        <div className="space-y-3">
+                          {(tour as any).transfer_type && (
+                            <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                              <Bus className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                              <div>
+                                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Tipo de Traslado</p>
+                                <p className="text-sm font-medium text-blue-900 mt-0.5">
+                                  {(tour as any).transfer_type === 'aeropuerto_hotel' ? 'Aeropuerto → Hotel'
+                                    : (tour as any).transfer_type === 'hotel_aeropuerto' ? 'Hotel → Aeropuerto'
+                                    : (tour as any).transfer_type === 'hotel_hotel' ? 'Hotel → Hotel'
+                                    : (tour as any).transfer_type === 'punto_punto' ? 'Punto → Punto'
+                                    : (tour as any).transfer_type === 'excursion_retorno' ? 'Excursión con Retorno'
+                                    : 'Otro'}
+                                </p>
+                              </div>
+                              {(tour as any).estimated_minutes && (
+                                <div className="ml-auto text-right">
+                                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Duración aprox.</p>
+                                  <p className="text-sm font-medium text-blue-900 mt-0.5">{(tour as any).estimated_minutes} min</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {(tour as any).transport_service_info && (
+                            <p className="text-sm text-gray-700 whitespace-pre-line">{(tour as any).transport_service_info}</p>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Detalles de la Entrada */}
+                    {tour.tour_type === 'receptivo' && (tour as any).activity_type === 'ticket' && (
+                      <>
+                        <h3 className="text-lg font-semibold mt-6 mb-3 flex items-center gap-2">
+                          <Tag className="h-5 w-5 text-orange-600" />
+                          Detalles de la Entrada
+                        </h3>
+                        <div className="space-y-3">
+                          {(tour as any).ticket_type && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-700">Tipo:</span>
+                              <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium capitalize">
+                                {(tour as any).ticket_type === 'parque_tematico' ? 'Parque Temático'
+                                  : (tour as any).ticket_type === 'museo' ? 'Museo / Galería'
+                                  : (tour as any).ticket_type === 'zona_arqueologica' ? 'Zona Arqueológica'
+                                  : (tour as any).ticket_type === 'show_evento' ? 'Show / Evento'
+                                  : (tour as any).ticket_type === 'atraccion_natural' ? 'Atracción Natural'
+                                  : 'Otro'}
+                              </span>
+                            </div>
+                          )}
+                          {(tour as any).ticket_validity_type && (
+                            <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                              <p className="text-xs font-semibold text-orange-700 mb-1">Vigencia</p>
+                              <p className="text-sm text-orange-900">
+                                {(tour as any).ticket_validity_type === 'open' ? 'Entrada abierta (sin fecha fija)'
+                                  : (tour as any).ticket_validity_type === 'fixed_date' && (tour as any).ticket_valid_from
+                                    ? `Fecha específica: ${(tour as any).ticket_valid_from}`
+                                    : (tour as any).ticket_validity_type === 'date_range' && (tour as any).ticket_valid_from
+                                      ? `Válida del ${(tour as any).ticket_valid_from} al ${(tour as any).ticket_valid_to || '...'}`
+                                      : '—'}
+                              </p>
+                            </div>
+                          )}
+                          {((tour as any).ticket_redemption_method || (tour as any).ticket_delivery_method) && (
+                            <div className="grid grid-cols-2 gap-3">
+                              {(tour as any).ticket_redemption_method && (
+                                <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                                  <p className="text-xs font-semibold text-gray-600 mb-1">Método de canje</p>
+                                  <p className="text-sm text-gray-800 capitalize">
+                                    {(tour as any).ticket_redemption_method === 'qr_codigo' ? 'Código QR'
+                                      : (tour as any).ticket_redemption_method === 'voucher_impreso' ? 'Voucher impreso'
+                                      : (tour as any).ticket_redemption_method === 'nombre_lista' ? 'Nombre en lista'
+                                      : 'Boleto físico'}
+                                  </p>
+                                </div>
+                              )}
+                              {(tour as any).ticket_delivery_method && (
+                                <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                                  <p className="text-xs font-semibold text-gray-600 mb-1">Entrega</p>
+                                  <p className="text-sm text-gray-800">
+                                    {(tour as any).ticket_delivery_method === 'email' ? 'Correo electrónico'
+                                      : (tour as any).ticket_delivery_method === 'whatsapp' ? 'WhatsApp'
+                                      : (tour as any).ticket_delivery_method === 'punto_recogida' ? 'Punto de recogida'
+                                      : 'En taquilla'}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {(tour as any).ticket_access_instructions && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                              <p className="text-xs font-semibold text-blue-700 mb-1">Instrucciones de acceso</p>
+                              <p className="text-sm text-blue-900">{(tour as any).ticket_access_instructions}</p>
+                            </div>
+                          )}
+                          {(tour as any).ticket_service_info && (
+                            <p className="text-sm text-gray-700 whitespace-pre-line">{(tour as any).ticket_service_info}</p>
+                          )}
+                        </div>
+                      </>
+                    )}
+
                     {/* Restricciones físicas — solo receptivo */}
                     {tour.tour_type === 'receptivo' && (tour.restriction_pregnant || tour.restriction_disability || tour.restriction_physical) && (
                       <>
@@ -924,6 +1081,22 @@ const TourDetailPage: React.FC = () => {
                       <h4 className="font-medium">Modalidad</h4>
                       <p className="text-gray-600 capitalize">
                         {tour.receptivo_modality === 'compartido' ? 'Tour Compartido' : 'Tour Privado'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {tour.tour_type === 'receptivo' && (tour as any).activity_type && (tour as any).activity_type !== 'guided_tour' && (
+                  <div className="flex items-start">
+                    {(tour as any).activity_type === 'transport' && <Bus className="h-5 w-5 text-blue-600 mr-3 mt-0.5" />}
+                    {(tour as any).activity_type === 'experience' && <Sparkles className="h-5 w-5 text-violet-600 mr-3 mt-0.5" />}
+                    {(tour as any).activity_type === 'ticket' && <Tag className="h-5 w-5 text-orange-600 mr-3 mt-0.5" />}
+                    <div>
+                      <h4 className="font-medium">Tipo de Actividad</h4>
+                      <p className="text-gray-600">
+                        {(tour as any).activity_type === 'experience' ? 'Experiencia'
+                          : (tour as any).activity_type === 'transport' ? 'Traslado'
+                          : 'Entrada'}
                       </p>
                     </div>
                   </div>

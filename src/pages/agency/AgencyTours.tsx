@@ -9,7 +9,7 @@ import AgencyScheduleManager from '../../components/receptivo/AgencyScheduleMana
 import AgencyBlackoutManager from '../../components/receptivo/AgencyBlackoutManager';
 import AgencySlotCalendar from '../../components/receptivo/AgencySlotCalendar';
 import SeatMapManager from '../../components/seats/SeatMapManager';
-import { TourType, ReceptivoModality, CancellationPolicy } from '../../types';
+import { TourType, ReceptivoModality, CancellationPolicy, ActivityType } from '../../types';
 
 interface OptionalService {
   id?: string;
@@ -247,6 +247,25 @@ const AgencyTours: React.FC = () => {
 
   const [tourType, setTourType] = useState<TourType>('excursion');
   const [receptivoModality, setReceptivoModality] = useState<ReceptivoModality>('compartido');
+  const [activityType, setActivityType] = useState<'guided_tour' | 'experience' | 'transport' | 'ticket'>('guided_tour');
+  const [transferType, setTransferType] = useState<string>('');
+  const [transportOriginPoints, setTransportOriginPoints] = useState<SelectedDeparturePoint[]>([]);
+  const [transportDestinationPoints, setTransportDestinationPoints] = useState<SelectedDeparturePoint[]>([]);
+  const [transportServiceInfo, setTransportServiceInfo] = useState('');
+  const [estimatedMinutes, setEstimatedMinutes] = useState('');
+  const [experienceEnvironment, setExperienceEnvironment] = useState<string[]>([]);
+  const [participationLevel, setParticipationLevel] = useState('');
+  const [localHost, setLocalHost] = useState(false);
+  const [uniqueExperience, setUniqueExperience] = useState('');
+  const [specialRequirements, setSpecialRequirements] = useState('');
+  const [ticketType, setTicketType] = useState('');
+  const [ticketValidityType, setTicketValidityType] = useState<'open' | 'fixed_date' | 'date_range'>('open');
+  const [ticketValidFrom, setTicketValidFrom] = useState('');
+  const [ticketValidTo, setTicketValidTo] = useState('');
+  const [ticketRedemptionMethod, setTicketRedemptionMethod] = useState('');
+  const [ticketDeliveryMethod, setTicketDeliveryMethod] = useState('');
+  const [ticketAccessInstructions, setTicketAccessInstructions] = useState('');
+  const [ticketServiceInfo, setTicketServiceInfo] = useState('');
   const [receptivoTab, setReceptivoTab] = useState<'info' | 'horarios' | 'bloqueos' | 'calendario' | 'asientos'>('info');
   const [receptivoData, setReceptivoData] = useState({
     operating_days: [] as number[],
@@ -548,6 +567,25 @@ const AgencyTours: React.FC = () => {
   const resetForm = () => {
     setTourType('excursion');
     setReceptivoModality('compartido');
+    setActivityType('guided_tour');
+    setTransferType('');
+    setTransportOriginPoints([]);
+    setTransportDestinationPoints([]);
+    setTransportServiceInfo('');
+    setEstimatedMinutes('');
+    setExperienceEnvironment([]);
+    setParticipationLevel('');
+    setLocalHost(false);
+    setUniqueExperience('');
+    setSpecialRequirements('');
+    setTicketType('');
+    setTicketValidityType('open');
+    setTicketValidFrom('');
+    setTicketValidTo('');
+    setTicketRedemptionMethod('');
+    setTicketDeliveryMethod('');
+    setTicketAccessInstructions('');
+    setTicketServiceInfo('');
     setReceptivoTab('info');
     setReceptivoData({
       operating_days: [],
@@ -682,6 +720,23 @@ const AgencyTours: React.FC = () => {
 
     setTourType(tour.tour_type || 'excursion');
     setReceptivoModality(tour.receptivo_modality || 'compartido');
+    setActivityType((tour.activity_type as ActivityType) || 'guided_tour');
+    setTransferType((tour as any).transfer_type || '');
+    setTransportServiceInfo((tour as any).transport_service_info || '');
+    setEstimatedMinutes((tour as any).estimated_minutes?.toString() || '');
+    setExperienceEnvironment((tour as any).experience_environment || []);
+    setParticipationLevel((tour as any).participation_level || '');
+    setLocalHost((tour as any).local_host || false);
+    setUniqueExperience((tour as any).unique_experience || '');
+    setSpecialRequirements((tour as any).special_requirements || '');
+    setTicketType((tour as any).ticket_type || '');
+    setTicketValidityType(((tour as any).ticket_validity_type as 'open' | 'fixed_date' | 'date_range') || 'open');
+    setTicketValidFrom((tour as any).ticket_valid_from || '');
+    setTicketValidTo((tour as any).ticket_valid_to || '');
+    setTicketRedemptionMethod((tour as any).ticket_redemption_method || '');
+    setTicketDeliveryMethod((tour as any).ticket_delivery_method || '');
+    setTicketAccessInstructions((tour as any).ticket_access_instructions || '');
+    setTicketServiceInfo((tour as any).ticket_service_info || '');
     setReceptivoTab('info');
     if (tour.tour_type === 'receptivo') {
       setReceptivoData({
@@ -1895,6 +1950,9 @@ const AgencyTours: React.FC = () => {
       }
 
       const isReceptivo = tourType === 'receptivo';
+      const isTransport = isReceptivo && activityType === 'transport';
+      const isExperience = isReceptivo && activityType === 'experience';
+      const isTicket = isReceptivo && activityType === 'ticket';
 
       const tourData = {
         name: formData.name,
@@ -1993,6 +2051,23 @@ const AgencyTours: React.FC = () => {
         late_payment_grace_days: (formData.payment_option === 'payment_plan' || formData.payment_option === 'both') ? Math.max(0, parseInt(formData.late_payment_grace_days) || 5) : 5,
         late_payment_penalty_pct: (formData.payment_option === 'payment_plan' || formData.payment_option === 'both') ? parseFloat(formData.late_payment_penalty_pct) || 0 : 0,
         late_payment_penalty_fixed: (formData.payment_option === 'payment_plan' || formData.payment_option === 'both') ? parseFloat(formData.late_payment_penalty_fixed) || 0 : 0,
+        activity_type: isReceptivo ? activityType : 'guided_tour',
+        transfer_type: isTransport ? transferType || null : null,
+        transport_service_info: isTransport ? transportServiceInfo || null : null,
+        estimated_minutes: isTransport && estimatedMinutes ? parseInt(estimatedMinutes) : null,
+        experience_environment: isExperience && experienceEnvironment.length > 0 ? experienceEnvironment : null,
+        participation_level: isExperience ? participationLevel || null : null,
+        local_host: isExperience ? localHost : false,
+        unique_experience: isExperience ? uniqueExperience || null : null,
+        special_requirements: isExperience ? specialRequirements || null : null,
+        ticket_type: isTicket ? ticketType || null : null,
+        ticket_validity_type: isTicket ? ticketValidityType : null,
+        ticket_valid_from: isTicket && ticketValidFrom ? ticketValidFrom : null,
+        ticket_valid_to: isTicket && ticketValidTo ? ticketValidTo : null,
+        ticket_redemption_method: isTicket ? ticketRedemptionMethod || null : null,
+        ticket_delivery_method: isTicket ? ticketDeliveryMethod || null : null,
+        ticket_access_instructions: isTicket ? ticketAccessInstructions || null : null,
+        ticket_service_info: isTicket ? ticketServiceInfo || null : null,
       };
 
       let tourId: string;
@@ -2672,6 +2747,45 @@ const AgencyTours: React.FC = () => {
                   </p>
                 </div>
               )}
+              {tourType === 'receptivo' && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="text-xs font-medium text-gray-600 mb-2">Tipo de Actividad</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      { value: 'guided_tour', label: 'Tour Guiado', desc: 'Guía en destino, itinerario y visitas.', color: 'teal' },
+                      { value: 'experience', label: 'Experiencia', desc: 'Actividad única o vivencial.', color: 'violet' },
+                      { value: 'transport', label: 'Traslado', desc: 'Servicio de transporte punto a punto.', color: 'blue' },
+                      { value: 'ticket', label: 'Entrada', desc: 'Acceso a atracción o evento.', color: 'orange' },
+                    ] as const).map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setActivityType(opt.value)}
+                        className={`flex items-start gap-2 p-3 rounded-xl border-2 transition-all text-left ${
+                          activityType === opt.value
+                            ? opt.color === 'teal' ? 'border-teal-500 bg-teal-50'
+                            : opt.color === 'violet' ? 'border-violet-500 bg-violet-50'
+                            : opt.color === 'blue' ? 'border-blue-500 bg-blue-50'
+                            : 'border-orange-500 bg-orange-50'
+                            : 'border-gray-200 hover:border-gray-300 bg-white'
+                        }`}
+                      >
+                        <div>
+                          <p className={`font-semibold text-xs ${
+                            activityType === opt.value
+                              ? opt.color === 'teal' ? 'text-teal-700'
+                              : opt.color === 'violet' ? 'text-violet-700'
+                              : opt.color === 'blue' ? 'text-blue-700'
+                              : 'text-orange-700'
+                              : 'text-gray-800'
+                          }`}>{opt.label}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{opt.desc}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* SECCIÓN 1 — Información General */}
@@ -2738,6 +2852,69 @@ const AgencyTours: React.FC = () => {
                   )}
                 </div>
 
+                {/* Tipo de traslado — solo para activityType=transport */}
+                {tourType === 'receptivo' && activityType === 'transport' && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Tipo de Traslado <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { value: 'aeropuerto_hotel', label: 'Aeropuerto → Hotel' },
+                        { value: 'hotel_aeropuerto', label: 'Hotel → Aeropuerto' },
+                        { value: 'hotel_hotel', label: 'Hotel → Hotel' },
+                        { value: 'punto_punto', label: 'Punto → Punto' },
+                        { value: 'excursion_retorno', label: 'Excursión con Retorno' },
+                        { value: 'otro', label: 'Otro' },
+                      ].map(opt => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setTransferType(opt.value)}
+                          className={`px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all text-left ${
+                            transferType === opt.value
+                              ? 'border-blue-500 bg-blue-50 text-blue-700'
+                              : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tipo de entrada — solo para activityType=ticket */}
+                {tourType === 'receptivo' && activityType === 'ticket' && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Tipo de Entrada <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { value: 'parque_tematico', label: 'Parque Temático' },
+                        { value: 'museo', label: 'Museo / Galería' },
+                        { value: 'zona_arqueologica', label: 'Zona Arqueológica' },
+                        { value: 'show_evento', label: 'Show / Evento' },
+                        { value: 'atraccion_natural', label: 'Atracción Natural' },
+                        { value: 'otro', label: 'Otro' },
+                      ].map(opt => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setTicketType(opt.value)}
+                          className={`px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all text-left ${
+                            ticketType === opt.value
+                              ? 'border-orange-500 bg-orange-50 text-orange-700'
+                              : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                     Descripción <span className="text-red-500">*</span>
@@ -3346,9 +3523,254 @@ const AgencyTours: React.FC = () => {
                     onCreateNew={() => setShowCreateDepartureForm(true)}
                     maxPoints={4}
                     minPoints={1}
-                    label={tourType === 'receptivo' ? 'Puntos de Encuentro' : 'Puntos de Salida'}
+                    label={
+                      tourType === 'receptivo' && activityType === 'transport'
+                        ? 'Puntos de Origen (Recogida)'
+                        : tourType === 'receptivo'
+                        ? 'Puntos de Encuentro'
+                        : 'Puntos de Salida'
+                    }
                   />
                 </div>
+
+                {/* Puntos de destino — solo para traslados */}
+                {tourType === 'receptivo' && activityType === 'transport' && (
+                  <div>
+                    <DeparturePointSelector
+                      selectedPoints={transportDestinationPoints}
+                      onPointsChange={setTransportDestinationPoints}
+                      onCreateNew={() => setShowCreateDepartureForm(true)}
+                      maxPoints={4}
+                      minPoints={0}
+                      label="Puntos de Destino (Entrega)"
+                    />
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                          Tiempo estimado de traslado (minutos)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={estimatedMinutes}
+                          onChange={e => setEstimatedMinutes(e.target.value)}
+                          className="input"
+                          placeholder="Ej: 45"
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Información del servicio de transporte
+                      </label>
+                      <textarea
+                        value={transportServiceInfo}
+                        onChange={e => setTransportServiceInfo(e.target.value)}
+                        className="input"
+                        rows={3}
+                        placeholder="Describe el vehículo, el servicio, instrucciones de abordaje, etc."
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Campos específicos de Experiencia */}
+                {tourType === 'receptivo' && activityType === 'experience' && (
+                  <div className="space-y-4 border border-violet-200 rounded-xl p-4 bg-violet-50/40">
+                    <h4 className="text-sm font-semibold text-violet-800 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4" />
+                      Detalles de la Experiencia
+                    </h4>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        ¿Qué hace única esta experiencia?
+                      </label>
+                      <textarea
+                        value={uniqueExperience}
+                        onChange={e => setUniqueExperience(e.target.value)}
+                        className="input"
+                        rows={2}
+                        placeholder="Describe lo que diferencia esta experiencia de otras similares..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Ambiente de la experiencia
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          'Al aire libre', 'En interiores', 'Acuático', 'Nocturno',
+                          'Gastronómico', 'Cultural', 'Aventura', 'Relajación',
+                        ].map(env => (
+                          <button
+                            key={env}
+                            type="button"
+                            onClick={() => setExperienceEnvironment(prev =>
+                              prev.includes(env) ? prev.filter(e => e !== env) : [...prev, env]
+                            )}
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium border-2 transition-all ${
+                              experienceEnvironment.includes(env)
+                                ? 'border-violet-500 bg-violet-600 text-white'
+                                : 'border-gray-200 text-gray-600 hover:border-violet-300'
+                            }`}
+                          >
+                            {env}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Nivel de participación
+                      </label>
+                      <div className="flex gap-2">
+                        {[
+                          { value: 'pasivo', label: 'Pasivo', desc: 'Solo observar' },
+                          { value: 'activo', label: 'Activo', desc: 'Participación física' },
+                          { value: 'interactivo', label: 'Interactivo', desc: 'Aprende haciendo' },
+                        ].map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setParticipationLevel(opt.value)}
+                            className={`flex-1 px-3 py-2 rounded-lg border-2 text-center text-sm transition-all ${
+                              participationLevel === opt.value
+                                ? 'border-violet-500 bg-violet-50 text-violet-700'
+                                : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                            }`}
+                          >
+                            <p className="font-semibold text-xs">{opt.label}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">{opt.desc}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        id="local-host"
+                        checked={localHost}
+                        onChange={e => setLocalHost(e.target.checked)}
+                        className="w-4 h-4 text-violet-600 border-gray-300 rounded focus:ring-violet-500"
+                      />
+                      <label htmlFor="local-host" className="text-sm font-medium text-gray-700">
+                        Dirigida por anfitrión local
+                      </label>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Requisitos especiales del participante
+                      </label>
+                      <input
+                        type="text"
+                        value={specialRequirements}
+                        onChange={e => setSpecialRequirements(e.target.value)}
+                        className="input"
+                        placeholder="Ej: Saber nadar, llevar ropa cómoda, edad mínima 12 años..."
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Campos específicos de Entrada */}
+                {tourType === 'receptivo' && activityType === 'ticket' && (
+                  <div className="space-y-4 border border-orange-200 rounded-xl p-4 bg-orange-50/40">
+                    <h4 className="text-sm font-semibold text-orange-800 flex items-center gap-2">
+                      <Tag className="w-4 h-4" />
+                      Detalles de la Entrada
+                    </h4>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Vigencia de la entrada
+                      </label>
+                      <div className="flex gap-2">
+                        {[
+                          { value: 'open', label: 'Abierta', desc: 'Sin fecha fija' },
+                          { value: 'fixed_date', label: 'Fecha fija', desc: 'Un día específico' },
+                          { value: 'date_range', label: 'Rango', desc: 'Entre dos fechas' },
+                        ].map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setTicketValidityType(opt.value as 'open' | 'fixed_date' | 'date_range')}
+                            className={`flex-1 px-3 py-2 rounded-lg border-2 text-center text-sm transition-all ${
+                              ticketValidityType === opt.value
+                                ? 'border-orange-500 bg-orange-50 text-orange-700'
+                                : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                            }`}
+                          >
+                            <p className="font-semibold text-xs">{opt.label}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">{opt.desc}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {ticketValidityType === 'fixed_date' && (
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Fecha de validez</label>
+                        <input type="date" value={ticketValidFrom} onChange={e => setTicketValidFrom(e.target.value)} className="input" />
+                      </div>
+                    )}
+                    {ticketValidityType === 'date_range' && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Válida desde</label>
+                          <input type="date" value={ticketValidFrom} onChange={e => setTicketValidFrom(e.target.value)} className="input" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Válida hasta</label>
+                          <input type="date" value={ticketValidTo} onChange={e => setTicketValidTo(e.target.value)} className="input" />
+                        </div>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Método de canje</label>
+                        <select value={ticketRedemptionMethod} onChange={e => setTicketRedemptionMethod(e.target.value)} className="input">
+                          <option value="">Seleccionar...</option>
+                          <option value="qr_codigo">Código QR</option>
+                          <option value="voucher_impreso">Voucher impreso</option>
+                          <option value="nombre_lista">Nombre en lista</option>
+                          <option value="fisico">Boleto físico</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Método de entrega</label>
+                        <select value={ticketDeliveryMethod} onChange={e => setTicketDeliveryMethod(e.target.value)} className="input">
+                          <option value="">Seleccionar...</option>
+                          <option value="email">Por correo electrónico</option>
+                          <option value="whatsapp">Por WhatsApp</option>
+                          <option value="punto_recogida">Punto de recogida</option>
+                          <option value="en_taquilla">En taquilla</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Instrucciones de acceso
+                      </label>
+                      <textarea
+                        value={ticketAccessInstructions}
+                        onChange={e => setTicketAccessInstructions(e.target.value)}
+                        className="input"
+                        rows={2}
+                        placeholder="Ej: Presentar QR en la entrada principal. Acceso válido solo una vez."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Información adicional del servicio
+                      </label>
+                      <textarea
+                        value={ticketServiceInfo}
+                        onChange={e => setTicketServiceInfo(e.target.value)}
+                        className="input"
+                        rows={2}
+                        placeholder="Información relevante sobre horarios de atención, restricciones de acceso, etc."
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -3908,8 +4330,8 @@ const AgencyTours: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Idiomas disponibles — solo receptivo */}
-                {tourType === 'receptivo' && (
+                {/* Idiomas disponibles — solo receptivo (no traslados ni entradas) */}
+                {tourType === 'receptivo' && activityType !== 'transport' && activityType !== 'ticket' && (
                   <div className="space-y-3">
                     <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                       <Globe className="w-4 h-4 text-teal-600" />
@@ -3993,8 +4415,8 @@ const AgencyTours: React.FC = () => {
                   </div>
                 )}
 
-                {/* Restricciones físicas — solo receptivo */}
-                {tourType === 'receptivo' && (
+                {/* Restricciones físicas — solo receptivo con actividad guiada o experiencia */}
+                {tourType === 'receptivo' && activityType !== 'transport' && activityType !== 'ticket' && (
                   <div className="space-y-3">
                     <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-amber-500" />

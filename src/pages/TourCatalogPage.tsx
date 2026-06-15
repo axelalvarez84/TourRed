@@ -40,6 +40,7 @@ const TourCatalogPage: React.FC = () => {
     radius: searchParams.get('radius') || '',
     locationName: searchParams.get('locationName') || '',
     tourType: (searchParams.get('tourType') as 'excursion' | 'receptivo' | undefined) || undefined,
+    activityType: (searchParams.get('activityType') as any) || undefined,
   }), [searchParams]);
 
   const hasGeoSearch = !!(initialFilters.lat && initialFilters.lng);
@@ -48,7 +49,7 @@ const TourCatalogPage: React.FC = () => {
     initialFilters.tourName, initialFilters.destination, initialFilters.category,
     initialFilters.startDate, initialFilters.endDate, initialFilters.agency,
     initialFilters.departurePoint, initialFilters.minPrice, initialFilters.maxPrice,
-    initialFilters.petFriendly, initialFilters.tourType,
+    initialFilters.petFriendly, initialFilters.tourType, (initialFilters as any).activityType,
   ].filter(Boolean).length, [initialFilters]);
 
   const activeFilterPills = useMemo(() => {
@@ -128,6 +129,7 @@ const TourCatalogPage: React.FC = () => {
               petFriendly: initialFilters.petFriendly || null,
               departurePoint: initialFilters.departurePoint || null,
               tourType: initialFilters.tourType || null,
+              activityType: (initialFilters as any).activityType || null,
               limit: PAGE_SIZE,
               offset,
             }),
@@ -385,6 +387,61 @@ const TourCatalogPage: React.FC = () => {
                 <option value="rating">Mejor Calificados</option>
                 <option value="newest">Más Recientes</option>
               </select>
+            </div>
+
+            {/* Tour type quick-filter */}
+            <div className="flex items-center gap-2 mb-5 flex-wrap">
+              {[
+                { value: '', label: 'Todos' },
+                { value: 'excursion', label: 'Excursiones' },
+                { value: 'receptivo', label: 'Receptivos' },
+              ].map(opt => (
+                <a
+                  key={opt.value}
+                  href={opt.value ? `/tours?${new URLSearchParams({ ...Object.fromEntries(new URLSearchParams(window.location.search)), tourType: opt.value }).toString()}` : '/tours'}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                    (opt.value === '' && !initialFilters.tourType) || initialFilters.tourType === opt.value
+                      ? 'bg-primary-600 text-white border-primary-600'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300 hover:text-primary-600'
+                  }`}
+                >
+                  {opt.label}
+                </a>
+              ))}
+              {initialFilters.tourType === 'receptivo' && (
+                <>
+                  <span className="text-xs text-gray-300 mx-1">|</span>
+                  {[
+                    { value: 'guided_tour', label: 'Tour Guiado' },
+                    { value: 'experience', label: 'Experiencias' },
+                    { value: 'transport', label: 'Traslados' },
+                    { value: 'ticket', label: 'Entradas' },
+                  ].map(opt => {
+                    const params = new URLSearchParams(window.location.search);
+                    const currentAT = params.get('activityType');
+                    params.set('activityType', opt.value);
+                    return (
+                      <a
+                        key={opt.value}
+                        href={currentAT === opt.value
+                          ? (() => { const p = new URLSearchParams(window.location.search); p.delete('activityType'); return `/tours?${p.toString()}`; })()
+                          : `/tours?${params.toString()}`
+                        }
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                          currentAT === opt.value
+                            ? opt.value === 'experience' ? 'bg-violet-600 text-white border-violet-600'
+                            : opt.value === 'transport' ? 'bg-blue-600 text-white border-blue-600'
+                            : opt.value === 'ticket' ? 'bg-orange-600 text-white border-orange-600'
+                            : 'bg-teal-600 text-white border-teal-600'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        {opt.label}
+                      </a>
+                    );
+                  })}
+                </>
+              )}
             </div>
 
             {/* Results */}

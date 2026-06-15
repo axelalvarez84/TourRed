@@ -93,6 +93,7 @@ export interface TourDeparturePoint {
 
 export type TourType = 'excursion' | 'receptivo';
 export type ReceptivoModality = 'compartido' | 'privado';
+export type ActivityType = 'guided_tour' | 'experience' | 'transport' | 'ticket';
 export type CancellationPolicy = 'flexible' | 'moderada' | 'estricta' | 'no_reembolsable';
 export type SlotStatus = 'activo' | 'lleno' | 'bloqueado' | 'cancelado' | 'completado';
 export type PaymentOption = 'standard' | 'full_upfront' | 'payment_plan' | 'both';
@@ -196,6 +197,7 @@ export interface Tour {
   admite_adultos_mayores?: boolean;
   tour_type?: TourType;
   receptivo_modality?: ReceptivoModality;
+  activity_type?: ActivityType;
   operating_days?: number[];
   operating_months?: number[];
   min_advance_booking_hours?: number;
@@ -221,6 +223,32 @@ export interface Tour {
   restriction_physical?: boolean;
   name_changes_not_allowed?: boolean;
   cancellation_not_allowed?: boolean;
+  // Experience fields
+  unique_experience?: string;
+  participation_level?: string;
+  local_host?: boolean;
+  special_requirements?: string;
+  experience_environment?: string[];
+  // Transport fields
+  transfer_type?: string;
+  transport_coverage?: string;
+  estimated_minutes?: number;
+  max_wait_minutes?: number;
+  flight_tracking?: boolean;
+  personalized_reception?: boolean;
+  vehicle_type?: string;
+  luggage_info?: string;
+  transport_service_info?: string;
+  // Ticket (Entrada) fields
+  ticket_type?: string;
+  ticket_validity_type?: string;
+  ticket_valid_from?: string;
+  ticket_valid_to?: string;
+  ticket_requires_reservation?: boolean;
+  ticket_redemption_method?: string;
+  ticket_delivery_method?: string;
+  ticket_access_instructions?: string;
+  ticket_service_info?: string;
   preventa_activa?: boolean;
   preventa_inicio?: string;
   preventa_fin?: string;
@@ -529,6 +557,7 @@ export interface SearchFilters {
   locationName?: string;
   tourType?: TourType | 'all';
   travelDate?: string;
+  activityType?: ActivityType | 'all';
 }
 
 export interface ImageUploadData {
