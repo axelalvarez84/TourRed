@@ -46,6 +46,7 @@ Deno.serve(async (req: Request) => {
       stripe_payment_intent_id,
       mp_form_data,
       paypal_order_id,
+      insurance_days, // optional: for standalone activities (transport/experience/ticket)
     } = await req.json();
 
     if (!booking_id || !type || !payment_method) {
@@ -188,23 +189,27 @@ Deno.serve(async (req: Request) => {
       const pricePerDayPerTraveler = parseFloat(platformSettings?.travel_insurance_price_per_day_per_traveler ?? "79");
       const tourData = booking.tours as any;
 
-      // Calculate tour days
-      const refDate = booking.selected_date || tourData?.start_date;
-      const endDate = tourData?.end_date;
-      let tourDays = 1;
-      if (refDate && endDate) {
-        const start = new Date(refDate);
-        const end = new Date(endDate);
-        const diffMs = end.getTime() - start.getTime();
-        tourDays = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1);
-      }
-
       const totalTravelers = Math.max(
         1,
         (booking.travelers_count || 0) ||
         ((booking.count_adultos || 0) + (booking.count_ninos || 0) +
          (booking.count_infantes || 0) + (booking.count_adultos_mayores || 0))
       );
+
+      // For standalone activities (transport/experience/ticket), use client-supplied insurance_days
+      let tourDays = insurance_days && Number(insurance_days) > 0 ? Math.min(30, Number(insurance_days)) : 0;
+      if (!tourDays) {
+        // Fall back to deriving days from tour dates
+        const refDate = booking.selected_date || tourData?.start_date;
+        const endDate = tourData?.end_date;
+        tourDays = 1;
+        if (refDate && endDate) {
+          const start = new Date(refDate);
+          const end = new Date(endDate);
+          const diffMs = end.getTime() - start.getTime();
+          tourDays = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1);
+        }
+      }
 
       const insuranceCost = parseFloat((pricePerDayPerTraveler * tourDays * totalTravelers).toFixed(2));
       itemName = "Seguro de asistencia de viaje";
@@ -285,11 +290,15 @@ Deno.serve(async (req: Request) => {
 
       // If insurance: update booking record
       if (type === "insurance") {
-        await supabase.from("bookings").update({
+        const insuranceUpdate: Record<string, unknown> = {
           travel_insurance_included: true,
           travel_insurance_cost: subtotal,
           updated_at: new Date().toISOString(),
-        }).eq("id", booking_id);
+        };
+        if (insurance_days && Number(insurance_days) > 0) {
+          insuranceUpdate.insurance_days = Math.min(30, Number(insurance_days));
+        }
+        await supabase.from("bookings").update(insuranceUpdate).eq("id", booking_id);
       }
 
       // Send notification emails (traveler + insurance team or agency)

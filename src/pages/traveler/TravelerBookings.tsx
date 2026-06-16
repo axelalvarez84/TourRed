@@ -87,6 +87,9 @@ const TravelerBookings: React.FC = () => {
     existingBosIds: Set<string>;
     insuranceAlreadyBought: boolean;
     insuranceCost: number;
+    insurancePricePerDay: number;
+    insuranceDays: number;
+    insuranceConditionsAccepted: boolean;
     isLoading: boolean;
   }>({
     open: false,
@@ -96,6 +99,9 @@ const TravelerBookings: React.FC = () => {
     existingBosIds: new Set(),
     insuranceAlreadyBought: false,
     insuranceCost: 0,
+    insurancePricePerDay: 0,
+    insuranceDays: 1,
+    insuranceConditionsAccepted: false,
     isLoading: false,
   });
   const [extrasPaymentModal, setExtrasPaymentModal] = useState<{
@@ -1647,6 +1653,10 @@ const TravelerBookings: React.FC = () => {
 
       const alreadyBought = (booking as any).travel_insurance_included === true;
       let insuranceCost = Number((booking as any).travel_insurance_cost || 0);
+      let insurancePricePerDay = 0;
+
+      const activityType = (booking.tours as any)?.activity_type;
+      const isStandaloneActivity = ['transport', 'experience', 'ticket'].includes(activityType);
 
       // Si el booking no tiene costo de seguro guardado, calcularlo desde platform_settings
       if (!alreadyBought && insuranceCost === 0) {
@@ -1656,21 +1666,27 @@ const TravelerBookings: React.FC = () => {
           .limit(1)
           .maybeSingle();
         const pricePerDay = Number(settingsRow?.travel_insurance_price_per_day_per_traveler || 0);
+        insurancePricePerDay = pricePerDay;
         if (pricePerDay > 0) {
-          const startDate = booking.selected_date || booking.tours?.start_date;
-          const endDate = booking.tours?.end_date;
-          let tourDays = 1;
-          if (startDate && endDate) {
-            try {
-              const start = new Date(startDate.includes('T') ? startDate : startDate + 'T00:00:00');
-              const end = new Date(endDate.includes('T') ? endDate : endDate + 'T00:00:00');
-              const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-              tourDays = Math.max(1, diff + 1);
-            } catch {
-              tourDays = 1;
+          if (isStandaloneActivity) {
+            // Para actividades standalone, el costo inicial es por 1 dia (el viajero elige cuantos)
+            insuranceCost = Math.round(pricePerDay * 1 * Math.max(1, booking.travelers_count || 1) * 100) / 100;
+          } else {
+            const startDate = booking.selected_date || booking.tours?.start_date;
+            const endDate = booking.tours?.end_date;
+            let tourDays = 1;
+            if (startDate && endDate) {
+              try {
+                const start = new Date(startDate.includes('T') ? startDate : startDate + 'T00:00:00');
+                const end = new Date(endDate.includes('T') ? endDate : endDate + 'T00:00:00');
+                const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+                tourDays = Math.max(1, diff + 1);
+              } catch {
+                tourDays = 1;
+              }
             }
+            insuranceCost = Math.round(pricePerDay * tourDays * Math.max(1, booking.travelers_count || 1) * 100) / 100;
           }
-          insuranceCost = Math.round(pricePerDay * tourDays * Math.max(1, booking.travelers_count || 1) * 100) / 100;
         }
       }
 
@@ -1681,6 +1697,9 @@ const TravelerBookings: React.FC = () => {
         existingBosIds,
         insuranceAlreadyBought: alreadyBought,
         insuranceCost,
+        insurancePricePerDay,
+        insuranceDays: 1,
+        insuranceConditionsAccepted: false,
         activeTab: (optSvcsRes.data || []).filter(
           (s: any) => !existingBosIds.has(s.id)
         ).length > 0 ? 'servicios' : 'seguro',
@@ -1728,9 +1747,16 @@ const TravelerBookings: React.FC = () => {
         'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
       };
 
+      const isStandaloneInsurance = type === 'insurance' &&
+        ['transport', 'experience', 'ticket'].includes((booking.tours as any)?.activity_type);
       const body = type === 'optional_service'
         ? { booking_id: booking.id, type: 'optional_service', tour_optional_service_id: item.id, quantity, payment_method: selectedMethod }
-        : { booking_id: booking.id, type: 'insurance', payment_method: selectedMethod };
+        : {
+            booking_id: booking.id,
+            type: 'insurance',
+            payment_method: selectedMethod,
+            ...(isStandaloneInsurance ? { insurance_days: extrasModal.insuranceDays } : {}),
+          };
 
       if (selectedMethod === 'mercadopago') {
         const amount = type === 'optional_service'
@@ -4543,6 +4569,90 @@ const TravelerBookings: React.FC = () => {
                           </div>
                           <p className="font-semibold text-gray-900">Seguro de viaje incluido</p>
                           <p className="text-sm text-gray-500 text-center">Ya tienes el seguro de asistencia en viaje para esta reserva.</p>
+                        </div>
+                      ) : extrasModal.insurancePricePerDay > 0 && ['transport', 'experience', 'ticket'].includes((extrasModal.booking?.tours as any)?.activity_type) ? (
+                        /* Standalone insurance for non-guided activities */
+                        <div className="space-y-4">
+                          <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                            <div className="flex items-start gap-3">
+                              <Shield className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" />
+                              <div className="flex-1">
+                                <p className="font-semibold text-gray-900">Seguro de asistencia en viaje</p>
+                                <p className="text-sm text-gray-600 mt-1">Protege tu viaje con cobertura de asistencia medica y cancelacion.</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Days selector */}
+                          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Dias de cobertura</label>
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => {
+                                  const days = Math.max(1, extrasModal.insuranceDays - 1);
+                                  const cost = Math.round(extrasModal.insurancePricePerDay * days * Math.max(1, extrasModal.booking?.travelers_count || 1) * 100) / 100;
+                                  setExtrasModal(prev => ({ ...prev, insuranceDays: days, insuranceCost: cost }));
+                                }}
+                                className="w-9 h-9 rounded-lg border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold text-lg"
+                              >-</button>
+                              <span className="text-2xl font-bold text-gray-900 min-w-[2rem] text-center">{extrasModal.insuranceDays}</span>
+                              <button
+                                onClick={() => {
+                                  const days = Math.min(30, extrasModal.insuranceDays + 1);
+                                  const cost = Math.round(extrasModal.insurancePricePerDay * days * Math.max(1, extrasModal.booking?.travelers_count || 1) * 100) / 100;
+                                  setExtrasModal(prev => ({ ...prev, insuranceDays: days, insuranceCost: cost }));
+                                }}
+                                className="w-9 h-9 rounded-lg border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 font-bold text-lg"
+                              >+</button>
+                              <span className="text-sm text-gray-500 ml-1">dia(s) de cobertura</span>
+                            </div>
+                            <div className="mt-3 flex items-baseline gap-2">
+                              <p className="text-xl font-bold text-blue-700">{formatCurrencyMXN(extrasModal.insuranceCost)}</p>
+                              <p className="text-xs text-gray-500">({extrasModal.insuranceDays} dia(s) × {extrasModal.booking?.travelers_count || 1} viajero(s))</p>
+                            </div>
+                          </div>
+
+                          {/* Insurer conditions */}
+                          <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                            <div className="flex items-start gap-2 mb-3">
+                              <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
+                              <p className="text-sm font-semibold text-amber-800">Condiciones de la aseguradora</p>
+                            </div>
+                            <ul className="space-y-2">
+                              <li className="flex items-start gap-2 text-sm text-amber-800">
+                                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-amber-600 flex-shrink-0" />
+                                El seguro cubre a partir de los <strong>100 km</strong> de tu ciudad o lugar de origen donde vives.
+                              </li>
+                              <li className="flex items-start gap-2 text-sm text-amber-800">
+                                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-amber-600 flex-shrink-0" />
+                                El seguro debe contratarse <strong>antes de iniciar el viaje</strong>. No aplica si ya te encuentras en traslado.
+                              </li>
+                              <li className="flex items-start gap-2 text-sm text-amber-800">
+                                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-amber-600 flex-shrink-0" />
+                                No aplica si la experiencia o evento es <strong>dentro de tu ciudad de origen</strong>.
+                              </li>
+                            </ul>
+                          </div>
+
+                          {/* Acceptance checkbox */}
+                          <label className="flex items-start gap-3 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={extrasModal.insuranceConditionsAccepted}
+                              onChange={e => setExtrasModal(prev => ({ ...prev, insuranceConditionsAccepted: e.target.checked }))}
+                              className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">He leido y acepto las condiciones de la aseguradora. Confirmo que este seguro aplica para mi situacion de viaje.</span>
+                          </label>
+
+                          <button
+                            onClick={() => handleOpenExtrasPayment('insurance', { name: 'Seguro de viaje', price: extrasModal.insuranceCost }, extrasModal.booking!)}
+                            disabled={!extrasModal.insuranceConditionsAccepted}
+                            className="w-full btn bg-blue-600 text-white hover:bg-blue-700 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Shield className="w-4 h-4" />
+                            Contratar seguro
+                          </button>
                         </div>
                       ) : extrasModal.insuranceCost > 0 ? (
                         <div className="space-y-4">

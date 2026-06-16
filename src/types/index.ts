@@ -439,6 +439,7 @@ export interface Booking {
   preventa_comision_descuento?: number;
   travel_insurance_included?: boolean;
   travel_insurance_cost?: number;
+  insurance_days?: number | null;
   has_payment_plan?: boolean;
   payment_plan_total?: number;
   payment_plan_paid?: number;
