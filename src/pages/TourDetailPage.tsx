@@ -672,7 +672,11 @@ const TourDetailPage: React.FC = () => {
                       <>
                         <h3 className="text-lg font-semibold mt-6 mb-3 flex items-center">
                           <MapPin className="h-5 w-5 mr-2 text-primary-600" />
-                          {tour.tour_type === 'receptivo' ? 'Puntos de Encuentro' : 'Puntos de Salida'}
+                          {(tour as any).activity_type === 'experience'
+                            ? 'Lugar de la Experiencia'
+                            : tour.tour_type === 'receptivo'
+                            ? 'Puntos de Encuentro'
+                            : 'Puntos de Salida'}
                         </h3>
                         <div className="space-y-3">
                           {departurePointsInfo.map((point) => (
@@ -685,7 +689,14 @@ const TourDetailPage: React.FC = () => {
                                 <p className="text-sm text-gray-600">{point.city}, {point.municipality}</p>
                                 {point.departure_time && (
                                   <p className="text-sm text-primary-700 font-medium mt-1">
-                                    Hora de salida: {point.departure_time}
+                                    {(tour as any).activity_type === 'experience' ? 'Hora de inicio:' : 'Hora de salida:'}{' '}
+                                    {point.departure_time}
+                                  </p>
+                                )}
+                                {(tour as any).activity_type === 'experience' && point.departure_time && (
+                                  <p className="text-xs text-violet-600 mt-1 flex items-center gap-1">
+                                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0" />
+                                    Se recomienda llegar al menos 10 minutos antes de la hora de inicio.
                                   </p>
                                 )}
                                 {point.special_instructions && (
@@ -708,7 +719,9 @@ const TourDetailPage: React.FC = () => {
                           ))}
                         </div>
                         <p className="text-sm text-gray-600 mt-3 italic">
-                          {tour.tour_type === 'receptivo'
+                          {(tour as any).activity_type === 'experience'
+                            ? `La experiencia se realiza en ${departurePointsInfo.length === 1 ? 'este lugar' : 'estos lugares'}. Llega al menos 10 minutos antes de tu hora de inicio.`
+                            : tour.tour_type === 'receptivo'
                             ? `El tour opera desde ${departurePointsInfo.length === 1 ? 'este punto de encuentro' : 'estos puntos de encuentro'}. Preséntate a tiempo.`
                             : `El tour sale desde ${departurePointsInfo.length === 1 ? 'este punto' : 'estos puntos'}. Asegúrate de llegar con tiempo suficiente.`
                           }

@@ -3264,13 +3264,19 @@ const AgencyTours: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Horarios de Salida */}
+                    {/* Horarios de Salida / Inicio */}
                     <div className="border border-gray-200 rounded-xl overflow-hidden">
                       <div className="bg-gray-50 px-4 py-3 flex items-center gap-2 border-b border-gray-200">
                         <Clock className="w-4 h-4 text-gray-500" />
                         <div>
-                          <span className="text-sm font-semibold text-gray-700">Horarios de Salida</span>
-                          <p className="text-xs text-gray-400 mt-0.5">Define las horas en que sale este tour cada día. Agrega un horario por turno (mañana, tarde, etc.).</p>
+                          <span className="text-sm font-semibold text-gray-700">
+                            {activityType === 'experience' ? 'Horarios de Inicio' : 'Horarios de Salida'}
+                          </span>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {activityType === 'experience'
+                              ? 'Define las horas en que inicia cada sesión de la experiencia. Agrega un horario por turno (mañana, tarde, etc.).'
+                              : 'Define las horas en que sale este tour cada día. Agrega un horario por turno (mañana, tarde, etc.).'}
+                          </p>
                         </div>
                       </div>
                       <div className="p-4 space-y-3">
@@ -3278,7 +3284,8 @@ const AgencyTours: React.FC = () => {
                           <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
                             <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
                             <p className="text-xs text-amber-700">
-                              <strong>Sin horarios configurados.</strong> Debes agregar al menos un horario para que los viajeros puedan ver y reservar este tour.
+                              <strong>{activityType === 'experience' ? 'Sin horarios de inicio configurados.' : 'Sin horarios configurados.'}</strong>{' '}
+                              Debes agregar al menos uno para que los viajeros puedan ver y reservar este tour.
                             </p>
                           </div>
                         )}
@@ -3352,7 +3359,10 @@ const AgencyTours: React.FC = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                               <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">Hora de salida <span className="text-red-500">*</span></label>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  {activityType === 'experience' ? 'Hora de inicio de la experiencia' : 'Hora de salida'}{' '}
+                                  <span className="text-red-500">*</span>
+                                </label>
                                 <input
                                   type="time"
                                   value={scheduleForm.departure_time}
@@ -3365,7 +3375,7 @@ const AgencyTours: React.FC = () => {
                                 <input
                                   type="text"
                                   value={scheduleForm.label}
-                                  placeholder="Ej: Salida matutina, Turno tarde"
+                                  placeholder={activityType === 'experience' ? 'Ej: Sesión matutina, Turno tarde' : 'Ej: Salida matutina, Turno tarde'}
                                   onChange={e => setScheduleForm(prev => ({ ...prev, label: e.target.value }))}
                                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                                 />
@@ -3478,7 +3488,12 @@ const AgencyTours: React.FC = () => {
                     Destinos <span className="text-red-500">*</span>
                     <span className="ml-2 text-xs font-normal text-gray-500">Escribe y presiona Enter para agregar</span>
                   </label>
-                  <p className="text-xs text-gray-500 mb-2">Ciudad o región donde se realiza el tour. Ej: <em>Cancún, Tulum, Oaxaca Centro</em>. Puedes agregar varios si el tour recorre múltiples destinos.</p>
+                  <p className="text-xs text-gray-500 mb-2">
+                    {tourType === 'receptivo' && activityType === 'experience'
+                      ? <>Ciudad o municipio donde se lleva a cabo la experiencia. Ej: <em>Oaxaca Centro, Tulum, Ciudad de México</em>.</>
+                      : <>Ciudad o región donde se realiza el tour. Ej: <em>Cancún, Tulum, Oaxaca Centro</em>. Puedes agregar varios si el tour recorre múltiples destinos.</>
+                    }
+                  </p>
                   <div className="mb-2 flex flex-wrap gap-2">
                     {selectedDestinations.map((destination) => (
                       <span
@@ -3559,11 +3574,18 @@ const AgencyTours: React.FC = () => {
                     label={
                       tourType === 'receptivo' && activityType === 'transport'
                         ? 'Puntos de Origen (Recogida)'
+                        : tourType === 'receptivo' && activityType === 'experience'
+                        ? 'Lugar de la Experiencia'
                         : tourType === 'receptivo'
                         ? 'Puntos de Encuentro'
                         : 'Puntos de Salida'
                     }
                   />
+                  {tourType === 'receptivo' && activityType === 'experience' && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      Agrega la dirección del recinto o sede donde se realiza la experiencia. Ej: <em>Escuela de Cocina Don Pedro, Av. Juárez 45, Oaxaca</em>. Si tiene varios espacios o hay punto de reunión previo, puedes agregar hasta 4 ubicaciones.
+                    </p>
+                  )}
                 </div>
 
                 {/* Puntos de destino — solo para traslados */}
@@ -3698,14 +3720,14 @@ const AgencyTours: React.FC = () => {
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                         Requisitos especiales del participante
                       </label>
-                      <input
-                        type="text"
+                      <textarea
                         value={specialRequirements}
                         onChange={e => setSpecialRequirements(e.target.value)}
                         className="input"
-                        placeholder="Ej: Saber nadar, llevar ropa cómoda, edad mínima 12 años..."
+                        rows={4}
+                        placeholder="Ej: Edad mínima 12 años. Llevar delantal y sus ingredientes: 500g de chile mulato, 200g de chocolate oscuro... Saber nadar, llevar ropa cómoda."
                       />
-                      <p className="text-xs text-gray-500 mt-1">Lo que el viajero debe saber o tener para participar. Se mostrará en la página del tour.</p>
+                      <p className="text-xs text-gray-500 mt-1">Lo que el viajero debe saber, llevar o tener para participar. Se mostrará en la página del tour.</p>
                     </div>
                   </div>
                 )}
