@@ -70,8 +70,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [isLoadingExemption, setIsLoadingExemption] = useState(true);
 
   // Travel insurance
+  const isInsuranceApplicable = !['experience', 'transport', 'ticket'].includes((tour as any).activity_type as string);
   const [insurancePricePerDayPerTraveler, setInsurancePricePerDayPerTraveler] = useState(79);
-  const [includeInsurance, setIncludeInsurance] = useState(true);
+  const [includeInsurance, setIncludeInsurance] = useState(isInsuranceApplicable);
   const [showInsuranceWarning, setShowInsuranceWarning] = useState(false);
   const [showInsuranceCoverage, setShowInsuranceCoverage] = useState(false);
   const [optionalServices, setOptionalServices] = useState<TourOptionalService[]>([]);
@@ -2207,6 +2208,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
             )}
 
             {/* Tarjeta del seguro */}
+            {isInsuranceApplicable && (
             <div className={`mb-4 rounded-xl border-2 overflow-hidden transition-all ${includeInsurance ? 'border-blue-300 bg-gradient-to-br from-blue-50 to-slate-50' : 'border-gray-200 bg-gray-50'}`}>
               {/* Header */}
               <div className={`px-4 py-3 flex items-center justify-between ${includeInsurance ? 'bg-blue-900' : 'bg-gray-400'}`}>
@@ -2348,6 +2350,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                 )}
               </div>
             </div>
+            )}
           </>
         )}
 
