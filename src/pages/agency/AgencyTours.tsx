@@ -249,6 +249,7 @@ const AgencyTours: React.FC = () => {
   const [receptivoModality, setReceptivoModality] = useState<ReceptivoModality>('compartido');
   const [activityType, setActivityType] = useState<'guided_tour' | 'experience' | 'transport' | 'ticket'>('guided_tour');
   const [transferType, setTransferType] = useState<string>('');
+  const [transferCustomTime, setTransferCustomTime] = useState(false);
   const [transportOriginPoints, setTransportOriginPoints] = useState<SelectedDeparturePoint[]>([]);
   const [transportDestinationPoints, setTransportDestinationPoints] = useState<SelectedDeparturePoint[]>([]);
   const [transportServiceInfo, setTransportServiceInfo] = useState('');
@@ -569,6 +570,7 @@ const AgencyTours: React.FC = () => {
     setReceptivoModality('compartido');
     setActivityType('guided_tour');
     setTransferType('');
+    setTransferCustomTime(false);
     setTransportOriginPoints([]);
     setTransportDestinationPoints([]);
     setTransportServiceInfo('');
@@ -722,6 +724,7 @@ const AgencyTours: React.FC = () => {
     setReceptivoModality(tour.receptivo_modality || 'compartido');
     setActivityType((tour.activity_type as ActivityType) || 'guided_tour');
     setTransferType((tour as any).transfer_type || '');
+    setTransferCustomTime((tour as any).transfer_custom_time || false);
     setTransportServiceInfo((tour as any).transport_service_info || '');
     setEstimatedMinutes((tour as any).estimated_minutes?.toString() || '');
     setExperienceEnvironment((tour as any).experience_environment || []);
@@ -2053,6 +2056,7 @@ const AgencyTours: React.FC = () => {
         late_payment_penalty_fixed: (formData.payment_option === 'payment_plan' || formData.payment_option === 'both') ? parseFloat(formData.late_payment_penalty_fixed) || 0 : 0,
         activity_type: isReceptivo ? activityType : 'guided_tour',
         transfer_type: isTransport ? transferType || null : null,
+        transfer_custom_time: isTransport && receptivoModality === 'privado' ? transferCustomTime : false,
         transport_service_info: isTransport ? transportServiceInfo || null : null,
         estimated_minutes: isTransport && estimatedMinutes ? parseInt(estimatedMinutes) : null,
         experience_environment: isExperience && experienceEnvironment.length > 0 ? experienceEnvironment : null,
@@ -3154,7 +3158,8 @@ const AgencyTours: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Pick Up */}
+                    {/* Pick Up — hidden for transport (transfers handle pickup via origin/destination points) */}
+                    {activityType !== 'transport' && (
                     <div className="border border-gray-200 rounded-xl overflow-hidden">
                       <div className="bg-gray-50 px-4 py-3 flex items-center gap-2 border-b border-gray-200">
                         <Car className="w-4 h-4 text-gray-500" />
@@ -3263,6 +3268,7 @@ const AgencyTours: React.FC = () => {
                         )}
                       </div>
                     </div>
+                    )}
 
                     {/* Horarios de Salida / Inicio */}
                     <div className="border border-gray-200 rounded-xl overflow-hidden">
@@ -3280,12 +3286,36 @@ const AgencyTours: React.FC = () => {
                         </div>
                       </div>
                       <div className="p-4 space-y-3">
-                        {schedulesDraft.length === 0 && !showScheduleForm && (
+                        {/* Checkbox: traveler defines transfer time (only for private transport) */}
+                        {activityType === 'transport' && receptivoModality === 'privado' && (
+                          <label className={`flex items-start gap-3 cursor-pointer p-3 rounded-lg border-2 transition-all ${transferCustomTime ? 'border-teal-400 bg-teal-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                            <input
+                              type="checkbox"
+                              checked={transferCustomTime}
+                              onChange={e => setTransferCustomTime(e.target.checked)}
+                              className="w-4 h-4 mt-0.5 text-teal-600 border-gray-300 rounded focus:ring-teal-500 flex-shrink-0"
+                            />
+                            <div>
+                              <span className="text-sm font-medium text-gray-800">Permitir que el viajero defina la hora del traslado al reservar</span>
+                              <p className="text-xs text-gray-500 mt-0.5">Al activar esto, el viajero indicará a qué hora necesita el traslado durante el proceso de reserva. Aún puedes agregar horarios fijos si también los ofreces.</p>
+                            </div>
+                          </label>
+                        )}
+                        {schedulesDraft.length === 0 && !showScheduleForm && !transferCustomTime && (
                           <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
                             <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
                             <p className="text-xs text-amber-700">
                               <strong>{activityType === 'experience' ? 'Sin horarios de inicio configurados.' : 'Sin horarios configurados.'}</strong>{' '}
                               Debes agregar al menos uno para que los viajeros puedan ver y reservar este tour.
+                            </p>
+                          </div>
+                        )}
+                        {activityType === 'transport' && receptivoModality === 'privado' && transferCustomTime && schedulesDraft.length === 0 && !showScheduleForm && (
+                          <div className="flex items-start gap-2 bg-teal-50 border border-teal-200 rounded-lg p-3">
+                            <Clock className="w-4 h-4 text-teal-500 flex-shrink-0 mt-0.5" />
+                            <p className="text-xs text-teal-700">
+                              <strong>El viajero definirá la hora al reservar.</strong>{' '}
+                              No es necesario agregar horarios fijos, aunque puedes hacerlo si también ofreces salidas en horarios específicos.
                             </p>
                           </div>
                         )}

@@ -102,7 +102,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [selectedPickupZone, setSelectedPickupZone] = useState<string>('free');
   const [selectedLanguage, setSelectedLanguage] = useState<string>('');
   const [restrictionsAccepted, setRestrictionsAccepted] = useState(false);
+  const [customTransferTime, setCustomTransferTime] = useState('');
 
+  const isTransferCustomTime = isReceptivo && (tour as any).transfer_custom_time === true;
   const hasRestrictions = isReceptivo && (tour.restriction_pregnant || tour.restriction_disability || tour.restriction_physical);
 
   const today = new Date();
@@ -1032,8 +1034,18 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
       return;
     }
 
-    if (isReceptivo && !selectedSlot) {
+    if (isReceptivo && !selectedSlot && !isTransferCustomTime) {
       setError('Debes seleccionar una fecha y horario para el tour receptivo.');
+      return;
+    }
+
+    if (isReceptivo && isTransferCustomTime && !selectedSlotDate) {
+      setError('Debes seleccionar la fecha en que necesitas el traslado.');
+      return;
+    }
+
+    if (isTransferCustomTime && !customTransferTime) {
+      setError('Debes indicar a qué hora necesitas el traslado.');
       return;
     }
 
@@ -1081,10 +1093,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         service_charge: serviceCharge,
         user_payment: userPayment + effectiveInsuranceCost,
         platform_revenue: platformRevenue,
-        booking_date: isReceptivo && selectedSlot ? selectedSlot.slot_date : tour.start_date,
+        booking_date: isReceptivo && selectedSlot ? selectedSlot.slot_date : (isTransferCustomTime && selectedSlotDate ? selectedSlotDate.toISOString().split('T')[0] : tour.start_date),
         slot_id: isReceptivo && selectedSlot ? selectedSlot.id : null,
-        selected_date: isReceptivo && selectedSlot ? selectedSlot.slot_date : null,
-        selected_time: isReceptivo && selectedSlot ? selectedSlot.departure_time : null,
+        selected_date: isReceptivo && selectedSlot ? selectedSlot.slot_date : (isTransferCustomTime && selectedSlotDate ? selectedSlotDate.toISOString().split('T')[0] : null),
+        selected_time: isTransferCustomTime ? (customTransferTime || null) : (isReceptivo && selectedSlot ? selectedSlot.departure_time : null),
         status: initialStatus,
         payment_status: initialPaymentStatus,
         approval_status: initialApprovalStatus,
@@ -1470,7 +1482,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         <div className="mb-4 space-y-3">
           <div className="flex items-center gap-2 mb-1">
             <RefreshCw className="w-4 h-4 text-teal-600" />
-            <span className="text-sm font-semibold text-gray-700">Selecciona fecha y horario</span>
+            <span className="text-sm font-semibold text-gray-700">
+              {isTransferCustomTime ? 'Selecciona la fecha del traslado' : 'Selecciona fecha y horario'}
+            </span>
           </div>
           <SlotCalendarPicker
             tour={tour}
@@ -1480,37 +1494,72 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
               setSelectedSlot(null);
             }}
           />
-          {selectedSlotDate && (
-            <SlotTimePicker
-              tourId={tour.id}
-              selectedDate={selectedSlotDate}
-              selectedSlotId={selectedSlot?.id || null}
-              onSlotSelect={(slot) => setSelectedSlot(slot)}
-            />
-          )}
-          {selectedSlot && tour.min_travelers_required && tour.min_travelers_required > 1 && (
-            <MinTravelersAlert
-              minTravelersRequired={tour.min_travelers_required}
-              confirmationHours={tour.min_travelers_confirmation_hours || 24}
-              currentSlotBooked={selectedSlot.booked_count}
-            />
-          )}
-          {selectedSlot && (
-            <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 flex items-center gap-2.5">
-              <Clock className="w-4 h-4 text-teal-600 flex-shrink-0" />
-              <div className="text-sm">
-                <span className="font-semibold text-teal-800">
-                  {format(new Date(selectedSlot.slot_date + 'T12:00:00'), "EEEE d 'de' MMMM", { locale: es })}
-                </span>
-                <span className="text-teal-600 ml-2">
-                  a las {(() => {
-                    const [h, m] = selectedSlot.departure_time.split(':');
-                    const hour = parseInt(h);
-                    return `${hour % 12 || 12}:${m} ${hour >= 12 ? 'PM' : 'AM'}`;
-                  })()}
-                </span>
+          {isTransferCustomTime ? (
+            selectedSlotDate && (
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-gray-600">
+                  ¿A qué hora necesitas el traslado? <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="time"
+                  value={customTransferTime}
+                  onChange={e => setCustomTransferTime(e.target.value)}
+                  className="input text-sm"
+                />
+                {customTransferTime && (
+                  <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 flex items-center gap-2.5">
+                    <Clock className="w-4 h-4 text-teal-600 flex-shrink-0" />
+                    <div className="text-sm">
+                      <span className="font-semibold text-teal-800">
+                        {format(selectedSlotDate, "EEEE d 'de' MMMM", { locale: es })}
+                      </span>
+                      <span className="text-teal-600 ml-2">
+                        a las {(() => {
+                          const [h, m] = customTransferTime.split(':');
+                          const hour = parseInt(h);
+                          return `${hour % 12 || 12}:${m} ${hour >= 12 ? 'PM' : 'AM'}`;
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            )
+          ) : (
+            <>
+              {selectedSlotDate && (
+                <SlotTimePicker
+                  tourId={tour.id}
+                  selectedDate={selectedSlotDate}
+                  selectedSlotId={selectedSlot?.id || null}
+                  onSlotSelect={(slot) => setSelectedSlot(slot)}
+                />
+              )}
+              {selectedSlot && tour.min_travelers_required && tour.min_travelers_required > 1 && (
+                <MinTravelersAlert
+                  minTravelersRequired={tour.min_travelers_required}
+                  confirmationHours={tour.min_travelers_confirmation_hours || 24}
+                  currentSlotBooked={selectedSlot.booked_count}
+                />
+              )}
+              {selectedSlot && (
+                <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 flex items-center gap-2.5">
+                  <Clock className="w-4 h-4 text-teal-600 flex-shrink-0" />
+                  <div className="text-sm">
+                    <span className="font-semibold text-teal-800">
+                      {format(new Date(selectedSlot.slot_date + 'T12:00:00'), "EEEE d 'de' MMMM", { locale: es })}
+                    </span>
+                    <span className="text-teal-600 ml-2">
+                      a las {(() => {
+                        const [h, m] = selectedSlot.departure_time.split(':');
+                        const hour = parseInt(h);
+                        return `${hour % 12 || 12}:${m} ${hour >= 12 ? 'PM' : 'AM'}`;
+                      })()}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       ) : (
