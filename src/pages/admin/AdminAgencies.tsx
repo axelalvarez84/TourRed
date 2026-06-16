@@ -1272,10 +1272,9 @@ const AdminAgencies: React.FC = () => {
                       <p><strong>Ejemplo con tour de $10,000:</strong></p>
                       <ul className="list-disc list-inside space-y-1 mt-1">
                         <li>Comisión plataforma: {formatCurrencyMXN(10000 * editForm.commission_rate)}</li>
-                        <li>Cargo servicio (3%): $300</li>
-                        <li>Total plataforma: {formatCurrencyMXN(10000 * editForm.commission_rate + 300)}</li>
                         <li>Agencia recibe: {formatCurrencyMXN(10000 * (1 - editForm.commission_rate))}</li>
                       </ul>
+                      <p className="mt-2 text-gray-400 italic">El cargo por servicio se cobra al viajero por separado.</p>
                     </div>
                   </div>
                 </div>
