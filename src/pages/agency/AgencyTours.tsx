@@ -4991,6 +4991,7 @@ const AgencyTours: React.FC = () => {
                           agencyId={editingTour.agency_id}
                           slotId={null}
                           isReceptivo={true}
+                          transferCustomTime={transferCustomTime}
                         />
                       </div>
                     )}

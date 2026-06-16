@@ -11,6 +11,7 @@ interface SeatMapManagerProps {
   tourDate?: string;
   slotTime?: string;
   isReceptivo?: boolean;
+  transferCustomTime?: boolean;
 }
 
 const SEAT_SIZE = 36;
@@ -42,6 +43,7 @@ const SeatMapManager: React.FC<SeatMapManagerProps> = ({
   tourDate,
   slotTime,
   isReceptivo = false,
+  transferCustomTime = false,
 }) => {
   const { user } = useAuth();
   const [layout, setLayout] = useState<VehicleSeatLayout | null>(null);
@@ -446,9 +448,12 @@ const SeatMapManager: React.FC<SeatMapManagerProps> = ({
             Cargando salidas disponibles...
           </div>
         ) : slots.length === 0 ? (
-          <div className="flex items-center gap-2 p-3 bg-white border border-blue-200 rounded-lg text-sm text-gray-500">
-            <AlertCircle className="w-4 h-4 text-amber-500" />
-            No hay salidas proximas programadas para este tour.
+          <div className="flex items-start gap-2 p-3 bg-white border border-blue-200 rounded-lg text-sm text-gray-600">
+            <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+            {transferCustomTime
+              ? <span>Este traslado permite que el viajero defina su hora al reservar. Para gestionar asientos por slot, agrega al menos un <strong>horario fijo</strong> en la pestana "Horarios de Salida" — esto generara los slots necesarios.</span>
+              : <span>No hay salidas proximas programadas para este tour.</span>
+            }
           </div>
         ) : (
           <div className="space-y-2">
