@@ -2656,6 +2656,17 @@ const AgencyTours: React.FC = () => {
                 </div>
               )}
             </div>
+            <div className="flex items-center gap-4 mt-4 pt-4 border-t border-gray-100">
+              <span className="text-xs text-gray-500 font-medium">Leyenda:</span>
+              <span className="flex items-center gap-1 text-xs text-gray-600">
+                <span className="text-red-500 font-bold">*</span>
+                Campo obligatorio
+              </span>
+              <span className="flex items-center gap-1 text-xs text-gray-600">
+                <span className="bg-gray-100 text-gray-500 text-[10px] font-medium px-1.5 py-0.5 rounded">Opcional</span>
+                Campo no requerido para guardar
+              </span>
+            </div>
           </div>
 
           <div className="space-y-5">
@@ -2813,6 +2824,7 @@ const AgencyTours: React.FC = () => {
                     placeholder="Ej: Tour Mágico por Oaxaca 3 días"
                     required
                   />
+                  <p className="text-xs text-gray-500 mt-1">Sé descriptivo y atractivo. Incluye el destino y la duración cuando aplique. Ej: <em>"Snorkel en Cenotes — Tulum"</em>, <em>"Traslado Aeropuerto-Hotel Cancún"</em>.</p>
                 </div>
 
                 <div>
@@ -2855,9 +2867,10 @@ const AgencyTours: React.FC = () => {
                 {/* Tipo de traslado — solo para activityType=transport */}
                 {tourType === 'receptivo' && activityType === 'transport' && (
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
                       Tipo de Traslado <span className="text-red-500">*</span>
                     </label>
+                    <p className="text-xs text-gray-500 mb-2">Selecciona la ruta principal de este servicio de transporte.</p>
                     <div className="grid grid-cols-2 gap-2">
                       {[
                         { value: 'aeropuerto_hotel', label: 'Aeropuerto → Hotel' },
@@ -2887,9 +2900,10 @@ const AgencyTours: React.FC = () => {
                 {/* Tipo de entrada — solo para activityType=ticket */}
                 {tourType === 'receptivo' && activityType === 'ticket' && (
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
                       Tipo de Entrada <span className="text-red-500">*</span>
                     </label>
+                    <p className="text-xs text-gray-500 mb-2">Categoriza el tipo de acceso o atracción que ofrece esta entrada.</p>
                     <div className="grid grid-cols-2 gap-2">
                       {[
                         { value: 'parque_tematico', label: 'Parque Temático' },
@@ -2927,6 +2941,7 @@ const AgencyTours: React.FC = () => {
                     placeholder="Describe brevemente qué hace especial a este tour..."
                     required
                   />
+                  <p className="text-xs text-gray-500 mt-1">Resumen que verán los viajeros en la tarjeta del tour. 2–4 oraciones que destaquen lo más atractivo. El itinerario detallado va en el Paso 3.</p>
                 </div>
               </div>
             </div>
@@ -3034,6 +3049,7 @@ const AgencyTours: React.FC = () => {
                         Días de operación
                         <span className="ml-2 text-xs font-normal text-gray-400">Vacío = todos los días</span>
                       </label>
+                      <p className="text-xs text-gray-500 mb-2">Selecciona los días en que este tour opera. Si lo dejas vacío, estará disponible todos los días de la semana.</p>
                       <div className="flex gap-1.5">
                         {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((d, i) => (
                           <button
@@ -3062,6 +3078,7 @@ const AgencyTours: React.FC = () => {
                         Meses de operación
                         <span className="ml-2 text-xs font-normal text-gray-400">Vacío = todo el año</span>
                       </label>
+                      <p className="text-xs text-gray-500 mb-2">Útil para tours de temporada. Si lo dejas vacío, opera los 12 meses.</p>
                       <div className="flex flex-wrap gap-1.5">
                         {['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'].map((m, i) => (
                           <button
@@ -3090,29 +3107,33 @@ const AgencyTours: React.FC = () => {
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Duración (días)</label>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Duración por salida (días) <span className="text-red-500">*</span></label>
                         <input type="number" min="1" value={receptivoData.slot_duration_days}
                           onChange={e => setReceptivoData(prev => ({ ...prev, slot_duration_days: e.target.value }))}
                           className="input" />
+                        <p className="text-[11px] text-gray-400 mt-1">¿Cuántos días dura cada salida? Ej: <em>1</em> para tours de un día</p>
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Cupos por defecto</label>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Cupos por horario</label>
                         <input type="number" min="1" value={receptivoData.default_slot_capacity}
                           placeholder="= máx. viajeros"
                           onChange={e => setReceptivoData(prev => ({ ...prev, default_slot_capacity: e.target.value }))}
                           className="input" />
+                        <p className="text-[11px] text-gray-400 mt-1">Máx. de personas por horario. Vacío = usa el límite general del tour</p>
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Anticip. mín. (hrs)</label>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Anticipación mínima (horas) <span className="text-red-500">*</span></label>
                         <input type="number" min="1" value={receptivoData.min_advance_booking_hours}
                           onChange={e => setReceptivoData(prev => ({ ...prev, min_advance_booking_hours: e.target.value }))}
                           className="input" />
+                        <p className="text-[11px] text-gray-400 mt-1">Ej: <em>24</em> = se debe reservar al menos 1 día antes</p>
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Ventana máx. (días)</label>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Reserva anticipada máxima (días) <span className="text-red-500">*</span></label>
                         <input type="number" min="1" value={receptivoData.max_advance_booking_days}
                           onChange={e => setReceptivoData(prev => ({ ...prev, max_advance_booking_days: e.target.value }))}
                           className="input" />
+                        <p className="text-[11px] text-gray-400 mt-1">Ej: <em>90</em> = se puede reservar con hasta 3 meses de anticipación</p>
                       </div>
                     </div>
 
@@ -3122,12 +3143,14 @@ const AgencyTours: React.FC = () => {
                         <input type="number" min="1" value={receptivoData.min_travelers_required}
                           onChange={e => setReceptivoData(prev => ({ ...prev, min_travelers_required: e.target.value }))}
                           className="input" />
+                        <p className="text-[11px] text-gray-400 mt-1">Ej: <em>4</em> = el tour no se confirma si hay menos de 4 reservas</p>
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Hrs. confirmación mín.</label>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Horas para confirmar mín.</label>
                         <input type="number" min="1" value={receptivoData.min_travelers_confirmation_hours}
                           onChange={e => setReceptivoData(prev => ({ ...prev, min_travelers_confirmation_hours: e.target.value }))}
                           className="input" />
+                        <p className="text-[11px] text-gray-400 mt-1">Ej: <em>24</em> = se evalúa el mínimo 1 día antes del tour</p>
                       </div>
                     </div>
 
@@ -3146,7 +3169,10 @@ const AgencyTours: React.FC = () => {
                             onChange={e => setPickupAvailable(e.target.checked)}
                             className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
                           />
-                          <span className="text-sm font-medium text-gray-700">Ofrecer recogida en hotel a los viajeros</span>
+                          <div>
+                            <span className="text-sm font-medium text-gray-700">Ofrecer recogida en hotel a los viajeros</span>
+                            <p className="text-xs text-gray-500 mt-0.5">Activa esto si puedes recoger a los viajeros en sus hoteles. Podrás definir zonas con o sin costo adicional.</p>
+                          </div>
                         </label>
 
                         {pickupAvailable && (
@@ -3217,10 +3243,10 @@ const AgencyTours: React.FC = () => {
                                         updated[idx] = { ...updated[idx], cost_type: e.target.value as 'por_persona' | 'por_reserva' };
                                         setPickupZones(updated);
                                       }}
-                                      className="input text-xs w-32 flex-shrink-0"
+                                      className="input text-xs w-36 flex-shrink-0"
                                     >
                                       <option value="por_persona">Por persona</option>
-                                      <option value="por_reserva">Por reserva</option>
+                                      <option value="por_reserva">Por reserva (fijo)</option>
                                     </select>
                                     <button
                                       type="button"
@@ -3242,14 +3268,19 @@ const AgencyTours: React.FC = () => {
                     <div className="border border-gray-200 rounded-xl overflow-hidden">
                       <div className="bg-gray-50 px-4 py-3 flex items-center gap-2 border-b border-gray-200">
                         <Clock className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm font-semibold text-gray-700">Horarios de Salida</span>
-                        <span className="ml-2 text-xs text-gray-400 font-normal">Configura las horas en que sale este tour</span>
+                        <div>
+                          <span className="text-sm font-semibold text-gray-700">Horarios de Salida</span>
+                          <p className="text-xs text-gray-400 mt-0.5">Define las horas en que sale este tour cada día. Agrega un horario por turno (mañana, tarde, etc.).</p>
+                        </div>
                       </div>
                       <div className="p-4 space-y-3">
                         {schedulesDraft.length === 0 && !showScheduleForm && (
-                          <p className="text-xs text-gray-400 italic text-center py-2">
-                            Sin horarios configurados. Agrega al menos uno para que los viajeros puedan reservar.
-                          </p>
+                          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                            <p className="text-xs text-amber-700">
+                              <strong>Sin horarios configurados.</strong> Debes agregar al menos un horario para que los viajeros puedan ver y reservar este tour.
+                            </p>
+                          </div>
                         )}
 
                         {schedulesDraft.length > 0 && (
@@ -3321,7 +3352,7 @@ const AgencyTours: React.FC = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                               <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">Hora de salida *</label>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">Hora de salida <span className="text-red-500">*</span></label>
                                 <input
                                   type="time"
                                   value={scheduleForm.departure_time}
@@ -3330,29 +3361,30 @@ const AgencyTours: React.FC = () => {
                                 />
                               </div>
                               <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">Etiqueta (opcional)</label>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">Etiqueta <span className="text-gray-400 font-normal">(opcional)</span></label>
                                 <input
                                   type="text"
                                   value={scheduleForm.label}
-                                  placeholder="Ej: Salida matutina"
+                                  placeholder="Ej: Salida matutina, Turno tarde"
                                   onChange={e => setScheduleForm(prev => ({ ...prev, label: e.target.value }))}
                                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                                 />
                               </div>
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">Cupos propios (opcional — deja vacío para usar el default del tour)</label>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Cupos propios <span className="text-gray-400 font-normal">(opcional)</span></label>
                               <input
                                 type="number"
                                 min="1"
                                 value={scheduleForm.slot_capacity}
-                                placeholder="Usa cupos por defecto del tour"
+                                placeholder="Deja vacío para usar los cupos por defecto del tour"
                                 onChange={e => setScheduleForm(prev => ({ ...prev, slot_capacity: e.target.value }))}
                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                               />
+                              <p className="text-[11px] text-gray-400 mt-1">Útil si este horario tiene menos capacidad que el resto. Ej: el turno nocturno solo admite 10 personas.</p>
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-2">Días específicos (vacío = todos los días del tour)</label>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Días específicos <span className="text-gray-400 font-normal">(opcional — vacío = todos los días de operación)</span></label>
                               <div className="flex gap-1.5">
                                 {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map((d, i) => (
                                   <button
@@ -3446,6 +3478,7 @@ const AgencyTours: React.FC = () => {
                     Destinos <span className="text-red-500">*</span>
                     <span className="ml-2 text-xs font-normal text-gray-500">Escribe y presiona Enter para agregar</span>
                   </label>
+                  <p className="text-xs text-gray-500 mb-2">Ciudad o región donde se realiza el tour. Ej: <em>Cancún, Tulum, Oaxaca Centro</em>. Puedes agregar varios si el tour recorre múltiples destinos.</p>
                   <div className="mb-2 flex flex-wrap gap-2">
                     {selectedDestinations.map((destination) => (
                       <span
@@ -3547,7 +3580,7 @@ const AgencyTours: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4 mt-4">
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                          Tiempo estimado de traslado (minutos)
+                          Tiempo estimado de traslado (minutos) <span className="text-gray-400 text-xs font-normal">Opcional</span>
                         </label>
                         <input
                           type="number"
@@ -3557,11 +3590,12 @@ const AgencyTours: React.FC = () => {
                           className="input"
                           placeholder="Ej: 45"
                         />
+                        <p className="text-xs text-gray-500 mt-1">Duración aproximada del recorrido. Ej: <em>45</em> = 45 minutos en camino.</p>
                       </div>
                     </div>
                     <div className="mt-4">
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                        Información del servicio de transporte
+                        Información del servicio de transporte <span className="text-gray-400 text-xs font-normal">Opcional</span>
                       </label>
                       <textarea
                         value={transportServiceInfo}
@@ -3570,6 +3604,7 @@ const AgencyTours: React.FC = () => {
                         rows={3}
                         placeholder="Describe el vehículo, el servicio, instrucciones de abordaje, etc."
                       />
+                      <p className="text-xs text-gray-500 mt-1">Ej: <em>"Unidad climatizada con capacidad para 8 personas, WiFi a bordo. El conductor estará en la terminal a 30 min antes del vuelo."</em></p>
                     </div>
                   </div>
                 )}
@@ -3580,6 +3615,7 @@ const AgencyTours: React.FC = () => {
                     <h4 className="text-sm font-semibold text-violet-800 flex items-center gap-2">
                       <Sparkles className="w-4 h-4" />
                       Detalles de la Experiencia
+                      <span className="ml-auto text-xs font-normal text-violet-500">Todos los campos son opcionales</span>
                     </h4>
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">
@@ -3592,6 +3628,7 @@ const AgencyTours: React.FC = () => {
                         rows={2}
                         placeholder="Describe lo que diferencia esta experiencia de otras similares..."
                       />
+                      <p className="text-xs text-gray-500 mt-1">Ej: <em>"Preparación del mole con una familia oaxaqueña de 3 generaciones en su cocina tradicional"</em>.</p>
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -3668,6 +3705,7 @@ const AgencyTours: React.FC = () => {
                         className="input"
                         placeholder="Ej: Saber nadar, llevar ropa cómoda, edad mínima 12 años..."
                       />
+                      <p className="text-xs text-gray-500 mt-1">Lo que el viajero debe saber o tener para participar. Se mostrará en la página del tour.</p>
                     </div>
                   </div>
                 )}
@@ -3678,11 +3716,13 @@ const AgencyTours: React.FC = () => {
                     <h4 className="text-sm font-semibold text-orange-800 flex items-center gap-2">
                       <Tag className="w-4 h-4" />
                       Detalles de la Entrada
+                      <span className="ml-auto text-xs font-normal text-orange-500">Todos los campos son opcionales</span>
                     </h4>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Vigencia de la entrada
                       </label>
+                      <p className="text-xs text-gray-500 mb-2">¿Esta entrada tiene una fecha fija de uso o es flexible? Ej: una entrada para el 20 de julio vs. una que puede usarse cualquier día del mes.</p>
                       <div className="flex gap-2">
                         {[
                           { value: 'open', label: 'Abierta', desc: 'Sin fecha fija' },
@@ -3733,6 +3773,7 @@ const AgencyTours: React.FC = () => {
                           <option value="nombre_lista">Nombre en lista</option>
                           <option value="fisico">Boleto físico</option>
                         </select>
+                        <p className="text-xs text-gray-500 mt-1">¿Cómo se usa la entrada en la puerta o taquilla?</p>
                       </div>
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">Método de entrega</label>
@@ -3743,6 +3784,7 @@ const AgencyTours: React.FC = () => {
                           <option value="punto_recogida">Punto de recogida</option>
                           <option value="en_taquilla">En taquilla</option>
                         </select>
+                        <p className="text-xs text-gray-500 mt-1">¿Cómo llega la entrada al viajero?</p>
                       </div>
                     </div>
                     <div>
@@ -3756,6 +3798,7 @@ const AgencyTours: React.FC = () => {
                         rows={2}
                         placeholder="Ej: Presentar QR en la entrada principal. Acceso válido solo una vez."
                       />
+                      <p className="text-xs text-gray-500 mt-1">Instrucciones que el viajero verá al recibir su entrada. Ej: qué puerta usar, si necesita imprimir, si es de un solo uso.</p>
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">
@@ -3768,6 +3811,7 @@ const AgencyTours: React.FC = () => {
                         rows={2}
                         placeholder="Información relevante sobre horarios de atención, restricciones de acceso, etc."
                       />
+                      <p className="text-xs text-gray-500 mt-1">Ej: <em>"El parque abre de 9am a 5pm. No se permiten mascotas. Casilleros disponibles con depósito reembolsable."</em></p>
                     </div>
                   </div>
                 )}
@@ -3799,13 +3843,15 @@ const AgencyTours: React.FC = () => {
                     placeholder="Día 1: Llegada al destino, traslado al hotel...&#10;Día 2: Visita a sitios turísticos...&#10;Día 3: Actividades y regreso..."
                     required
                   />
+                  <p className="text-xs text-gray-500 mt-1">Describe el recorrido hora por hora o día por día. Cuanto más detallado, más confianza genera en el viajero. Ej: <em>"9:00 am — Salida desde el punto de encuentro. 10:30 am — Llegada a Cenote X. Nado libre 1hr…"</em></p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Qué Incluye
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Qué Incluye <span className="text-gray-400 text-xs font-normal">Opcional</span>
                     </label>
+                    <p className="text-xs text-gray-500 mb-2">Lista todo lo que está cubierto en el precio. Ej: <em>Transporte, guía, entrada al sitio, comida</em>.</p>
                     <div className="space-y-2">
                       {includes.map((include, index) => (
                         <div key={index} className="flex items-center gap-2">
@@ -3841,9 +3887,10 @@ const AgencyTours: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Qué NO Incluye
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Qué NO Incluye <span className="text-gray-400 text-xs font-normal">Opcional</span>
                     </label>
+                    <p className="text-xs text-gray-500 mb-2">Aclara qué queda fuera del precio para evitar malentendidos. Ej: <em>Vuelos, propinas, gastos personales</em>.</p>
                     <div className="space-y-2">
                       {excludes.map((exclude, index) => (
                         <div key={index} className="flex items-center gap-2">
@@ -3880,9 +3927,10 @@ const AgencyTours: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Imagen Principal del Tour <span className="text-red-500">*</span>
                   </label>
+                  <p className="text-xs text-gray-500 mb-2">Una foto atractiva aumenta drásticamente las reservas. Recomendado: horizontal, mínimo 1200×800 px. Sube un archivo o pega una URL.</p>
                   <ImageUploader
                     onImageSelect={handleImageSelect}
                     currentImage={formData.image_url}
@@ -3944,7 +3992,7 @@ const AgencyTours: React.FC = () => {
                         required
                       />
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Precio de referencia si no defines tarifas por categoría</p>
+                    <p className="text-xs text-gray-500 mt-1">Precio de referencia por persona. Si defines tarifas por categoría (adulto, niño…) abajo, esas tarifas tendrán prioridad.</p>
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1.5">
@@ -3963,7 +4011,7 @@ const AgencyTours: React.FC = () => {
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">%</span>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Mínimo 30% — Máximo 100%</p>
+                    <p className="text-xs text-gray-500 mt-1">Mínimo 30% — Máximo 100%. Ej: <em>50</em> = el viajero paga la mitad al reservar y el resto antes de la salida.</p>
                   </div>
                 </div>
 
@@ -4084,7 +4132,7 @@ const AgencyTours: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      Tamaño Máximo del Grupo
+                      Tamaño Máximo del Grupo <span className="text-gray-400 text-xs font-normal">Opcional</span>
                     </label>
                     <div className="relative">
                       <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -4097,7 +4145,7 @@ const AgencyTours: React.FC = () => {
                         placeholder="Ej: 20"
                       />
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Capacidad total del tour</p>
+                    <p className="text-xs text-gray-500 mt-1">Límite total de personas en el tour. Vacío = sin límite definido.</p>
                   </div>
                   {tourType === 'excursion' && (
                     <div>
@@ -4143,13 +4191,13 @@ const AgencyTours: React.FC = () => {
                       className="input"
                       required
                     >
-                      <option value="automatic">Automática (pago inmediato)</option>
-                      <option value="manual">Con aprobación manual (sin cargo inicial)</option>
+                      <option value="automatic">Automática — el viajero paga al instante</option>
+                      <option value="manual">Con aprobación manual — tú apruebas primero</option>
                     </select>
                     <p className="text-xs text-gray-500 mt-1">
                       {formData.booking_approval_type === 'automatic'
-                        ? 'El viajero paga el anticipo en el momento de reservar'
-                        : 'Tú apruebas cada reserva antes de que el viajero pague'
+                        ? 'La reserva se confirma inmediatamente y el viajero paga el anticipo en ese momento. Ideal para tours de alta demanda.'
+                        : 'El viajero solicita la reserva y tú la apruebas o rechazas antes de que se realice el cobro. Útil para tours personalizados o con cupos muy limitados.'
                       }
                     </p>
                   </div>
@@ -4160,6 +4208,7 @@ const AgencyTours: React.FC = () => {
                     <Ban className="w-4 h-4 text-rose-500" />
                     Restricciones del Tour
                   </h4>
+                  <p className="text-xs text-gray-500">Estas restricciones se mostrarán al viajero antes de confirmar su reserva.</p>
 
                   <div className={`rounded-xl border-2 p-4 transition-all ${formData.cancellation_not_allowed ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50'}`}>
                     <label className="flex items-start gap-3 cursor-pointer">
@@ -4182,7 +4231,7 @@ const AgencyTours: React.FC = () => {
 
                   {tourType === 'receptivo' && !formData.cancellation_not_allowed && (
                     <div className="space-y-3">
-                      <p className="text-xs text-gray-500">Define las franjas horarias y porcentajes de reembolso. La zona sin reembolso se aplica automáticamente cuando faltan menos horas que el umbral moderado.</p>
+                      <p className="text-xs text-gray-500">Define cuántas horas antes del tour puede cancelar el viajero y qué porcentaje se le reembolsa. Tienes tres zonas: <strong>flexible</strong> (reembolso total), <strong>moderada</strong> (reembolso parcial) y <strong>sin reembolso</strong> (automática).</p>
                       <div className="bg-green-50 border border-green-200 rounded-xl p-3">
                         <p className="text-xs font-semibold text-green-700 mb-2">Zona flexible — reembolso total</p>
                         <div className="grid grid-cols-2 gap-3">
@@ -4277,6 +4326,7 @@ const AgencyTours: React.FC = () => {
                     Mapa de Asientos Interactivo
                     <span className="text-xs font-normal text-gray-400">Opcional</span>
                   </h4>
+                  <p className="text-xs text-gray-500">Permite que los viajeros elijan su asiento al reservar. Solo disponible para tours en autobús o sprinter.</p>
                   <div className={`rounded-xl border-2 p-4 transition-all ${formData.vehicle_map_type ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
                     <label className="flex items-center gap-3 cursor-pointer">
                       <input
@@ -4338,6 +4388,7 @@ const AgencyTours: React.FC = () => {
                       Idiomas Disponibles
                       <span className="text-xs font-normal text-gray-400">Opcional</span>
                     </h4>
+                    <p className="text-xs text-gray-500">Si ofreces el tour en más de un idioma, agrégalos aquí. Puedes indicar si hay un costo adicional por guía en otro idioma. Si no agregas nada, se asume que el tour es solo en español.</p>
                     <div className="border border-gray-200 rounded-xl p-4 space-y-3">
                       {tourLanguages.length === 0 && (
                         <p className="text-xs text-gray-400 italic">No hay idiomas configurados. El tour se realiza solo en el idioma local.</p>
@@ -4423,6 +4474,7 @@ const AgencyTours: React.FC = () => {
                       Restricciones de Aptitud Física
                       <span className="text-xs font-normal text-gray-400">Opcional</span>
                     </h4>
+                    <p className="text-xs text-gray-500">Activa las restricciones que apliquen. El viajero deberá aceptarlas antes de completar su reserva, y se mostrarán en la página del tour.</p>
                     <div className="border border-gray-200 rounded-xl p-4 space-y-3">
                       <div className={`rounded-lg border p-3 transition-all ${restrictionPregnant ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-gray-50'}`}>
                         <label className="flex items-center gap-3 cursor-pointer">
@@ -4467,7 +4519,7 @@ const AgencyTours: React.FC = () => {
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-2">
                           <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                           <p className="text-xs text-amber-700">
-                            Si alguna restricción está activa, el viajero deberá aceptarlas explícitamente antes de poder completar su reserva. Estas restricciones también serán visibles en la página del tour.
+                            Las restricciones activas serán visibles en la página del tour y el viajero deberá aceptarlas antes de poder reservar.
                           </p>
                         </div>
                       )}
