@@ -5565,6 +5565,13 @@ const AgencyTours: React.FC = () => {
               )}
             </div>
 
+            {error && (
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg flex items-start gap-3 text-sm">
+                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            )}
+
             <div className="flex justify-end space-x-4">
               <button
                 type="button"
