@@ -1058,19 +1058,6 @@ const AdminAgencies: React.FC = () => {
                       </select>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Banco
-                      </label>
-                      <input
-                        type="text"
-                        value={editForm.banco}
-                        onChange={(e) => setEditForm({...editForm, banco: e.target.value})}
-                        className="input"
-                        placeholder="BBVA, Santander, etc."
-                      />
-                    </div>
-
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Domicilio Fiscal
@@ -1081,33 +1068,6 @@ const AdminAgencies: React.FC = () => {
                         className="input"
                         rows={2}
                         placeholder="Dirección fiscal completa"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Cuenta CLABE
-                      </label>
-                      <input
-                        type="text"
-                        value={editForm.cuenta_clabe}
-                        onChange={(e) => setEditForm({...editForm, cuenta_clabe: e.target.value})}
-                        className="input"
-                        placeholder="18 dígitos"
-                        maxLength={18}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Titular de la Cuenta
-                      </label>
-                      <input
-                        type="text"
-                        value={editForm.titular_cuenta}
-                        onChange={(e) => setEditForm({...editForm, titular_cuenta: e.target.value})}
-                        className="input"
-                        placeholder="Nombre del titular"
                       />
                     </div>
                   </div>
@@ -1292,59 +1252,57 @@ const AdminAgencies: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Información Bancaria */}
-            <div className="mt-6 bg-green-50 rounded-lg p-4">
-              <h4 className="text-lg font-semibold mb-4 flex items-center">
-                <DollarSign className="h-5 w-5 mr-2" />
-                Información Bancaria
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Banco
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.banco}
-                    onChange={(e) => setEditForm({...editForm, banco: e.target.value})}
-                    className="input"
-                    placeholder="BBVA, Santander, etc."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Cuenta CLABE
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.cuenta_clabe}
-                    onChange={(e) => setEditForm({...editForm, cuenta_clabe: e.target.value})}
-                    className="input"
-                    placeholder="18 dígitos"
-                    maxLength={18}
-                  />
-                  {editForm.cuenta_clabe && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Formato: {formatClabe(editForm.cuenta_clabe)}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Titular de la Cuenta
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.titular_cuenta}
-                    onChange={(e) => setEditForm({...editForm, titular_cuenta: e.target.value})}
-                    className="input"
-                    placeholder="Nombre del titular"
-                  />
+                {/* Información Bancaria */}
+                <div className="bg-green-50 rounded-lg p-4">
+                  <h4 className="text-lg font-semibold mb-4 flex items-center">
+                    <DollarSign className="h-5 w-5 mr-2" />
+                    Información Bancaria
+                  </h4>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Banco
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.banco}
+                        onChange={(e) => setEditForm({...editForm, banco: e.target.value})}
+                        className="input"
+                        placeholder="BBVA, Santander, etc."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Cuenta CLABE
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.cuenta_clabe}
+                        onChange={(e) => setEditForm({...editForm, cuenta_clabe: e.target.value})}
+                        className="input"
+                        placeholder="18 dígitos"
+                        maxLength={18}
+                      />
+                      {editForm.cuenta_clabe && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Formato: {formatClabe(editForm.cuenta_clabe)}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Titular de la Cuenta
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.titular_cuenta}
+                        onChange={(e) => setEditForm({...editForm, titular_cuenta: e.target.value})}
+                        className="input"
+                        placeholder="Nombre del titular"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
