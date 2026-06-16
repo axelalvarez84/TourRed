@@ -2347,6 +2347,19 @@ const AgencyTours: React.FC = () => {
                 });
               }
             }
+
+            // Auto-generate slots for the next 90 days when editing too
+            const startDateEdit = new Date().toISOString().split('T')[0];
+            const endDateEdit = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            try {
+              await supabase.rpc('auto_generate_slots_for_range', {
+                p_tour_id: tourId,
+                p_start_date: startDateEdit,
+                p_end_date: endDateEdit,
+              });
+            } catch (slotErr) {
+              console.warn('Could not auto-generate slots on edit:', slotErr);
+            }
           } else {
             // New tour: bulk insert all draft schedules
             const schedulesToInsert = schedulesDraft.map((s, i) => ({
