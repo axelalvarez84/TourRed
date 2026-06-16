@@ -2522,6 +2522,9 @@ const AgencyTours: React.FC = () => {
     }
   };
 
+  const isReceptivoForm = tourType === 'receptivo';
+  const isTicket = isReceptivoForm && activityType === 'ticket';
+
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
