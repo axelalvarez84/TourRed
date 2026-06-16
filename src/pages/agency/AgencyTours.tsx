@@ -250,6 +250,8 @@ const AgencyTours: React.FC = () => {
   const [activityType, setActivityType] = useState<'guided_tour' | 'experience' | 'transport' | 'ticket'>('guided_tour');
   const [transferType, setTransferType] = useState<string>('');
   const [transferCustomTime, setTransferCustomTime] = useState(false);
+  const [transferPricingMode, setTransferPricingMode] = useState<'per_person' | 'per_vehicle'>('per_person');
+  const [privateVehicleCapacity, setPrivateVehicleCapacity] = useState('');
   const [transportOriginPoints, setTransportOriginPoints] = useState<SelectedDeparturePoint[]>([]);
   const [transportDestinationPoints, setTransportDestinationPoints] = useState<SelectedDeparturePoint[]>([]);
   const [transportServiceInfo, setTransportServiceInfo] = useState('');
@@ -571,6 +573,8 @@ const AgencyTours: React.FC = () => {
     setActivityType('guided_tour');
     setTransferType('');
     setTransferCustomTime(false);
+    setTransferPricingMode('per_person');
+    setPrivateVehicleCapacity('');
     setTransportOriginPoints([]);
     setTransportDestinationPoints([]);
     setTransportServiceInfo('');
@@ -725,6 +729,8 @@ const AgencyTours: React.FC = () => {
     setActivityType((tour.activity_type as ActivityType) || 'guided_tour');
     setTransferType((tour as any).transfer_type || '');
     setTransferCustomTime((tour as any).transfer_custom_time || false);
+    setTransferPricingMode(((tour as any).transfer_pricing_mode as 'per_person' | 'per_vehicle') || 'per_person');
+    setPrivateVehicleCapacity((tour as any).private_vehicle_capacity?.toString() || '');
     setTransportServiceInfo((tour as any).transport_service_info || '');
     setEstimatedMinutes((tour as any).estimated_minutes?.toString() || '');
     setExperienceEnvironment((tour as any).experience_environment || []);
@@ -2027,7 +2033,6 @@ const AgencyTours: React.FC = () => {
         restriction_pregnant: isReceptivo ? restrictionPregnant : false,
         restriction_disability: isReceptivo ? restrictionDisability : false,
         restriction_physical: isReceptivo ? restrictionPhysical : false,
-        vehicle_map_type: formData.vehicle_map_type || null,
         preventa_activa: formData.preventa_activa,
         preventa_inicio: formData.preventa_activa && formData.preventa_inicio ? formData.preventa_inicio : null,
         preventa_fin: formData.preventa_activa && formData.preventa_fin ? formData.preventa_fin : null,
@@ -2057,6 +2062,9 @@ const AgencyTours: React.FC = () => {
         activity_type: isReceptivo ? activityType : 'guided_tour',
         transfer_type: isTransport ? transferType || null : null,
         transfer_custom_time: isTransport && receptivoModality === 'privado' ? transferCustomTime : false,
+        transfer_pricing_mode: isTransport && receptivoModality === 'privado' ? transferPricingMode : 'per_person',
+        private_vehicle_capacity: isTransport && receptivoModality === 'privado' && privateVehicleCapacity ? parseInt(privateVehicleCapacity) : null,
+        vehicle_map_type: isTransport && receptivoModality === 'privado' ? null : formData.vehicle_map_type ?? null,
         transport_service_info: isTransport ? transportServiceInfo || null : null,
         estimated_minutes: isTransport && estimatedMinutes ? parseInt(estimatedMinutes) : null,
         experience_environment: isExperience && experienceEnvironment.length > 0 ? experienceEnvironment : null,
@@ -4403,66 +4411,118 @@ const AgencyTours: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Mapa de Asientos */}
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                    <Bus className="w-4 h-4 text-blue-600" />
-                    Mapa de Asientos Interactivo
-                    <span className="text-xs font-normal text-gray-400">Opcional</span>
-                  </h4>
-                  <p className="text-xs text-gray-500">Permite que los viajeros elijan su asiento al reservar. Solo disponible para tours en autobús o sprinter.</p>
-                  <div className={`rounded-xl border-2 p-4 transition-all ${formData.vehicle_map_type ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={!!formData.vehicle_map_type}
-                        onChange={(e) => setFormData({ ...formData, vehicle_map_type: e.target.checked ? 'sprinter_20' : null })}
-                        className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
+                {/* Capacidad y precio de traslado privado */}
+                {activityType === 'transport' && receptivoModality === 'privado' && (
+                  <div className="space-y-4 border border-teal-200 rounded-xl p-4 bg-teal-50/40">
+                    <h4 className="text-sm font-semibold text-teal-800 flex items-center gap-2">
+                      <Bus className="w-4 h-4" />
+                      Configuración del Vehículo Privado
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <span className={`text-sm font-semibold ${formData.vehicle_map_type ? 'text-blue-800' : 'text-gray-600'}`}>
-                          Activar mapa de asientos para este tour
-                        </span>
-                        <p className="text-xs text-gray-500">Los viajeros podran elegir su asiento al reservar. Aplica para excursiones y tours receptivos.</p>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                          Capacidad máxima del vehículo <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="50"
+                          value={privateVehicleCapacity}
+                          onChange={e => setPrivateVehicleCapacity(e.target.value)}
+                          className="input"
+                          placeholder="Ej: 4"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Pasajeros máximos que caben en el vehículo. Ej: 4 para sedán, 7 para minivan, 15 para sprinter.</p>
                       </div>
-                    </label>
-                    {formData.vehicle_map_type && (
-                      <div className="mt-4 ml-8 space-y-3">
-                        <p className="text-xs font-semibold text-blue-700">Selecciona el tipo de vehiculo:</p>
-                        <div className="grid grid-cols-2 gap-3">
-                          {VEHICLE_OPTIONS.map(opt => {
-                            const capacidad = parseInt(formData.max_travelers || '0');
-                            const mismatch = capacidad > 0 && capacidad !== opt.capacity;
-                            return (
-                              <button
-                                key={opt.type}
-                                type="button"
-                                onClick={() => setFormData({ ...formData, vehicle_map_type: opt.type })}
-                                className={`relative p-4 rounded-xl border-2 text-left transition-all ${
-                                  formData.vehicle_map_type === opt.type
-                                    ? 'border-blue-600 bg-blue-100'
-                                    : 'border-gray-200 bg-white hover:border-blue-300'
-                                }`}
-                              >
-                                <div className="flex items-center gap-2 mb-1">
-                                  <Bus className={`w-5 h-5 ${formData.vehicle_map_type === opt.type ? 'text-blue-700' : 'text-gray-500'}`} />
-                                  <span className={`text-sm font-semibold ${formData.vehicle_map_type === opt.type ? 'text-blue-800' : 'text-gray-700'}`}>{opt.label}</span>
-                                </div>
-                                <p className={`text-xs ${formData.vehicle_map_type === opt.type ? 'text-blue-600' : 'text-gray-500'}`}>{opt.description}</p>
-                                {formData.vehicle_map_type === opt.type && mismatch && (
-                                  <div className="mt-2 flex items-start gap-1 text-amber-700 bg-amber-50 rounded-lg p-2">
-                                    <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                                    <p className="text-xs">La capacidad configurada ({capacidad}) no coincide con la del vehiculo ({opt.capacity}). Se recomienda actualizarla.</p>
-                                  </div>
-                                )}
-                              </button>
-                            );
-                          })}
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                          Precio por <span className="text-red-500">*</span>
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setTransferPricingMode('per_person')}
+                            className={`p-3 rounded-lg border-2 text-left transition-all ${transferPricingMode === 'per_person' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+                          >
+                            <p className={`text-sm font-semibold ${transferPricingMode === 'per_person' ? 'text-teal-800' : 'text-gray-700'}`}>Por persona</p>
+                            <p className="text-xs text-gray-500 mt-0.5">El precio se multiplica por número de viajeros</p>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTransferPricingMode('per_vehicle')}
+                            className={`p-3 rounded-lg border-2 text-left transition-all ${transferPricingMode === 'per_vehicle' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+                          >
+                            <p className={`text-sm font-semibold ${transferPricingMode === 'per_vehicle' ? 'text-teal-800' : 'text-gray-700'}`}>Por vehículo</p>
+                            <p className="text-xs text-gray-500 mt-0.5">Precio fijo sin importar cuántos viajeros van</p>
+                          </button>
                         </div>
                       </div>
-                    )}
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {/* Mapa de Asientos — solo para traslados compartidos y demás tours */}
+                {!(activityType === 'transport' && receptivoModality === 'privado') && (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                      <Bus className="w-4 h-4 text-blue-600" />
+                      Mapa de Asientos Interactivo
+                      <span className="text-xs font-normal text-gray-400">Opcional</span>
+                    </h4>
+                    <p className="text-xs text-gray-500">Permite que los viajeros elijan su asiento al reservar. Solo disponible para tours en autobús o sprinter.</p>
+                    <div className={`rounded-xl border-2 p-4 transition-all ${formData.vehicle_map_type ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!formData.vehicle_map_type}
+                          onChange={(e) => setFormData({ ...formData, vehicle_map_type: e.target.checked ? 'sprinter_20' : null })}
+                          className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <div>
+                          <span className={`text-sm font-semibold ${formData.vehicle_map_type ? 'text-blue-800' : 'text-gray-600'}`}>
+                            Activar mapa de asientos para este tour
+                          </span>
+                          <p className="text-xs text-gray-500">Los viajeros podran elegir su asiento al reservar. Aplica para excursiones y tours compartidos.</p>
+                        </div>
+                      </label>
+                      {formData.vehicle_map_type && (
+                        <div className="mt-4 ml-8 space-y-3">
+                          <p className="text-xs font-semibold text-blue-700">Selecciona el tipo de vehiculo:</p>
+                          <div className="grid grid-cols-2 gap-3">
+                            {VEHICLE_OPTIONS.map(opt => {
+                              const capacidad = parseInt(formData.max_travelers || '0');
+                              const mismatch = capacidad > 0 && capacidad !== opt.capacity;
+                              return (
+                                <button
+                                  key={opt.type}
+                                  type="button"
+                                  onClick={() => setFormData({ ...formData, vehicle_map_type: opt.type })}
+                                  className={`relative p-4 rounded-xl border-2 text-left transition-all ${
+                                    formData.vehicle_map_type === opt.type
+                                      ? 'border-blue-600 bg-blue-100'
+                                      : 'border-gray-200 bg-white hover:border-blue-300'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <Bus className={`w-5 h-5 ${formData.vehicle_map_type === opt.type ? 'text-blue-700' : 'text-gray-500'}`} />
+                                    <span className={`text-sm font-semibold ${formData.vehicle_map_type === opt.type ? 'text-blue-800' : 'text-gray-700'}`}>{opt.label}</span>
+                                  </div>
+                                  <p className={`text-xs ${formData.vehicle_map_type === opt.type ? 'text-blue-600' : 'text-gray-500'}`}>{opt.description}</p>
+                                  {formData.vehicle_map_type === opt.type && mismatch && (
+                                    <div className="mt-2 flex items-start gap-1 text-amber-700 bg-amber-50 rounded-lg p-2">
+                                      <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                      <p className="text-xs">La capacidad configurada ({capacidad}) no coincide con la del vehiculo ({opt.capacity}). Se recomienda actualizarla.</p>
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Idiomas disponibles — solo receptivo (no traslados ni entradas) */}
                 {tourType === 'receptivo' && activityType !== 'transport' && activityType !== 'ticket' && (

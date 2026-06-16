@@ -239,6 +239,9 @@ export interface Tour {
   vehicle_type?: string;
   luggage_info?: string;
   transport_service_info?: string;
+  transfer_custom_time?: boolean;
+  transfer_pricing_mode?: 'per_person' | 'per_vehicle';
+  private_vehicle_capacity?: number | null;
   // Ticket (Entrada) fields
   ticket_type?: string;
   ticket_validity_type?: string;

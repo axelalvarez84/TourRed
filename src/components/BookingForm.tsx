@@ -93,10 +93,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [isLoadingOptionalServices, setIsLoadingOptionalServices] = useState(true);
 
   const isReceptivo = tour.tour_type === 'receptivo';
+  const isPrivateTransfer = isReceptivo && (tour as any).activity_type === 'transport' && (tour as any).receptivo_modality === 'privado';
   const [selectedSlotDate, setSelectedSlotDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TourSlot | null>(null);
   const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
-  const hasSeatMap = !!(tour as any).vehicle_map_type;
+  // Seat map only applies to shared transfers and non-private tours
+  const hasSeatMap = !!(tour as any).vehicle_map_type && !isPrivateTransfer;
 
   const [pickupType, setPickupType] = useState<'meeting_point' | 'pickup'>('meeting_point');
   const [pickupHotelAddress, setPickupHotelAddress] = useState('');
@@ -711,7 +713,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const receptivoExtrasSubtotal = pickupExtraCost + languageExtraCost;
 
   // Precio total del tour (sin descuento, sin opcionales)
-  const grossTourPrice = precioAdultos + precioNinos + precioInfantes + precioAdultosMayores + precioMascotas;
+  // Para traslados privados con precio por vehículo, el precio es fijo sin importar viajeros
+  const grossTourPrice = (isPrivateTransfer && (tour as any).transfer_pricing_mode === 'per_vehicle')
+    ? (tour.precio_adulto || tour.price) * preventaRatio
+    : precioAdultos + precioNinos + precioInfantes + precioAdultosMayores + precioMascotas;
 
   // Calcular descuento por promoción grupal
   const calculatePromoDiscount = (): { discount: number; isActive: boolean; label: string; nearMissMessage: string | null; availabilityNote: string | null } => {
@@ -1067,6 +1072,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
     if (availableSpots !== null && totalTravelers > availableSpots) {
       setError(`Solo hay ${availableSpots} lugar${availableSpots !== 1 ? 'es' : ''} disponible${availableSpots !== 1 ? 's' : ''} para este tour.`);
+      return;
+    }
+
+    if (isPrivateTransfer && (tour as any).private_vehicle_capacity && totalTravelers > (tour as any).private_vehicle_capacity) {
+      setError(`Este vehículo tiene capacidad máxima de ${(tour as any).private_vehicle_capacity} pasajero${(tour as any).private_vehicle_capacity !== 1 ? 's' : ''}.`);
       return;
     }
 
@@ -1579,6 +1589,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Número de Viajeros
+          {isPrivateTransfer && (tour as any).private_vehicle_capacity && (
+            <span className="ml-2 text-xs font-normal text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full">
+              Máx. {(tour as any).private_vehicle_capacity} pasajeros por vehículo
+            </span>
+          )}
         </label>
         {isLoadingAvailability ? (
           <div className="flex items-center justify-center py-2 text-gray-500">
@@ -2721,39 +2736,48 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           <div className="mb-4 bg-gray-50 p-4 rounded-md space-y-2">
             <h4 className="text-sm font-semibold text-gray-900">Desglose de Costos</h4>
 
-            {travelerCounts.adultos > 0 && (
+            {isPrivateTransfer && (tour as any).transfer_pricing_mode === 'per_vehicle' ? (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">{travelerCounts.adultos} Adulto{travelerCounts.adultos > 1 ? 's' : ''} × {formatCurrencyMXN(getPrecioPorCategoria('adulto'))}:</span>
-                <span className="font-medium">{formatCurrencyMXN(precioAdultos)}</span>
+                <span className="text-gray-600">Precio por vehículo ({totalTravelers} viajero{totalTravelers !== 1 ? 's' : ''}):</span>
+                <span className="font-medium">{formatCurrencyMXN(grossTourPrice)}</span>
               </div>
-            )}
+            ) : (
+              <>
+                {travelerCounts.adultos > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">{travelerCounts.adultos} Adulto{travelerCounts.adultos > 1 ? 's' : ''} × {formatCurrencyMXN(getPrecioPorCategoria('adulto'))}:</span>
+                    <span className="font-medium">{formatCurrencyMXN(precioAdultos)}</span>
+                  </div>
+                )}
 
-            {travelerCounts.ninos > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">{travelerCounts.ninos} Niño{travelerCounts.ninos > 1 ? 's' : ''} × {formatCurrencyMXN(getPrecioPorCategoria('nino'))}:</span>
-                <span className="font-medium">{formatCurrencyMXN(precioNinos)}</span>
-              </div>
-            )}
+                {travelerCounts.ninos > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">{travelerCounts.ninos} Niño{travelerCounts.ninos > 1 ? 's' : ''} × {formatCurrencyMXN(getPrecioPorCategoria('nino'))}:</span>
+                    <span className="font-medium">{formatCurrencyMXN(precioNinos)}</span>
+                  </div>
+                )}
 
-            {travelerCounts.infantes > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">{travelerCounts.infantes} Infante{travelerCounts.infantes > 1 ? 's' : ''} × {formatCurrencyMXN(getPrecioPorCategoria('infante'))}:</span>
-                <span className="font-medium">{formatCurrencyMXN(precioInfantes)}</span>
-              </div>
-            )}
+                {travelerCounts.infantes > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">{travelerCounts.infantes} Infante{travelerCounts.infantes > 1 ? 's' : ''} × {formatCurrencyMXN(getPrecioPorCategoria('infante'))}:</span>
+                    <span className="font-medium">{formatCurrencyMXN(precioInfantes)}</span>
+                  </div>
+                )}
 
-            {travelerCounts.adultos_mayores > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">{travelerCounts.adultos_mayores} Adulto{travelerCounts.adultos_mayores > 1 ? 's' : ''} Mayor{travelerCounts.adultos_mayores > 1 ? 'es' : ''} × {formatCurrencyMXN(getPrecioPorCategoria('adulto_mayor'))}:</span>
-                <span className="font-medium">{formatCurrencyMXN(precioAdultosMayores)}</span>
-              </div>
-            )}
+                {travelerCounts.adultos_mayores > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">{travelerCounts.adultos_mayores} Adulto{travelerCounts.adultos_mayores > 1 ? 's' : ''} Mayor{travelerCounts.adultos_mayores > 1 ? 'es' : ''} × {formatCurrencyMXN(getPrecioPorCategoria('adulto_mayor'))}:</span>
+                    <span className="font-medium">{formatCurrencyMXN(precioAdultosMayores)}</span>
+                  </div>
+                )}
 
-            {travelerCounts.mascotas > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">{travelerCounts.mascotas} Mascota{travelerCounts.mascotas > 1 ? 's' : ''} × {formatCurrencyMXN(getPrecioPorCategoria('mascota'))}:</span>
-                <span className="font-medium">{formatCurrencyMXN(precioMascotas)}</span>
-              </div>
+                {travelerCounts.mascotas > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">{travelerCounts.mascotas} Mascota{travelerCounts.mascotas > 1 ? 's' : ''} × {formatCurrencyMXN(getPrecioPorCategoria('mascota'))}:</span>
+                    <span className="font-medium">{formatCurrencyMXN(precioMascotas)}</span>
+                  </div>
+                )}
+              </>
             )}
 
             {promoResult.isActive && promoDiscountAmount > 0 && (
