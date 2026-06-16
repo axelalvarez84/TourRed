@@ -2301,7 +2301,7 @@ const AgencyTours: React.FC = () => {
         await supabase.from('tour_supplements').insert(toInsertSup);
       }
 
-      // Save schedules for receptivo tours
+      // Save schedules for receptivo tours (only when schedules were modified)
       if (tourType === 'receptivo' && schedulesDraft.length > 0) {
         const agencyIdForSchedules = editingTour ? editingTour.agency_id : createdTour?.agency_id;
 
@@ -2347,19 +2347,6 @@ const AgencyTours: React.FC = () => {
                 });
               }
             }
-
-            // Auto-generate slots for the next 90 days when editing too
-            const startDateEdit = new Date().toISOString().split('T')[0];
-            const endDateEdit = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            try {
-              await supabase.rpc('auto_generate_slots_for_range', {
-                p_tour_id: tourId,
-                p_start_date: startDateEdit,
-                p_end_date: endDateEdit,
-              });
-            } catch (slotErr) {
-              console.warn('Could not auto-generate slots on edit:', slotErr);
-            }
           } else {
             // New tour: bulk insert all draft schedules
             const schedulesToInsert = schedulesDraft.map((s, i) => ({
@@ -2374,20 +2361,22 @@ const AgencyTours: React.FC = () => {
               display_order: i + 1,
             }));
             await supabase.from('tour_schedules').insert(schedulesToInsert);
-
-            // Auto-generate slots for the next 90 days
-            const startDate = new Date().toISOString().split('T')[0];
-            const endDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            try {
-              await supabase.rpc('auto_generate_slots_for_range', {
-                p_tour_id: tourId,
-                p_start_date: startDate,
-                p_end_date: endDate,
-              });
-            } catch (slotErr) {
-              console.warn('Could not auto-generate slots:', slotErr);
-            }
           }
+        }
+      }
+
+      // Auto-generate slots for receptivo tours unconditionally (schedules may already exist)
+      if (tourType === 'receptivo') {
+        const slotStart = new Date().toISOString().split('T')[0];
+        const slotEnd = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        try {
+          await supabase.rpc('auto_generate_slots_for_range', {
+            p_tour_id: tourId,
+            p_start_date: slotStart,
+            p_end_date: slotEnd,
+          });
+        } catch (slotErr) {
+          console.warn('Could not auto-generate slots:', slotErr);
         }
       }
 
