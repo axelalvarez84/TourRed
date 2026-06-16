@@ -127,7 +127,7 @@ const AdminAgencies: React.FC = () => {
               .from('commission_records')
               .select('agency_net_amount, agency_commission_amount')
               .eq('agency_id', agency.id)
-              .eq('status', 'processed');
+              .in('status', ['processed', 'pending']);
 
             if (commissionError) {
               console.error(`❌ Error obteniendo comisiones para ${agency.name}:`, commissionError);
