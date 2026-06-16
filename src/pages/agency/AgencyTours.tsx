@@ -2728,42 +2728,6 @@ const AgencyTours: React.FC = () => {
               </div>
               {tourType === 'receptivo' && (
                 <div className="mt-4 pt-4 border-t border-gray-100">
-                  <p className="text-xs font-medium text-gray-600 mb-2">Modalidad del tour receptivo</p>
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setReceptivoModality('compartido')}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
-                        receptivoModality === 'compartido'
-                          ? 'border-teal-500 bg-teal-50 text-teal-700'
-                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                      }`}
-                    >
-                      <Users className="w-3.5 h-3.5" />
-                      Compartido
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setReceptivoModality('privado')}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
-                        receptivoModality === 'privado'
-                          ? 'border-teal-500 bg-teal-50 text-teal-700'
-                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                      }`}
-                    >
-                      <Settings className="w-3.5 h-3.5" />
-                      Privado
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-2">
-                    {receptivoModality === 'compartido'
-                      ? 'Los viajeros comparten la salida con otros grupos. Informativo para el viajero.'
-                      : 'El tour es exclusivo para un grupo. Informativo para el viajero.'}
-                  </p>
-                </div>
-              )}
-              {tourType === 'receptivo' && (
-                <div className="mt-4 pt-4 border-t border-gray-100">
                   <p className="text-xs font-medium text-gray-600 mb-2">Tipo de Actividad</p>
                   <div className="grid grid-cols-2 gap-2">
                     {([
@@ -2801,6 +2765,42 @@ const AgencyTours: React.FC = () => {
                   </div>
                 </div>
               )}
+              {tourType === 'receptivo' && activityType !== 'ticket' && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="text-xs font-medium text-gray-600 mb-2">Modalidad del tour receptivo</p>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setReceptivoModality('compartido')}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
+                        receptivoModality === 'compartido'
+                          ? 'border-teal-500 bg-teal-50 text-teal-700'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      Compartido
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReceptivoModality('privado')}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
+                        receptivoModality === 'privado'
+                          ? 'border-teal-500 bg-teal-50 text-teal-700'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                      Privado
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    {receptivoModality === 'compartido'
+                      ? 'Los viajeros comparten la salida con otros grupos. Informativo para el viajero.'
+                      : 'El tour es exclusivo para un grupo. Informativo para el viajero.'}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* SECCIÓN 1 — Información General */}
@@ -2811,24 +2811,24 @@ const AgencyTours: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-white font-semibold text-sm">Paso 1 — Información General</h3>
-                  <p className="text-blue-100 text-xs">Nombre, categoría y descripción del tour</p>
+                  <p className="text-blue-100 text-xs">{isTicket ? 'Nombre, categoría y descripción del evento' : 'Nombre, categoría y descripción del tour'}</p>
                 </div>
                 <span className="ml-auto bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">Requerido</span>
               </div>
               <div className="p-5 space-y-5">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    Nombre del Tour <span className="text-red-500">*</span>
+                    {isTicket ? 'Nombre del Evento' : 'Nombre del Tour'} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
                     className="input"
-                    placeholder="Ej: Tour Mágico por Oaxaca 3 días"
+                    placeholder={isTicket ? 'Ej: Entrada a Xcaret, Concierto de Jazz en Tulum' : 'Ej: Tour Mágico por Oaxaca 3 días'}
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">Sé descriptivo y atractivo. Incluye el destino y la duración cuando aplique. Ej: <em>"Snorkel en Cenotes — Tulum"</em>, <em>"Traslado Aeropuerto-Hotel Cancún"</em>.</p>
+                  <p className="text-xs text-gray-500 mt-1">{isTicket ? 'Sé descriptivo y atractivo. Incluye el nombre del lugar o evento y el tipo de acceso.' : 'Sé descriptivo y atractivo. Incluye el destino y la duración cuando aplique. Ej: '}<em>{isTicket ? '' : '"Snorkel en Cenotes — Tulum"'}</em>{isTicket ? '' : ', '}<em>{isTicket ? '' : '"Traslado Aeropuerto-Hotel Cancún"'}</em>{isTicket ? '' : '.'}</p>
                 </div>
 
                 <div>
@@ -3158,8 +3158,8 @@ const AgencyTours: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Pick Up — hidden for transport (transfers handle pickup via origin/destination points) */}
-                    {activityType !== 'transport' && (
+                    {/* Pick Up — hidden for transport and ticket */}
+                    {activityType !== 'transport' && activityType !== 'ticket' && (
                     <div className="border border-gray-200 rounded-xl overflow-hidden">
                       <div className="bg-gray-50 px-4 py-3 flex items-center gap-2 border-b border-gray-200">
                         <Car className="w-4 h-4 text-gray-500" />
@@ -3270,16 +3270,39 @@ const AgencyTours: React.FC = () => {
                     </div>
                     )}
 
+                    {/* Dirección del Evento — solo para entradas */}
+                    {activityType === 'ticket' && (
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="bg-gray-50 px-4 py-3 flex items-center gap-2 border-b border-gray-200">
+                        <MapPin className="w-4 h-4 text-gray-500" />
+                        <span className="text-sm font-semibold text-gray-700">Dirección del Evento</span>
+                        <span className="ml-2 text-xs text-gray-400 font-normal">Opcional</span>
+                      </div>
+                      <div className="p-4">
+                        <input
+                          type="text"
+                          value={pickupFreeZone}
+                          onChange={e => setPickupFreeZone(e.target.value)}
+                          className="input"
+                          placeholder="Ej: Av. Tulum km 4, Cancún, Q. Roo"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">Dirección o ubicación donde se lleva a cabo el evento o atracción.</p>
+                      </div>
+                    </div>
+                    )}
+
                     {/* Horarios de Salida / Inicio */}
                     <div className="border border-gray-200 rounded-xl overflow-hidden">
                       <div className="bg-gray-50 px-4 py-3 flex items-center gap-2 border-b border-gray-200">
                         <Clock className="w-4 h-4 text-gray-500" />
                         <div>
                           <span className="text-sm font-semibold text-gray-700">
-                            {activityType === 'experience' ? 'Horarios de Inicio' : 'Horarios de Salida'}
+                            {activityType === 'ticket' ? 'Horario del Evento / Apertura del Recinto' : activityType === 'experience' ? 'Horarios de Inicio' : 'Horarios de Salida'}
                           </span>
                           <p className="text-xs text-gray-400 mt-0.5">
-                            {activityType === 'experience'
+                            {activityType === 'ticket'
+                              ? 'Define los horarios de apertura o los turnos disponibles del evento.'
+                              : activityType === 'experience'
                               ? 'Define las horas en que inicia cada sesión de la experiencia. Agrega un horario por turno (mañana, tarde, etc.).'
                               : 'Define las horas en que sale este tour cada día. Agrega un horario por turno (mañana, tarde, etc.).'}
                           </p>
@@ -3515,11 +3538,13 @@ const AgencyTours: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    Destinos <span className="text-red-500">*</span>
+                    {isTicket ? 'Ciudad o Lugar del Evento' : 'Destinos'} <span className="text-red-500">*</span>
                     <span className="ml-2 text-xs font-normal text-gray-500">Escribe y presiona Enter para agregar</span>
                   </label>
                   <p className="text-xs text-gray-500 mb-2">
-                    {tourType === 'receptivo' && activityType === 'experience'
+                    {isTicket
+                      ? <>Ciudad o municipio donde se lleva a cabo el evento. Ej: <em>Cancún, Tulum, Ciudad de México</em>.</>
+                      : tourType === 'receptivo' && activityType === 'experience'
                       ? <>Ciudad o municipio donde se lleva a cabo la experiencia. Ej: <em>Oaxaca Centro, Tulum, Ciudad de México</em>.</>
                       : <>Ciudad o región donde se realiza el tour. Ej: <em>Cancún, Tulum, Oaxaca Centro</em>. Puedes agregar varios si el tour recorre múltiples destinos.</>
                     }
@@ -3550,7 +3575,7 @@ const AgencyTours: React.FC = () => {
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyPress={handleKeyPress}
                         className="input flex-1"
-                        placeholder="Ej: Cancún, Oaxaca, Los Cabos..."
+                        placeholder={isTicket ? 'Ej: Cancún, Tulum, Ciudad de México...' : 'Ej: Cancún, Oaxaca, Los Cabos...'}
                       />
                       <button
                         type="button"
@@ -3877,25 +3902,27 @@ const AgencyTours: React.FC = () => {
                   <Image className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-white font-semibold text-sm">Paso 3 — Itinerario e Imagen</h3>
-                  <p className="text-amber-100 text-xs">Detalla el recorrido y agrega una foto atractiva</p>
+                  <h3 className="text-white font-semibold text-sm">{isTicket ? 'Paso 3 — Descripción e Imagen' : 'Paso 3 — Itinerario e Imagen'}</h3>
+                  <p className="text-amber-100 text-xs">{isTicket ? 'Describe el evento y agrega una foto atractiva' : 'Detalla el recorrido y agrega una foto atractiva'}</p>
                 </div>
                 <span className="ml-auto bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">Requerido</span>
               </div>
               <div className="p-5 space-y-5">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    Itinerario Detallado <span className="text-red-500">*</span>
+                    {isTicket ? 'Descripción del Evento' : 'Itinerario Detallado'} <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     value={formData.itinerary}
                     onChange={(e) => setFormData({...formData, itinerary: e.target.value})}
                     className="input"
                     rows={6}
-                    placeholder="Día 1: Llegada al destino, traslado al hotel...&#10;Día 2: Visita a sitios turísticos...&#10;Día 3: Actividades y regreso..."
+                    placeholder={isTicket
+                      ? 'Describe el evento: qué se verá, qué incluye la entrada, recomendaciones para el visitante...'
+                      : 'Día 1: Llegada al destino, traslado al hotel...\nDía 2: Visita a sitios turísticos...\nDía 3: Actividades y regreso...'}
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">Describe el recorrido hora por hora o día por día. Cuanto más detallado, más confianza genera en el viajero. Ej: <em>"9:00 am — Salida desde el punto de encuentro. 10:30 am — Llegada a Cenote X. Nado libre 1hr…"</em></p>
+                  <p className="text-xs text-gray-500 mt-1">{isTicket ? 'Describe qué encontrará el visitante, qué está incluido en la entrada y cualquier recomendación útil.' : 'Describe el recorrido hora por hora o día por día. Cuanto más detallado, más confianza genera en el viajero. Ej: '}<em>{isTicket ? '' : '"9:00 am — Salida desde el punto de encuentro. 10:30 am — Llegada a Cenote X. Nado libre 1hr…"'}</em></p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
