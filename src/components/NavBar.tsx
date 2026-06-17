@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, User, LogOut, Search, MessageCircle, ChevronDown, LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation, Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent, DollarSign, Gift, Megaphone, Ticket, BadgePercent, Sparkles, Send, ArrowLeftRight, FileText, FilePlus2, BookOpen, Headphones as HeadphonesIcon, TicketCheck, ShoppingBag, Trash2, Bus, BarChart2, Briefcase, FileSpreadsheet } from 'lucide-react';
+import { Menu, X, User, LogOut, Search, MessageCircle, ChevronDown, LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation, Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent, DollarSign, Gift, Megaphone, Ticket, BadgePercent, Sparkles, Send, ArrowLeftRight, FileText, FilePlus2, BookOpen, Headphones as HeadphonesIcon, TicketCheck, ShoppingBag, Trash2, Bus, BarChart2, Briefcase, FileSpreadsheet, Shield } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import { useAuth } from '../context/AuthContext';
 import { signOut, supabase } from '../lib/supabase';
@@ -258,6 +258,13 @@ const NavBar: React.FC = () => {
 
     if (serviceDeskItems.length > 0)
       groups.push({ title: 'Service Desk', icon: <HeadphonesIcon className="h-4 w-4" />, items: serviceDeskItems });
+
+    const seguridadItems: AdminMenuItem[] = [];
+    if (isSuperAdmin || permissions?.canViewAuditLog)
+      seguridadItems.push({ to: '/admin/audit-log', label: 'Registro de Auditoria', icon: <Shield className="h-4 w-4" /> });
+
+    if (seguridadItems.length > 0)
+      groups.push({ title: 'Seguridad', icon: <Shield className="h-4 w-4" />, items: seguridadItems });
 
     const ejecutivosItems: AdminMenuItem[] = [];
     if (isSuperAdmin || permissions?.canManageExecutives) {
