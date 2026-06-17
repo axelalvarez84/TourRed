@@ -1,13 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, ShieldAlert } from 'lucide-react';
 import { signIn, supabase } from '../../lib/supabase';
+
+function computeDeviceFingerprint(): string {
+  try {
+    const raw = [
+      navigator.userAgent,
+      navigator.language,
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+      screen.width + 'x' + screen.height,
+      navigator.platform,
+    ].join('|');
+    let hash = 5381;
+    for (let i = 0; i < raw.length; i++) {
+      hash = ((hash << 5) + hash) ^ raw.charCodeAt(i);
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  } catch {
+    return 'unknown';
+  }
+}
+
+async function checkLoginRisk(email: string, deviceFingerprint: string) {
+  try {
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-login-risk`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, device_fingerprint: deviceFingerprint }),
+        signal: AbortSignal.timeout(4000),
+      }
+    );
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null; // never block on risk-check failure
+  }
+}
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [ipBlocked, setIpBlocked] = useState(false);
+  const deviceFingerprintRef = useRef<string>(computeDeviceFingerprint());
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -22,12 +61,48 @@ const LoginPage: React.FC = () => {
       : ''
   );
 
+  const recordFailedLogin = (failureReason: string) => {
+    try {
+      fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/record-session-event`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_type: 'failed_login',
+            email,
+            device_fingerprint: deviceFingerprintRef.current,
+            user_agent: navigator.userAgent,
+            failure_reason: failureReason,
+          }),
+        }
+      );
+    } catch {
+      // best-effort
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
       setIsLoading(true);
       setError('');
+      setIpBlocked(false);
+
+      // Pre-login risk check
+      const risk = await checkLoginRisk(email, deviceFingerprintRef.current);
+
+      if (risk?.ip_blocked) {
+        setIpBlocked(true);
+        setError('Demasiados intentos fallidos desde tu red. Por favor intenta más tarde.');
+        return;
+      }
+
+      // Progressive delay if risk engine requests it
+      if (risk?.delay_ms && risk.delay_ms > 0) {
+        await new Promise(resolve => setTimeout(resolve, Math.min(risk.delay_ms, 30000)));
+      }
 
       const { data, error } = await signIn(email, password);
 
@@ -54,7 +129,9 @@ const LoginPage: React.FC = () => {
       if (err.message === 'USUARIO_BLOQUEADO') {
         setError('Su cuenta ha sido bloqueada. Para mayor información contáctenos.');
       } else {
-        setError('Error al iniciar sesión. Por favor verifica tus credenciales.');
+        // Generic message — anti-enumeration
+        setError('Credenciales incorrectas. Por favor verifica tu correo y contraseña.');
+        recordFailedLogin(err.message ?? 'unknown');
       }
     } finally {
       setIsLoading(false);
@@ -82,8 +159,9 @@ const LoginPage: React.FC = () => {
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
             {error && (
-              <div className="bg-error-50 border border-error-200 text-error-700 px-4 py-3 rounded">
-                {error}
+              <div className={`flex items-start gap-2 px-4 py-3 rounded border ${ipBlocked ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-error-50 border-error-200 text-error-700'}`}>
+                {ipBlocked && <ShieldAlert className="h-4 w-4 mt-0.5 flex-shrink-0" />}
+                <span>{error}</span>
               </div>
             )}
             

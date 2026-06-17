@@ -20,6 +20,60 @@ export interface AdminPermissions {
   canManageChartOfAccounts: boolean;
   canManageServiceDesk: boolean;
   canManageExecutives: boolean;
+  // Audit permissions
+  canViewAuditLog: boolean;
+  canViewAuditSensitiveData: boolean;
+  canExportAuditLog: boolean;
+}
+
+// Stable device fingerprint (no PII — only browser characteristics)
+function computeDeviceFingerprint(): string {
+  try {
+    const raw = [
+      navigator.userAgent,
+      navigator.language,
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+      screen.width + 'x' + screen.height,
+      navigator.platform,
+    ].join('|');
+    // Simple djb2 hash — no crypto needed for this use-case
+    let hash = 5381;
+    for (let i = 0; i < raw.length; i++) {
+      hash = ((hash << 5) + hash) ^ raw.charCodeAt(i);
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  } catch {
+    return 'unknown';
+  }
+}
+
+// Inactivity timeouts per role (ms); 0 = no timeout
+const INACTIVITY_TIMEOUT_MS: Record<string, number> = {
+  admin: 30 * 60 * 1000,
+  accountant: 30 * 60 * 1000,
+  account_executive: 2 * 60 * 60 * 1000,
+  agency: 2 * 60 * 60 * 1000,
+  traveler: 0,
+};
+
+async function callRecordSessionEvent(payload: Record<string, unknown>): Promise<void> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token ?? '';
+    await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/record-session-event`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+  } catch {
+    // best-effort — never throw
+  }
 }
 
 export interface AgencyStaffPermissions {
@@ -332,6 +386,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 canManageChartOfAccounts: p.can_manage_chart_of_accounts ?? false,
                 canManageServiceDesk: p.can_manage_service_desk ?? false,
                 canManageExecutives: p.can_manage_executives ?? false,
+                canViewAuditLog: p.can_view_audit_log ?? false,
+                canViewAuditSensitiveData: p.can_view_audit_sensitive_data ?? false,
+                canExportAuditLog: p.can_export_audit_log ?? false,
               });
             } else {
               setPermissions(null);
@@ -522,6 +579,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Inactivity detection refs
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentRoleRef = useRef<UserRole | null>(null);
+  const currentUserRef = useRef<any>(null);
+
+  const resetInactivityTimer = useCallback(() => {
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    const role = currentRoleRef.current;
+    if (!role) return;
+    const timeout = INACTIVITY_TIMEOUT_MS[role] ?? 0;
+    if (timeout <= 0) return;
+
+    inactivityTimerRef.current = setTimeout(async () => {
+      const authUser = currentUserRef.current;
+      if (authUser) {
+        callRecordSessionEvent({
+          event_type: 'logout',
+          user_id: authUser.id,
+          email: authUser.email,
+          ip_address: undefined,
+          device_fingerprint: computeDeviceFingerprint(),
+        });
+      }
+      await supabase.auth.signOut();
+    }, timeout);
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 
@@ -567,6 +651,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         initializedUserIdRef.current = incomingUserId ?? null;
         updateAuthState(session?.user ?? null, true).catch(() => {});
+
+        // Record login session event (best-effort)
+        if (session?.user) {
+          callRecordSessionEvent({
+            event_type: 'login',
+            user_id: session.user.id,
+            email: session.user.email,
+            session_id: session.access_token ? undefined : undefined,
+            device_fingerprint: computeDeviceFingerprint(),
+            user_agent: navigator.userAgent,
+            login_method: 'email_password',
+          });
+        }
       } else if (event === 'TOKEN_REFRESHED') {
         if (session?.user) {
           setUser(session.user);
@@ -576,7 +673,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Siempre liberar el loading en TOKEN_REFRESHED para evitar ciclo infinito
         setIsLoading(false);
       } else if (event === 'SIGNED_OUT') {
+        // Record logout (best-effort)
+        const prevUser = currentUserRef.current;
+        if (prevUser) {
+          callRecordSessionEvent({
+            event_type: 'logout',
+            user_id: prevUser.id,
+            email: prevUser.email,
+            device_fingerprint: computeDeviceFingerprint(),
+            user_agent: navigator.userAgent,
+          });
+        }
+
+        if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
         initializedUserIdRef.current = null;
+        currentUserRef.current = null;
+        currentRoleRef.current = null;
         setUser(null);
         setUserRole(null);
         setIsLoading(false);
@@ -593,9 +705,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       mounted = false;
       clearTimeout(safetyTimer);
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
       authListener?.subscription.unsubscribe();
     };
   }, []);
+
+  // Keep role + user refs in sync for inactivity timer
+  useEffect(() => {
+    currentRoleRef.current = userRole;
+    currentUserRef.current = user;
+    resetInactivityTimer();
+  }, [userRole, user, resetInactivityTimer]);
+
+  // Bind user activity events to reset inactivity timer
+  useEffect(() => {
+    const events = ['mousemove', 'keydown', 'pointerdown', 'scroll', 'touchstart'];
+    const handler = () => resetInactivityTimer();
+    events.forEach(e => window.addEventListener(e, handler, { passive: true }));
+    return () => events.forEach(e => window.removeEventListener(e, handler));
+  }, [resetInactivityTimer]);
 
   const isAdmin = userRole === UserRole.ADMIN;
   const isAgency = userRole === UserRole.AGENCY;
