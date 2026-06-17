@@ -18,49 +18,17 @@ interface GeoResult {
   is_proxy?: boolean;
   is_hosting?: boolean;
   geo_provider: string;
+  ip_masked: string;
   error?: string;
-}
-
-async function lookupIPInfoLite(ip: string, apiKey: string): Promise<GeoResult> {
-  const token = apiKey && apiKey.length > 0 ? `?token=${apiKey}` : "";
-  const url = `https://ipinfo.io/${ip}/json${token}`;
-
-  const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
-  if (!res.ok) throw new Error(`ipinfo responded ${res.status}`);
-
-  const data = await res.json();
-
-  let latitude: number | undefined;
-  let longitude: number | undefined;
-  if (data.loc) {
-    const [lat, lon] = data.loc.split(",").map(Number);
-    if (!isNaN(lat)) latitude = lat;
-    if (!isNaN(lon)) longitude = lon;
-  }
-
-  return {
-    country: data.country_name ?? data.country ?? undefined,
-    country_code: data.country ?? undefined,
-    city: data.city ?? undefined,
-    region: data.region ?? undefined,
-    postal_code: data.postal ?? undefined,
-    latitude,
-    longitude,
-    is_proxy: data.privacy?.proxy ?? false,
-    is_hosting: data.privacy?.hosting ?? false,
-    geo_provider: "ipinfo_lite",
-  };
 }
 
 function maskIp(ip: string): string {
   if (!ip) return "";
-  // IPv4: replace last octet with xxx
   if (ip.includes(".")) {
     const parts = ip.split(".");
     parts[parts.length - 1] = "xxx";
     return parts.join(".");
   }
-  // IPv6: replace last two groups with xxx:xxx
   const parts = ip.split(":");
   if (parts.length >= 4) {
     parts[parts.length - 1] = "xxx";
@@ -69,32 +37,77 @@ function maskIp(ip: string): string {
   return parts.join(":");
 }
 
+// IPinfo Lite API: https://api.ipinfo.io/lite/{ip}
+// Authorization: Bearer {token}
+// Response fields: ip, country_code, country_name, is_eu, city, postal, latitude, longitude, asn, company, privacy
+async function lookupIPInfoLite(ip: string, apiKey: string): Promise<Omit<GeoResult, "ip_masked">> {
+  const headers: Record<string, string> = {
+    "Accept": "application/json",
+  };
+  if (apiKey && apiKey.length > 0) {
+    headers["Authorization"] = `Bearer ${apiKey}`;
+  }
+
+  const url = `https://api.ipinfo.io/lite/${ip}`;
+  const res = await fetch(url, {
+    headers,
+    signal: AbortSignal.timeout(3500),
+  });
+
+  if (!res.ok) {
+    throw new Error(`IPinfo responded ${res.status}: ${await res.text()}`);
+  }
+
+  const data = await res.json();
+
+  return {
+    country: data.country_name ?? data.country ?? undefined,
+    country_code: data.country_code ?? data.country ?? undefined,
+    city: data.city ?? undefined,
+    region: undefined, // not available in Lite tier
+    postal_code: data.postal ?? undefined,
+    latitude: typeof data.latitude === "number" ? data.latitude : undefined,
+    longitude: typeof data.longitude === "number" ? data.longitude : undefined,
+    is_proxy: data.privacy?.proxy ?? data.privacy?.vpn ?? false,
+    is_hosting: data.privacy?.hosting ?? false,
+    geo_provider: "ipinfo_lite",
+  };
+}
+
+const PRIVATE_RANGES = [
+  /^127\./,
+  /^10\./,
+  /^192\.168\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^::1$/,
+  /^fc/,
+  /^fd/,
+  /^169\.254\./,
+];
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  const respond = (body: GeoResult, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
   try {
     const body = await req.json();
-    const ip: string = body.ip ?? "";
+    const ip: string = (body.ip ?? "").trim();
 
     if (!ip) {
-      return new Response(
-        JSON.stringify({ error: "ip is required", geo_provider: "none" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return respond({ geo_provider: "none", ip_masked: "", error: "ip_required" }, 400);
     }
 
-    // Skip private/loopback IPs
-    const privateRanges = [/^127\./, /^10\./, /^192\.168\./, /^172\.(1[6-9]|2\d|3[01])\./, /^::1$/, /^fc/, /^fd/];
-    if (privateRanges.some((r) => r.test(ip))) {
-      return new Response(
-        JSON.stringify({ geo_provider: "none", error: "private_ip", ip_masked: maskIp(ip) }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (PRIVATE_RANGES.some((r) => r.test(ip))) {
+      return respond({ geo_provider: "none", ip_masked: maskIp(ip), error: "private_ip" });
     }
 
-    // Read settings from platform_settings
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -109,32 +122,24 @@ Deno.serve(async (req: Request) => {
     const provider: string = settings?.geo_provider ?? "ipinfo_lite";
     const apiKey: string = settings?.geo_api_key ?? "";
 
-    let geoResult: GeoResult;
+    let geoResult: Omit<GeoResult, "ip_masked">;
 
     try {
       if (provider === "ipinfo_lite" || provider === "ipinfo_paid") {
         geoResult = await lookupIPInfoLite(ip, apiKey);
         if (provider === "ipinfo_paid") geoResult.geo_provider = "ipinfo_paid";
       } else {
-        // Unknown provider — return minimal result
         geoResult = { geo_provider: provider, error: "unsupported_provider" };
       }
     } catch (lookupErr) {
-      // Geo lookup failed — never block the caller, return empty geo
       geoResult = {
         geo_provider: provider,
         error: lookupErr instanceof Error ? lookupErr.message : "lookup_failed",
       };
     }
 
-    return new Response(
-      JSON.stringify({ ...geoResult, ip_masked: maskIp(ip) }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "internal_error", geo_provider: "none" }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return respond({ ...geoResult, ip_masked: maskIp(ip) });
+  } catch {
+    return respond({ geo_provider: "none", ip_masked: "", error: "internal_error" });
   }
 });

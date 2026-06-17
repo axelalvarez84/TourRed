@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building, MapPin, Calendar, TrendingUp, Activity, BarChart2, ArrowRight, FileSpreadsheet } from 'lucide-react';
+import { Users, Building, MapPin, Calendar, TrendingUp, Activity, BarChart2, ArrowRight, FileSpreadsheet, Shield, AlertTriangle, LogIn } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 interface DashboardStats {
   totalUsers: number;
@@ -13,7 +14,18 @@ interface DashboardStats {
   recentActivity: any[];
 }
 
+interface SecurityStats {
+  failedLoginsToday: number;
+  activeSessions: number;
+  blockedIps: number;
+}
+
 const AdminDashboard: React.FC = () => {
+  const { isSuperAdmin, permissions } = useAuth();
+  const canViewAudit = isSuperAdmin || permissions?.canViewAuditLog;
+
+  const [secStats, setSecStats] = useState<SecurityStats>({ failedLoginsToday: 0, activeSessions: 0, blockedIps: 0 });
+
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     totalAgencies: 0,
@@ -28,7 +40,34 @@ const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchDashboardStats();
-  }, []);
+    if (canViewAudit) fetchSecurityStats();
+  }, [canViewAudit]);
+
+  const fetchSecurityStats = async () => {
+    try {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const [failedRes, activeRes] = await Promise.all([
+        supabase
+          .from('failed_login_attempts')
+          .select('id', { count: 'exact', head: true })
+          .gte('attempted_at', todayStart.toISOString()),
+        supabase
+          .from('user_sessions')
+          .select('id', { count: 'exact', head: true })
+          .is('logout_at', null),
+      ]);
+
+      setSecStats({
+        failedLoginsToday: failedRes.count ?? 0,
+        activeSessions: activeRes.count ?? 0,
+        blockedIps: 0,
+      });
+    } catch {
+      // best-effort
+    }
+  };
 
   const fetchDashboardStats = async () => {
     try {
@@ -307,6 +346,44 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Seguridad */}
+      {canViewAudit && (
+        <div className="mt-6 bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-slate-700" />
+              <h2 className="text-lg font-semibold text-gray-900">Seguridad</h2>
+            </div>
+            <Link to="/admin/audit-log" className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+              Ver registro completo <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-amber-50 border border-amber-100 rounded-lg p-4 flex items-center gap-3">
+              <AlertTriangle className="w-7 h-7 text-amber-500 flex-shrink-0" />
+              <div>
+                <div className="text-2xl font-bold text-gray-900">{secStats.failedLoginsToday}</div>
+                <div className="text-xs text-gray-500">Intentos fallidos hoy</div>
+              </div>
+            </div>
+            <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-4 flex items-center gap-3">
+              <LogIn className="w-7 h-7 text-emerald-500 flex-shrink-0" />
+              <div>
+                <div className="text-2xl font-bold text-gray-900">{secStats.activeSessions}</div>
+                <div className="text-xs text-gray-500">Sesiones activas</div>
+              </div>
+            </div>
+            <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 flex items-center gap-3">
+              <Shield className="w-7 h-7 text-slate-400 flex-shrink-0" />
+              <div>
+                <div className="text-2xl font-bold text-gray-900">{secStats.blockedIps}</div>
+                <div className="text-xs text-gray-500">IPs bloqueadas</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Acceso rápido a métricas por tour */}
       <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">

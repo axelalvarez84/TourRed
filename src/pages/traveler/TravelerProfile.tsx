@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Calendar, Save, CreditCard as Edit, X, MapPin, CreditCard, Globe, Phone, Wallet, FileText } from 'lucide-react';
+import { User, Mail, Calendar, Save, CreditCard as Edit, X, MapPin, CreditCard, Globe, Phone, Wallet, FileText, Shield, Monitor, Smartphone, Tablet, CheckCircle, XCircle, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { formatCurrency, formatCurrencyMXN } from '../../utils/formatCurrency';
 import { supabase } from '../../lib/supabase';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import TravelerReviewsDisplay from '../../components/TravelerReviewsDisplay';
 import ProfilePictureUploader from '../../components/ProfilePictureUploader';
 import ChangePasswordSection from '../../components/ChangePasswordSection';
@@ -42,6 +44,127 @@ interface TravelerProfile {
   wallet_balance?: number;
   profile_picture_url?: string;
 }
+
+interface SessionRow {
+  id: string;
+  login_at: string;
+  logout_at: string | null;
+  ip_masked: string | null;
+  country: string | null;
+  city: string | null;
+  browser: string | null;
+  browser_version: string | null;
+  os: string | null;
+  device_type: string | null;
+  login_method: string;
+  success: boolean;
+  failure_reason: string | null;
+  is_proxy: boolean | null;
+  is_hosting: boolean | null;
+}
+
+function DeviceIcon({ type }: { type: string | null }) {
+  if (type === 'mobile') return <Smartphone className="w-4 h-4 text-gray-500" />;
+  if (type === 'tablet') return <Tablet className="w-4 h-4 text-gray-500" />;
+  return <Monitor className="w-4 h-4 text-gray-500" />;
+}
+
+const SecuritySection: React.FC<{ userId?: string }> = ({ userId }) => {
+  const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAll, setShowAll] = useState(false);
+
+  useEffect(() => {
+    if (!userId) return;
+    supabase
+      .from('user_sessions_view')
+      .select('id, login_at, logout_at, ip_masked, country, city, browser, browser_version, os, device_type, login_method, success, failure_reason, is_proxy, is_hosting')
+      .eq('user_id', userId)
+      .order('login_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        setSessions((data as SessionRow[]) || []);
+        setLoading(false);
+      });
+  }, [userId]);
+
+  const visible = showAll ? sessions : sessions.slice(0, 5);
+
+  return (
+    <div className="mt-6 bg-white rounded-lg shadow-md p-6">
+      <div className="flex items-center gap-3 mb-4">
+        <Shield className="w-5 h-5 text-slate-700" />
+        <h2 className="text-lg font-semibold text-gray-900">Historial de Acceso</h2>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-6">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600" />
+        </div>
+      ) : sessions.length === 0 ? (
+        <p className="text-sm text-gray-500 py-4 text-center">No hay registros de acceso aún.</p>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase">Fecha</th>
+                  <th className="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase">Ubicación</th>
+                  <th className="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase">Dispositivo</th>
+                  <th className="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase">IP</th>
+                  <th className="text-left py-2 text-xs font-semibold text-gray-500 uppercase">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {visible.map(s => (
+                  <tr key={s.id} className={`${!s.success || s.is_proxy ? 'bg-amber-50' : ''}`}>
+                    <td className="py-2.5 pr-4 text-xs text-gray-700 whitespace-nowrap">
+                      {format(new Date(s.login_at), 'dd MMM yyyy HH:mm', { locale: es })}
+                    </td>
+                    <td className="py-2.5 pr-4 text-xs text-gray-700">
+                      {s.city && s.country ? `${s.city}, ${s.country}` : s.country ?? '—'}
+                    </td>
+                    <td className="py-2.5 pr-4">
+                      <div className="flex items-center gap-1.5">
+                        <DeviceIcon type={s.device_type} />
+                        <span className="text-xs text-gray-700">
+                          {s.browser ? `${s.browser}${s.browser_version ? ` ${s.browser_version}` : ''}` : '—'}
+                          {s.os && <span className="text-gray-400"> · {s.os}</span>}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 pr-4 text-xs font-mono text-gray-600">
+                      {s.ip_masked ?? '—'}
+                      {s.is_proxy && <span className="ml-1 text-amber-600 font-sans font-medium">(proxy)</span>}
+                    </td>
+                    <td className="py-2.5">
+                      {s.success
+                        ? <span className="flex items-center gap-1 text-xs text-emerald-700"><CheckCircle className="w-3.5 h-3.5" /> Exitoso</span>
+                        : <span className="flex items-center gap-1 text-xs text-red-700"><XCircle className="w-3.5 h-3.5" /> Fallido</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {sessions.length > 5 && (
+            <button
+              onClick={() => setShowAll(!showAll)}
+              className="mt-3 flex items-center gap-1 text-xs text-primary-600 hover:underline"
+            >
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAll ? 'rotate-180' : ''}`} />
+              {showAll ? 'Mostrar menos' : `Ver ${sessions.length - 5} más`}
+            </button>
+          )}
+          <p className="mt-3 text-xs text-gray-400">
+            Si detectas accesos no reconocidos, cambia tu contraseña de inmediato.
+          </p>
+        </>
+      )}
+    </div>
+  );
+};
 
 const TravelerProfile: React.FC = () => {
   const { user } = useAuth();
@@ -1176,6 +1299,9 @@ const TravelerProfile: React.FC = () => {
         <div className="mt-6">
           <ChangePasswordSection />
         </div>
+
+        {/* Seguridad - Historial de acceso */}
+        <SecuritySection userId={user?.id} />
 
         {/* Información Adicional */}
         <div className="mt-6 bg-white rounded-lg shadow-md p-6">

@@ -58,6 +58,9 @@ const AdminUsers: React.FC = () => {
     canManageInquiries: false,
     canManagePoints: false,
     canManageDiscountCodes: false,
+    canViewAuditLog: false,
+    canViewAuditSensitiveData: false,
+    canExportAuditLog: false,
   });
 
   useEffect(() => {
@@ -82,7 +85,7 @@ const AdminUsers: React.FC = () => {
         (usersData || []).map(async (user) => {
           const { data: permsData } = await supabase
             .from('admin_permissions')
-            .select('can_manage_agencies, can_manage_users, can_manage_travelers, can_manage_destinations, can_manage_categories, can_manage_departure_points, can_manage_reviews, can_manage_messages, can_manage_inquiries, can_manage_settings, can_manage_memberships, can_manage_points, can_manage_discount_codes')
+            .select('can_manage_agencies, can_manage_users, can_manage_travelers, can_manage_destinations, can_manage_categories, can_manage_departure_points, can_manage_reviews, can_manage_messages, can_manage_inquiries, can_manage_settings, can_manage_memberships, can_manage_points, can_manage_discount_codes, can_view_audit_log, can_view_audit_sensitive_data, can_export_audit_log')
             .eq('user_id', user.id)
             .maybeSingle();
 
@@ -102,6 +105,9 @@ const AdminUsers: React.FC = () => {
               canManageInquiries: permsData.can_manage_inquiries,
               canManagePoints: permsData.can_manage_points,
               canManageDiscountCodes: permsData.can_manage_discount_codes,
+              canViewAuditLog: permsData.can_view_audit_log ?? false,
+              canViewAuditSensitiveData: permsData.can_view_audit_sensitive_data ?? false,
+              canExportAuditLog: permsData.can_export_audit_log ?? false,
             } : null
           };
         })
@@ -222,6 +228,9 @@ const AdminUsers: React.FC = () => {
           can_manage_inquiries: tempPermissions.canManageInquiries,
           can_manage_points: tempPermissions.canManagePoints,
           can_manage_discount_codes: tempPermissions.canManageDiscountCodes,
+          can_view_audit_log: tempPermissions.canViewAuditLog,
+          can_view_audit_sensitive_data: tempPermissions.canViewAuditSensitiveData,
+          can_export_audit_log: tempPermissions.canExportAuditLog,
         })
         .eq('user_id', userId);
 
@@ -239,7 +248,12 @@ const AdminUsers: React.FC = () => {
 
   const startEditPermissions = (user: StaffUser) => {
     if (user.permissions) {
-      setTempPermissions(user.permissions);
+      setTempPermissions({
+        ...user.permissions,
+        canViewAuditLog: user.permissions.canViewAuditLog ?? false,
+        canViewAuditSensitiveData: user.permissions.canViewAuditSensitiveData ?? false,
+        canExportAuditLog: user.permissions.canExportAuditLog ?? false,
+      });
       setEditingPermissions(user.id);
     }
   };
@@ -258,6 +272,11 @@ const AdminUsers: React.FC = () => {
       canManageSettings: false,
       canManageMemberships: false,
       canManageInquiries: false,
+      canManagePoints: false,
+      canManageDiscountCodes: false,
+      canViewAuditLog: false,
+      canViewAuditSensitiveData: false,
+      canExportAuditLog: false,
     });
   };
 
@@ -532,6 +551,21 @@ const AdminUsers: React.FC = () => {
                             checked={tempPermissions.canManageDiscountCodes}
                             onChange={(checked) => setTempPermissions({ ...tempPermissions, canManageDiscountCodes: checked })}
                           />
+                          <PermissionCheckbox
+                            label="Ver Registro de Auditoría"
+                            checked={tempPermissions.canViewAuditLog}
+                            onChange={(checked) => setTempPermissions({ ...tempPermissions, canViewAuditLog: checked })}
+                          />
+                          <PermissionCheckbox
+                            label="Ver Datos Sensibles (Auditoría)"
+                            checked={tempPermissions.canViewAuditSensitiveData}
+                            onChange={(checked) => setTempPermissions({ ...tempPermissions, canViewAuditSensitiveData: checked })}
+                          />
+                          <PermissionCheckbox
+                            label="Exportar Auditoría"
+                            checked={tempPermissions.canExportAuditLog}
+                            onChange={(checked) => setTempPermissions({ ...tempPermissions, canExportAuditLog: checked })}
+                          />
                         </>
                       ) : (
                         <>
@@ -610,6 +644,24 @@ const AdminUsers: React.FC = () => {
                           <PermissionCheckbox
                             label="Códigos de Descuento"
                             checked={user.permissions.canManageDiscountCodes}
+                            onChange={() => {}}
+                            disabled
+                          />
+                          <PermissionCheckbox
+                            label="Ver Registro de Auditoría"
+                            checked={user.permissions.canViewAuditLog ?? false}
+                            onChange={() => {}}
+                            disabled
+                          />
+                          <PermissionCheckbox
+                            label="Ver Datos Sensibles (Auditoría)"
+                            checked={user.permissions.canViewAuditSensitiveData ?? false}
+                            onChange={() => {}}
+                            disabled
+                          />
+                          <PermissionCheckbox
+                            label="Exportar Auditoría"
+                            checked={user.permissions.canExportAuditLog ?? false}
                             onChange={() => {}}
                             disabled
                           />

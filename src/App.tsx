@@ -112,6 +112,7 @@ import AdminServiceDesk from './pages/admin/AdminServiceDesk';
 import AdminTicketDetail from './pages/admin/AdminTicketDetail';
 import AdminSupportCategories from './pages/admin/AdminSupportCategories';
 import AdminSupportAgents from './pages/admin/AdminSupportAgents';
+import AdminAuditLog from './pages/admin/AdminAuditLog';
 import { useAuth } from './context/AuthContext';
 import { UserRole, supabase } from './lib/supabase';
 
@@ -631,6 +632,16 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                 <AdminSupportAgents />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admin: Audit Log */}
+          <Route
+            path="/admin/audit-log"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminAuditLog />
               </ProtectedRoute>
             }
           />

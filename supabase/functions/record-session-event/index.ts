@@ -12,7 +12,6 @@ interface SessionEventBody {
   user_id?: string;
   email?: string;
   session_id?: string;
-  ip_address?: string;
   user_agent?: string;
   device_fingerprint?: string;
   login_method?: string;
@@ -40,6 +39,26 @@ function maskIp(ip: string): string {
   return parts.join(":");
 }
 
+// Extract real client IP from standard headers set by proxies / Supabase edge network
+function extractClientIp(req: Request): string | null {
+  const candidates = [
+    req.headers.get("cf-connecting-ip"),        // Cloudflare
+    req.headers.get("x-real-ip"),               // Nginx / generic
+    req.headers.get("x-forwarded-for"),         // Standard proxy (may be comma-separated)
+    req.headers.get("true-client-ip"),          // Akamai / Cloudflare Enterprise
+    req.headers.get("fastly-client-ip"),        // Fastly
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate) {
+      // x-forwarded-for may be "client, proxy1, proxy2" — take first
+      const ip = candidate.split(",")[0].trim();
+      if (ip) return ip;
+    }
+  }
+  return null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -52,7 +71,6 @@ Deno.serve(async (req: Request) => {
       user_id,
       email,
       session_id,
-      ip_address,
       user_agent,
       device_fingerprint,
       login_method = "email_password",
@@ -72,12 +90,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Always extract IP from request headers — client cannot spoof server-side header reads
+    const ip_address = extractClientIp(req);
+    const ipMasked = ip_address ? maskIp(ip_address) : null;
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-
-    const ipMasked = ip_address ? maskIp(ip_address) : null;
 
     // Async geo lookup — never blocks session recording
     let geoData: Record<string, unknown> = {};
@@ -92,7 +112,7 @@ Deno.serve(async (req: Request) => {
               Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
             },
             body: JSON.stringify({ ip: ip_address }),
-            signal: AbortSignal.timeout(4000),
+            signal: AbortSignal.timeout(4500),
           }
         );
         if (geoRes.ok) {
@@ -116,7 +136,6 @@ Deno.serve(async (req: Request) => {
     }
 
     if (event_type === "failed_login") {
-      // Insert into failed_login_attempts
       await supabase.from("failed_login_attempts").insert({
         user_id: user_id ?? null,
         email: email ?? null,
@@ -125,7 +144,6 @@ Deno.serve(async (req: Request) => {
         failure_reason: failure_reason ?? "unknown",
       });
 
-      // Also write to audit_logs via RPC
       await supabase.rpc("insert_audit_log", {
         p_tenant_type: "system",
         p_actor_id: user_id ?? null,
@@ -145,7 +163,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // login or logout — write to user_sessions
     if (!user_id) {
       return new Response(
         JSON.stringify({ error: "user_id required for login/logout events" }),
@@ -185,7 +202,6 @@ Deno.serve(async (req: Request) => {
         p_metadata: JSON.stringify({ login_method, device_fingerprint, device_type }),
       });
     } else if (event_type === "logout") {
-      // Mark matching open session as closed
       const { data: openSession } = await supabase
         .from("user_sessions")
         .select("id")
@@ -220,7 +236,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({ ok: true }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (err) {
+  } catch {
     return new Response(
       JSON.stringify({ error: "internal_error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
