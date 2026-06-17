@@ -498,7 +498,8 @@ const AdminAuditLog: React.FC = () => {
                   Anterior
                 </button>
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const p = Math.max(0, Math.min(page - 2 + i, totalPages - 1));
+                  const windowStart = Math.max(0, Math.min(page - 2, totalPages - 5));
+                  const p = windowStart + i;
                   return (
                     <button
                       key={p}
@@ -526,3 +527,6 @@ const AdminAuditLog: React.FC = () => {
 };
 
 export default AdminAuditLog;
+
+
+export default AdminAuditLog
