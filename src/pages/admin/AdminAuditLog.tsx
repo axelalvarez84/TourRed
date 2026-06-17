@@ -84,24 +84,23 @@ const AdminAuditLog: React.FC = () => {
   const fetchEntries = useCallback(async () => {
     setIsLoading(true);
     try {
-      const view = canViewSensitive ? 'audit_logs_sensitive_view' : 'audit_logs_view';
-      let query = supabase
-        .from(view)
-        .select('*', { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+      const rpc = canViewSensitive ? 'get_audit_logs_sensitive' : 'get_audit_logs';
+      const params: Record<string, unknown> = {
+        p_limit: PAGE_SIZE,
+        p_offset: page * PAGE_SIZE,
+      };
+      if (appliedFilters.action) params.p_action = appliedFilters.action.toUpperCase();
+      if (appliedFilters.target_table) params.p_target_table = appliedFilters.target_table;
+      if (appliedFilters.actor_email) params.p_actor_email = appliedFilters.actor_email;
+      if (appliedFilters.correlation_id) params.p_correlation_id = appliedFilters.correlation_id;
+      if (appliedFilters.date_from) params.p_date_from = appliedFilters.date_from;
+      if (appliedFilters.date_to) params.p_date_to = appliedFilters.date_to + 'T23:59:59';
 
-      if (appliedFilters.action) query = query.eq('action', appliedFilters.action.toUpperCase());
-      if (appliedFilters.target_table) query = query.ilike('target_table', `%${appliedFilters.target_table}%`);
-      if (appliedFilters.actor_email) query = query.ilike('actor_email', `%${appliedFilters.actor_email}%`);
-      if (appliedFilters.correlation_id) query = query.eq('correlation_id', appliedFilters.correlation_id);
-      if (appliedFilters.date_from) query = query.gte('created_at', appliedFilters.date_from);
-      if (appliedFilters.date_to) query = query.lte('created_at', appliedFilters.date_to + 'T23:59:59');
-
-      const { data, count, error } = await query;
+      const { data, error } = await supabase.rpc(rpc, params);
       if (error) throw error;
-      setEntries((data as AuditEntry[]) || []);
-      setTotal(count || 0);
+      const rows = (data as (AuditEntry & { total_count: number })[]) || [];
+      setEntries(rows);
+      setTotal(rows.length > 0 ? Number(rows[0].total_count) : 0);
     } catch (err) {
       console.error('Error cargando audit log:', err);
     } finally {
@@ -126,15 +125,15 @@ const AdminAuditLog: React.FC = () => {
   const handleExportCSV = async () => {
     if (!canExport) return;
     try {
-      const view = canViewSensitive ? 'audit_logs_sensitive_view' : 'audit_logs_view';
-      let query = supabase.from(view).select('*').order('created_at', { ascending: false }).limit(5000);
-      if (appliedFilters.action) query = query.eq('action', appliedFilters.action.toUpperCase());
-      if (appliedFilters.target_table) query = query.ilike('target_table', `%${appliedFilters.target_table}%`);
-      if (appliedFilters.actor_email) query = query.ilike('actor_email', `%${appliedFilters.actor_email}%`);
-      if (appliedFilters.date_from) query = query.gte('created_at', appliedFilters.date_from);
-      if (appliedFilters.date_to) query = query.lte('created_at', appliedFilters.date_to + 'T23:59:59');
+      const rpc = canViewSensitive ? 'get_audit_logs_sensitive' : 'get_audit_logs';
+      const params: Record<string, unknown> = { p_limit: 5000, p_offset: 0 };
+      if (appliedFilters.action) params.p_action = appliedFilters.action.toUpperCase();
+      if (appliedFilters.target_table) params.p_target_table = appliedFilters.target_table;
+      if (appliedFilters.actor_email) params.p_actor_email = appliedFilters.actor_email;
+      if (appliedFilters.date_from) params.p_date_from = appliedFilters.date_from;
+      if (appliedFilters.date_to) params.p_date_to = appliedFilters.date_to + 'T23:59:59';
 
-      const { data } = await query;
+      const { data } = await supabase.rpc(rpc, params);
       if (!data?.length) return;
 
       const cols = ['created_at', 'action', 'target_table', 'target_id', 'actor_email', 'actor_role', 'ip_masked', 'correlation_id', 'error_message'];

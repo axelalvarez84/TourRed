@@ -24,6 +24,93 @@ interface SessionEventBody {
   device_name?: string;
 }
 
+interface ParsedUA {
+  browser: string | null;
+  browser_version: string | null;
+  os: string | null;
+  os_version: string | null;
+  device_type: "mobile" | "tablet" | "desktop" | null;
+}
+
+function parseUserAgent(ua: string | undefined | null): ParsedUA {
+  if (!ua) return { browser: null, browser_version: null, os: null, os_version: null, device_type: null };
+
+  const s = ua.toLowerCase();
+
+  // device_type
+  let device_type: "mobile" | "tablet" | "desktop" = "desktop";
+  if (/ipad|tablet|playbook|silk|(android(?!.*mobile))/i.test(ua)) device_type = "tablet";
+  else if (/mobile|iphone|ipod|android.*mobile|windows phone|blackberry|opera mini|iemobile/i.test(ua)) device_type = "mobile";
+
+  // browser — order matters (Edge/Opera before Chrome, Chrome before Safari)
+  let browser: string | null = null;
+  let browser_version: string | null = null;
+
+  const browserPatterns: [RegExp, string][] = [
+    [/edg(?:e|\/)([\d.]+)/i,      "Edge"],
+    [/opr\/([\d.]+)/i,            "Opera"],
+    [/opera(?:.*version)?\/([\d.]+)/i, "Opera"],
+    [/chrome\/([\d.]+)/i,         "Chrome"],
+    [/chromium\/([\d.]+)/i,       "Chromium"],
+    [/firefox\/([\d.]+)/i,        "Firefox"],
+    [/fxios\/([\d.]+)/i,          "Firefox"],
+    [/safari\/([\d.]+)/i,         "Safari"],
+    [/msie ([\d.]+)/i,            "IE"],
+    [/trident.*rv:([\d.]+)/i,     "IE"],
+    [/samsungbrowser\/([\d.]+)/i, "Samsung Browser"],
+    [/ucbrowser\/([\d.]+)/i,      "UC Browser"],
+  ];
+
+  // Special case: version for Safari uses Version/x.x
+  if (/safari/i.test(ua) && !/chrome|chromium|edg|opr/i.test(ua)) {
+    browser = "Safari";
+    const vm = ua.match(/version\/([\d.]+)/i);
+    browser_version = vm ? vm[1] : null;
+  } else {
+    for (const [pattern, name] of browserPatterns) {
+      const m = ua.match(pattern);
+      if (m) {
+        browser = name;
+        browser_version = m[1] ?? null;
+        break;
+      }
+    }
+  }
+
+  // os
+  let os: string | null = null;
+  let os_version: string | null = null;
+
+  if (/windows nt/i.test(ua)) {
+    os = "Windows";
+    const m = ua.match(/windows nt ([\d.]+)/i);
+    const versions: Record<string, string> = { "10.0": "10/11", "6.3": "8.1", "6.2": "8", "6.1": "7", "6.0": "Vista", "5.2": "XP x64", "5.1": "XP" };
+    os_version = m ? (versions[m[1]] ?? m[1]) : null;
+  } else if (/iphone os/i.test(ua)) {
+    os = "iOS";
+    const m = ua.match(/iphone os ([\d_]+)/i);
+    os_version = m ? m[1].replace(/_/g, ".") : null;
+  } else if (/ipad.*os/i.test(ua)) {
+    os = "iPadOS";
+    const m = ua.match(/os ([\d_]+)/i);
+    os_version = m ? m[1].replace(/_/g, ".") : null;
+  } else if (/android/i.test(ua)) {
+    os = "Android";
+    const m = ua.match(/android ([\d.]+)/i);
+    os_version = m ? m[1] : null;
+  } else if (/mac os x/i.test(ua)) {
+    os = "macOS";
+    const m = ua.match(/mac os x ([\d_]+)/i);
+    os_version = m ? m[1].replace(/_/g, ".") : null;
+  } else if (s.includes("linux")) {
+    os = "Linux";
+  } else if (s.includes("cros")) {
+    os = "ChromeOS";
+  }
+
+  return { browser, browser_version, os, os_version, device_type };
+}
+
 function maskIp(ip: string): string {
   if (!ip) return "";
   if (ip.includes(".")) {
@@ -75,13 +162,16 @@ Deno.serve(async (req: Request) => {
       device_fingerprint,
       login_method = "email_password",
       failure_reason,
-      browser,
-      browser_version,
-      os,
-      os_version,
-      device_type,
       device_name,
     } = body;
+
+    // Parse UA server-side so browser/os/device_type are always populated
+    const uaParsed = parseUserAgent(user_agent);
+    const browser       = body.browser       ?? uaParsed.browser;
+    const browser_version = body.browser_version ?? uaParsed.browser_version;
+    const os            = body.os            ?? uaParsed.os;
+    const os_version    = body.os_version    ?? uaParsed.os_version;
+    const device_type   = body.device_type   ?? uaParsed.device_type;
 
     if (!event_type) {
       return new Response(
