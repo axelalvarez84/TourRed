@@ -29,7 +29,20 @@ interface AuditEntry {
   country_code?: string | null;
   city?: string | null;
   region?: string | null;
+  severity?: string | null;
 }
+
+const SEVERITY_STYLES: Record<string, string> = {
+  info:     'bg-blue-50 text-blue-700 border border-blue-200',
+  warning:  'bg-amber-50 text-amber-700 border border-amber-200',
+  critical: 'bg-red-50 text-red-700 border border-red-200',
+};
+
+const SEVERITY_LABELS: Record<string, string> = {
+  info:     'Info',
+  warning:  'Alerta',
+  critical: 'Critico',
+};
 
 const ACTION_COLORS: Record<string, string> = {
   INSERT: 'bg-green-100 text-green-800',
@@ -82,6 +95,7 @@ const AdminAuditLog: React.FC = () => {
     correlation_id: '',
     date_from: '',
     date_to: '',
+    severity: '',
   });
   const [appliedFilters, setAppliedFilters] = useState(filters);
 
@@ -99,6 +113,7 @@ const AdminAuditLog: React.FC = () => {
       if (appliedFilters.correlation_id) params.p_correlation_id = appliedFilters.correlation_id;
       if (appliedFilters.date_from) params.p_date_from = appliedFilters.date_from;
       if (appliedFilters.date_to) params.p_date_to = appliedFilters.date_to + 'T23:59:59';
+      if (appliedFilters.severity) params.p_severity = appliedFilters.severity;
 
       const { data, error } = await supabase.rpc(rpc, params);
       if (error) throw error;
@@ -120,7 +135,7 @@ const AdminAuditLog: React.FC = () => {
   };
 
   const clearFilters = () => {
-    const empty = { action: '', target_table: '', actor_email: '', correlation_id: '', date_from: '', date_to: '' };
+    const empty = { action: '', target_table: '', actor_email: '', correlation_id: '', date_from: '', date_to: '', severity: '' };
     setFilters(empty);
     setAppliedFilters(empty);
     setPage(0);
@@ -136,11 +151,12 @@ const AdminAuditLog: React.FC = () => {
       if (appliedFilters.actor_email) params.p_actor_email = appliedFilters.actor_email;
       if (appliedFilters.date_from) params.p_date_from = appliedFilters.date_from;
       if (appliedFilters.date_to) params.p_date_to = appliedFilters.date_to + 'T23:59:59';
+      if (appliedFilters.severity) params.p_severity = appliedFilters.severity;
 
       const { data } = await supabase.rpc(rpc, params);
       if (!data?.length) return;
 
-      const cols = ['created_at', 'action', 'target_table', 'target_id', 'actor_email', 'actor_role', 'ip_masked', 'country', 'country_code', 'city', 'correlation_id', 'error_message'];
+      const cols = ['created_at', 'severity', 'action', 'target_table', 'target_id', 'actor_email', 'actor_role', 'ip_masked', 'country', 'country_code', 'city', 'correlation_id', 'error_message'];
       const header = cols.join(',');
       const rows = data.map((r: any) =>
         cols.map(c => JSON.stringify(r[c] ?? '')).join(',')
@@ -224,19 +240,67 @@ const AdminAuditLog: React.FC = () => {
               <span className="bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full">{activeFilterCount}</span>
             )}
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             <select
               value={filters.action}
               onChange={e => setFilters(f => ({ ...f, action: e.target.value }))}
               className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Todas las acciones</option>
-              <option value="INSERT">INSERT</option>
-              <option value="UPDATE">UPDATE</option>
-              <option value="DELETE">DELETE</option>
-              <option value="LOGIN">LOGIN</option>
-              <option value="LOGOUT">LOGOUT</option>
-              <option value="FAILED_LOGIN">FAILED_LOGIN</option>
+              <optgroup label="Autenticacion">
+                <option value="LOGIN">LOGIN</option>
+                <option value="LOGOUT">LOGOUT</option>
+                <option value="FAILED_LOGIN">FAILED_LOGIN</option>
+              </optgroup>
+              <optgroup label="Agencias">
+                <option value="AGENCY_APPROVED">AGENCY_APPROVED</option>
+                <option value="AGENCY_REJECTED">AGENCY_REJECTED</option>
+                <option value="AGENCY_SUSPENDED">AGENCY_SUSPENDED</option>
+                <option value="AGENCY_REACTIVATED">AGENCY_REACTIVATED</option>
+                <option value="AGENCY_BANK_ACCOUNT_UPDATED">AGENCY_BANK_ACCOUNT_UPDATED</option>
+              </optgroup>
+              <optgroup label="Usuarios">
+                <option value="USER_APPROVED">USER_APPROVED</option>
+                <option value="USER_DEACTIVATED">USER_DEACTIVATED</option>
+                <option value="USER_REACTIVATED">USER_REACTIVATED</option>
+                <option value="ROLE_CHANGED">ROLE_CHANGED</option>
+                <option value="EMAIL_CHANGED">EMAIL_CHANGED</option>
+                <option value="SUPER_ADMIN_CHANGED">SUPER_ADMIN_CHANGED</option>
+              </optgroup>
+              <optgroup label="Reservas">
+                <option value="BOOKING_CREATED">BOOKING_CREATED</option>
+                <option value="BOOKING_CONFIRMED">BOOKING_CONFIRMED</option>
+                <option value="BOOKING_CANCELLED">BOOKING_CANCELLED</option>
+                <option value="BOOKING_COMPLETED">BOOKING_COMPLETED</option>
+              </optgroup>
+              <optgroup label="Pagos">
+                <option value="PAYMENT_RECEIVED">PAYMENT_RECEIVED</option>
+                <option value="PAYMENT_STATUS_CHANGED">PAYMENT_STATUS_CHANGED</option>
+                <option value="PAYOUT_CREATED">PAYOUT_CREATED</option>
+                <option value="PAYOUT_PAID">PAYOUT_PAID</option>
+              </optgroup>
+              <optgroup label="Permisos y config">
+                <option value="ADMIN_PERMISSIONS_GRANTED">ADMIN_PERMISSIONS_GRANTED</option>
+                <option value="ADMIN_PERMISSIONS_CHANGED">ADMIN_PERMISSIONS_CHANGED</option>
+                <option value="ADMIN_PERMISSIONS_REVOKED">ADMIN_PERMISSIONS_REVOKED</option>
+                <option value="COMMISSION_RATE_UPDATED">COMMISSION_RATE_UPDATED</option>
+                <option value="PLATFORM_SETTINGS_UPDATED">PLATFORM_SETTINGS_UPDATED</option>
+              </optgroup>
+              <optgroup label="Genericos">
+                <option value="INSERT">INSERT</option>
+                <option value="UPDATE">UPDATE</option>
+                <option value="DELETE">DELETE</option>
+              </optgroup>
+            </select>
+            <select
+              value={filters.severity}
+              onChange={e => setFilters(f => ({ ...f, severity: e.target.value }))}
+              className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Toda severidad</option>
+              <option value="info">Info</option>
+              <option value="warning">Alerta</option>
+              <option value="critical">Critico</option>
             </select>
             <input
               type="text"
@@ -306,7 +370,8 @@ const AdminAuditLog: React.FC = () => {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-40">Fecha / Hora</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">Acción</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-20">Severidad</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">Accion</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">Tabla</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actor</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-36">IP</th>
@@ -323,6 +388,13 @@ const AdminAuditLog: React.FC = () => {
                       >
                         <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
                           {format(new Date(entry.created_at), 'dd MMM yyyy HH:mm:ss', { locale: es })}
+                        </td>
+                        <td className="px-4 py-3">
+                          {entry.severity && (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${SEVERITY_STYLES[entry.severity] ?? 'bg-gray-100 text-gray-600'}`}>
+                              {SEVERITY_LABELS[entry.severity] ?? entry.severity}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${ACTION_COLORS[entry.action] ?? 'bg-gray-100 text-gray-700'}`}>
@@ -369,7 +441,7 @@ const AdminAuditLog: React.FC = () => {
                       </tr>
                       {expandedId === entry.id && (
                         <tr className="bg-blue-50">
-                          <td colSpan={7} className="px-4 py-4">
+                          <td colSpan={8} className="px-4 py-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
                               <div>
                                 <p className="font-semibold text-gray-700 mb-1">Identificadores</p>

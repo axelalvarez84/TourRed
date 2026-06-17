@@ -240,6 +240,7 @@ Deno.serve(async (req: Request) => {
         p_actor_email: email ?? null,
         p_target_table: "auth",
         p_action: "FAILED_LOGIN",
+        p_severity: "warning",
         p_ip_address: ip_address ?? null,
         p_ip_masked: ipMasked,
         p_user_agent: user_agent ?? null,
