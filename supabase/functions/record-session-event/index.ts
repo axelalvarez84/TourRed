@@ -244,7 +244,11 @@ Deno.serve(async (req: Request) => {
         p_ip_masked: ipMasked,
         p_user_agent: user_agent ?? null,
         p_session_id: session_id ?? null,
-        p_metadata: JSON.stringify({ failure_reason, device_fingerprint, ...geoData }),
+        p_metadata: JSON.stringify({ failure_reason, device_fingerprint }),
+        p_country: (geoData.country as string) ?? null,
+        p_country_code: (geoData.country_code as string) ?? null,
+        p_city: (geoData.city as string) ?? null,
+        p_region: (geoData.region as string) ?? null,
       });
 
       return new Response(
@@ -290,6 +294,10 @@ Deno.serve(async (req: Request) => {
         p_user_agent: user_agent ?? null,
         p_session_id: session_id ?? null,
         p_metadata: JSON.stringify({ login_method, device_fingerprint, device_type }),
+        p_country: (geoData.country as string) ?? null,
+        p_country_code: (geoData.country_code as string) ?? null,
+        p_city: (geoData.city as string) ?? null,
+        p_region: (geoData.region as string) ?? null,
       });
     } else if (event_type === "logout") {
       const { data: openSession } = await supabase

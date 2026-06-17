@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Shield, Search, Download, ChevronDown, ChevronUp, X, Filter, RefreshCw, Eye, AlertTriangle } from 'lucide-react';
+import { Shield, Search, Download, ChevronDown, ChevronUp, X, Filter, RefreshCw, Eye, AlertTriangle, MapPin } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { format } from 'date-fns';
@@ -25,6 +25,10 @@ interface AuditEntry {
   metadata: Record<string, unknown> | null;
   error_message: string | null;
   created_at: string;
+  country?: string | null;
+  country_code?: string | null;
+  city?: string | null;
+  region?: string | null;
 }
 
 const ACTION_COLORS: Record<string, string> = {
@@ -136,7 +140,7 @@ const AdminAuditLog: React.FC = () => {
       const { data } = await supabase.rpc(rpc, params);
       if (!data?.length) return;
 
-      const cols = ['created_at', 'action', 'target_table', 'target_id', 'actor_email', 'actor_role', 'ip_masked', 'correlation_id', 'error_message'];
+      const cols = ['created_at', 'action', 'target_table', 'target_id', 'actor_email', 'actor_role', 'ip_masked', 'country', 'country_code', 'city', 'correlation_id', 'error_message'];
       const header = cols.join(',');
       const rows = data.map((r: any) =>
         cols.map(c => JSON.stringify(r[c] ?? '')).join(',')
@@ -306,6 +310,7 @@ const AdminAuditLog: React.FC = () => {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">Tabla</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actor</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-36">IP</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-36">Origen</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-20">Detalle</th>
                   </tr>
                 </thead>
@@ -335,6 +340,28 @@ const AdminAuditLog: React.FC = () => {
                             : (entry.ip_masked ?? '—')}
                         </td>
                         <td className="px-4 py-3">
+                          {entry.country ? (
+                            <div className="flex items-center gap-1">
+                              {entry.country_code && (
+                                <img
+                                  src={`https://flagcdn.com/16x12/${entry.country_code.toLowerCase()}.png`}
+                                  alt={entry.country_code}
+                                  className="w-4 h-3 object-cover rounded-sm flex-shrink-0"
+                                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                />
+                              )}
+                              <div>
+                                <div className="text-xs text-gray-700">{entry.country}</div>
+                                {entry.city && <div className="text-xs text-gray-400">{entry.city}</div>}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-300 text-xs flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />—
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
                           <button className="text-blue-600 hover:text-blue-800">
                             {expandedId === entry.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                           </button>
@@ -342,7 +369,7 @@ const AdminAuditLog: React.FC = () => {
                       </tr>
                       {expandedId === entry.id && (
                         <tr className="bg-blue-50">
-                          <td colSpan={6} className="px-4 py-4">
+                          <td colSpan={7} className="px-4 py-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
                               <div>
                                 <p className="font-semibold text-gray-700 mb-1">Identificadores</p>
