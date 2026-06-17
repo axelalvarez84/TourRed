@@ -527,6 +527,3 @@ const AdminAuditLog: React.FC = () => {
 };
 
 export default AdminAuditLog;
-
-
-export default AdminAuditLog
