@@ -12,6 +12,9 @@ import MessagingPage from './pages/MessagingPage';
 import LoginPage from './pages/auth/LoginPage';
 import SignupPage from './pages/auth/SignupPage';
 import AgencySignupPage from './pages/auth/AgencySignupPage';
+import GoogleOnboardingPage from './pages/auth/GoogleOnboardingPage';
+import GoogleTravelerSignupPage from './pages/auth/GoogleTravelerSignupPage';
+import GoogleAgencySignupPage from './pages/auth/GoogleAgencySignupPage';
 import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
@@ -153,6 +156,9 @@ const App: React.FC = () => {
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/auth/google-onboarding" element={<GoogleOnboardingPage />} />
+          <Route path="/auth/google-signup/traveler" element={<GoogleTravelerSignupPage />} />
+          <Route path="/auth/google-signup/agency" element={<GoogleAgencySignupPage />} />
           <Route path="/success" element={<SuccessPage />} />
           <Route path="/cancel" element={<CancelPage />} />
           <Route path="/booking-success" element={<BookingSuccessPage />} />

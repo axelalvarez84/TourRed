@@ -122,6 +122,7 @@ interface AuthContextType {
   isAccountExecutive: boolean;
   isEmailVerified: boolean;
   isSuperAdmin: boolean;
+  isOnboardingPending: boolean;
   permissions: AdminPermissions | null;
   accountantPermissions: AccountantPermissions | null;
   accountExecutiveInfo: AccountExecutiveInfo | null;
@@ -132,6 +133,7 @@ interface AuthContextType {
   switchActiveAgency: (agencyId: string) => void;
   needsTermsAcceptance: boolean;
   markTermsAccepted: () => void;
+  signInWithGoogle: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -145,6 +147,7 @@ const AuthContext = createContext<AuthContextType>({
   isAccountExecutive: false,
   isEmailVerified: false,
   isSuperAdmin: false,
+  isOnboardingPending: false,
   permissions: null,
   accountantPermissions: null,
   accountExecutiveInfo: null,
@@ -155,6 +158,7 @@ const AuthContext = createContext<AuthContextType>({
   switchActiveAgency: () => {},
   needsTermsAcceptance: false,
   markTermsAccepted: () => {},
+  signInWithGoogle: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -179,6 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
   const [needsTermsAcceptance, setNeedsTermsAcceptance] = useState(false);
+  const [isOnboardingPending, setIsOnboardingPending] = useState(false);
 
   const initializedUserIdRef = useRef<string | null>(null);
   const isUpdatingRef = useRef(false);
@@ -330,6 +335,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { role: UserRole.TRAVELER, emailVerified: true };
   };
 
+  const signInWithGoogle = useCallback(async () => {
+    const redirectTo = `${window.location.origin}/auth/google-callback`;
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo },
+    });
+  }, []);
+
   const updateAuthState = async (authUser: any, forceRefresh: boolean = false) => {
     if (isUpdatingRef.current) return;
     isUpdatingRef.current = true;
@@ -337,6 +350,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(authUser);
 
       if (authUser) {
+        // Check if Google OAuth user hasn't completed onboarding yet
+        const isGoogleProvider = authUser.app_metadata?.provider === 'google' ||
+          (authUser.identities ?? []).some((i: any) => i.provider === 'google');
+        const metaOnboarding = authUser.user_metadata?.onboarding_completed;
+
+        if (isGoogleProvider && (metaOnboarding === false || metaOnboarding === null || metaOnboarding === undefined)) {
+          // Check if profile exists in users table
+          const { data: existingProfile } = await supabase
+            .from('users')
+            .select('id, role')
+            .eq('id', authUser.id)
+            .maybeSingle();
+
+          if (!existingProfile) {
+            // New Google user — needs onboarding
+            setIsOnboardingPending(true);
+            setIsLoading(false);
+            isUpdatingRef.current = false;
+            return;
+          }
+        }
+
+        setIsOnboardingPending(false);
+
         const { role, emailVerified } = await determineUserRole(authUser, forceRefresh);
         setUserRole(role);
         setIsEmailVerified(emailVerified);
@@ -538,6 +575,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUserRole(null);
         setIsEmailVerified(false);
         setIsSuperAdmin(false);
+        setIsOnboardingPending(false);
         setPermissions(null);
         setAccountantPermissions(null);
         setAccountExecutiveInfo(null);
@@ -693,6 +731,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUserRole(null);
         setIsLoading(false);
         setIsSuperAdmin(false);
+        setIsOnboardingPending(false);
         setPermissions(null);
         setAllStaffInfo([]);
         setActiveAgencyId(null);
@@ -748,6 +787,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isAccountExecutive,
     isEmailVerified,
     isSuperAdmin,
+    isOnboardingPending,
     permissions,
     accountantPermissions,
     accountExecutiveInfo,
@@ -758,7 +798,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     switchActiveAgency,
     needsTermsAcceptance,
     markTermsAccepted,
-  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isAccountant, isAccountExecutive, isEmailVerified, isSuperAdmin, permissions, accountantPermissions, accountExecutiveInfo, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency, needsTermsAcceptance, markTermsAccepted]);
+    signInWithGoogle,
+  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isAccountant, isAccountExecutive, isEmailVerified, isSuperAdmin, isOnboardingPending, permissions, accountantPermissions, accountExecutiveInfo, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency, needsTermsAcceptance, markTermsAccepted, signInWithGoogle]);
 
   return (
     <AuthContext.Provider value={contextValue}>
