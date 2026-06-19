@@ -2,59 +2,69 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 
+async function redirectForUser(user: any, navigate: (path: string, opts?: any) => void) {
+  const isGoogleProvider =
+    user.app_metadata?.provider === 'google' ||
+    (user.identities ?? []).some((i: any) => i.provider === 'google');
+
+  if (isGoogleProvider) {
+    const onboardingCompleted = user.user_metadata?.onboarding_completed;
+    if (!onboardingCompleted) {
+      const { data: existingProfile } = await supabase
+        .from('users')
+        .select('id, role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (existingProfile) {
+        const role = existingProfile.role;
+        if (role === 'admin') navigate('/admin/dashboard', { replace: true });
+        else if (role === 'agency') navigate('/agency/dashboard', { replace: true });
+        else navigate('/traveler/dashboard', { replace: true });
+      } else {
+        navigate('/auth/google-onboarding', { replace: true });
+      }
+      return;
+    }
+  }
+
+  const role = user.user_metadata?.role;
+  if (role === 'admin') navigate('/admin/dashboard', { replace: true });
+  else if (role === 'agency') navigate('/agency/dashboard', { replace: true });
+  else navigate('/traveler/dashboard', { replace: true });
+}
+
 const GoogleCallbackPage: React.FC = () => {
   const navigate = useNavigate();
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Supabase JS v2 automatically parses the hash fragment (#access_token=...)
-    // and fires onAuthStateChange. We just need to wait for it.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        const user = session.user;
-        const isGoogleProvider =
-          user.app_metadata?.provider === 'google' ||
-          (user.identities ?? []).some((i: any) => i.provider === 'google');
+    let done = false;
 
-        if (isGoogleProvider) {
-          const onboardingCompleted = user.user_metadata?.onboarding_completed;
-          if (!onboardingCompleted) {
-            // Check if a profile already exists (returning Google user)
-            const { data: existingProfile } = await supabase
-              .from('users')
-              .select('id, role')
-              .eq('id', user.id)
-              .maybeSingle();
-
-            if (existingProfile) {
-              // Existing user — go to their dashboard
-              const role = existingProfile.role;
-              if (role === 'admin') navigate('/admin/dashboard', { replace: true });
-              else if (role === 'agency') navigate('/agency/dashboard', { replace: true });
-              else navigate('/traveler/dashboard', { replace: true });
-            } else {
-              // New Google user — start onboarding
-              navigate('/auth/google-onboarding', { replace: true });
-            }
-          } else {
-            // Onboarding already complete — go to dashboard
-            const role = user.user_metadata?.role;
-            if (role === 'admin') navigate('/admin/dashboard', { replace: true });
-            else if (role === 'agency') navigate('/agency/dashboard', { replace: true });
-            else navigate('/traveler/dashboard', { replace: true });
-          }
-        } else {
-          navigate('/', { replace: true });
-        }
-      } else if (event === 'SIGNED_OUT') {
-        navigate('/login', { replace: true });
+    // 1. Check if session already exists (Supabase processed the hash on init)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (done) return;
+      if (session?.user) {
+        done = true;
+        redirectForUser(session.user, navigate);
       }
     });
 
-    // Fallback: if no auth event fires in 8s, show error
+    // 2. Also listen for the event in case hash processing isn't done yet
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (done) return;
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+        done = true;
+        redirectForUser(session.user, navigate);
+      }
+    });
+
+    // 3. Timeout fallback
     const timeout = setTimeout(() => {
-      setError('No se pudo completar el inicio de sesión. Por favor intenta de nuevo.');
-    }, 8000);
+      if (!done) {
+        setError('No se pudo completar el inicio de sesión. Por favor intenta de nuevo.');
+      }
+    }, 10000);
 
     return () => {
       subscription.unsubscribe();
