@@ -1009,7 +1009,7 @@ const AgencyTours: React.FC = () => {
 
   const handleOpenFeatured = async (tour: Tour) => {
     if (!resolvedAgencyId) return;
-    setFeaturedModal({ open: true, tour, plans: [], activeSlot: null, isLoading: true, isSubmitting: false, selectedPlanId: '', error: '', success: '', step: 'plan', pendingSlotId: '', selectedProvider: 'stripe' });
+    setFeaturedModal({ open: true, tour, plans: [], activeSlot: null, isLoading: true, isSubmitting: false, selectedPlanId: '', error: '', success: '', step: 'plan', pendingSlotId: '', selectedProvider: 'stripe', couponCode: '', couponError: '', couponDiscount: 0, couponType: '', couponApplied: false, couponIsValidating: false });
     const [plansRes, slotsRes] = await Promise.all([
       getFeaturedPlans(),
       getAgencyFeaturedSlots(resolvedAgencyId),
