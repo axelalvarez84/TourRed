@@ -15,6 +15,7 @@ import AgencySignupPage from './pages/auth/AgencySignupPage';
 import GoogleOnboardingPage from './pages/auth/GoogleOnboardingPage';
 import GoogleTravelerSignupPage from './pages/auth/GoogleTravelerSignupPage';
 import GoogleAgencySignupPage from './pages/auth/GoogleAgencySignupPage';
+import GoogleCallbackPage from './pages/auth/GoogleCallbackPage';
 import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
@@ -156,6 +157,7 @@ const App: React.FC = () => {
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/auth/google-callback" element={<GoogleCallbackPage />} />
           <Route path="/auth/google-onboarding" element={<GoogleOnboardingPage />} />
           <Route path="/auth/google-signup/traveler" element={<GoogleTravelerSignupPage />} />
           <Route path="/auth/google-signup/agency" element={<GoogleAgencySignupPage />} />
