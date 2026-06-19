@@ -1002,7 +1002,12 @@ const AgencyTours: React.FC = () => {
       getFeaturedPlans(),
       getAgencyFeaturedSlots(resolvedAgencyId),
     ]);
-    const activeSlot = (slotsRes.data || []).find((s: any) => s.tour_id === tour.id && s.status === 'active') ?? null;
+    const now = new Date();
+    const activeSlot = (slotsRes.data || []).find((s: any) =>
+      s.tour_id === tour.id &&
+      s.status === 'active' &&
+      new Date(s.expires_at) > now
+    ) ?? null;
     setFeaturedModal(prev => ({
       ...prev,
       plans: plansRes.data || [],

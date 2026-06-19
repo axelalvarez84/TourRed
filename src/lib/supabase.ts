@@ -770,7 +770,13 @@ export const getAgencyFeaturedSlots = async (agencyId: string) => {
       `)
       .eq('agency_id', agencyId)
       .order('created_at', { ascending: false });
-    return { data: data ?? [], error };
+    const normalized = (data ?? []).map((slot: any) => ({
+      ...slot,
+      featured_tour_stats: Array.isArray(slot.featured_tour_stats)
+        ? (slot.featured_tour_stats[0] ?? null)
+        : slot.featured_tour_stats,
+    }));
+    return { data: normalized, error };
   } catch (error: any) {
     return { data: [], error };
   }
