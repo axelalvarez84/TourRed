@@ -41,7 +41,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { slot_id, provider, success_url, cancel_url } = await req.json();
+    const { slot_id, provider, success_url, cancel_url, discount_code } = await req.json();
 
     if (!slot_id || !provider) {
       return new Response(
@@ -81,10 +81,58 @@ Deno.serve(async (req: Request) => {
 
     const plan = slot.featured_plans as Record<string, unknown>;
     const tour = slot.tours as Record<string, unknown>;
-    const totalAmount = Number(slot.total_amount ?? (plan?.price as number) ?? 0);
+    const baseAmount = Number(slot.total_amount ?? (plan?.price as number) ?? 0);
     const planName = (plan?.name as string) ?? "Plan Destacado";
     const tourName = (tour?.name as string) ?? "Tour";
     const description = `Tour Destacado — ${tourName} (${planName})`;
+
+    // Apply discount code if provided
+    let finalAmount = baseAmount;
+    let discountAmount = 0;
+    let appliedDiscountCodeId: string | null = null;
+
+    if (discount_code && discount_code.trim()) {
+      const { data: validationResult, error: validErr } = await supabase.rpc(
+        "validate_featured_slot_discount",
+        { p_code: discount_code.trim(), p_user_id: user.id }
+      );
+
+      if (validErr || !validationResult?.valid) {
+        return new Response(
+          JSON.stringify({ error: validationResult?.error ?? "Código de descuento inválido" }),
+          { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const discountType: string = validationResult.discount_type;
+      const discountValue = Number(validationResult.discount_value);
+
+      if (discountType === "featured_percentage") {
+        discountAmount = Math.min(baseAmount, (baseAmount * discountValue) / 100);
+      } else if (discountType === "featured_fixed") {
+        discountAmount = Math.min(baseAmount, discountValue);
+      }
+
+      finalAmount = Math.max(0, baseAmount - discountAmount);
+      appliedDiscountCodeId = validationResult.code_id as string;
+
+      // Record usage and update slot with discount info
+      const { error: applyErr } = await supabase.rpc("apply_discount_code", {
+        p_code: discount_code.trim(),
+        p_user_id: user.id,
+      });
+
+      if (!applyErr) {
+        // Update the slot with discount traceability
+        await supabase
+          .from("featured_tour_slots")
+          .update({
+            discount_code_id: appliedDiscountCodeId,
+            discount_amount: discountAmount,
+          })
+          .eq("id", slot_id);
+      }
+    }
 
     const appUrl = success_url?.split("/agency")[0] ?? Deno.env.get("APP_URL") ?? "https://toursred.com";
     const successUrl = success_url ?? `${appUrl}/agency/featured-slot-success?slot_id=${slot_id}`;
@@ -109,7 +157,7 @@ Deno.serve(async (req: Request) => {
             price_data: {
               currency: "mxn",
               product_data: { name: description },
-              unit_amount: Math.round(totalAmount * 100),
+              unit_amount: Math.round(finalAmount * 100),
             },
             quantity: 1,
           },
@@ -156,7 +204,7 @@ Deno.serve(async (req: Request) => {
             {
               title: description,
               quantity: 1,
-              unit_price: totalAmount,
+              unit_price: finalAmount,
               currency_id: "MXN",
             },
           ],
@@ -222,7 +270,7 @@ Deno.serve(async (req: Request) => {
           intent: "CAPTURE",
           purchase_units: [
             {
-              amount: { currency_code: "MXN", value: totalAmount.toFixed(2) },
+              amount: { currency_code: "MXN", value: finalAmount.toFixed(2) },
               description,
               custom_id: slot_id,
             },

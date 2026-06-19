@@ -162,9 +162,15 @@ const AgencyTours: React.FC = () => {
     error: string;
     success: string;
     // payment flow
-    step: 'plan' | 'payment' | 'done';
+    step: 'plan' | 'coupon' | 'payment' | 'done';
     pendingSlotId: string;
     selectedProvider: 'stripe' | 'mercadopago' | 'paypal';
+    couponCode: string;
+    couponError: string;
+    couponDiscount: number;
+    couponType: string;
+    couponApplied: boolean;
+    couponIsValidating: boolean;
   }>({
     open: false,
     tour: null,
@@ -178,6 +184,12 @@ const AgencyTours: React.FC = () => {
     step: 'plan',
     pendingSlotId: '',
     selectedProvider: 'stripe',
+    couponCode: '',
+    couponError: '',
+    couponDiscount: 0,
+    couponType: '',
+    couponApplied: false,
+    couponIsValidating: false,
   });
 
   const [receptivoActionsModal, setReceptivoActionsModal] = useState<{
@@ -1028,7 +1040,7 @@ const AgencyTours: React.FC = () => {
     if (error) {
       setFeaturedModal(prev => ({ ...prev, isSubmitting: false, error: error.message }));
     } else {
-      setFeaturedModal(prev => ({ ...prev, isSubmitting: false, step: 'payment', pendingSlotId: slotId as string }));
+      setFeaturedModal(prev => ({ ...prev, isSubmitting: false, step: 'coupon', pendingSlotId: slotId as string }));
     }
   };
 
@@ -1044,6 +1056,7 @@ const AgencyTours: React.FC = () => {
           provider: featuredModal.selectedProvider,
           success_url: `${origin}/agency/featured-slot-success?slot_id=${featuredModal.pendingSlotId}`,
           cancel_url: `${origin}/agency/tours`,
+          ...(featuredModal.couponApplied && featuredModal.couponCode ? { discount_code: featuredModal.couponCode } : {}),
         },
       });
       if (res.error) throw new Error(res.error.message);
@@ -1067,6 +1080,31 @@ const AgencyTours: React.FC = () => {
     } else {
       setFeaturedModal(prev => ({ ...prev, isSubmitting: false, success: 'Te has unido a la lista de espera. Te notificaremos cuando haya un lugar disponible.' }));
     }
+  };
+
+  const handleValidateCoupon = async () => {
+    const code = featuredModal.couponCode.trim();
+    if (!code) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    setFeaturedModal(prev => ({ ...prev, couponIsValidating: true, couponError: '', couponApplied: false, couponDiscount: 0, couponType: '' }));
+    const { data, error } = await supabase.rpc('validate_featured_slot_discount', {
+      p_code: code,
+      p_user_id: user.id,
+    });
+    if (error || !data?.valid) {
+      setFeaturedModal(prev => ({ ...prev, couponIsValidating: false, couponError: data?.error ?? 'Código inválido' }));
+      return;
+    }
+    const plan = featuredModal.plans.find((p: any) => p.id === featuredModal.selectedPlanId);
+    const base = plan?.price ?? 0;
+    let discount = 0;
+    if (data.discount_type === 'featured_percentage') {
+      discount = Math.min(base, (base * Number(data.discount_value)) / 100);
+    } else if (data.discount_type === 'featured_fixed') {
+      discount = Math.min(base, Number(data.discount_value));
+    }
+    setFeaturedModal(prev => ({ ...prev, couponIsValidating: false, couponApplied: true, couponDiscount: discount, couponType: data.discount_type }));
   };
 
   const handleDelete = async (tourId: string, tourName: string) => {
@@ -6818,21 +6856,115 @@ const AgencyTours: React.FC = () => {
                     Cerrar
                   </button>
                 </div>
+              ) : featuredModal.step === 'coupon' ? (
+                /* ── Paso 2: Código de descuento ── */
+                <>
+                  <div className="mb-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 text-xs font-bold flex items-center justify-center">2</div>
+                      <p className="font-semibold text-gray-800 text-sm">¿Tienes un código de descuento?</p>
+                    </div>
+
+                    {/* Plan summary */}
+                    {(() => {
+                      const plan = featuredModal.plans.find((p: any) => p.id === featuredModal.selectedPlanId);
+                      return plan ? (
+                        <div className="mb-4 px-3 py-2 bg-amber-50 border border-amber-100 rounded-lg text-sm flex items-center justify-between">
+                          <span className="text-amber-800 font-medium">{plan.name} — {plan.duration_days} dias</span>
+                          <div className="text-right">
+                            {featuredModal.couponApplied && featuredModal.couponDiscount > 0 ? (
+                              <>
+                                <div className="text-xs text-gray-400 line-through">${plan.price.toLocaleString('es-MX')} MXN</div>
+                                <div className="font-bold text-green-600">${(plan.price - featuredModal.couponDiscount).toLocaleString('es-MX')} MXN</div>
+                              </>
+                            ) : (
+                              <span className="font-bold text-amber-700">${plan.price.toLocaleString('es-MX')} MXN</span>
+                            )}
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
+
+                    {/* Coupon input */}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Ingresa tu código"
+                        value={featuredModal.couponCode}
+                        onChange={e => setFeaturedModal(prev => ({ ...prev, couponCode: e.target.value.toUpperCase(), couponApplied: false, couponDiscount: 0, couponError: '' }))}
+                        onKeyDown={e => { if (e.key === 'Enter') handleValidateCoupon(); }}
+                        className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 uppercase tracking-wider"
+                        disabled={featuredModal.couponApplied}
+                      />
+                      {featuredModal.couponApplied ? (
+                        <button
+                          onClick={() => setFeaturedModal(prev => ({ ...prev, couponCode: '', couponApplied: false, couponDiscount: 0, couponError: '', couponType: '' }))}
+                          className="px-3 py-2 border border-gray-200 text-gray-500 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+                        >
+                          Quitar
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleValidateCoupon}
+                          disabled={!featuredModal.couponCode.trim() || featuredModal.couponIsValidating}
+                          className="px-4 py-2 bg-gray-800 text-white rounded-xl text-sm font-semibold disabled:opacity-40 hover:bg-gray-700 transition-colors"
+                        >
+                          {featuredModal.couponIsValidating ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Aplicar'}
+                        </button>
+                      )}
+                    </div>
+
+                    {featuredModal.couponError && (
+                      <p className="mt-2 text-xs text-red-600">{featuredModal.couponError}</p>
+                    )}
+
+                    {featuredModal.couponApplied && featuredModal.couponDiscount > 0 && (
+                      <div className="mt-2 flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                        <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>Descuento de <strong>${featuredModal.couponDiscount.toLocaleString('es-MX')} MXN</strong> aplicado correctamente</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setFeaturedModal(prev => ({ ...prev, step: 'payment' }))}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white rounded-xl text-sm font-semibold transition-all shadow-sm"
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      {featuredModal.couponApplied && featuredModal.couponDiscount > 0 ? 'Continuar con descuento' : 'Continuar al pago'}
+                    </button>
+                    <button
+                      onClick={() => setFeaturedModal(prev => ({ ...prev, step: 'plan', error: '', couponCode: '', couponApplied: false, couponDiscount: 0, couponError: '', couponType: '' }))}
+                      className="px-4 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      Atras
+                    </button>
+                  </div>
+                </>
               ) : featuredModal.step === 'payment' ? (
-                /* ── Paso 2: Seleccionar proveedor de pago ── */
+                /* ── Paso 3: Seleccionar proveedor de pago ── */
                 <>
                   <div className="mb-5">
                     <div className="flex items-center gap-2 mb-1">
-                      <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 text-xs font-bold flex items-center justify-center">2</div>
+                      <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 text-xs font-bold flex items-center justify-center">3</div>
                       <p className="font-semibold text-gray-800 text-sm">Elige como pagar</p>
                     </div>
                     {/* Plan summary */}
                     {(() => {
-                      const plan = featuredModal.plans.find(p => p.id === featuredModal.selectedPlanId);
+                      const plan = featuredModal.plans.find((p: any) => p.id === featuredModal.selectedPlanId);
+                      const finalPrice = featuredModal.couponApplied && featuredModal.couponDiscount > 0
+                        ? plan?.price - featuredModal.couponDiscount
+                        : plan?.price;
                       return plan ? (
                         <div className="mt-2 px-3 py-2 bg-amber-50 border border-amber-100 rounded-lg text-sm flex items-center justify-between">
                           <span className="text-amber-800 font-medium">{plan.name} — {plan.duration_days} dias</span>
-                          <span className="font-bold text-amber-700">${plan.price.toLocaleString('es-MX')} MXN</span>
+                          <div className="text-right">
+                            {featuredModal.couponApplied && featuredModal.couponDiscount > 0 && (
+                              <div className="text-xs text-gray-400 line-through">${plan.price.toLocaleString('es-MX')} MXN</div>
+                            )}
+                            <span className="font-bold text-amber-700">${finalPrice?.toLocaleString('es-MX')} MXN</span>
+                          </div>
                         </div>
                       ) : null;
                     })()}
@@ -6885,7 +7017,7 @@ const AgencyTours: React.FC = () => {
                       Pagar y destacar tour
                     </button>
                     <button
-                      onClick={() => setFeaturedModal(prev => ({ ...prev, step: 'plan', error: '' }))}
+                      onClick={() => setFeaturedModal(prev => ({ ...prev, step: 'coupon', error: '' }))}
                       className="px-4 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
                     >
                       Atras

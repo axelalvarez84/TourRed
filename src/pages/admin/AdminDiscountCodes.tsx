@@ -321,6 +321,11 @@ export default function AdminDiscountCodes() {
           { value: 'insurance_fixed', label: 'Monto Fijo' },
           { value: 'insurance_free', label: 'Seguro Gratis' },
         ];
+      case 'featured_slots':
+        return [
+          { value: 'featured_percentage', label: 'Porcentaje' },
+          { value: 'featured_fixed', label: 'Monto Fijo' },
+        ];
       default:
         return [];
     }
@@ -341,6 +346,8 @@ export default function AdminDiscountCodes() {
       insurance_percentage: 'Porcentaje del Seguro',
       insurance_fixed: 'Monto Fijo',
       insurance_free: 'Seguro Gratis',
+      featured_percentage: 'Porcentaje',
+      featured_fixed: 'Monto Fijo',
     };
     return labels[type] || type;
   };
@@ -361,6 +368,7 @@ export default function AdminDiscountCodes() {
       gift_cards: 'Tarjetas de Regalo',
       service_fees: 'Cargo por Servicio',
       insurance: 'Seguro de Viajero',
+      featured_slots: 'Tours Destacados',
     };
     return labels[type] || type;
   };
@@ -625,6 +633,7 @@ export default function AdminDiscountCodes() {
                 <option value="gift_cards">Tarjetas de Regalo</option>
                 <option value="service_fees">Cargo por Servicio</option>
                 <option value="insurance">Seguro de Viajero</option>
+                <option value="featured_slots">Tours Destacados</option>
               </select>
             </div>
 
@@ -929,6 +938,7 @@ export default function AdminDiscountCodes() {
                       <option value="gift_cards">Tarjetas de Regalo</option>
                       <option value="service_fees">Cargo por Servicio</option>
                       <option value="insurance">Seguro de Viajero</option>
+                      <option value="featured_slots">Tours Destacados</option>
                     </select>
                     {formData.applicable_to === 'service_fees' && (
                       <p className="text-xs text-cyan-600 mt-1">
