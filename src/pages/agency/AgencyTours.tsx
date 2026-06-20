@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAgencyId } from '../../hooks/useAgencyId';
 import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination, getTourCategories, getFeaturedPlans, getAgencyFeaturedSlots, joinFeaturedWaitlist } from '../../lib/supabase';
-import { Plus, Search, X, CreditCard, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban, ShoppingBag, Info, Percent, Route, RefreshCw, Layers, Car, Globe, AlertTriangle, Bus, Pencil, Sparkles, Star, TrendingUp, CheckCircle, Loader2, Lock } from 'lucide-react';
+import { Plus, Search, X, CreditCard, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban, ShoppingBag, Info, Percent, Route, RefreshCw, Layers, Car, Globe, AlertTriangle, Bus, Pencil, Sparkles, Star, TrendingUp, CheckCircle, Loader2, Lock, ChevronDown } from 'lucide-react';
 import { VehicleMapType } from '../../types/seats';
 import TourPromotionsManager from '../../components/TourPromotionsManager';
 import AgencyScheduleManager from '../../components/receptivo/AgencyScheduleManager';
@@ -162,7 +162,8 @@ const AgencyTours: React.FC = () => {
     error: string;
     success: string;
     // payment flow
-    step: 'plan' | 'coupon' | 'payment' | 'done';
+    step: 'plan' | 'payment' | 'done';
+    couponExpanded: boolean;
     pendingSlotId: string;
     selectedProvider: 'stripe' | 'mercadopago' | 'paypal';
     couponCode: string;
@@ -182,6 +183,7 @@ const AgencyTours: React.FC = () => {
     error: '',
     success: '',
     step: 'plan',
+    couponExpanded: false,
     pendingSlotId: '',
     selectedProvider: 'stripe',
     couponCode: '',
@@ -1009,7 +1011,7 @@ const AgencyTours: React.FC = () => {
 
   const handleOpenFeatured = async (tour: Tour) => {
     if (!resolvedAgencyId) return;
-    setFeaturedModal({ open: true, tour, plans: [], activeSlot: null, isLoading: true, isSubmitting: false, selectedPlanId: '', error: '', success: '', step: 'plan', pendingSlotId: '', selectedProvider: 'stripe', couponCode: '', couponError: '', couponDiscount: 0, couponType: '', couponApplied: false, couponIsValidating: false });
+    setFeaturedModal({ open: true, tour, plans: [], activeSlot: null, isLoading: true, isSubmitting: false, selectedPlanId: '', error: '', success: '', step: 'plan', couponExpanded: false, pendingSlotId: '', selectedProvider: 'stripe', couponCode: '', couponError: '', couponDiscount: 0, couponType: '', couponApplied: false, couponIsValidating: false });
     const [plansRes, slotsRes] = await Promise.all([
       getFeaturedPlans(),
       getAgencyFeaturedSlots(resolvedAgencyId),
@@ -1040,7 +1042,7 @@ const AgencyTours: React.FC = () => {
     if (error) {
       setFeaturedModal(prev => ({ ...prev, isSubmitting: false, error: error.message }));
     } else {
-      setFeaturedModal(prev => ({ ...prev, isSubmitting: false, step: 'coupon', pendingSlotId: slotId as string }));
+      setFeaturedModal(prev => ({ ...prev, isSubmitting: false, step: 'payment', pendingSlotId: slotId as string }));
     }
   };
 
@@ -6856,98 +6858,12 @@ const AgencyTours: React.FC = () => {
                     Cerrar
                   </button>
                 </div>
-              ) : featuredModal.step === 'coupon' ? (
-                /* ── Paso 2: Código de descuento ── */
-                <>
-                  <div className="mb-5">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 text-xs font-bold flex items-center justify-center">2</div>
-                      <p className="font-semibold text-gray-800 text-sm">¿Tienes un código de descuento?</p>
-                    </div>
-
-                    {/* Plan summary */}
-                    {(() => {
-                      const plan = featuredModal.plans.find((p: any) => p.id === featuredModal.selectedPlanId);
-                      return plan ? (
-                        <div className="mb-4 px-3 py-2 bg-amber-50 border border-amber-100 rounded-lg text-sm flex items-center justify-between">
-                          <span className="text-amber-800 font-medium">{plan.name} — {plan.duration_days} dias</span>
-                          <div className="text-right">
-                            {featuredModal.couponApplied && featuredModal.couponDiscount > 0 ? (
-                              <>
-                                <div className="text-xs text-gray-400 line-through">${plan.price.toLocaleString('es-MX')} MXN</div>
-                                <div className="font-bold text-green-600">${(plan.price - featuredModal.couponDiscount).toLocaleString('es-MX')} MXN</div>
-                              </>
-                            ) : (
-                              <span className="font-bold text-amber-700">${plan.price.toLocaleString('es-MX')} MXN</span>
-                            )}
-                          </div>
-                        </div>
-                      ) : null;
-                    })()}
-
-                    {/* Coupon input */}
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Ingresa tu código"
-                        value={featuredModal.couponCode}
-                        onChange={e => setFeaturedModal(prev => ({ ...prev, couponCode: e.target.value.toUpperCase(), couponApplied: false, couponDiscount: 0, couponError: '' }))}
-                        onKeyDown={e => { if (e.key === 'Enter') handleValidateCoupon(); }}
-                        className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 uppercase tracking-wider"
-                        disabled={featuredModal.couponApplied}
-                      />
-                      {featuredModal.couponApplied ? (
-                        <button
-                          onClick={() => setFeaturedModal(prev => ({ ...prev, couponCode: '', couponApplied: false, couponDiscount: 0, couponError: '', couponType: '' }))}
-                          className="px-3 py-2 border border-gray-200 text-gray-500 rounded-xl text-sm hover:bg-gray-50 transition-colors"
-                        >
-                          Quitar
-                        </button>
-                      ) : (
-                        <button
-                          onClick={handleValidateCoupon}
-                          disabled={!featuredModal.couponCode.trim() || featuredModal.couponIsValidating}
-                          className="px-4 py-2 bg-gray-800 text-white rounded-xl text-sm font-semibold disabled:opacity-40 hover:bg-gray-700 transition-colors"
-                        >
-                          {featuredModal.couponIsValidating ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Aplicar'}
-                        </button>
-                      )}
-                    </div>
-
-                    {featuredModal.couponError && (
-                      <p className="mt-2 text-xs text-red-600">{featuredModal.couponError}</p>
-                    )}
-
-                    {featuredModal.couponApplied && featuredModal.couponDiscount > 0 && (
-                      <div className="mt-2 flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                        <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                        <span>Descuento de <strong>${featuredModal.couponDiscount.toLocaleString('es-MX')} MXN</strong> aplicado correctamente</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setFeaturedModal(prev => ({ ...prev, step: 'payment' }))}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white rounded-xl text-sm font-semibold transition-all shadow-sm"
-                    >
-                      <CreditCard className="w-4 h-4" />
-                      {featuredModal.couponApplied && featuredModal.couponDiscount > 0 ? 'Continuar con descuento' : 'Continuar al pago'}
-                    </button>
-                    <button
-                      onClick={() => setFeaturedModal(prev => ({ ...prev, step: 'plan', error: '', couponCode: '', couponApplied: false, couponDiscount: 0, couponError: '', couponType: '' }))}
-                      className="px-4 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
-                    >
-                      Atras
-                    </button>
-                  </div>
-                </>
               ) : featuredModal.step === 'payment' ? (
-                /* ── Paso 3: Seleccionar proveedor de pago ── */
+                /* ── Paso 2: Seleccionar proveedor de pago ── */
                 <>
                   <div className="mb-5">
                     <div className="flex items-center gap-2 mb-1">
-                      <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 text-xs font-bold flex items-center justify-center">3</div>
+                      <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 text-xs font-bold flex items-center justify-center">2</div>
                       <p className="font-semibold text-gray-800 text-sm">Elige como pagar</p>
                     </div>
                     {/* Plan summary */}
@@ -7017,7 +6933,7 @@ const AgencyTours: React.FC = () => {
                       Pagar y destacar tour
                     </button>
                     <button
-                      onClick={() => setFeaturedModal(prev => ({ ...prev, step: 'coupon', error: '' }))}
+                      onClick={() => setFeaturedModal(prev => ({ ...prev, step: 'plan', error: '' }))}
                       className="px-4 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
                     >
                       Atras
@@ -7101,6 +7017,64 @@ const AgencyTours: React.FC = () => {
                             <p>Todos los espacios de tours destacados estan ocupados. Puedes unirte a la lista de espera y te notificaremos cuando se libere un espacio.</p>
                           </>
                         ) : featuredModal.error}
+                    </div>
+                  )}
+
+                  {/* Cupón de descuento colapsable */}
+                  {!featuredModal.activeSlot && featuredModal.selectedPlanId && !(featuredModal.error?.includes('max') || featuredModal.error?.includes('50')) && (
+                    <div className="mb-4">
+                      <button
+                        type="button"
+                        onClick={() => setFeaturedModal(prev => ({ ...prev, couponExpanded: !prev.couponExpanded }))}
+                        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                      >
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${featuredModal.couponExpanded ? 'rotate-180' : ''}`} />
+                        {featuredModal.couponApplied ? (
+                          <span className="text-green-600 font-medium">Codigo aplicado: -{featuredModal.couponCode}</span>
+                        ) : (
+                          '¿Tienes un codigo de descuento?'
+                        )}
+                      </button>
+                      {featuredModal.couponExpanded && (
+                        <div className="mt-2">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="Ingresa tu codigo"
+                              value={featuredModal.couponCode}
+                              onChange={e => setFeaturedModal(prev => ({ ...prev, couponCode: e.target.value.toUpperCase(), couponApplied: false, couponDiscount: 0, couponError: '' }))}
+                              onKeyDown={e => { if (e.key === 'Enter') handleValidateCoupon(); }}
+                              className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 uppercase tracking-wider"
+                              disabled={featuredModal.couponApplied}
+                            />
+                            {featuredModal.couponApplied ? (
+                              <button
+                                onClick={() => setFeaturedModal(prev => ({ ...prev, couponCode: '', couponApplied: false, couponDiscount: 0, couponError: '', couponType: '' }))}
+                                className="px-3 py-2 border border-gray-200 text-gray-500 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+                              >
+                                Quitar
+                              </button>
+                            ) : (
+                              <button
+                                onClick={handleValidateCoupon}
+                                disabled={!featuredModal.couponCode.trim() || featuredModal.couponIsValidating}
+                                className="px-4 py-2 bg-gray-800 text-white rounded-xl text-sm font-semibold disabled:opacity-40 hover:bg-gray-700 transition-colors"
+                              >
+                                {featuredModal.couponIsValidating ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Aplicar'}
+                              </button>
+                            )}
+                          </div>
+                          {featuredModal.couponError && (
+                            <p className="mt-2 text-xs text-red-600">{featuredModal.couponError}</p>
+                          )}
+                          {featuredModal.couponApplied && featuredModal.couponDiscount > 0 && (
+                            <div className="mt-2 flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                              <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                              <span>Descuento de <strong>${featuredModal.couponDiscount.toLocaleString('es-MX')} MXN</strong> aplicado</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
