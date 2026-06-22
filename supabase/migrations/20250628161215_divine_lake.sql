@@ -1,19 +1,3 @@
-/*
-  # Funciones para Gestión de Pagos
-
-  1. Nuevas Funciones
-    - update_booking_payment_status: Actualiza el estado de pago de una reserva
-    - get_booking_payment_details: Obtiene detalles de pago de una reserva
-    - calculate_payment_breakdown: Calcula el desglose de pagos para un tour
-
-  2. Seguridad
-    - Funciones con SECURITY DEFINER para operaciones críticas
-    - Validaciones para evitar actualizaciones no autorizadas
-
-  3. Cambios
-    - Mejoras en el sistema de pagos para mayor seguridad y trazabilidad
-*/
-
 -- Función para actualizar el estado de pago de una reserva
 CREATE OR REPLACE FUNCTION update_booking_payment_status(
   p_booking_id uuid,
