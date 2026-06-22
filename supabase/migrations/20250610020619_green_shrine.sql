@@ -1,21 +1,3 @@
-/*
-  # Sistema de almacenamiento de imágenes en Base64
-
-  1. Cambios en la tabla destinations
-    - Agregar campo main_image_base64 para imagen principal en base64
-    - Mantener main_image_url como respaldo
-
-  2. Cambios en destination_images
-    - Agregar campo image_base64 para almacenar imagen en base64
-    - Mantener image_url como respaldo
-    - Agregar campo image_size para control de tamaño
-    - Agregar campo image_type para tipo MIME
-
-  3. Nuevas funciones
-    - Validación de tamaño de imagen
-    - Conversión automática entre URL y base64
-*/
-
 -- Agregar campos base64 a la tabla destinations
 ALTER TABLE destinations 
 ADD COLUMN IF NOT EXISTS main_image_base64 text,
