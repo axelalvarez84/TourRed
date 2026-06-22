@@ -1,17 +1,3 @@
-/*
-  # Create notification RPC functions
-
-  1. Functions Created
-    - `get_unread_notifications_count()` - Returns count of unread notifications for current user
-    - `get_user_notifications()` - Returns paginated user notifications with expiration check
-    - `mark_notification_as_read()` - Marks a specific notification as read
-    - `mark_all_notifications_as_read()` - Marks all user notifications as read
-
-  2. Security
-    - All functions use SECURITY DEFINER to access data with elevated privileges
-    - Functions validate user authentication via auth.uid()
-    - Row-level security is respected through user_id checks
-*/
 
 -- Function to get unread notifications count for current user
 CREATE OR REPLACE FUNCTION public.get_unread_notifications_count()
