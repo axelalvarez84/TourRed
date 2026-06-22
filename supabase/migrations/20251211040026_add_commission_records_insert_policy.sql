@@ -1,14 +1,3 @@
-/*
-  # Add INSERT policy for commission_records
-
-  1. Changes
-    - Add policy to allow inserting commission records when payment succeeds
-    - This is needed for the automatic trigger that creates commission records
-    
-  2. Security
-    - Uses SECURITY DEFINER on the trigger function to bypass RLS
-    - This allows the trigger to insert records even when called by regular users
-*/
 
 -- Make the trigger function SECURITY DEFINER so it can bypass RLS
 CREATE OR REPLACE FUNCTION create_commission_record()
