@@ -1,11 +1,3 @@
-/*
-  # Agregar campo booking_deadline a tours
-
-  1. Cambios
-    - Agregar campo booking_deadline (fecha límite de reserva)
-    - Asegurar que todos los campos necesarios existen
-*/
-
 -- Agregar campo booking_deadline si no existe
 DO $$
 BEGIN
