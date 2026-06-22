@@ -1,15 +1,3 @@
-/*
-  # Fix destination_images table schema
-
-  1. Changes
-    - Make `image_url` column nullable in `destination_images` table
-    - This allows storing images as either base64 data OR URLs, not requiring both
-
-  2. Security
-    - No changes to RLS policies needed
-    - Maintains existing security model
-*/
-
 -- Make image_url nullable to allow base64-only images
 ALTER TABLE destination_images 
 ALTER COLUMN image_url DROP NOT NULL;
