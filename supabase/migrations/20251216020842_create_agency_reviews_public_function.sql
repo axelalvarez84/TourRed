@@ -1,15 +1,3 @@
-/*
-  # Create Function to Get Agency Reviews with User Info
-
-  1. Changes
-    - Create a SECURITY DEFINER function that bypasses RLS for reading public reviews
-    - Returns agency reviews with traveler information
-    
-  2. Security
-    - Function only returns visible reviews
-    - Only exposes basic user information (first_name, last_name)
-    - Accessible to everyone
-*/
 
 -- Drop existing view if it exists
 DROP VIEW IF EXISTS agency_reviews_with_users;
