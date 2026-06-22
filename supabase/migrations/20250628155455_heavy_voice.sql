@@ -1,21 +1,3 @@
-/*
-  # Add image columns to destinations table
-
-  1. New Columns
-    - `main_image_base64` (text) - Base64 encoded main image data
-    - `main_image_type` (text) - MIME type of the main image
-    - `main_image_size` (integer) - Size of the main image in bytes
-
-  2. Security
-    - Add trigger to validate image size for new columns
-    - Ensure existing RLS policies cover new columns
-
-  3. Notes
-    - These columns support storing images directly in the database as base64
-    - Maximum recommended size is 5MB per image
-    - Columns are nullable to maintain backward compatibility
-*/
-
 -- Add the missing image columns to destinations table
 DO $$
 BEGIN
