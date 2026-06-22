@@ -1,16 +1,3 @@
-/*
-  # Fix destinations RLS policies for admin access
-
-  1. Security Updates
-    - Add policy for admins to insert destinations
-    - Add policy for admins to update destinations
-    - Maintain existing agency and public read policies
-
-  2. Changes
-    - Allow admins to create new destinations
-    - Allow admins to update existing destinations
-    - Verify admin role through users table lookup
-*/
 
 -- Add policy for admins to insert destinations
 CREATE POLICY "Admins can insert destinations"
