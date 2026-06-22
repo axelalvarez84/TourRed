@@ -1,22 +1,3 @@
-/*
-  # Add Platform Fee Settings
-
-  1. New Tables
-    - `platform_settings`
-      - `id` (uuid, primary key) - single row table
-      - `service_charge_percentage` (decimal) - Platform service charge percentage (default 5%)
-      - `agency_commission_percentage` (decimal) - Agency commission percentage (default 15%)
-      - `updated_at` (timestamptz) - Last update timestamp
-      - `updated_by` (uuid) - Admin who last updated settings
-
-  2. Security
-    - Enable RLS on `platform_settings` table
-    - Allow all users to read settings (needed for booking calculations)
-    - Only admins can update settings
-
-  3. Initial Data
-    - Insert default settings with service charge at 5% and agency commission at 15%
-*/
 
 -- Create platform_settings table
 CREATE TABLE IF NOT EXISTS public.platform_settings (
