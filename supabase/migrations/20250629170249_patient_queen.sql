@@ -1,16 +1,3 @@
-/*
-  # Add fiscal and banking information to agencies table
-
-  1. New Columns
-    - `rfc` - Registro Federal de Contribuyentes
-    - `razon_social` - Legal business name
-    - `regimen_fiscal` - Tax regime code
-    - `domicilio_fiscal` - Tax address
-    - `banco` - Bank name
-    - `cuenta_clabe` - Bank account number (CLABE)
-    - `titular_cuenta` - Account holder name
-*/
-
 -- Add fiscal information columns to agencies table
 ALTER TABLE agencies ADD COLUMN IF NOT EXISTS rfc text;
 ALTER TABLE agencies ADD COLUMN IF NOT EXISTS razon_social text;
