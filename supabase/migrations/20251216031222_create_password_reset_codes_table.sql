@@ -1,25 +1,4 @@
-/*
-  # Create Password Reset Codes Table
 
-  1. New Tables
-    - `password_reset_codes`
-      - `id` (uuid, primary key)
-      - `user_id` (uuid, references users)
-      - `email` (text)
-      - `code` (text, 6-digit code)
-      - `expires_at` (timestamptz, expires in 15 minutes)
-      - `used` (boolean, default false)
-      - `created_at` (timestamptz)
-      
-  2. Security
-    - Enable RLS on `password_reset_codes` table
-    - No public access to this table
-    - Only edge functions can insert/update
-    
-  3. Indexes
-    - Index on user_id for faster lookups
-    - Index on code for verification
-*/
 
 CREATE TABLE IF NOT EXISTS password_reset_codes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
