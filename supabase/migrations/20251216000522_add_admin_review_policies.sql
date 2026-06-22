@@ -1,19 +1,3 @@
-/*
-  # Agregar políticas de administrador para reseñas
-
-  1. Cambios en tablas
-    - Agregar campo `is_visible` a `agency_reviews` y `traveler_reviews` para control de visibilidad
-    - Agregar campo `reply` a `agency_reviews` para permitir respuestas
-
-  2. Políticas RLS para administradores
-    - Permitir a los administradores ver TODAS las reseñas de todas las tablas
-    - Permitir a los administradores actualizar cualquier reseña (ocultar/mostrar, responder)
-    - Permitir a los administradores eliminar cualquier reseña
-  
-  3. Notas
-    - Los administradores pueden moderar todo el contenido de reseñas
-    - El campo is_visible permite ocultar reseñas inapropiadas sin eliminarlas
-*/
 
 -- Agregar campos is_visible y reply a agency_reviews
 ALTER TABLE agency_reviews 
