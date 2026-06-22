@@ -1,13 +1,3 @@
-/*
-  # Add confirmation email sent field to bookings
-  
-  1. Changes
-    - Add `confirmation_email_sent` boolean field to track if confirmation emails were sent
-    - Defaults to false
-  
-  2. Purpose
-    - Prevents duplicate email sends for the same booking
-*/
 
 DO $$
 BEGIN
