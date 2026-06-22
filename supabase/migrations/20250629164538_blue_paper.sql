@@ -1,15 +1,3 @@
-/*
-  # Fix Notifications Functions
-
-  1. Changes
-     - Adds missing function for handling booking approval notifications
-     - Fixes the get_user_notifications function to properly return notifications
-     - Adds a function to get user conversations
-
-  2. Security
-     - All functions are security definer to ensure proper access control
-*/
-
 -- Create function to handle booking approval notifications
 CREATE OR REPLACE FUNCTION handle_booking_approval_notification()
 RETURNS TRIGGER
