@@ -1,25 +1,3 @@
-/*
-  # Sistema de aprobación de reservas
-
-  1. Nuevas columnas en tours
-    - `booking_approval_type` (enum: 'automatic', 'manual')
-    - `approval_required` (boolean, por compatibilidad)
-
-  2. Nuevas columnas en bookings
-    - `approval_status` (enum: 'pending', 'approved', 'rejected')
-    - `approval_notes` (text, opcional)
-    - `approved_at` (timestamp)
-    - `approved_by` (uuid, referencia al usuario que aprobó)
-
-  3. Nueva tabla notifications
-    - Para notificaciones en la plataforma
-    - Incluye tipos específicos para reservas pendientes
-
-  4. Funciones y triggers
-    - Función para crear notificaciones automáticamente
-    - Trigger para notificar cuando hay reservas pendientes
-*/
-
 -- Crear enum para tipo de aprobación de reservas
 CREATE TYPE booking_approval_type AS ENUM ('automatic', 'manual');
 
