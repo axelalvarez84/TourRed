@@ -1,19 +1,3 @@
-/*
-  # Fix conversation policies and function
-
-  1. Policy Updates
-    - Simplify message_participants RLS policies to avoid infinite recursion
-    - Fix ambiguous column references in policies
-  
-  2. Function Updates
-    - Fix create_conversation_with_participants function to resolve ambiguous column references
-    - Add proper table aliases and qualifications
-
-  3. Security
-    - Maintain proper access control while avoiding recursion
-    - Ensure users can only access conversations they participate in
-*/
-
 -- Drop existing problematic policies
 DROP POLICY IF EXISTS "Users can view participants in their conversations" ON message_participants;
 DROP POLICY IF EXISTS "Users can join conversations" ON message_participants;
