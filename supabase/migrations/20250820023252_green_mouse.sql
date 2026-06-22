@@ -1,16 +1,3 @@
-/*
-  # Add commission rate configuration for agencies
-
-  1. Schema Changes
-    - Add `commission_rate` column to agencies table
-    - Set default commission rate to 10% (0.10)
-    - Add constraint to ensure commission rate is between 0% and 50%
-
-  2. Security
-    - Only admins can modify commission rates
-    - Agencies can view their own commission rate
-*/
-
 -- Add commission rate column to agencies table
 DO $$
 BEGIN
