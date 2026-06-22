@@ -1,26 +1,3 @@
-/*
-  # Initial Schema Setup for TravelHub
-
-  1. New Tables
-    - users (extends Supabase auth)
-      - profile information for all users
-    - agencies
-      - agency profiles and details
-    - tours
-      - tour listings and information
-    - bookings
-      - tour booking records
-    - reviews
-      - tour and agency reviews
-
-  2. Security
-    - Enable RLS on all tables
-    - Add policies for appropriate access control
-
-  3. Changes
-    - Initial schema creation
-*/
-
 -- Users table to extend auth.users
 create table if not exists public.users (
   id uuid primary key references auth.users(id) on delete cascade,
