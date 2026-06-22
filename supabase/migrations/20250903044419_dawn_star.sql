@@ -1,13 +1,3 @@
-/*
-  # Fix destination images RLS policy for admin access
-
-  1. Security Updates
-    - Add policy to allow admins to insert destination images
-    - Ensure admins can manage all destination images operations
-
-  This fixes the 403 error when admins try to add images to destinations.
-*/
-
 -- Add policy to allow admins to insert destination images
 CREATE POLICY "Admins can insert destination images"
   ON destination_images
