@@ -1,15 +1,3 @@
-/*
-  # Fix image validation function for destinations
-
-  1. Updates
-    - Fix validate_image_size() function to use correct field names for destinations table
-    - The function should check main_image_base64 and main_image_size for destinations
-    - The function should check image_base64 and image_size for destination_images
-
-  2. Security
-    - No changes to RLS policies
-*/
-
 -- Drop and recreate the validate_image_size function to handle both tables correctly
 CREATE OR REPLACE FUNCTION validate_image_size()
 RETURNS TRIGGER AS $$
