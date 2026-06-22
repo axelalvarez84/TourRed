@@ -1,20 +1,3 @@
-/*
-  # Fix Destination Image Fields
-
-  1. New Changes
-    - Ensure all image-related columns exist in the destinations table
-    - Fix the validate_image_size function to handle NULL values properly
-    - Recreate triggers with proper error handling
-
-  2. Security
-    - Maintain existing RLS policies
-    - No changes to access control
-
-  3. Changes
-    - Add missing columns if they don't exist
-    - Improve error handling in validation function
-*/
-
 -- Ensure all image-related columns exist in the destinations table
 ALTER TABLE destinations 
 ADD COLUMN IF NOT EXISTS main_image_base64 text,
