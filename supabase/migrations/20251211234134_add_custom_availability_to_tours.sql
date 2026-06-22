@@ -1,18 +1,3 @@
-/*
-  # Agregar disponibilidad personalizada a tours
-
-  1. Cambios
-    - Agregar campo `available_spots` a la tabla `tours`
-      - Campo opcional (nullable) de tipo integer
-      - Permite a las agencias controlar manualmente cuántos lugares están disponibles
-      - Si no está configurado, se usa `max_travelers` como antes
-      - Si está configurado, prevalece sobre `max_travelers` para la disponibilidad real
-
-  2. Notas
-    - Este campo es independiente de `max_travelers`
-    - Útil cuando la agencia tiene restricciones adicionales (hoteles, transporte, etc.)
-    - La agencia puede ajustarlo en cualquier momento desde su panel
-*/
 
 -- Agregar campo available_spots a tours
 DO $$
