@@ -1,15 +1,3 @@
-/*
-  # Cambiar categoría de tours a array para permitir múltiples categorías
-
-  1. Cambios en la tabla `tours`
-    - Cambia el campo `category` de text a text[] (array de texto)
-    - Migra los datos existentes convirtiendo el valor único en un array de un elemento
-    - Actualiza el constraint para permitir arrays
-  
-  2. Notas
-    - Los tours existentes mantendrán su categoría actual pero en formato de array
-    - Ahora se pueden seleccionar múltiples categorías por tour
-*/
 
 -- Primero, crear una nueva columna temporal con el tipo array
 ALTER TABLE tours ADD COLUMN IF NOT EXISTS categories_temp text[];
