@@ -1,12 +1,3 @@
-/*
-  # Vista unificada de todas las reseñas
-  
-  Crea una vista que combina reviews, agency_reviews y traveler_reviews
-  con toda la información relacionada (usuario, agencia, tour, etc.)
-  
-  Esta vista simplifica las consultas del panel admin y asegura
-  que todos los datos necesarios estén disponibles en una sola query.
-*/
 
 -- Eliminar vista si existe
 DROP VIEW IF EXISTS admin_reviews_view;
