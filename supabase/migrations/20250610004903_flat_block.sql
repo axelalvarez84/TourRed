@@ -1,19 +1,3 @@
-/*
-  # Sistema de Gestión de Destinos
-
-  1. Nuevas Tablas
-    - Actualizar tabla `destinations` con campos adicionales
-    - Crear tabla `destination_images` para múltiples imágenes por destino
-
-  2. Seguridad
-    - Políticas RLS para permitir que todas las agencias editen destinos
-    - Políticas para gestión de imágenes
-
-  3. Cambios
-    - Agregar descripción, imagen principal y metadatos a destinos
-    - Sistema de imágenes múltiples por destino
-*/
-
 -- Actualizar tabla destinations con campos adicionales
 ALTER TABLE destinations 
 ADD COLUMN IF NOT EXISTS description text,
