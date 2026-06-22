@@ -1,14 +1,3 @@
-/*
-  # Add RNT field to agencies table
-
-  1. Changes
-    - Add `rnt` column to agencies table for Registro Nacional de Turismo
-    - This field is optional as not all agencies have RNT registration
-
-  2. Security
-    - No changes to existing RLS policies needed
-    - Field follows same access patterns as other agency fields
-*/
 
 DO $$
 BEGIN
