@@ -1,15 +1,3 @@
-/*
-  # Create View for Agency Reviews with User Info
-
-  1. Changes
-    - Create a view that joins agency_reviews with user information
-    - This simplifies querying and avoids RLS complexity with joins
-    
-  2. Security
-    - View only shows visible reviews
-    - Only exposes basic user information (first_name, last_name)
-    - Accessible to everyone (public)
-*/
 
 -- Create view for agency reviews with user information
 CREATE OR REPLACE VIEW agency_reviews_with_users AS
