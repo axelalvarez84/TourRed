@@ -1,22 +1,3 @@
-/*
-  # Sistema de Mensajería Interna
-
-  1. Nuevas Tablas
-    - conversations: Conversaciones entre usuarios
-    - message_participants: Participantes en conversaciones
-    - messages: Mensajes individuales
-
-  2. Seguridad
-    - Políticas RLS para control de acceso
-    - Solo participantes pueden ver conversaciones
-    - Admins pueden ver todas las conversaciones
-
-  3. Funciones
-    - Crear conversaciones con participantes
-    - Marcar mensajes como leídos
-    - Obtener conversaciones del usuario
-*/
-
 -- Tabla de conversaciones
 CREATE TABLE IF NOT EXISTS conversations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
