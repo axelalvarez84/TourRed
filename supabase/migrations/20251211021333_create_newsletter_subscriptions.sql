@@ -1,23 +1,3 @@
-/*
-  # Create newsletter subscriptions table
-
-  1. New Tables
-    - `newsletter_subscriptions`
-      - `id` (uuid, primary key) - Unique identifier for each subscription
-      - `email` (text, unique, not null) - Subscriber email address
-      - `subscribed_at` (timestamptz, default now()) - When they subscribed
-      - `active` (boolean, default true) - Whether subscription is active
-      - `ip_address` (text) - Optional IP address for tracking
-      - `user_agent` (text) - Optional user agent for tracking
-
-  2. Security
-    - Enable RLS on `newsletter_subscriptions` table
-    - Add policy for public to insert their own subscription
-    - Add policy for authenticated admins to view all subscriptions
-
-  3. Indexes
-    - Add unique index on email for fast lookups and duplicate prevention
-*/
 
 CREATE TABLE IF NOT EXISTS newsletter_subscriptions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
