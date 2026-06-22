@@ -1,21 +1,3 @@
-/*
-  # Agregar campos de verificación de correo electrónico
-
-  1. Cambios en la tabla `users`
-    - `email_verified` (boolean): Indica si el correo ha sido verificado
-    - `verification_code` (text): Código de verificación de un solo uso
-    - `verification_code_expires_at` (timestamptz): Fecha de expiración del código (24 horas)
-    - `verification_code_attempts` (integer): Contador de intentos fallidos (máximo 5)
-
-  2. Valores por defecto
-    - `email_verified` por defecto es `false`
-    - `verification_code_attempts` por defecto es `0`
-
-  3. Seguridad
-    - Los códigos expiran en 24 horas
-    - Máximo 5 intentos de verificación
-    - El código se elimina después de la verificación exitosa
-*/
 
 -- Agregar campos de verificación de email a la tabla users
 DO $$
