@@ -1,17 +1,3 @@
-/*
-  # Fix messaging system policies
-
-  1. Security Updates
-    - Drop and recreate all messaging-related policies to ensure consistency
-    - Simplify policy logic to avoid conflicts
-    - Separate admin policies from user policies
-
-  2. Changes
-    - Clean up existing policies completely before creating new ones
-    - Create simplified policies for message_participants, conversations, and messages
-    - Add proper admin access policies
-*/
-
 -- First, drop ALL existing policies for messaging tables to start clean
 DO $$ 
 DECLARE
