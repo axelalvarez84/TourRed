@@ -1,20 +1,3 @@
-/*
-  # Sistema de Actualización Automática de Calificación de Agencias
-
-  1. Nueva Función
-    - `update_agency_rating()` - Calcula y actualiza el rating promedio de una agencia basado en todas sus reseñas
-    - Se ejecuta automáticamente cuando se crea, actualiza o elimina una reseña de agencia
-  
-  2. Triggers
-    - `update_agency_rating_on_review_insert` - Se dispara al insertar una nueva reseña
-    - `update_agency_rating_on_review_update` - Se dispara al actualizar una reseña existente
-    - `update_agency_rating_on_review_delete` - Se dispara al eliminar una reseña
-  
-  3. Lógica
-    - Calcula el promedio de todas las calificaciones (rating) de la agencia
-    - Actualiza el campo `rating` en la tabla `agencies`
-    - Si no hay reseñas, establece el rating en 0
-*/
 
 -- Función para calcular y actualizar el rating de una agencia
 CREATE OR REPLACE FUNCTION update_agency_rating(agency_uuid uuid)
