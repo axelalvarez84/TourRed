@@ -1,26 +1,3 @@
-/*
-# Fix Messaging and Notification Functions
-
-1. New Functions
-   - `create_user_notification`: Creates notifications for users
-   - `get_user_notifications`: Retrieves notifications for the current user
-   - `mark_notification_as_read`: Marks a notification as read
-   - `mark_all_notifications_as_read`: Marks all notifications as read
-   - `get_unread_notifications_count`: Counts unread notifications
-   - `get_user_conversations`: Gets conversations for the current user
-   - `create_conversation_with_participants`: Creates a new conversation
-   - `mark_messages_as_read`: Marks messages in a conversation as read
-   - `update_booking_payment_status`: Updates booking payment status
-
-2. Trigger Functions
-   - `handle_booking_approval_notification`: Handles booking approval notifications
-   - `update_conversation_last_message`: Updates conversation timestamp
-   - `mark_message_edited`: Marks messages as edited when updated
-
-3. Triggers
-   - Ensures all necessary triggers are created or updated
-*/
-
 -- Primero eliminamos los triggers que dependen de las funciones
 DROP TRIGGER IF EXISTS update_conversation_last_message_trigger ON messages;
 DROP TRIGGER IF EXISTS mark_message_edited_trigger ON messages;
