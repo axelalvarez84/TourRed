@@ -1,18 +1,3 @@
-/*
-  # Agregar funcionalidad de eliminación de destinos para administradores
-
-  1. Nuevas funciones
-    - delete_destination: Función para eliminar destinos (solo administradores)
-    - Verificación de que no haya tours asociados antes de eliminar
-
-  2. Seguridad
-    - Solo usuarios con rol 'admin' pueden eliminar destinos
-    - Verificación de integridad referencial antes de eliminar
-
-  3. Políticas
-    - Política DELETE para administradores en la tabla destinations
-*/
-
 -- Función para eliminar destinos (solo administradores)
 CREATE OR REPLACE FUNCTION delete_destination(destination_uuid uuid)
 RETURNS TABLE(
