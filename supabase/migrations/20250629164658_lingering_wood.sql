@@ -1,18 +1,3 @@
-/*
-  # Fix Notification and Messaging Functions
-
-  1. New Functions
-    - `handle_booking_approval_notification` - Trigger function for booking approval notifications
-    - `get_user_conversations` - Function to get user's conversations
-    - `create_conversation_with_participants` - Function to create a conversation with participants
-    - `mark_messages_as_read` - Function to mark messages as read
-    - `update_conversation_last_message` - Trigger function to update conversation last message timestamp
-    - `mark_message_edited` - Trigger function to mark message as edited
-
-  2. Fixed Functions
-    - `get_user_notifications` - Fixed to return proper table structure
-*/
-
 -- Drop the existing function first to change its return type
 DROP FUNCTION IF EXISTS get_user_notifications(integer, integer, boolean);
 
