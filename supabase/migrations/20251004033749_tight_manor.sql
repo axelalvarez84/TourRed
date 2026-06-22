@@ -1,19 +1,3 @@
-/*
-  # Add CURP/Passport field to users table
-
-  1. New Columns
-    - `curp` (text, unique) - CURP for Mexican citizens
-    - `passport_number` (text, unique) - Passport number for foreign travelers
-    - `is_foreign_traveler` (boolean) - Flag to indicate if user is foreign
-
-  2. Constraints
-    - Either CURP or passport_number must be provided (not both)
-    - CURP is unique across all users
-    - Passport number is unique across all users
-
-  3. Security
-    - Maintain existing RLS policies
-*/
 
 -- Add new columns to users table
 DO $$
