@@ -1,10 +1,3 @@
-/*
-  # Fix RLS Policies for Message System
-
-  This migration fixes the infinite recursion issue in the message system RLS policies
-  by simplifying the policy logic and removing circular dependencies.
-*/
-
 -- Drop ALL existing policies for message_participants
 DROP POLICY IF EXISTS "Users can view participants in their conversations" ON message_participants;
 DROP POLICY IF EXISTS "Users can join conversations" ON message_participants;
