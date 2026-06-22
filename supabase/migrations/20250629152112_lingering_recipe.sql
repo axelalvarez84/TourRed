@@ -1,14 +1,3 @@
-/*
-  # Corrección de políticas de notificaciones
-
-  1. Cambios
-    - Elimina políticas existentes antes de crearlas nuevamente
-    - Usa bloques DO para verificar la existencia de objetos antes de crearlos
-    - Mantiene la misma funcionalidad que la migración original
-  2. Seguridad
-    - Mantiene las mismas políticas RLS para proteger los datos
-*/
-
 -- Eliminar políticas existentes antes de recrearlas
 DO $$ 
 BEGIN
