@@ -1,19 +1,3 @@
-/*
-  # Sistema de Pagos y Comisiones
-
-  1. Cambios en la tabla bookings
-    - Agregar campos para el sistema de pagos
-    - Campos para comisiones y cargos por servicio
-    - ID del payment intent de Stripe
-
-  2. Nuevas tablas
-    - payment_transactions para registro detallado de pagos
-    - commission_records para tracking de comisiones
-
-  3. Seguridad
-    - Políticas RLS apropiadas para datos financieros
-*/
-
 -- Agregar campos de pago a la tabla bookings
 ALTER TABLE bookings 
 ADD COLUMN IF NOT EXISTS service_charge decimal(10,2) DEFAULT 0 CHECK (service_charge >= 0),
