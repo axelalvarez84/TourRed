@@ -1,13 +1,3 @@
-/*
-  # Fix function signatures
-
-  1. Changes
-    - Drop and recreate get_user_notifications with new return type
-    - Drop and recreate create_conversation_with_participants with parameter defaults
-    - Add handle_booking_approval_notification function
-    - Add messaging-related functions
-*/
-
 -- Drop the existing functions first to change their signatures
 DROP FUNCTION IF EXISTS get_user_notifications(integer, integer, boolean);
 DROP FUNCTION IF EXISTS create_conversation_with_participants(text, text, uuid, uuid, uuid[]);
