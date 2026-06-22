@@ -222,16 +222,16 @@ CREATE OR REPLACE FUNCTION get_unread_notifications_count()
 RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   unread_count integer;
 BEGIN
   SELECT COUNT(*)::integer INTO unread_count
   FROM notifications
-  WHERE user_id = auth.uid() 
+  WHERE user_id = auth.uid()
     AND is_read = false
     AND (expires_at IS NULL OR expires_at > now());
-    
   RETURN unread_count;
 END;
 $$;
