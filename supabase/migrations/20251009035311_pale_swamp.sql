@@ -1,19 +1,3 @@
-/*
-  # Add identification fields to users table
-
-  1. New Columns
-    - `curp` (text, nullable) - CURP for Mexican travelers
-    - `passport_number` (text, nullable) - Passport number for foreign travelers  
-    - `is_foreign_traveler` (boolean, default false) - Flag to identify traveler type
-
-  2. Constraints
-    - Unique constraint on curp (when not null)
-    - Unique constraint on passport_number (when not null)
-    - Check constraint to ensure only one identification method is used
-
-  3. Security
-    - RLS policies already exist for users table
-</sql>
 
 -- Add new columns to users table
 ALTER TABLE users 
