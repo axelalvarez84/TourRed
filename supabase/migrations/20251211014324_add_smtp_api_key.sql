@@ -1,13 +1,3 @@
-/*
-  # Add SMTP API Key Field
-
-  1. Changes
-    - Add `smtp_api_key` column to `email_settings` table
-    - Update default value with provided SMTP2GO API key
-    
-  2. Notes
-    - This field will store the SMTP2GO API key for sending emails via their REST API
-*/
 
 -- Add smtp_api_key column if it doesn't exist
 DO $$
