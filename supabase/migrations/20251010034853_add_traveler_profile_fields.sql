@@ -1,25 +1,3 @@
-/*
-  # Add Traveler Profile Fields
-
-  ## Summary
-  Adds additional profile fields for travelers: date of birth and address.
-  
-  ## Changes Made
-  
-  ### New Columns in `users` table:
-  1. **date_of_birth** (date, nullable)
-     - Traveler's date of birth
-     - Used for age verification and travel documentation
-  
-  2. **address** (text, nullable)
-     - Full physical address of the traveler
-     - Required for travel documentation and emergency contact
-  
-  ## Notes
-  - These fields complement the existing identification fields (CURP/passport, phone)
-  - All fields will be displayed and editable in the traveler profile page
-*/
-
 -- Add date of birth and address fields to users table
 DO $$
 BEGIN
