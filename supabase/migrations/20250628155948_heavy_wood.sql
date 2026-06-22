@@ -1,16 +1,3 @@
-/*
-  # Fix destination image columns and validation
-
-  1. Changes
-    - Ensure all required columns exist in the destinations table
-    - Fix the image validation function to handle NULL values properly
-    - Add proper triggers for validation
-
-  2. Security
-    - Maintain existing RLS policies
-    - Ensure proper validation of image sizes
-*/
-
 -- Add the missing image columns to destinations table if they don't exist
 ALTER TABLE destinations 
 ADD COLUMN IF NOT EXISTS main_image_base64 text,
