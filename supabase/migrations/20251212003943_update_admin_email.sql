@@ -1,13 +1,3 @@
-/*
-  # Update Admin Email Address
-
-  1. Changes
-    - Update admin email from tourredmx@gmail.com to admin@toursred.com
-    - Update both users table and auth.users table
-    
-  2. Notes
-    - This migration updates the admin email address in both tables to maintain consistency
-*/
 
 -- Update email in users table
 UPDATE users 
