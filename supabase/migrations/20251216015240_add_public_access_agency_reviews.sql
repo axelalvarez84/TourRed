@@ -1,14 +1,3 @@
-/*
-  # Add Public Access to Agency Reviews
-
-  1. Changes
-    - Add policy to allow anonymous (non-authenticated) users to view agency reviews
-    - Add policy to allow anonymous users to view basic user info for reviewers
-    
-  2. Security
-    - Only visible reviews are accessible
-    - Only basic user information (first_name, last_name) is exposed
-*/
 
 -- Allow anyone (including non-authenticated users) to view visible agency reviews
 DROP POLICY IF EXISTS "Anyone can view agency reviews" ON agency_reviews;
