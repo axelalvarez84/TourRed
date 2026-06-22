@@ -1,15 +1,3 @@
-/*
-  # Fix Destination Image Columns
-
-  1. Changes
-    - Add missing image columns to destinations table
-    - Fix validation trigger for image size
-    - Ensure proper comments on columns
-
-  This migration fixes the "record new has no field image_base64" error
-  by ensuring all required columns exist in the destinations table.
-*/
-
 -- Add the missing image columns to destinations table if they don't exist
 ALTER TABLE destinations 
 ADD COLUMN IF NOT EXISTS main_image_base64 text,
