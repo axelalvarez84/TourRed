@@ -1,25 +1,3 @@
-/*
-  # Email Configuration Settings
-
-  1. New Tables
-    - `email_settings`
-      - `id` (uuid, primary key) - Unique identifier
-      - `contact_email` (text) - Email address to receive contact form messages
-      - `smtp_host` (text) - SMTP server host
-      - `smtp_port` (integer) - SMTP server port
-      - `smtp_user` (text) - SMTP username
-      - `smtp_password` (text) - SMTP password (encrypted)
-      - `updated_at` (timestamptz) - Last update timestamp
-      - `updated_by` (uuid) - User who last updated settings
-
-  2. Security
-    - Enable RLS on `email_settings` table
-    - Only admins can read email settings
-    - Only admins can update email settings
-    
-  3. Initial Data
-    - Insert default configuration with provided SMTP settings
-*/
 
 -- Create email_settings table
 CREATE TABLE IF NOT EXISTS email_settings (
