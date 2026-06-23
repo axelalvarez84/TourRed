@@ -1,16 +1,3 @@
-/*
-  # Fix get_tour_availability function with SECURITY DEFINER
-
-  1. Changes
-    - Make function SECURITY DEFINER to bypass RLS policies
-    - Add search_path for security
-    - Ensure all users see the same availability regardless of RLS policies
-  
-  2. Security
-    - Function now counts ALL bookings regardless of who calls it
-    - Prevents inconsistent availability numbers between users
-    - Maintains data integrity for booking system
-*/
 
 DROP FUNCTION IF EXISTS get_tour_availability(uuid);
 
