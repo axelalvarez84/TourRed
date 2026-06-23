@@ -1,10 +1,3 @@
-/*
-  # Corregir process_expired_slot_reschedules para leer credenciales de email_settings
-
-  - URL del proyecto: hardcodeada (valor conocido y publico)
-  - Service key: leida de email_settings.internal_service_key
-  - Si no hay service key configurado, los emails se omiten sin fallar
-*/
 
 CREATE OR REPLACE FUNCTION public.process_expired_slot_reschedules()
 RETURNS jsonb
