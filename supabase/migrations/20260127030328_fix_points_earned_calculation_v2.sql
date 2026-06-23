@@ -1,15 +1,3 @@
-/*
-  # Fix Points Earned Calculation
-  
-  ## Changes
-  - Drop and recreate award_points_for_booking to calculate points based on actual amount paid
-  - Award 1 point per peso paid (not per peso of total price)
-  - Only award points on the amount actually paid via Stripe/card
-  
-  ## Rationale
-  - Users should earn points on what they actually spend
-  - 1 peso = 1 point (not 1 peso = 100 points)
-*/
 
 -- Drop the old function
 DROP FUNCTION IF EXISTS award_points_for_booking(uuid, uuid, numeric, integer, numeric);
