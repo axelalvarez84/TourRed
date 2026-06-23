@@ -77,7 +77,7 @@ $$;
 REVOKE ALL ON FUNCTION get_garbage_bookings(int) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION get_garbage_bookings(int) TO authenticated;
 
--- ── Actualizar RLS policy DELETE ────────────────────────────────────────────
+-- Actualizar RLS policy DELETE
 
 DROP POLICY IF EXISTS "Admins can delete unpaid bookings" ON bookings;
 
