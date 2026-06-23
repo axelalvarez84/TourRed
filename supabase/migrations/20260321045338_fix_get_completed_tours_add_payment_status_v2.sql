@@ -1,25 +1,3 @@
-/*
-  # Corregir funcion get_completed_tours_with_commission_status
-
-  ## Problema
-  La funcion retornaba ready_for_payout = true para tours cuyas comisiones
-  ya fueron procesadas (status = 'processed'), lo que causaba que el boton
-  "Procesar Pago" siguiera apareciendo aunque el pago ya se hubiera realizado.
-
-  ## Cambios
-  - Nuevo campo `payment_status` en el resultado:
-      'no_commissions'  -> sin registros de comision
-      'pending'         -> hay comisiones pendientes de pago
-      'processed'       -> todas las comisiones ya fueron procesadas (pagadas)
-      'partial'         -> mezcla de pendientes y procesadas
-  - `ready_for_payout` ahora solo es true si hay comisiones en estado 'pending'
-    Y han pasado 3+ dias desde que termino el tour
-  - `total_commission_pending` sigue siendo la suma de comisiones 'pending'
-  - `total_commission_processed` nuevo campo con la suma de comisiones ya pagadas
-
-  ## Nota
-  Se hace DROP + CREATE porque se agrega un nuevo campo al tipo de retorno.
-*/
 
 DROP FUNCTION IF EXISTS public.get_completed_tours_with_commission_status();
 
