@@ -1,14 +1,3 @@
-/*
-  # Fix Discount Code Validation for Gift Cards
-
-  1. Changes
-    - Create overloaded version of validate_discount_code that doesn't require user_id
-    - This allows anonymous users to validate discount codes when purchasing gift cards
-    
-  2. Security
-    - Function uses SECURITY DEFINER with explicit search_path
-    - Skips user-specific checks when user_id is NULL
-*/
 
 -- Overloaded function to validate discount code without user_id (for anonymous purchases)
 CREATE OR REPLACE FUNCTION validate_discount_code(
