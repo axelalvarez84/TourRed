@@ -1,21 +1,3 @@
-/*
-  # Fix: Use Agencies Table for Agency Name
-
-  1. Problem
-    - Function tries to get `agency_name` from `users` table
-    - The `users` table doesn't have an `agency_name` column
-    - Agency info is stored in the `agencies` table
-
-  2. Solution
-    - JOIN with `agencies` table instead of just `users`
-    - Get agency name from `agencies.name`
-    - Ensure we have all necessary info
-
-  3. Changes
-    - Update function to JOIN with agencies table
-    - Get name from agencies.name
-*/
-
 -- Drop and recreate the function with correct table joins
 DROP FUNCTION IF EXISTS search_tours_by_departure_radius(double precision, double precision, double precision, text[], text, numeric, numeric, integer);
 
