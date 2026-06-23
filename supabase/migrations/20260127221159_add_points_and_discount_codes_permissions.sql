@@ -1,15 +1,3 @@
-/*
-  # Add permissions for points and discount codes management
-
-  1. Changes
-    - Add `can_manage_points` column to `admin_permissions` table
-    - Add `can_manage_discount_codes` column to `admin_permissions` table
-    - These permissions allow admins to manage ToursRed points and discount codes
-    
-  2. Security
-    - Default value is false (no access by default)
-    - Super admins will have access regardless of these permissions
-*/
 
 -- Add can_manage_points column
 DO $$
