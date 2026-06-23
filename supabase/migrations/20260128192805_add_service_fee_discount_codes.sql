@@ -1,18 +1,3 @@
-/*
-  # Add Service Fee Discount Codes Support
-
-  1. Changes
-    - Extend discount_type CHECK constraint to include service fee discount types:
-      - service_fee_percentage: Percentage discount on service fee
-      - service_fee_fixed: Fixed amount discount on service fee
-      - service_fee_full: 100% discount on service fee (free service fee)
-    - Extend applicable_to CHECK constraint to include 'service_fees'
-    - Add max_discount_amount column to limit maximum discount for percentage-based codes
-    - Add indexes for efficient filtering by applicable_to
-
-  2. Security
-    - RLS policies remain unchanged (admin-only access via existing policies)
-*/
 
 -- Drop existing CHECK constraints
 ALTER TABLE discount_codes DROP CONSTRAINT IF EXISTS discount_codes_discount_type_check;
