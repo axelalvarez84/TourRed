@@ -1,18 +1,3 @@
-/*
-  # Corregir políticas RLS de subida CFDI ejecutivos
-
-  ## Problemas corregidos
-
-  1. Storage policy "Executives can upload own CFDI files":
-     left(name, 16) comparaba 16 chars pero 'executive-cfdi/' tiene 15.
-     Se corrige usando starts_with() que es más robusto.
-
-  2. executive_commissions UPDATE:
-     WITH CHECK exigía status = 'invoiced' lo que bloqueaba cualquier
-     re-intento si la fila ya estaba en invoiced (USING exige pending).
-     Se simplifica: USING permite pending o invoiced (re-subida), 
-     WITH CHECK solo verifica propiedad.
-*/
 
 -- Storage: corregir prefix check (15 chars, no 16)
 DROP POLICY IF EXISTS "Executives can upload own CFDI files" ON storage.objects;
