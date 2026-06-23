@@ -1,22 +1,3 @@
-/*
-  # Create unified validate_tour_discount_code function
-
-  1. Functions
-    - `validate_tour_discount_code(p_code, p_user_id, p_tour_id)` - Unified validation for all tour discount codes
-      - Handles platform codes (admin-created, applicable_to = 'tours')
-      - Handles agency codes (agency-created, agency_tour_percentage/agency_tour_fixed)
-      - Handles platform codes scoped to specific agency or tour
-      - Returns validation result with discount details including discount_applies_to and max_discount_amount
-
-  2. Validation Logic
-    - Code exists and is active
-    - Within valid date range
-    - Not exceeded max_uses
-    - User hasn't used it before
-    - Code is applicable to tours
-    - If code has agency_id: tour must belong to that agency
-    - If code has tour_id: must match the booking tour
-*/
 
 CREATE OR REPLACE FUNCTION validate_tour_discount_code(
   p_code text,
