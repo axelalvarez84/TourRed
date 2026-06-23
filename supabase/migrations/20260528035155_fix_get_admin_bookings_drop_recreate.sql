@@ -1,9 +1,3 @@
-/*
-  # Fix get_admin_bookings: drop y recrear con tipos exactos
-
-  Se elimina la funcion anterior y se recrea con los tipos exactos de cada columna,
-  usando casts explicitos para enums, varchar y tipos especiales.
-*/
 
 DROP FUNCTION IF EXISTS get_admin_bookings();
 
