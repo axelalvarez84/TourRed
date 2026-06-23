@@ -1,15 +1,3 @@
-/*
-  # Corregir funciones de mensajería para usar columnas correctas
-
-  1. Cambios
-    - Cambiar c.topic a c.title (la columna correcta)
-    - Mantener toda la lógica de seguridad
-    - Admins pueden ver todas las conversaciones
-    - Usuarios normales solo ven sus conversaciones
-
-  2. Seguridad
-    - Mantiene todas las verificaciones de seguridad existentes
-*/
 
 -- Eliminar funciones existentes
 DROP FUNCTION IF EXISTS _get_user_conversations_internal(uuid);
