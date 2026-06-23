@@ -1,16 +1,3 @@
-/*
-  # Sistema de reset mensual del beneficio de membresía
-
-  1. Cambios
-    - Agregar campo `exemption_period_start` para rastrear el inicio del período mensual actual
-    - Crear función para resetear automáticamente el contador cada mes
-    - Crear trigger para ejecutar el reset al consultar membresías activas
-    
-  2. Propósito
-    - Resetear automáticamente `service_fee_exemption_used` cada mes
-    - Mantener el rastreo del período mensual actual
-*/
-
 -- Agregar campo para rastrear el inicio del período mensual
 DO $$ 
 BEGIN
