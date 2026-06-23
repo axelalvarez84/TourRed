@@ -1,24 +1,3 @@
-/*
-  # Fix Points Earned on ToursRed Cash Payments
-  
-  ## Problem
-  When users pay with ToursRed Cash, they should earn points on that amount.
-  Currently the calculation was subtracting the points value from toursred_cash_used,
-  but this is incorrect because:
-  - toursred_cash_used should only contain the actual ToursRed Cash amount
-  - Points earned should be based on ToursRed Cash spent (not Stripe payments)
-  
-  ## Fix
-  Update award_points_for_booking to award points based on ToursRed Cash spent:
-  - Points are earned on money from the ToursRed Cash wallet
-  - Points are NOT earned on points used (you can't earn points by spending points)
-  - Stripe payments should not be included since they're handled by the webhook
-  
-  ## Example
-  - User pays with 1042 points ($10.42) + $354.16 ToursRed Cash = $375 total
-  - Should earn: 354 points (based on $354.16 ToursRed Cash)
-  - Should NOT earn points on: points used or Stripe payment
-*/
 
 DROP FUNCTION IF EXISTS award_points_for_booking(uuid, uuid, numeric, integer, numeric);
 
