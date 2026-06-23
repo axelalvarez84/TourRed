@@ -1,13 +1,3 @@
-/*
-  # Crear bucket para comprobantes de pago
-
-  1. Nuevo Bucket
-    - payment-receipts: almacena comprobantes de pago subidos por admin
-
-  2. Seguridad
-    - Solo admin puede subir archivos
-    - Admin y agencias pueden ver sus propios comprobantes
-*/
 
 -- Crear bucket para comprobantes de pago si no existe
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
