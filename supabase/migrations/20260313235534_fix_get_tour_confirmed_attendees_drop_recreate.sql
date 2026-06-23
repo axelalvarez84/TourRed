@@ -1,11 +1,3 @@
-/*
-  # Fix get_tour_confirmed_attendees function - drop and recreate
-
-  The function declared selected_date as text but the bookings column is date type.
-  This type mismatch caused the function to fail silently returning 0 results.
-
-  Fix: drop and recreate with correct date type.
-*/
 
 DROP FUNCTION IF EXISTS public.get_tour_confirmed_attendees(uuid, uuid);
 
