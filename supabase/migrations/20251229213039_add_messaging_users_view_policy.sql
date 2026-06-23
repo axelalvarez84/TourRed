@@ -1,14 +1,3 @@
-/*
-  # Agregar política para ver usuarios en conversaciones
-
-  1. Cambios
-    - Permitir a los participantes de una conversación ver información básica de otros participantes
-    - Esto permite que el JOIN sender:users funcione en las queries de mensajes
-
-  2. Seguridad
-    - Solo permite ver usuarios que están en las mismas conversaciones
-    - Mantiene la privacidad entre usuarios que no tienen conversaciones
-*/
 
 CREATE POLICY "Users can view other participants in their conversations"
   ON users FOR SELECT
