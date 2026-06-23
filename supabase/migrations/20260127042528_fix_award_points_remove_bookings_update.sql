@@ -1,15 +1,3 @@
-/*
-  # Fix Award Points Function - Remove Bookings Update
-  
-  ## Problem
-  The trigger `trigger_auto_award_points_on_completion` runs BEFORE UPDATE on bookings
-  and calls `award_points_for_booking`, which also updates the bookings table,
-  causing a "tuple to be updated was already modified" error.
-  
-  ## Solution
-  Drop and recreate `award_points_for_booking` WITHOUT the UPDATE bookings statement.
-  The trigger itself sets NEW.points_earned, so no additional update is needed.
-*/
 
 -- Drop the existing function
 DROP FUNCTION IF EXISTS award_points_for_booking(uuid, uuid, numeric, integer, numeric);
