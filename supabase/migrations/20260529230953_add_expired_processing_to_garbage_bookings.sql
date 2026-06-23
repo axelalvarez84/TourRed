@@ -1,23 +1,3 @@
-/*
-  # Extender depuración de reservas basura: incluir pagos en proceso expirados
-
-  ## Cambios
-
-  ### Función get_garbage_bookings()
-  - Se agrega un tercer tipo de reserva basura: `expired_processing`
-  - Criterio: `payment_status = 'processing'` con cualquier método de pago (excepto
-    Transferencia Bancaria, que ya tiene su propio tipo) y con más de 3 días de antigüedad
-  - Razonamiento: OXXO expira en 72 horas; cualquier otro pago en proceso que lleve
-    más de 3 días sin resolverse es un pago fantasma
-  - El umbral de 3 días para `expired_processing` es FIJO (no usa el parámetro configurable)
-  - El parámetro `threshold_days` sigue aplicando a los tipos `abandoned` y
-    `unconfirmed_transfer` (payment_status = pending o transferencia bancaria)
-
-  ### RLS policy DELETE
-  - Se amplía para permitir eliminar reservas con `payment_status = 'processing'`
-    cuando tienen más de 3 días de antigüedad (independiente del método de pago)
-*/
-
 -- ── Reemplazar función ──────────────────────────────────────────────────────
 
 DROP FUNCTION IF EXISTS get_garbage_bookings(integer);
