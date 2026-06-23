@@ -1,16 +1,3 @@
-/*
-  # Crear función para obtener mensajes con información completa
-
-  1. Nueva función
-    - `get_conversation_messages(conversation_id)`: Obtiene mensajes con información del remitente
-    - Usa SECURITY DEFINER para bypassear RLS de manera segura
-    - Solo retorna información de conversaciones donde el usuario es participante
-
-  2. Seguridad
-    - Verifica que el usuario sea participante de la conversación
-    - Solo expone información necesaria para mostrar mensajes
-    - No permite acceso a conversaciones ajenas
-*/
 
 CREATE OR REPLACE FUNCTION get_conversation_messages(p_conversation_id uuid)
 RETURNS TABLE (
