@@ -1,19 +1,3 @@
-/*
-  # Función get_account_balances_full
-
-  1. Nueva función
-    - `get_account_balances_full(p_year, p_month)` — Retorna para cada cuenta activa:
-      - `period_balance`: saldo neto del mes/año indicado (solo ese período)
-      - `historic_balance`: saldo neto acumulado histórico (todos los períodos confirmados hasta el cierre del mes indicado)
-    - Aplica naturaleza deudora/acreedora: deudora = débito - crédito, acreedora = crédito - débito
-    - Solo incluye cuentas activas con movimientos (balance != 0 se muestra, las con 0 también para el catálogo)
-    - Política de seguridad: SECURITY DEFINER para admin y accountant
-
-  2. Notas
-    - El saldo del período solo acumula polizas donde period_year = p_year AND period_month = p_month
-    - El saldo histórico acumula TODAS las polizas confirmadas (is_posted = true) hasta ese punto
-    - Ambos calculados desde accounting_entry_lines via accounting_entries (is_posted = true)
-*/
 
 CREATE OR REPLACE FUNCTION get_account_balances_full(
   p_year integer,
