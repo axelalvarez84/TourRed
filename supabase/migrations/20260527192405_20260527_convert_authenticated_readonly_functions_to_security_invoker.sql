@@ -1,3 +1,9 @@
+-- Drops preventivos para funciones que cambian return type
+DROP FUNCTION IF EXISTS public._get_user_conversations_internal(uuid);
+DROP FUNCTION IF EXISTS public.get_account_balances_full(integer, integer);
+DROP FUNCTION IF EXISTS public.get_user_conversations();
+DROP FUNCTION IF EXISTS public.get_user_notifications(integer, integer, boolean);
+DROP FUNCTION IF EXISTS public.get_trial_balance(integer, integer);
 
 -- _get_user_conversations_internal: internal helper, should not be directly callable via REST
 CREATE OR REPLACE FUNCTION public._get_user_conversations_internal(p_user_id uuid)
