@@ -1,16 +1,3 @@
-/*
-  # Add indexes for foreign keys
-
-  1. Performance Improvements
-    - Add indexes for all unindexed foreign keys to improve query performance
-    - Includes indexes for agencies, bookings, commission_records, destination_images, 
-      destinations, email_settings, payment_transactions, platform_settings, reviews, 
-      saved_tours, tour_destinations, and tours tables
-  
-  2. Security Notes
-    - Indexes improve performance without affecting RLS policies
-    - No data changes, only index creation
-*/
 
 -- Agencies table
 CREATE INDEX IF NOT EXISTS idx_agencies_user_id ON public.agencies(user_id);
