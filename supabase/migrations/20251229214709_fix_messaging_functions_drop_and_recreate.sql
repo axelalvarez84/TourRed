@@ -1,15 +1,3 @@
-/*
-  # Corregir funciones de mensajería eliminando duplicados
-
-  1. Cambios
-    - Eliminar todas las versiones de get_user_conversations con todas sus firmas posibles
-    - Crear una única versión limpia que funcione para todos los usuarios
-    - Los admins ven todas las conversaciones, los demás solo las suyas
-
-  2. Seguridad
-    - Mantiene restricciones para usuarios no-admin
-    - Administradores tienen acceso completo
-*/
 
 -- Eliminar todas las versiones posibles de la función
 DROP FUNCTION IF EXISTS get_user_conversations();
