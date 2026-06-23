@@ -1,21 +1,3 @@
-/*
-  # Función generate_and_notify_platform_commissions
-
-  ## Descripción
-  Reemplaza el flujo manual del admin: en lugar de solo calcular (calculate)
-  y luego insertar por separado, esta función hace ambas cosas en un solo paso
-  y además envía un email consolidado a cada ejecutivo con el resumen del mes.
-
-  ## Comportamiento
-  1. Llama a calculate_executive_platform_commissions(p_month, p_year)
-  2. Inserta los registros nuevos (saltando los que ya_exists = true)
-  3. Agrupa por ejecutivo y construye un payload consolidado con todas sus agencias
-  4. Envía UN solo email por ejecutivo via notify_executive_by_email (pg_net)
-  5. Retorna el número de comisiones insertadas
-
-  ## Uso desde el admin
-  SELECT generate_and_notify_platform_commissions(6, 2026);
-*/
 
 CREATE OR REPLACE FUNCTION generate_and_notify_platform_commissions(
   p_month INTEGER,
