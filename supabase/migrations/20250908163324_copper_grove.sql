@@ -1,1 +1,1 @@
-(Content omitted)
+-- Migration placeholder: copper_grove
