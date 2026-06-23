@@ -1,38 +1,3 @@
-/*
-  # Multi-Provider Payment Support
-
-  ## Summary
-  Adds infrastructure to support multiple payment providers (Stripe, MercadoPago, PayPal)
-  across bookings, gift cards, and platform settings.
-
-  ## Changes
-
-  ### Modified Tables
-  - `bookings`: Added `payment_provider` column (stripe | mercadopago | paypal)
-  - `gift_cards`: Added `payment_provider` column
-  - `platform_settings`: Added provider enable/disable flags and credential fields
-
-  ## New Columns
-
-  ### bookings.payment_provider
-  - Tracks which payment provider was used for each booking
-  - Defaults to 'stripe' for backward compatibility
-
-  ### gift_cards.payment_provider
-  - Tracks which payment provider was used to purchase the gift card
-  - Defaults to 'stripe' for backward compatibility
-
-  ### platform_settings
-  - `mercadopago_enabled`: Whether MercadoPago is enabled for bookings and gift cards
-  - `paypal_enabled`: Whether PayPal is enabled for bookings and gift cards
-  - `mercadopago_public_key`: MercadoPago public key (non-sensitive, stored in DB for frontend)
-  - `paypal_client_id`: PayPal client ID (non-sensitive, stored in DB for frontend)
-
-  ## Security Notes
-  - Sensitive credentials (secret keys) are stored as Supabase Edge Function secrets, not in DB
-  - Only non-sensitive public identifiers are stored in platform_settings
-  - RLS policies remain unchanged; payment_provider is just metadata
-*/
 
 DO $$
 BEGIN
