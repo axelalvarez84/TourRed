@@ -1,14 +1,3 @@
-/*
-  # Finalize Financial Management Tables Setup
-
-  ## Overview
-  Final setup for financial management system - adds missing columns and creates indexes only for existing columns
-
-  ## Changes
-  - Add missing columns to all tables
-  - Create indexes for existing columns only
-  - Create helper functions and triggers
-*/
 
 -- Add missing columns to agency_payouts
 DO $$
