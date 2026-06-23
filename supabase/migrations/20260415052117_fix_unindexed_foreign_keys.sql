@@ -1,20 +1,3 @@
-/*
-  # Add Missing Foreign Key Indexes
-
-  ## Summary
-  Creates covering indexes for all foreign key columns that lack them.
-  This improves query performance for JOIN operations and cascading deletes.
-
-  ## Tables affected
-  - admin_broadcast_messages, agency_payouts, agency_tour_message_recipients
-  - agency_tour_messages, booking_cancellations, booking_checkin_tokens
-  - booking_partial_cancellations, booking_reschedule_responses, bookings
-  - cfdi_cancellation_requests, discount_code_usage, discount_codes
-  - financial_transactions, payout_batches, referral_bonuses
-  - referral_fraud_logs, referral_relationships, slot_reschedule_requests
-  - slot_seat_status, tour_cancellations, tour_promotions
-  - tour_reschedules, tour_schedules, tours
-*/
 
 CREATE INDEX IF NOT EXISTS idx_admin_broadcast_messages_sent_by ON public.admin_broadcast_messages(sent_by);
 CREATE INDEX IF NOT EXISTS idx_agency_payouts_processed_by ON public.agency_payouts(processed_by);
