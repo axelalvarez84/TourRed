@@ -1,17 +1,3 @@
-/*
-  # Fix mutable search_path in functions
-
-  ## Summary
-  Functions without a fixed search_path are vulnerable to search_path injection attacks.
-  Adding SET search_path = public, pg_catalog to each function locks down the schema
-  resolution and prevents malicious schema overriding.
-
-  ## Functions fixed
-  - generate_random_alphanumeric
-  - generate_unique_booking_code
-  - normalize_text
-  - update_tour_categories_updated_at
-*/
 
 CREATE OR REPLACE FUNCTION public.generate_random_alphanumeric(length integer)
 RETURNS text
