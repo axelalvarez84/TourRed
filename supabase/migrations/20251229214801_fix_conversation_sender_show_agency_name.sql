@@ -1,15 +1,3 @@
-/*
-  # Separar funciones de conversaciones para evitar ambigüedad
-
-  1. Cambios
-    - Crear función interna _get_user_conversations_internal con parámetro
-    - Crear función pública get_user_conversations() sin parámetros para usuarios
-    - Esto evita la ambigüedad en PostgreSQL al llamar desde el cliente
-
-  2. Seguridad
-    - Mantiene todas las verificaciones de seguridad
-    - Admins pueden ver todas las conversaciones
-*/
 
 -- Eliminar la función existente
 DROP FUNCTION IF EXISTS get_user_conversations(uuid);
