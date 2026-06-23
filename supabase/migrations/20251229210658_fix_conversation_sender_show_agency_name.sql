@@ -1,15 +1,4 @@
-/*
-  # Actualizar función get_user_conversations para mostrar nombre de agencia
 
-  1. Cambios
-    - Modificar la subconsulta que obtiene el nombre del remitente
-    - Cuando el remitente es una agencia, mostrar el nombre de la agencia en lugar del nombre de usuario
-    - Mantener el comportamiento anterior para otros roles
-
-  2. Seguridad
-    - Mantener SECURITY DEFINER y search_path
-    - Solo devuelve información de conversaciones donde el usuario es participante
-*/
 
 CREATE OR REPLACE FUNCTION public.get_user_conversations()
 RETURNS TABLE (
