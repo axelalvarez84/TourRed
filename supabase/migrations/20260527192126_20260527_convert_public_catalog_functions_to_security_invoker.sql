@@ -1,20 +1,3 @@
-/*
-  # Convert public catalog functions to SECURITY INVOKER
-
-  ## Problem
-  22 SECURITY DEFINER functions accessible by anon role were flagged by the security auditor.
-  These functions only read from tables with RLS enabled, so SECURITY DEFINER is unnecessary.
-
-  ## Solution
-  Recreate these functions as SECURITY INVOKER. Since they only read public catalog data
-  (tours, promotions, availability, etc.) and all referenced tables have RLS,
-  the functions work correctly under the caller's security context.
-
-  ## Note on increment_geocoding_cache_usage
-  This function does an UPDATE on geocoding_cache. It can be SECURITY INVOKER because
-  the geocoding_cache table has an RLS policy allowing authenticated updates,
-  and anon only needs SELECT on that table. We remove anon EXECUTE for this one.
-*/
 
 -- 1. calculate_preventa_precio
 CREATE OR REPLACE FUNCTION public.calculate_preventa_precio(
