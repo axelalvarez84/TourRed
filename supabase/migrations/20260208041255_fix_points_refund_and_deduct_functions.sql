@@ -1,19 +1,3 @@
-/*
-  # Fix points refund and deduct functions
-
-  ## Issue
-  When cancelling a booking with points, the system throws error:
-  "new row for relation "toursred_points_wallets" violates check constraint toursred_points_wallets_total_used_check"
-
-  ## Root Causes
-  1. `deduct_points_for_booking` function references non-existent column `total_redeemed` instead of `total_used`
-  2. `refund_points_for_cancelled_booking` function doesn't decrement `total_used` when refunding points
-
-  ## Changes
-  - Fix `deduct_points_for_booking` to use `total_used` instead of `total_redeemed`
-  - Fix `refund_points_for_cancelled_booking` to decrement `total_used` when refunding
-  - Ensure both functions maintain wallet integrity
-*/
 
 -- Fix deduct_points_for_booking to use correct column name
 CREATE OR REPLACE FUNCTION deduct_points_for_booking(
