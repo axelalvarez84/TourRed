@@ -1,13 +1,3 @@
-/*
-  # Corregir función get_conversation_messages
-
-  1. Cambios
-    - Eliminar columna read_at que no existe en la tabla messages
-    - La función ahora solo retorna columnas que existen
-
-  2. Seguridad
-    - Mantiene todas las verificaciones de seguridad existentes
-*/
 
 DROP FUNCTION IF EXISTS get_conversation_messages(uuid);
 
