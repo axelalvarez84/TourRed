@@ -1,24 +1,3 @@
-/*
-  # Fix Points Accumulation Formula
-  
-  ## Problem
-  Points were being multiplied by 100, causing users to earn 100x more points than they should.
-  Example: Pay 375 MXN → Got 37,500 points (WRONG)
-  
-  ## Correct Logic
-  - Earning: 1 peso pagado = 1 punto ganado
-  - Using: 100 puntos = 1 peso de descuento
-  
-  ## Fix
-  Change formula from:
-    v_points_to_award := FLOOR(p_amount_to_pay * 100)::integer;
-  To:
-    v_points_to_award := FLOOR(p_amount_to_pay)::integer;
-  
-  ## Example
-  - User pays 375 MXN → Earns 375 points
-  - User has 375 points → Can use for 3.75 MXN discount (375/100)
-*/
 
 -- Drop and recreate function with correct formula
 DROP FUNCTION IF EXISTS award_points_for_booking(uuid, uuid, numeric);
