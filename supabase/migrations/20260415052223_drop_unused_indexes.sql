@@ -1,16 +1,3 @@
-/*
-  # Drop Unused Indexes
-
-  ## Summary
-  Removes all indexes that have not been used according to Supabase advisor.
-  Unused indexes waste storage space and slow down write operations (INSERT/UPDATE/DELETE)
-  without providing any query performance benefit.
-
-  ## Note
-  These indexes will be recreated by the database if query patterns change and
-  they become necessary. The foreign key indexes that were flagged are being
-  replaced by the new targeted indexes created in the previous migration.
-*/
 
 DROP INDEX IF EXISTS public.idx_booking_partial_cancellations_booking_id;
 DROP INDEX IF EXISTS public.idx_booking_partial_cancellations_user_id;
