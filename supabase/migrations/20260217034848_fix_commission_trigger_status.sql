@@ -1,14 +1,3 @@
-/*
-  # Fix commission record trigger to use correct status
-
-  1. Changes
-    - Update create_commission_record() function to set status='pending' instead of 'processed'
-    - Fix get_agency_financial_summary() to correctly calculate pending_payouts
-    
-  2. Notes
-    - This fixes the bug where commissions were auto-created with wrong status
-    - Commissions should start as 'pending' and only become 'processed' after admin pays them
-*/
 
 -- Corregir el trigger para crear comisiones con status 'pending'
 CREATE OR REPLACE FUNCTION create_commission_record()
