@@ -1,17 +1,3 @@
-/*
-  # Cron automático para eliminar reservas basura (no pagadas en 72 horas)
-
-  ## Qué hace
-  Crea una función `auto_cleanup_garbage_bookings()` que elimina de forma automática:
-  - Reservas con payment_status = 'pending' que llevan más de 3 días sin pago
-  - Reservas con payment_status = 'processing' + Transferencia Bancaria sin confirmar > 3 días
-  - Reservas con payment_status = 'processing' + otro método expirado > 3 días
-
-  Registra un resumen en booking_cleanup_logs con razón 'auto_cron'.
-
-  El cron corre diariamente a la 01:00 UTC (aprox 7pm o 8pm hora México).
-*/
-
 -- ── Función de limpieza automática ─────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION auto_cleanup_garbage_bookings()
