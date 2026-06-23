@@ -1,21 +1,3 @@
-/*
-  # Indices FK faltantes — segunda pasada
-
-  ## Cambios
-  Cubre las 5 FK que quedaron sin indice tras la migration anterior:
-
-  1. agency_payouts.agency_id — FK a agencies (la query anterior detecto
-     que idx_agency_payouts_processed_by existe pero no uno para agency_id)
-
-  2. cookie_consents.user_id — FK a auth.users
-  3. email_settings.updated_by — FK a auth.users
-  4. platform_settings.updated_by — FK a auth.users
-  5. terms_versions.published_by_user_id — FK a auth.users
-
-  Los indices sobre columnas que referencian auth.users son igual de
-  importantes para el planner, ya que mejoran JOINs y validaciones RLS.
-*/
-
 -- agency_payouts
 CREATE INDEX IF NOT EXISTS idx_agency_payouts_agency_id
   ON public.agency_payouts (agency_id);
