@@ -1,27 +1,3 @@
-/*
-  # Fix Points Earned - Subtract Points Value from Calculation
-  
-  ## Issue
-  When users pay with points, those points were being deducted but the points earned calculation
-  wasn't accounting for the peso value of points used. This caused users to earn points on money
-  they didn't actually spend.
-  
-  ## Fix
-  Update award_points_for_booking to also subtract the peso value of points used:
-  - points_used are in points (100 points = 1 peso)
-  - So we need to divide points_used by 100 to get the peso value
-  - Then subtract both toursred_cash_used AND the peso value of points from user_payment
-  
-  ## Example
-  - User pays 375 pesos total
-  - Uses 674 points (= 6.74 pesos)
-  - user_payment = 375
-  - toursred_cash_used = 0
-  - points_used = 674
-  
-  Before fix: earned 375 points (375 - 0)
-  After fix: earns 368 points (375 - 0 - 6.74)
-*/
 
 DROP FUNCTION IF EXISTS award_points_for_booking(uuid, uuid, numeric, integer, numeric);
 
