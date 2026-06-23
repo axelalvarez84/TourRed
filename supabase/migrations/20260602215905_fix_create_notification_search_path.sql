@@ -1,12 +1,3 @@
-/*
-  # Fix create_notification search path
-
-  The create_notification function has SET search_path TO '' (empty),
-  which causes "relation notifications does not exist" because the INSERT
-  cannot resolve the table without the public schema in the path.
-
-  Fix: qualify the table name with public schema explicitly.
-*/
 
 CREATE OR REPLACE FUNCTION public.create_notification(
   p_user_id uuid,
