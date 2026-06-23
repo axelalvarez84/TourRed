@@ -1,19 +1,3 @@
-/*
-  # Codigos de descuento para seguro de viajero
-
-  1. Cambios en discount_codes
-     - Nuevos discount_type: insurance_percentage, insurance_fixed, insurance_free
-     - Nuevo applicable_to: insurance
-
-  2. Cambios en bookings
-     - insurance_discount_code_id: referencia al codigo de seguro aplicado
-     - insurance_discount_amount: monto descontado del seguro
-
-  3. Nueva funcion SQL
-     - validate_insurance_discount_code: valida un codigo de descuento de seguro
-       siguiendo la misma logica que validate_tour_discount_code
-*/
-
 -- Ampliar CHECK constraint de discount_type
 ALTER TABLE public.discount_codes
   DROP CONSTRAINT IF EXISTS discount_codes_discount_type_check;
