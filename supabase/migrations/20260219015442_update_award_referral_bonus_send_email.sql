@@ -1,11 +1,3 @@
-/*
-  # Update Award Referral Bonus Function to Send Email
-
-  1. Changes
-    - Modify the award_referral_bonus function to call the email edge function
-    - Send email to referrer when referral completes first booking
-    - Include all necessary information in the email
-*/
 
 CREATE OR REPLACE FUNCTION public.award_referral_bonus(p_booking_id uuid)
 RETURNS void
