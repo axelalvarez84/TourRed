@@ -1,3 +1,11 @@
+-- Drops preventivos al inicio de blue_paper.sql
+DROP FUNCTION IF EXISTS get_user_notifications(integer, integer, boolean);
+DROP FUNCTION IF EXISTS create_conversation_with_participants(text, text, uuid, uuid, uuid[]);
+DROP FUNCTION IF EXISTS get_user_conversations();
+DROP FUNCTION IF EXISTS mark_messages_as_read(uuid);
+DROP FUNCTION IF EXISTS update_conversation_last_message();
+DROP FUNCTION IF EXISTS mark_message_edited();
+
 -- Create function to handle booking approval notifications
 CREATE OR REPLACE FUNCTION handle_booking_approval_notification()
 RETURNS TRIGGER
