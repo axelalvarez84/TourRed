@@ -1,21 +1,3 @@
-/*
-  # Fix get_staff_with_permissions: support multi-agency coordinators
-
-  ## Summary
-  Removes the LIMIT 1 from the get_staff_with_permissions function so it returns
-  ALL active agency links for a given user (one row per agency). This enables
-  coordinators to be linked to multiple agencies simultaneously.
-
-  ## Changes
-  - Drops and recreates get_staff_with_permissions without the LIMIT 1 clause
-  - All other columns and logic remain identical
-  - The function continues to filter WHERE is_active = true
-
-  ## Impact
-  - A coordinator linked to Agency A and Agency B will now get 2 rows
-  - The frontend AuthContext will build an array of AgencyStaffInfo objects
-  - The user can then switch between agencies via the new agency switcher in NavBar
-*/
 
 DROP FUNCTION IF EXISTS public.get_staff_with_permissions(uuid);
 
