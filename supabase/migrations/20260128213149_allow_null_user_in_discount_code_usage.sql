@@ -1,15 +1,3 @@
-/*
-  # Allow NULL user_id in discount_code_usage
-
-  1. Changes
-    - Make user_id nullable in discount_code_usage table
-    - This allows anonymous users (gift card purchases) to use discount codes
-    - Update the unique constraint to handle NULL user_id
-    
-  2. Security
-    - Maintains referential integrity
-    - Anonymous usage is tracked by gift_card_id
-*/
 
 -- Drop the existing unique constraint
 ALTER TABLE public.discount_code_usage 
