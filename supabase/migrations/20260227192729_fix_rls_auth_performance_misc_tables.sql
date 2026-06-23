@@ -35,27 +35,35 @@ CREATE POLICY "Agency can delete optional services for own tours"
   ));
 
 -- integration_configs
-DROP POLICY IF EXISTS "Admins can view all integration configs" ON public.integration_configs;
-CREATE POLICY "Admins can view all integration configs"
-  ON public.integration_configs FOR SELECT
-  TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public.users
-    WHERE id = (SELECT auth.uid()) AND role IN ('admin','super_admin')
-  ));
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_schema = 'public' AND table_name = 'integration_configs'
+  ) THEN
+    DROP POLICY IF EXISTS "Admins can view all integration configs" ON public.integration_configs;
+    CREATE POLICY "Admins can view all integration configs"
+      ON public.integration_configs FOR SELECT
+      TO authenticated
+      USING (EXISTS (
+        SELECT 1 FROM public.users
+        WHERE id = (SELECT auth.uid()) AND role IN ('admin','super_admin')
+      ));
 
-DROP POLICY IF EXISTS "Admins can manage integration configs" ON public.integration_configs;
-CREATE POLICY "Admins can manage integration configs"
-  ON public.integration_configs FOR ALL
-  TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public.users
-    WHERE id = (SELECT auth.uid()) AND role IN ('admin','super_admin')
-  ))
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM public.users
-    WHERE id = (SELECT auth.uid()) AND role IN ('admin','super_admin')
-  ));
+    DROP POLICY IF EXISTS "Admins can manage integration configs" ON public.integration_configs;
+    CREATE POLICY "Admins can manage integration configs"
+      ON public.integration_configs FOR ALL
+      TO authenticated
+      USING (EXISTS (
+        SELECT 1 FROM public.users
+        WHERE id = (SELECT auth.uid()) AND role IN ('admin','super_admin')
+      ))
+      WITH CHECK (EXISTS (
+        SELECT 1 FROM public.users
+        WHERE id = (SELECT auth.uid()) AND role IN ('admin','super_admin')
+      ));
+  END IF;
+END $$;
 
 -- international_tour_inquiries
 DROP POLICY IF EXISTS "Admins with permission can view inquiries" ON public.international_tour_inquiries;
