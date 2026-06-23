@@ -1,31 +1,3 @@
-/*
-  # Crear funcion get_admin_bookings con SECURITY DEFINER
-
-  ## Problema raiz
-  El query de la vista admin de reservas causaba timeout porque las politicas RLS
-  de las tablas relacionadas (users, commission_records) ejecutan multiples subqueries
-  por cada fila del resultado. Con 113+ reservas y joins a 4 tablas, el costo
-  se multiplica exponencialmente hasta superar el timeout de statement.
-
-  ## Solucion
-  Funcion SECURITY DEFINER que:
-  - Ejecuta con privilegios del owner (saltando RLS de tablas relacionadas)
-  - Valida internamente que el llamador sea admin/super_admin
-  - Retorna solo los campos que la vista realmente necesita (no SELECT *)
-  - Aplana el resultado para evitar objetos anidados (mas eficiente en PostgREST)
-
-  ## Campos retornados
-  - Todos los campos de bookings necesarios para la tabla y el modal
-  - Campos de users aplanados: user_first_name, user_last_name, user_email, etc.
-  - Campos de tours aplanados: tour_name, tour_destination, etc.
-  - Campos de agencies aplanados: agency_name, agency_logo, etc.
-  - Primer commission_record por booking: cr_agency_commission_amount, etc.
-
-  ## Seguridad
-  - SECURITY DEFINER con SET search_path = public para evitar inyeccion de schema
-  - Validacion de rol admin/super_admin antes de retornar datos
-  - GRANT EXECUTE solo a authenticated
-*/
 
 CREATE OR REPLACE FUNCTION get_admin_bookings()
 RETURNS TABLE (
