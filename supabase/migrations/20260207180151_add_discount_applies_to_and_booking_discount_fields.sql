@@ -1,20 +1,3 @@
-/*
-  # Add discount_applies_to column to discount_codes and discount tracking to bookings
-
-  1. Changes to `discount_codes`
-    - Add `discount_applies_to` column (text, default 'total_price')
-      - 'total_price': Discount applies to the total tour cost, cascading to deposit, commission, and service charge
-      - 'payment_amount': Discount applies only to what the user pays (deposit + service charge)
-    - Only relevant when applicable_to = 'tours'
-
-  2. Changes to `bookings`
-    - Add `discount_code_id` (uuid, nullable, FK to discount_codes)
-    - Add `discount_amount` (numeric, default 0) - the actual discount in pesos applied
-    - Add index on discount_code_id for query performance
-
-  3. Security
-    - No new RLS policies needed (existing policies on bookings and discount_codes cover these columns)
-*/
 
 -- Add discount_applies_to column to discount_codes
 DO $$
