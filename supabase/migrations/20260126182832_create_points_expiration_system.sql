@@ -1,21 +1,3 @@
-/*
-  # Create Points Expiration System
-
-  ## Overview
-  This migration creates the automated points expiration system with daily cron job processing.
-
-  ## Functions Created
-
-  1. **process_expired_points** - Processes all expired points and updates wallets
-  2. **get_points_expiring_soon** - Gets points expiring in next 30 days for notifications
-  
-  ## Cron Jobs
-  - Daily job at midnight to process expired points
-  - Requires pg_cron extension (pre-installed in Supabase)
-
-  ## Security
-  Functions use SECURITY DEFINER for automated processing
-*/
 
 -- Enable pg_cron extension if not already enabled
 CREATE EXTENSION IF NOT EXISTS pg_cron;
