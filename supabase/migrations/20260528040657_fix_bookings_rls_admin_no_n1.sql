@@ -1,15 +1,3 @@
-/*
-  # Fix bookings RLS SELECT policy para admin
-
-  El problema: la politica actual llama a is_admin() y has_manage_travelers_permission()
-  que son funciones que hacen SELECT a users por cada fila evaluada — un N+1 masivo.
-  Con 113 reservas eso genera 226+ subconsultas adicionales causando timeouts.
-
-  Solucion: reemplazar la politica SELECT con una version que evalua la condicion
-  de admin UNA sola vez usando una subquery con (SELECT auth.uid()) que Postgres
-  puede optimizar como una constante por consulta.
-*/
-
 -- Eliminar politica SELECT existente
 DROP POLICY IF EXISTS "Users, agencies and admins can read bookings" ON bookings;
 
