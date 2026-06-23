@@ -1,20 +1,3 @@
-/*
-  # Add membership_plan_type column to discount_codes
-
-  1. New Columns
-    - `membership_plan_type` (text) - Restricts which membership plan a discount code applies to
-      - 'monthly' - Only applies to monthly plans
-      - 'annual' - Only applies to annual plans
-      - 'both' - Applies to both (default)
-
-  2. Changes
-    - Adds CHECK constraint for valid values
-    - Default is 'both' so all existing codes continue working
-    - Only relevant when applicable_to = 'memberships'
-
-  3. Security
-    - No RLS changes needed (column inherits existing table policies)
-*/
 
 DO $$
 BEGIN
