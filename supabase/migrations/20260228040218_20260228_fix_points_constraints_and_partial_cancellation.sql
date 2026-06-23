@@ -1,19 +1,3 @@
-/*
-  # Fix Points Constraints and Partial Cancellation Deduction
-
-  ## Problem
-  1. The `toursred_points_transactions` table has CHECK constraints that don't allow
-     `type = 'partial_cancellation'` or `reference_type = 'booking_partial_cancellation'`,
-     so the `deduct_points_for_partial_cancellation` function always fails silently.
-
-  2. The partial cancellation for booking TRG-ME6232SKDW2 never deducted 1,000 points.
-
-  ## Changes
-  1. Expand `type` CHECK constraint to include `partial_cancellation`
-  2. Expand `reference_type` CHECK constraint to include `booking_partial_cancellation`
-  3. Apply the missing 1,000 point deduction for the affected booking
-  4. Update `points_earned` on the booking from 3,000 to 2,000
-*/
 
 -- 1. Expand the type constraint
 ALTER TABLE toursred_points_transactions
