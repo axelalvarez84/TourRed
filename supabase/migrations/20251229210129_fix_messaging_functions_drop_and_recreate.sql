@@ -1,15 +1,3 @@
-/*
-  # Corregir funciones de mensajería eliminando y recreando
-
-  1. Cambios
-    - Eliminar funciones existentes de mensajería
-    - Recrearlas con SET search_path = public para seguridad
-    - Calificar todas las referencias a tablas con el esquema public
-
-  2. Seguridad
-    - SET search_path = public previene ataques de inyección de esquema
-    - SECURITY DEFINER permite evitar problemas con RLS
-*/
 
 -- Eliminar funciones existentes
 DROP FUNCTION IF EXISTS public.mark_messages_as_read(uuid);
