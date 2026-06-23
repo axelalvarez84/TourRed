@@ -1,15 +1,3 @@
-/*
-  # Fix get_tour_slots_by_range to exclude blackout dates
-
-  ## Problem
-  The function returns all available tour slots without checking if those
-  dates fall within a blackout period. This allows travelers to book on
-  blocked dates.
-
-  ## Solution
-  Add a NOT EXISTS subquery that filters out any slot whose date overlaps
-  with an active blackout entry in tour_slot_blackouts for the same tour.
-*/
 
 CREATE OR REPLACE FUNCTION public.get_tour_slots_by_range(
   p_tour_id uuid,
