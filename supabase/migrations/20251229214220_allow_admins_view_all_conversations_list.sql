@@ -1,14 +1,3 @@
-/*
-  # Permitir que administradores vean todas las conversaciones
-
-  1. Cambios
-    - Modificar get_user_conversations para que admins vean todas las conversaciones
-    - Los usuarios normales solo ven sus propias conversaciones
-
-  2. Seguridad
-    - Mantiene restricciones para usuarios no-admin
-    - Administradores tienen acceso completo para moderación
-*/
 
 DROP FUNCTION IF EXISTS get_user_conversations(uuid);
 
