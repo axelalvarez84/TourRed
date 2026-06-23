@@ -1,25 +1,3 @@
-/*
-  # Agregar campos configurables de política de cancelación para tours receptivos
-
-  ## Descripción
-  Agrega columnas a la tabla `tours` para que las agencias puedan configurar
-  sus propias políticas de cancelación en tours de tipo receptivo. Los tours
-  de tipo excursión continúan usando la lógica fija existente sin cambios.
-
-  ## Nuevas columnas
-  - `flexible_hours` - Umbral de horas para política flexible (ej: 48+ horas = reembolso total)
-  - `flexible_refund_percentage` - Porcentaje de reembolso en zona flexible (0-100)
-  - `moderate_hours` - Umbral de horas para política moderada (ej: 24-47 horas = reembolso parcial)
-  - `moderate_refund_percentage` - Porcentaje de reembolso en zona moderada (0-100)
-  - La zona de sin reembolso se calcula automáticamente: menos de `moderate_hours`
-
-  ## Notas importantes
-  1. Estas columnas solo aplican a tours con `tour_type = 'receptivo'`
-  2. Los tours de tipo `excursion` siguen usando la lógica fija basada en días
-  3. Se mantienen las columnas existentes `cancellation_policy`, `cancellation_hours_limit`
-     y `cancellation_refund_percentage` para compatibilidad con datos existentes
-  4. Todos los valores por defecto reflejan la política moderada estándar
-*/
 
 DO $$
 BEGIN
