@@ -1,10 +1,3 @@
-/*
-  # Agregar auto_cancelled al CHECK constraint de bookings.slot_reschedule_response
-
-  Necesario para que process_expired_slot_reschedules() pueda escribir
-  'auto_cancelled' en la columna slot_reschedule_response de bookings.
-*/
-
 ALTER TABLE bookings
   DROP CONSTRAINT IF EXISTS bookings_slot_reschedule_response_check;
 
