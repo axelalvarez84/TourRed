@@ -1,14 +1,3 @@
-/*
-  # Agregar campo apellido a acompañantes frecuentes y viajeros de reserva
-
-  ## Cambios
-  - Agrega columna `apellido` (text, nullable) a `frequent_companions`
-  - Agrega columna `apellido` (text, nullable) a `booking_travelers`
-
-  ## Notas
-  - Las columnas son nullable para no romper datos existentes
-  - El apellido se capturará ahora de forma separada al nombre en el formulario
-*/
 
 DO $$
 BEGIN
