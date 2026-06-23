@@ -1,9 +1,3 @@
-/*
-  # Agregar proveedor contable interno (Mini ERP ToursRed)
-
-  Agrega 'internal' al constraint CHECK del campo accounting_provider
-  en platform_settings para soportar el Mini ERP nativo de la plataforma.
-*/
 
 ALTER TABLE platform_settings DROP CONSTRAINT IF EXISTS platform_settings_accounting_provider_check;
 
