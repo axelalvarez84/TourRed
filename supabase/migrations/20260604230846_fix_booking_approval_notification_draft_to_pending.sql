@@ -1,12 +1,3 @@
-/*
-  Fix handle_booking_approval_notification to fire when
-  activate_draft_booking transitions status from 'draft' → 'pending'.
-
-  Root cause: bookings are created with status='draft' (trigger skips them),
-  then activate_draft_booking does UPDATE SET status='pending' — but the
-  trigger only re-fired on approval_status changes, which didn't happen.
-  Result: no in-app notification was ever inserted for manual-approval tours.
-*/
 
 CREATE OR REPLACE FUNCTION handle_booking_approval_notification()
 RETURNS trigger
