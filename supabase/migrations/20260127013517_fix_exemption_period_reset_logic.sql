@@ -1,14 +1,3 @@
-/*
-  # Corregir la lógica de reset del período de exención
-
-  1. Cambios
-    - Reinicializar el campo exemption_period_start basado en start_date de cada membresía
-    - Corregir la función de reset para que cada membresía mantenga su propio ciclo
-    
-  2. Propósito
-    - Cada membresía debe resetearse en el día del mes que corresponde a su fecha de inicio
-    - Por ejemplo: si empezó el 26 de diciembre, debe resetearse cada 26 del mes
-*/
 
 -- Primero, reinicializar exemption_period_start correctamente para cada membresía
 UPDATE memberships
