@@ -1,13 +1,3 @@
-/*
-  # Extender sistema para Service Desk
-
-  ## Cambios
-
-  1. Extender ENUM notification_type con nuevos valores de soporte
-  2. Agregar campo canManageServiceDesk a tabla admin_permissions
-  3. Crear bucket de storage support-attachments (via INSERT en storage.buckets)
-*/
-
 -- Extender el ENUM notification_type con valores de soporte
 ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'support_ticket_created';
 ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'support_ticket_updated';
