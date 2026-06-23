@@ -1,9 +1,3 @@
-/*
-  # RPC para sincronizar capacidad de slots desde el frontend
-
-  Permite que el frontend fuerce la sincronización de capacidad de slots
-  al guardar un tour, para corregir slots existentes.
-*/
 
 CREATE OR REPLACE FUNCTION public.sync_tour_slots_capacity_for_tour(p_tour_id uuid)
 RETURNS void
