@@ -1,9 +1,3 @@
-/*
-  # Ampliar generate_accounting_entries_batch para Gift Cards
-  Agrega dos loops al batch:
-  1. Gift cards vendidas sin poliza de venta
-  2. Gift cards canjeadas sin poliza de canje
-*/
 
 CREATE OR REPLACE FUNCTION generate_accounting_entries_batch(
   p_from_date date DEFAULT (CURRENT_DATE - interval '90 days')::date,
