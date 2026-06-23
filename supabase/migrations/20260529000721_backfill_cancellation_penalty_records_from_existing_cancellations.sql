@@ -1,20 +1,3 @@
-/*
-  # Recuperar penalizaciones de cancelacion existentes
-
-  ## Problema
-  La tabla `cancellation_penalty_records` esta vacia aunque ya hubo cancelaciones
-  con politica de penalizacion (no_refund / 50_percent). El INSERT en el cliente
-  fallo silenciosamente (solo console.error) y no genero los registros correspondientes.
-
-  ## Cambios
-
-  1. INSERT ... SELECT que recupera todos los registros de `booking_cancellations`
-     con `cancellation_policy_type IN ('no_refund', '50_percent')` y `amount_to_agency > 0`
-     que aun no existen en `cancellation_penalty_records`, insertandolos como `pending`.
-
-  2. Solo inserta los que no tengan ya un registro en `cancellation_penalty_records`
-     con el mismo `cancellation_id` (idempotente).
-*/
 
 INSERT INTO cancellation_penalty_records (
   booking_id,
