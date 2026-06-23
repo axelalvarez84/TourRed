@@ -1,10 +1,3 @@
-/*
-  # Add PayPal Sandbox Flag to Platform Settings
-
-  Adds a boolean column `paypal_sandbox` to `platform_settings` to control
-  whether PayPal operates in sandbox (test) or live mode.
-  Defaults to true (sandbox) for safety.
-*/
 
 DO $$
 BEGIN
