@@ -1,19 +1,3 @@
-/*
-  # Add service charge discount support to bookings and update validation function
-
-  1. Modified Tables
-    - `bookings`
-      - `service_charge_discount` (numeric, default 0) - Stores discount amount applied to service charge via discount code, separate from tour discount_amount for reporting
-
-  2. Functions
-    - `validate_tour_discount_code` - Updated to also accept codes with applicable_to = 'service_fees'
-      - Returns `applicable_to` field so frontend can distinguish between tour and service fee discounts
-
-  3. Notes
-    - The existing `discount_amount` field continues to store tour price discounts
-    - The new `service_charge_discount` field stores service charge discounts separately for clean reporting
-    - Both fields reference the same `discount_code_id` to track which code was used
-*/
 
 DO $$
 BEGIN
