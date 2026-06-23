@@ -1,15 +1,3 @@
-/*
-  # Fix infinite recursion in message_participants RLS policies
-
-  ## Problem
-  The SELECT and INSERT policies on message_participants reference the same table
-  (message_participants) in their USING/WITH CHECK clauses, causing infinite recursion.
-
-  ## Solution
-  1. Drop the recursive policies on message_participants
-  2. Replace with non-recursive policies using a security definer function
-  3. Add admin bypass policies for all messaging tables
-*/
 
 -- Create a security definer function to check conversation membership
 -- This breaks the recursion by bypassing RLS when checking participation
