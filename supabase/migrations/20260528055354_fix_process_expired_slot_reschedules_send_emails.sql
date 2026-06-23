@@ -1,12 +1,3 @@
-/*
-  # Agregar envio de emails en process_expired_slot_reschedules
-
-  Despues de cancelar cada reserva, se invocan dos edge functions via net.http_post:
-  1. send-slot-reschedule-auto-cancelled-traveler  -> email al viajero
-  2. send-slot-reschedule-auto-cancelled-agency    -> email a la agencia
-
-  Se usa el mismo patron que process_renewal_reminders (net.http_post con Authorization Bearer).
-*/
 
 CREATE OR REPLACE FUNCTION public.process_expired_slot_reschedules()
 RETURNS jsonb
