@@ -1,21 +1,3 @@
-/*
-  # Setup Automatic Renewal Reminders Cron Job
-
-  1. Extensions
-    - Enable `pg_cron` for scheduling tasks
-    - Enable `pg_net` for HTTP requests from PostgreSQL
-  
-  2. Cron Job Configuration
-    - Creates a daily cron job that runs at 9 AM Mexico City time (UTC-6)
-    - Calls the `process-membership-renewal-reminders` edge function
-    - Automatically sends renewal reminders to users 5 days before expiration
-  
-  3. Notes
-    - The cron job runs daily without human intervention
-    - Uses service role key for authentication
-    - Logs execution in pg_cron.job_run_details table
-    - Cron time: 15:00 UTC = 9:00 AM Mexico City (CST/CDT)
-*/
 
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS pg_cron;
