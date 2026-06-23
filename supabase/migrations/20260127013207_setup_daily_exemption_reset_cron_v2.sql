@@ -1,14 +1,3 @@
-/*
-  # Configurar tarea programada para reset automático diario
-
-  1. Cambios
-    - Crear una tarea cron que ejecute el reset cada día a medianoche
-    - Esto asegura que el contador se resetee automáticamente sin intervención del usuario
-    
-  2. Propósito
-    - Automatizar completamente el reset del beneficio mensual
-    - Garantizar que los usuarios siempre tengan su exención actualizada
-*/
 
 -- Habilitar la extensión pg_cron si no está habilitada
 CREATE EXTENSION IF NOT EXISTS pg_cron;
