@@ -1,14 +1,3 @@
-/*
-  # Fix generate_ticket_folio function
-
-  ## Problema
-  La función usaba `SELECT COUNT(*) ... FOR UPDATE` lo cual PostgreSQL no permite
-  (FOR UPDATE no es compatible con aggregate functions).
-
-  ## Solución
-  Se reemplaza por LOCK TABLE en modo ROW EXCLUSIVE antes de contar,
-  lo que garantiza atomicidad sin mezclar agregados con FOR UPDATE.
-*/
 
 CREATE OR REPLACE FUNCTION public.generate_ticket_folio(p_subcategory_id uuid)
 RETURNS text
