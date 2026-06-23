@@ -1,10 +1,3 @@
-/*
-  # Corregir comparacion de tipo date en process_expired_slot_reschedules
-
-  selected_date en bookings es de tipo date, no text.
-  Se elimina el ::text innecesario en las comparaciones con slot_date.
-*/
-
 CREATE OR REPLACE FUNCTION public.process_expired_slot_reschedules()
 RETURNS jsonb
 LANGUAGE plpgsql
