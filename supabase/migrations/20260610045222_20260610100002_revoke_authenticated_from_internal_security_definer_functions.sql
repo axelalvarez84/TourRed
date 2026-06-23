@@ -1,26 +1,3 @@
-/*
-  # Prioridad 2: Revocar EXECUTE de authenticated en funciones SECURITY DEFINER internas
-
-  Estas funciones solo son llamadas desde:
-  - Edge functions que usan service_role_key (webhooks de pago, cron jobs)
-  - Triggers del motor de PostgreSQL
-  - Funciones internas (prefijo _)
-
-  Ninguna es invocada directamente desde el cliente frontend con JWT de usuario.
-  Confirmar: activate_featured_slot es llamada desde stripe-webhook/mercadopago-webhook
-  (service_role), no desde el cliente. deduct_points es llamada desde edge functions
-  con service_role (process-payment-plan-installment, etc.).
-
-  Funciones que MANTIENEN su grant a authenticated (helpers de RLS y consultas del frontend):
-  - current_user_has_role, current_user_is_admin, is_admin_user
-  - is_admin_with_executive_permission, is_super_admin
-  - is_conversation_participant, get_current_user_agency_id
-  - get_executive_id_for_user, has_manage_travelers_permission
-  - get_user_conversations, get_payment_plan_minimum_at_booking
-  - get_pending_reschedule_for_booking, get_garbage_bookings
-  - generate_and_notify_platform_commissions (llamada desde admin panel vía authenticated)
-*/
-
 -- Función interna (prefijo _ indica privada), llamada desde get_user_conversations
 REVOKE EXECUTE ON FUNCTION public._get_user_conversations_internal(uuid) FROM authenticated;
 
