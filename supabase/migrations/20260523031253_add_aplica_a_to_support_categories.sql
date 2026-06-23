@@ -1,12 +1,3 @@
-/*
-  # Agregar aplica_a a support_categories
-
-  ## Cambio
-  - Agrega columna `aplica_a text[] DEFAULT '{general,traveler,agency}'` a `support_categories`
-  - Permite indicar para qué tipo de usuarios aplica cada categoría
-  - Por defecto incluye todos los tipos para no romper registros existentes
-*/
-
 DO $$
 BEGIN
   IF NOT EXISTS (
