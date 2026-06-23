@@ -1,17 +1,3 @@
-/*
-  # Agregar acceso RLS para CFDIs de tipo checkin_wallet
-
-  ## Cambio
-  La política SELECT "Users, agencies and admins can view cfdi invoices" no incluye
-  el tipo `checkin_wallet`, por lo que los viajeros no pueden ver sus propias facturas
-  de cobro en check-in.
-
-  ## Solución
-  Se agrega una condición OR que permite a viajeros leer CFDIs de tipo `checkin_wallet`
-  cuando son dueños del `booking_id` asociado.
-
-  La condición de agencia (por `agency_id`) ya cubre el acceso desde el panel de agencia.
-*/
 
 DROP POLICY IF EXISTS "Users, agencies and admins can view cfdi invoices" ON cfdi_invoices;
 
