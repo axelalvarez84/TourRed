@@ -1,8 +1,3 @@
-/*
-  # Fix get_tour_confirmed_attendees - booking_code type
-
-  booking_code is varchar(15) not text. Drop and recreate with correct type.
-*/
 
 DROP FUNCTION IF EXISTS public.get_tour_confirmed_attendees(uuid, uuid);
 
