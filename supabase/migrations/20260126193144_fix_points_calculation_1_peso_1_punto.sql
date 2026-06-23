@@ -1,16 +1,3 @@
-/*
-  # Fix Points Calculation - 1 Peso = 1 Point
-  
-  ## Changes
-  This migration fixes the points calculation to award 1 point per peso spent (not 100 points).
-  
-  ## Correct Logic
-  - 1 peso gastado = 1 punto ganado
-  - 100 puntos = 1 peso de valor de canje
-  
-  ## Functions Updated
-  - `award_points_for_booking()` - Changed calculation from * 100 to * 1
-*/
 
 -- Fix award_points_for_booking function with correct calculation
 CREATE OR REPLACE FUNCTION award_points_for_booking(
