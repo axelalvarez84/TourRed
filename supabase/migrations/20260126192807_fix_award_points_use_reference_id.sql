@@ -1,14 +1,3 @@
-/*
-  # Fix Award Points Function - Use reference_id and reference_type
-  
-  ## Changes
-  This migration fixes the award_points_for_booking function to use the correct column names
-  reference_id and reference_type instead of booking_id.
-  
-  ## Functions Updated
-  - `award_points_for_booking()` - Changed to use reference_id and reference_type, and added user_id
-*/
-
 -- Fix award_points_for_booking function to use correct column names
 CREATE OR REPLACE FUNCTION award_points_for_booking(
   p_booking_id uuid,
