@@ -1,29 +1,3 @@
-/*
-  # Rol Contador (accountant) y Permisos Contables
-
-  ## Descripcion
-  - Agrega el valor 'accountant' al constraint de rol en la tabla users
-  - Agrega columnas de permisos contables a admin_permissions
-  - Crea tabla accounting_access_invitations para invitar contadores externos
-
-  ## Cambios en Tablas
-
-  ### users
-  - Modifica el CHECK constraint de `role` para incluir 'accountant'
-
-  ### admin_permissions
-  - Agrega `can_view_accounting` (boolean) — ver reportes, balance, estado de resultados
-  - Agrega `can_export_sat_xml` (boolean) — descargar XMLs para el SAT
-  - Agrega `can_manage_chart_of_accounts` (boolean) — modificar catalogo de cuentas
-
-  ### accounting_access_invitations (nueva)
-  - Tabla para gestionar invitaciones a contadores externos
-  - `email`: correo del contador
-  - `invited_by`: admin que invita
-  - `token`: token unico para el link de activacion
-  - `status`: pending | accepted | expired | revoked
-  - `expires_at`: expiracion del link
-*/
 
 -- Modificar el constraint de role en users para incluir 'accountant'
 DO $$
