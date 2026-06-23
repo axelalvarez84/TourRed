@@ -1,17 +1,3 @@
-/*
-  # Optimize RLS policies - Part 2: Reviews and messaging
-
-  1. Changes
-    - Replace auth.uid() with (select auth.uid()) in RLS policies
-    - Part 2 covers: reviews, agency_reviews, traveler_reviews, conversations, messages
-  
-  2. Security Notes
-    - No changes to security logic, only performance optimization
-*/
-
--- ============================================================================
--- REVIEWS TABLE POLICIES
--- ============================================================================
 
 DROP POLICY IF EXISTS "Users can create reviews for booked tours" ON public.reviews;
 CREATE POLICY "Users can create reviews for booked tours"
@@ -75,9 +61,6 @@ CREATE POLICY "Admins can delete any review"
     )
   );
 
--- ============================================================================
--- AGENCY REVIEWS TABLE POLICIES
--- ============================================================================
 
 DROP POLICY IF EXISTS "Travelers can create their own agency reviews" ON public.agency_reviews;
 CREATE POLICY "Travelers can create their own agency reviews"
@@ -140,9 +123,6 @@ CREATE POLICY "Admins can delete any agency review"
     )
   );
 
--- ============================================================================
--- TRAVELER REVIEWS TABLE POLICIES
--- ============================================================================
 
 DROP POLICY IF EXISTS "Travelers can view their own reviews" ON public.traveler_reviews;
 CREATE POLICY "Travelers can view their own reviews"
@@ -249,9 +229,6 @@ CREATE POLICY "Admins can delete any traveler review"
     )
   );
 
--- ============================================================================
--- CONVERSATIONS TABLE POLICIES
--- ============================================================================
 
 DROP POLICY IF EXISTS "Users can view conversations they participate in" ON public.conversations;
 CREATE POLICY "Users can view conversations they participate in"
@@ -299,9 +276,6 @@ CREATE POLICY "Admins can view all conversations"
     )
   );
 
--- ============================================================================
--- MESSAGES TABLE POLICIES
--- ============================================================================
 
 DROP POLICY IF EXISTS "Users can view messages in their conversations" ON public.messages;
 CREATE POLICY "Users can view messages in their conversations"
@@ -351,9 +325,6 @@ CREATE POLICY "Admins can view all messages"
     )
   );
 
--- ============================================================================
--- MESSAGE PARTICIPANTS TABLE POLICIES
--- ============================================================================
 
 DROP POLICY IF EXISTS "Users can view their own participation" ON public.message_participants;
 CREATE POLICY "Users can view their own participation"
