@@ -1,17 +1,3 @@
-/*
-  # Corregir políticas RLS de mensajería completamente
-
-  1. Cambios
-    - Eliminar TODAS las políticas existentes de las tablas de mensajería
-    - Recrear políticas correctas desde cero
-    - Permitir ver todos los participantes de conversaciones en las que el usuario participa
-    - Simplificar acceso de admins
-
-  2. Seguridad
-    - Los usuarios solo pueden ver conversaciones en las que participan
-    - Los usuarios solo pueden enviar mensajes en conversaciones donde son participantes
-    - Los admins pueden ver todo para moderación
-*/
 
 -- ============================================
 -- CONVERSATIONS
