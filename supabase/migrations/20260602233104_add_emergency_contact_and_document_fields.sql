@@ -1,27 +1,3 @@
-/*
-  # Agregar campos de contacto de emergencia y documento a perfil y acompañantes
-
-  ## Cambios
-
-  ### Tabla `users`
-  - `emergency_contact_name` (text, nullable) — nombre del contacto de emergencia del viajero
-  - `emergency_contact_phone` (text, nullable) — teléfono del contacto de emergencia
-
-  ### Tabla `booking_travelers`
-  - `documento_tipo` (text, nullable) — tipo de documento: 'curp' o 'pasaporte'
-  - `documento_numero` (text, nullable) — número del documento
-  - `emergency_contact_name` (text, nullable) — contacto de emergencia por viajero
-  - `emergency_contact_phone` (text, nullable) — teléfono contacto de emergencia
-
-  ### Tabla `frequent_companions`
-  - Mismos 4 campos que booking_travelers para pre-llenar en futuras reservas
-
-  ## Notas
-  - Todos los campos son opcionales (nullable) para no romper registros existentes
-  - Los campos de documento permiten registrar tanto CURP (mexicanos) como pasaporte (extranjeros)
-  - Se usan para emitir pólizas de seguro de viajero con Universal Assistance / Assist Card
-*/
-
 -- Campos de contacto de emergencia en la tabla users
 DO $$
 BEGIN
