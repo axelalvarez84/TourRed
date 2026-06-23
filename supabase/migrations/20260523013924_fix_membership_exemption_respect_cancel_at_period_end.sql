@@ -1,18 +1,3 @@
-/*
-  # Corregir funciones de exención de membresía para respetar cancel_at_period_end
-
-  ## Problema
-  Las funciones get_available_service_fee_exemption y get_remaining_service_fee_exemption
-  solo reconocen membresías con status = 'active'. Una membresía con cancel_at_period_end = true
-  tiene status = 'active' pero aun puede haber casos donde el status quede como 'cancelled'
-  mientras el periodo sigue vigente (current_period_end > now()).
-
-  ## Cambios
-  - Ambas funciones ahora también reconocen membresías cuyo current_period_end > now(),
-    independientemente del status, siempre que no sean 'expired'.
-  - Esto garantiza que un usuario que canceló la renovación automática pero pagó por un
-    periodo siga teniendo sus beneficios hasta que ese periodo expire.
-*/
 
 CREATE OR REPLACE FUNCTION public.get_available_service_fee_exemption(p_user_id uuid)
 RETURNS numeric
