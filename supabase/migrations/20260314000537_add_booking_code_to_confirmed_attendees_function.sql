@@ -1,9 +1,3 @@
-/*
-  # Add booking_code to get_tour_confirmed_attendees function
-
-  Adds the booking_code field to the returned columns so email templates
-  can display the booking reference number to each recipient.
-*/
 
 DROP FUNCTION IF EXISTS public.get_tour_confirmed_attendees(uuid, uuid);
 
