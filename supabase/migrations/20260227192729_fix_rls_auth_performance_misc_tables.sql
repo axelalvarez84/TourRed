@@ -450,27 +450,35 @@ CREATE POLICY "Admins can delete batches"
   ));
 
 -- batch_payouts
-DROP POLICY IF EXISTS "Admins can view all batch payouts" ON public.batch_payouts;
-CREATE POLICY "Admins can view all batch payouts"
-  ON public.batch_payouts FOR SELECT
-  TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public.users
-    WHERE id = (SELECT auth.uid()) AND role IN ('admin','super_admin')
-  ));
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_schema = 'public' AND table_name = 'batch_payouts'
+  ) THEN
+    DROP POLICY IF EXISTS "Admins can view all batch payouts" ON public.batch_payouts;
+    CREATE POLICY "Admins can view all batch payouts"
+      ON public.batch_payouts FOR SELECT
+      TO authenticated
+      USING (EXISTS (
+        SELECT 1 FROM public.users
+        WHERE id = (SELECT auth.uid()) AND role IN ('admin','super_admin')
+      ));
 
-DROP POLICY IF EXISTS "Admins can manage batch payouts" ON public.batch_payouts;
-CREATE POLICY "Admins can manage batch payouts"
-  ON public.batch_payouts FOR ALL
-  TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public.users
-    WHERE id = (SELECT auth.uid()) AND role IN ('admin','super_admin')
-  ))
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM public.users
-    WHERE id = (SELECT auth.uid()) AND role IN ('admin','super_admin')
-  ));
+    DROP POLICY IF EXISTS "Admins can manage batch payouts" ON public.batch_payouts;
+    CREATE POLICY "Admins can manage batch payouts"
+      ON public.batch_payouts FOR ALL
+      TO authenticated
+      USING (EXISTS (
+        SELECT 1 FROM public.users
+        WHERE id = (SELECT auth.uid()) AND role IN ('admin','super_admin')
+      ))
+      WITH CHECK (EXISTS (
+        SELECT 1 FROM public.users
+        WHERE id = (SELECT auth.uid()) AND role IN ('admin','super_admin')
+      ));
+  END IF;
+END $$;
 
 -- booking_optional_services
 DROP POLICY IF EXISTS "Traveler can view own booking optional services" ON public.booking_optional_services;
