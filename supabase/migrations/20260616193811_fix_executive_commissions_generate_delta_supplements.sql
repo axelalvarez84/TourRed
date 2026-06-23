@@ -1,22 +1,3 @@
-/*
-  # Fix executive platform commission generation
-
-  ## Problem
-  calculate_executive_platform_commissions returns already_exists = TRUE as soon as ANY
-  platform_period commission exists for that executive+agency+month+year, causing
-  generate_and_notify_platform_commissions to skip new bookings that arrived after the
-  initial generation.
-
-  ## Solution
-  Rework the calculation to:
-  1. Sum revenue from ALL commission_records for the period
-  2. Subtract the total already_generated_amount from existing executive_commissions
-  3. Return the DELTA as commission_amount
-  4. already_exists = TRUE only when the delta is zero (nothing new to generate)
-
-  This allows supplementary platform_period records for revenue that arrived after
-  the first generation, without touching already-invoiced/paid records.
-*/
 
 CREATE OR REPLACE FUNCTION calculate_executive_platform_commissions(
   p_month INTEGER,
