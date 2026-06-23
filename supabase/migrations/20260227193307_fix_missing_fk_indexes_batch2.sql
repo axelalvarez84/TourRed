@@ -1,39 +1,4 @@
-/*
-  # Add missing foreign key indexes - batch 2
 
-  ## Summary
-  Second batch of foreign key columns lacking covering indexes.
-
-  ## New Indexes Added
-  - agency_payouts: agency_id, payout_batch_id
-  - batch_payouts: payout_id
-  - booking_cancellations: booking_id, cancelled_by_user_id
-  - booking_optional_services: tour_optional_service_id
-  - booking_reschedule_responses: tour_reschedule_id, user_id
-  - bookings: discount_code_id, promotion_id
-  - commission_records: payout_id
-  - conversations: booking_id, tour_id
-  - destination_images: destination_id, uploaded_by
-  - destinations: last_updated_by
-  - discount_codes: tour_id
-  - email_settings: updated_by
-  - financial_transactions: agency_id, booking_id, payout_id, tour_id
-  - gift_card_redemption_attempts: gift_card_id, user_id
-  - gift_cards: redeemed_by
-  - integration_configs: agency_id
-  - platform_settings: updated_by
-  - referral_bonuses: user_id
-  - reviews: tour_id
-  - saved_tours: tour_id
-  - tour_cancellations: agency_id, tour_id
-  - tour_destinations: destination_id
-  - tour_promotions: agency_id
-  - tour_reschedules: agency_id, tour_id
-  - tours: agency_id
-  - toursred_cash_transactions: user_id
-  - toursred_points_transactions: wallet_id
-  - users: referred_by_user_id
-*/
 
 CREATE INDEX IF NOT EXISTS idx_agency_payouts_agency_id
   ON public.agency_payouts (agency_id);
