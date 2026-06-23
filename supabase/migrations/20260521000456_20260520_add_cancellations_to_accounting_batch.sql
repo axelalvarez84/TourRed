@@ -1,24 +1,3 @@
-/*
-  # Integrar cancelaciones en generate_accounting_entries_batch
-
-  ## Resumen
-  Amplía la función batch para que también procese automáticamente las pólizas
-  contables de todas las cancelaciones (totales, parciales, por agencia y por tour)
-  que aún no tengan entrada en accounting_entries.
-
-  ## Cambios
-  1. Reescribe `generate_accounting_entries_batch` añadiendo tres loops adicionales:
-     - Cancelaciones totales de viajero (booking_cancellations con política de penalización)
-     - Cancelaciones parciales (booking_partial_cancellations con política de penalización)
-     - Cancelaciones por agencia de reserva individual (booking_cancellations.cancelled_by_agency = true)
-  2. El retorno jsonb ahora incluye `cancellations_processed`
-
-  ## Notas
-  - Las cancelaciones con política 100% (reembolso completo) no generan póliza contable
-    compleja; solo si tienen retención (50_percent o no_refund).
-  - Las cancelaciones agency_tour se manejan dentro de booking_cancellations con
-    cancellation_type = 'agency_cancellation'.
-*/
 
 CREATE OR REPLACE FUNCTION generate_accounting_entries_batch(
   p_from_date date DEFAULT (CURRENT_DATE - interval '90 days')::date,
