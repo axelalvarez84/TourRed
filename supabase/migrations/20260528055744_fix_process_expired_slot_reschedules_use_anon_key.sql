@@ -1,10 +1,3 @@
-/*
-  # Usar anon key para invocar edge functions desde process_expired_slot_reschedules
-
-  Las edge functions send-slot-reschedule-auto-cancelled-* tienen verify_jwt=false,
-  por lo que no necesitan el service role key. Se puede usar el anon key que
-  se guarda en email_settings o se hardcodea directamente ya que es publico.
-*/
 
 CREATE OR REPLACE FUNCTION public.process_expired_slot_reschedules()
 RETURNS jsonb
