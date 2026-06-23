@@ -1,13 +1,4 @@
-/*
-  # Corregir función update_conversation para usar search_path correcto
 
-  1. Cambios
-    - Agregar SET search_path = public a la función
-    - Esto previene problemas de seguridad y recursión
-
-  2. Seguridad
-    - Mantiene verificaciones de permisos existentes
-*/
 
 CREATE OR REPLACE FUNCTION update_conversation_last_message()
 RETURNS TRIGGER
