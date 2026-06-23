@@ -1,16 +1,3 @@
-/*
-  # Deshabilitar sistema de expiración de puntos ToursRed
-
-  1. Cambios
-    - Desactivar cron job de expiración de puntos
-    - Actualizar trigger para NO asignar fecha de expiración a nuevos puntos
-    - Los puntos existentes mantienen su expires_at pero no se procesarán
-  
-  2. Beneficio
-    - Los puntos ToursRed nunca expiran
-    - Los puntos solo se pueden usar con membresía activa
-    - Simplifica el sistema y es un gran beneficio para usuarios
-*/
 
 -- Desactivar el cron job de expiración de puntos
 DO $$
