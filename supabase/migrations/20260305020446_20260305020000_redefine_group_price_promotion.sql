@@ -1,16 +1,3 @@
-/*
-  # Redefinir Promoción de Precio Grupal
-
-  ## Cambios
-  - Elimina todos los registros existentes del tipo `grupo_precio_fijo` (entorno de desarrollo/pruebas, no hay datos productivos)
-  - Agrega la columna `group_discount_percentage` (numeric) a `tour_promotions` para almacenar el porcentaje de descuento por persona que define la agencia
-  - Actualiza la función RPC `get_active_promotion_for_tour` para devolver el nuevo campo
-
-  ## Lógica del nuevo tipo grupal
-  - Mínimo de viajeros configurable por la agencia (validado en frontend, mínimo 4)
-  - El porcentaje aplica por igual a cada categoría de viajero según su tarifa individual
-  - Las mascotas no cuentan en el conteo ni reciben descuento
-*/
 
 -- 1. Limpiar registros existentes del tipo grupo_precio_fijo
 DELETE FROM tour_promotions WHERE promotion_type = 'grupo_precio_fijo';
