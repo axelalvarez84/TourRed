@@ -1,23 +1,3 @@
-/*
-  # Create Proximity Search Function
-  
-  1. Function: search_tours_by_departure_radius
-    - Searches for tours based on departure location proximity
-    - Uses PostGIS ST_DWithin for efficient geographic queries
-    - Calculates exact distance from search point to each departure location
-    - Supports filtering by category, dates, and other standard tour filters
-    - Returns tours ordered by distance (closest first)
-  
-  2. Performance
-    - Leverages spatial index on departure_locations.location
-    - Uses JOIN optimization with tour_departure_locations
-    - Limits results to prevent excessive data transfer
-  
-  3. Returns
-    - Tour details with all standard fields
-    - Distance in meters from search point to nearest departure location
-    - Array of nearby departure locations for each tour
-*/
 
 -- Create function to search tours by departure location proximity
 CREATE OR REPLACE FUNCTION search_tours_by_departure_radius(
