@@ -1,8 +1,3 @@
-/*
-  # Update get_staff_with_permissions to include new granular tour permission fields
-
-  Adds can_view_tours and can_edit_tours to the return type of the function.
-*/
 
 DROP FUNCTION IF EXISTS public.get_staff_with_permissions(uuid);
 
