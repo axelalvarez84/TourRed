@@ -1,9 +1,3 @@
-/*
-  # Eliminar EXECUTE explícito de anon en funciones SECURITY DEFINER
-
-  El REVOKE ALL FROM PUBLIC en la migración anterior no elimina grants explícitos
-  a roles específicos (anon). Se revoca también de anon directamente.
-*/
 
 REVOKE EXECUTE ON FUNCTION public.activate_featured_slot(uuid, uuid, uuid) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.confirm_featured_slot_payment(uuid, text, text, numeric) FROM anon;
