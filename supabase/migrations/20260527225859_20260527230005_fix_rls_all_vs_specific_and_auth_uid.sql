@@ -1,6 +1,5 @@
 -- ============================================================
 -- 1. admin_permissions
--- ALL (super_admin) + SELECT (admin propio) → descomponer ALL en acciones con OR
 -- ============================================================
 DROP POLICY IF EXISTS "Super admins can manage all permissions" ON public.admin_permissions;
 DROP POLICY IF EXISTS "Admins can read own permissions" ON public.admin_permissions;
@@ -59,19 +58,24 @@ CREATE POLICY "Super admins can delete admin permissions"
 
 -- ============================================================
 -- 2. batch_payouts
--- ALL + SELECT con idéntica condición → eliminar SELECT redundante
 -- ============================================================
-DROP POLICY IF EXISTS "Admins can view all batch payouts" ON public.batch_payouts;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'batch_payouts'
+  ) THEN
+    DROP POLICY IF EXISTS "Admins can view all batch payouts" ON public.batch_payouts;
+  END IF;
+END $$;
 
 -- ============================================================
 -- 3. destination_images
--- ALL (admin+agency) + INSERT (solo admin) → INSERT ya está cubierto por ALL
 -- ============================================================
 DROP POLICY IF EXISTS "Admins can insert destination images" ON public.destination_images;
 
 -- ============================================================
 -- 4. destinations
--- ALL (agency) + DELETE/INSERT/UPDATE (admin) → descomponer ALL en acciones con OR
 -- ============================================================
 DROP POLICY IF EXISTS "Agencies can manage destinations" ON public.destinations;
 DROP POLICY IF EXISTS "Admins can delete destinations" ON public.destinations;
@@ -120,13 +124,19 @@ CREATE POLICY "Agencies and admins can delete destinations"
 
 -- ============================================================
 -- 5. integration_configs
--- ALL + SELECT con idéntica condición → eliminar SELECT redundante
 -- ============================================================
-DROP POLICY IF EXISTS "Admins can view all integration configs" ON public.integration_configs;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'integration_configs'
+  ) THEN
+    DROP POLICY IF EXISTS "Admins can view all integration configs" ON public.integration_configs;
+  END IF;
+END $$;
 
 -- ============================================================
 -- 6. password_reset_codes
--- ALL (admin) + INSERT/SELECT/UPDATE (user) → descomponer ALL en acciones con OR
 -- ============================================================
 DROP POLICY IF EXISTS "Admins can manage all password reset codes" ON public.password_reset_codes;
 DROP POLICY IF EXISTS "Users can create own password reset codes" ON public.password_reset_codes;
@@ -190,7 +200,6 @@ CREATE POLICY "Admins can delete password reset codes"
 
 -- ============================================================
 -- 7. payout_schedules
--- ALL (admin) + INSERT/SELECT/UPDATE (agency) → descomponer ALL en acciones con OR
 -- ============================================================
 DROP POLICY IF EXISTS "Admins can manage all schedules" ON public.payout_schedules;
 DROP POLICY IF EXISTS "Agencies can insert own schedule" ON public.payout_schedules;
@@ -266,7 +275,6 @@ CREATE POLICY "Admins can delete payout schedules"
 
 -- ============================================================
 -- 8. tour_departure_points
--- ALL (admin) + INSERT/UPDATE/DELETE (agency) → descomponer ALL en acciones con OR
 -- ============================================================
 DROP POLICY IF EXISTS "Admins can manage all tour departure points" ON public.tour_departure_points;
 DROP POLICY IF EXISTS "Agencies can add departure points to their tours" ON public.tour_departure_points;
@@ -334,7 +342,7 @@ CREATE POLICY "Agencies and admins can delete tour departure points"
   );
 
 -- ============================================================
--- 9. cookie_consents — Fix auth.uid() directo → (SELECT auth.uid())
+-- 9. cookie_consents
 -- ============================================================
 DROP POLICY IF EXISTS "Anyone can record consent" ON public.cookie_consents;
 CREATE POLICY "Anyone can record consent"
@@ -355,7 +363,7 @@ CREATE POLICY "Anyone can record consent"
   );
 
 -- ============================================================
--- 10. international_tour_inquiries — Fix auth.uid() directo → (SELECT auth.uid())
+-- 10. international_tour_inquiries
 -- ============================================================
 DROP POLICY IF EXISTS "Anyone can submit inquiry" ON public.international_tour_inquiries;
 CREATE POLICY "Anyone can submit inquiry"
