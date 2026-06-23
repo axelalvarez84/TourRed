@@ -1,24 +1,3 @@
-/*
-  # Fix Security Definer Views
-
-  ## Summary
-  Views defined with SECURITY DEFINER bypass the calling user's RLS policies and
-  run with the permissions of the view owner (typically a superuser). This can
-  expose data that the caller shouldn't see. Converting to SECURITY INVOKER ensures
-  the view runs with the permissions of the querying user, respecting all RLS policies.
-
-  ## Views fixed
-  - points_expiration_summary: aggregation view, no auth check needed - SECURITY INVOKER is safe
-  - user_notifications: already filters by auth.uid() in WHERE clause
-  - admin_conversations: already checks admin role in WHERE clause
-  - admin_status: already checks admin role in WHERE clause
-  - admin_reviews_view: already checks admin role in WHERE/UNION clauses
-  - commission_records_with_days_pending: no auth filter, relies on caller having access
-
-  ## Note
-  SECURITY INVOKER views respect the calling user's RLS policies, which is the
-  correct and secure default behavior.
-*/
 
 -- points_expiration_summary
 CREATE OR REPLACE VIEW public.points_expiration_summary
