@@ -1,14 +1,3 @@
-/*
-  # Fix bookings RLS: eliminar recursion infinita con users
-
-  El problema: la politica anterior consultaba la tabla users para verificar
-  si el usuario es admin, pero users tiene una politica que consulta bookings,
-  creando recursion infinita (error 42P17).
-
-  Solucion: usar auth.jwt() para leer el rol directamente del JWT sin tocar
-  ninguna tabla. El rol 'admin' esta almacenado en raw_user_meta_data->>'role'
-  y es accesible como auth.jwt()->'user_metadata'->>'role'.
-*/
 
 DROP POLICY IF EXISTS "Users agencies and admins can read bookings" ON bookings;
 
