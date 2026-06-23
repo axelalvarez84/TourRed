@@ -1,17 +1,3 @@
-/*
-  # Create get_tour_availability function
-
-  1. New Functions
-    - `get_tour_availability(tour_id uuid)`: Returns real-time availability calculation
-      - Calculates total travelers in confirmed and pending bookings
-      - Returns available spots and max capacity
-      - Single source of truth to prevent overbooking
-
-  2. Security
-    - Public function, readable by all users
-    - Returns real-time availability data
-    - Used for all availability calculations to prevent race conditions
-*/
 
 CREATE OR REPLACE FUNCTION get_tour_availability(p_tour_id uuid)
 RETURNS TABLE (
