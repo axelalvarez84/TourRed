@@ -1,20 +1,3 @@
-/*
-  # Fix Ambiguous Column Reference in Proximity Search Function
-
-  1. Problem
-    - The `search_tours_by_departure_radius` function has an ambiguous reference to `tour_id`
-    - This occurs in the subquery within the `tour_distances` CTE
-    - The error appears when searching for tours by departure location
-
-  2. Solution
-    - Fully qualify all column references with their table/alias names
-    - Fix the subquery to properly reference `tdl.tour_id` from the outer query
-    - Ensure all `tour_id` references are unambiguous
-
-  3. Changes
-    - Update the `search_tours_by_departure_radius` function
-    - Properly qualify the `tour_id` column in the nearest_location subquery
-*/
 
 -- Drop and recreate the function with fixed column references
 CREATE OR REPLACE FUNCTION search_tours_by_departure_radius(
