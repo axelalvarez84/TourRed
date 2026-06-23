@@ -1,20 +1,3 @@
-/*
-  # Fix: RLS Policies for Tour Departure Locations
-
-  1. Problem
-    - INSERT policy is blocking agencies from adding departure locations to their tours
-    - SELECT policy after INSERT is also failing
-    - WITH CHECK clause is too restrictive or has incorrect logic
-
-  2. Solution
-    - Simplify INSERT policy to check tour ownership directly
-    - Ensure SELECT policy allows agencies to see their own tour's locations
-    - Add proper indexes for performance
-
-  3. Changes
-    - Drop and recreate policies with correct logic
-    - Ensure agencies can manage their own tour's departure locations
-*/
 
 -- Drop existing policies
 DROP POLICY IF EXISTS "Agencies can add departure locations to their tours" ON tour_departure_locations;
