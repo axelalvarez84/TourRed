@@ -1,14 +1,3 @@
-/*
-  # Fix notification function schema qualification
-
-  1. Changes
-    - Update create_user_notification function to use fully qualified table names
-    - This function has SET search_path TO '' for security, so needs qualified names
-  
-  2. Security Notes
-    - Maintains SECURITY DEFINER with proper schema qualification
-    - Prevents search_path injection attacks while allowing proper table access
-*/
 
 CREATE OR REPLACE FUNCTION public.create_user_notification(
   p_user_id uuid,
