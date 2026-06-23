@@ -1,16 +1,3 @@
-/*
-  # Add Agency Approval Status
-
-  1. Changes
-    - Add `is_approved` column to `users` table
-      - Boolean field to track if an agency has been approved by admin
-      - Defaults to false for new agencies
-      - Only applies to users with role 'agency'
-    
-  2. Security
-    - Super admins can update the approval status
-    - Agencies can view their own approval status
-*/
 
 -- Add is_approved column to users table
 DO $$
