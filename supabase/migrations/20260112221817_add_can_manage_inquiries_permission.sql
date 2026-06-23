@@ -1,14 +1,3 @@
-/*
-  # Add permission to manage international tour inquiries
-
-  1. Changes
-    - Add `can_manage_inquiries` column to `admin_permissions` table
-    - This permission allows admins to view and manage international tour inquiries
-    
-  2. Security
-    - Default value is false (no access by default)
-    - Super admins will have access regardless of this permission
-*/
 
 -- Add can_manage_inquiries column
 DO $$
