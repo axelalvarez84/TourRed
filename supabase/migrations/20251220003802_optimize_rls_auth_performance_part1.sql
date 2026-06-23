@@ -38,9 +38,6 @@ CREATE POLICY "Agencies can view travelers with bookings"
     )
   );
 
--- ============================================================================
--- AGENCIES TABLE POLICIES
--- ============================================================================
 
 DROP POLICY IF EXISTS "Agencies can create own profile" ON public.agencies;
 CREATE POLICY "Agencies can create own profile"
@@ -70,9 +67,6 @@ CREATE POLICY "Admins can update agency commission"
     )
   );
 
--- ============================================================================
--- BOOKINGS TABLE POLICIES
--- ============================================================================
 
 DROP POLICY IF EXISTS "Users can create bookings" ON public.bookings;
 CREATE POLICY "Users can create bookings"
@@ -109,9 +103,6 @@ CREATE POLICY "Agencies can read own tour bookings"
     )
   );
 
--- ============================================================================
--- TOURS TABLE POLICIES
--- ============================================================================
 
 DROP POLICY IF EXISTS "Agencies can manage own tours" ON public.tours;
 CREATE POLICY "Agencies can manage own tours"
