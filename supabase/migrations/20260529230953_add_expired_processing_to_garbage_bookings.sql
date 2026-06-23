@@ -1,4 +1,4 @@
--- ── Reemplazar función ──────────────────────────────────────────────────────
+-- Reemplazar funcion
 
 DROP FUNCTION IF EXISTS get_garbage_bookings(integer);
 
