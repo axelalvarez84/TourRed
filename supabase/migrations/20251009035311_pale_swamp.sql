@@ -4,7 +4,11 @@ ADD COLUMN IF NOT EXISTS curp text,
 ADD COLUMN IF NOT EXISTS passport_number text,
 ADD COLUMN IF NOT EXISTS is_foreign_traveler boolean DEFAULT false;
 
--- Add unique constraints usando DROP + CREATE para garantizar idempotencia
+-- Dropear índices únicos por si existen así
+DROP INDEX IF EXISTS users_curp_unique;
+DROP INDEX IF EXISTS users_passport_number_unique;
+
+-- Add unique constraints
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_curp_unique;
 ALTER TABLE users ADD CONSTRAINT users_curp_unique UNIQUE (curp);
 
