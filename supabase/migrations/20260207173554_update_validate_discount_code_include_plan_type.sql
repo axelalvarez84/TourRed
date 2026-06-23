@@ -1,14 +1,3 @@
-/*
-  # Update validate_discount_code to include membership_plan_type
-
-  1. Changes
-    - The validate_discount_code function now returns `membership_plan_type` in its response
-    - This allows frontend and edge functions to check plan type restrictions
-
-  2. Security
-    - Function remains SECURITY DEFINER with explicit search_path
-    - No privilege changes
-*/
 
 CREATE OR REPLACE FUNCTION validate_discount_code(
   p_code text,
