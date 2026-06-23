@@ -19,7 +19,7 @@ CREATE POLICY "Users, agencies and admins can read bookings"
     OR has_manage_travelers_permission()
   );
 
--- bookings UPDATE: 2 políticas → 1 (mantiene la de service_role separada)
+-- bookings UPDATE: 2 políticas → 1
 DROP POLICY IF EXISTS "Agencies can update own tour bookings" ON public.bookings;
 DROP POLICY IF EXISTS "Users can update own bookings" ON public.bookings;
 CREATE POLICY "Users and agencies can update own bookings"
@@ -245,7 +245,6 @@ CREATE POLICY "Agencies and admins can update agencies"
 
 -- ============================================================
 -- agency_reviews SELECT: 2 políticas → 1
--- (already has a public policy "Anyone can view visible agency reviews")
 -- ============================================================
 DROP POLICY IF EXISTS "Admins can view all agency reviews" ON public.agency_reviews;
 DROP POLICY IF EXISTS "Authenticated users can view visible agency reviews" ON public.agency_reviews;
@@ -443,78 +442,84 @@ CREATE POLICY "Users, agencies and admins can view slot reschedule responses"
   );
 
 -- ============================================================
--- slot_seat_status INSERT: 2 políticas → 1
--- (agencies ya tenía condición OR admin en su política, agregamos la de travelers)
+-- slot_seat_status: solo si la tabla existe
 -- ============================================================
-DROP POLICY IF EXISTS "Agencies can insert seat status for their tours" ON public.slot_seat_status;
-DROP POLICY IF EXISTS "Travelers can insert seat status for their own bookings" ON public.slot_seat_status;
-CREATE POLICY "Users and agencies can insert seat status"
-  ON public.slot_seat_status FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    (
-      agency_id IN (
-        SELECT agencies.id FROM agencies
-        WHERE agencies.user_id = (SELECT auth.uid())
-      )
-      OR EXISTS (
-        SELECT 1 FROM users
-        WHERE users.id = (SELECT auth.uid())
-          AND users.role = ANY (ARRAY['admin', 'super_admin'])
-      )
-    )
-    OR (
-      booking_id IS NOT NULL
-      AND booking_id IN (
-        SELECT bookings.id FROM bookings
-        WHERE bookings.user_id = (SELECT auth.uid())
-      )
-    )
-  );
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'slot_seat_status'
+  ) THEN
+    DROP POLICY IF EXISTS "Agencies can insert seat status for their tours" ON public.slot_seat_status;
+    DROP POLICY IF EXISTS "Travelers can insert seat status for their own bookings" ON public.slot_seat_status;
+    CREATE POLICY "Users and agencies can insert seat status"
+      ON public.slot_seat_status FOR INSERT
+      TO authenticated
+      WITH CHECK (
+        (
+          agency_id IN (
+            SELECT agencies.id FROM agencies
+            WHERE agencies.user_id = (SELECT auth.uid())
+          )
+          OR EXISTS (
+            SELECT 1 FROM users
+            WHERE users.id = (SELECT auth.uid())
+              AND users.role = ANY (ARRAY['admin', 'super_admin'])
+          )
+        )
+        OR (
+          booking_id IS NOT NULL
+          AND booking_id IN (
+            SELECT bookings.id FROM bookings
+            WHERE bookings.user_id = (SELECT auth.uid())
+          )
+        )
+      );
 
--- slot_seat_status UPDATE: 2 políticas → 1
-DROP POLICY IF EXISTS "Agencies can update seat status for their tours" ON public.slot_seat_status;
-DROP POLICY IF EXISTS "Travelers can update seat status for their own bookings" ON public.slot_seat_status;
-CREATE POLICY "Users and agencies can update seat status"
-  ON public.slot_seat_status FOR UPDATE
-  TO authenticated
-  USING (
-    (
-      agency_id IN (
-        SELECT agencies.id FROM agencies
-        WHERE agencies.user_id = (SELECT auth.uid())
+    DROP POLICY IF EXISTS "Agencies can update seat status for their tours" ON public.slot_seat_status;
+    DROP POLICY IF EXISTS "Travelers can update seat status for their own bookings" ON public.slot_seat_status;
+    CREATE POLICY "Users and agencies can update seat status"
+      ON public.slot_seat_status FOR UPDATE
+      TO authenticated
+      USING (
+        (
+          agency_id IN (
+            SELECT agencies.id FROM agencies
+            WHERE agencies.user_id = (SELECT auth.uid())
+          )
+          OR EXISTS (
+            SELECT 1 FROM users
+            WHERE users.id = (SELECT auth.uid())
+              AND users.role = ANY (ARRAY['admin', 'super_admin'])
+          )
+        )
+        OR (
+          booking_id IS NOT NULL
+          AND booking_id IN (
+            SELECT bookings.id FROM bookings
+            WHERE bookings.user_id = (SELECT auth.uid())
+          )
+        )
       )
-      OR EXISTS (
-        SELECT 1 FROM users
-        WHERE users.id = (SELECT auth.uid())
-          AND users.role = ANY (ARRAY['admin', 'super_admin'])
-      )
-    )
-    OR (
-      booking_id IS NOT NULL
-      AND booking_id IN (
-        SELECT bookings.id FROM bookings
-        WHERE bookings.user_id = (SELECT auth.uid())
-      )
-    )
-  )
-  WITH CHECK (
-    (
-      agency_id IN (
-        SELECT agencies.id FROM agencies
-        WHERE agencies.user_id = (SELECT auth.uid())
-      )
-      OR EXISTS (
-        SELECT 1 FROM users
-        WHERE users.id = (SELECT auth.uid())
-          AND users.role = ANY (ARRAY['admin', 'super_admin'])
-      )
-    )
-    OR (
-      booking_id IS NOT NULL
-      AND booking_id IN (
-        SELECT bookings.id FROM bookings
-        WHERE bookings.user_id = (SELECT auth.uid())
-      )
-    )
-  );
+      WITH CHECK (
+        (
+          agency_id IN (
+            SELECT agencies.id FROM agencies
+            WHERE agencies.user_id = (SELECT auth.uid())
+          )
+          OR EXISTS (
+            SELECT 1 FROM users
+            WHERE users.id = (SELECT auth.uid())
+              AND users.role = ANY (ARRAY['admin', 'super_admin'])
+          )
+        )
+        OR (
+          booking_id IS NOT NULL
+          AND booking_id IN (
+            SELECT bookings.id FROM bookings
+            WHERE bookings.user_id = (SELECT auth.uid())
+          )
+        )
+      );
+  END IF;
+END $$;
