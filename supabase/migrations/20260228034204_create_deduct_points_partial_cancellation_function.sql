@@ -1,20 +1,3 @@
-/*
-  # Create Deduct Points for Partial Cancellation Function
-
-  ## Purpose
-  When travelers are partially cancelled from a booking, deduct the proportional
-  points that were earned for those specific travelers.
-
-  ## Logic
-  - Points earned are proportional to the deposit paid
-  - Points to deduct = points_earned * (cancelled_travelers_deposit / total_deposit)
-  - Uses type 'partial_cancellation' to avoid conflicts with full cancellation refunds
-
-  ## Security
-  - SECURITY DEFINER to allow system-level deductions
-  - Proper search_path to prevent injection
-  - Prevents duplicate deductions per partial cancellation
-*/
 
 CREATE OR REPLACE FUNCTION deduct_points_for_partial_cancellation(
   p_booking_id uuid,
