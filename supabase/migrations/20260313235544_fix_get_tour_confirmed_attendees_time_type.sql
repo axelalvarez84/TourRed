@@ -1,9 +1,3 @@
-/*
-  # Fix get_tour_confirmed_attendees function - correct time type
-
-  Both selected_date (date) and selected_time (time) were declared as text.
-  Drop and recreate with correct types.
-*/
 
 DROP FUNCTION IF EXISTS public.get_tour_confirmed_attendees(uuid, uuid);
 
