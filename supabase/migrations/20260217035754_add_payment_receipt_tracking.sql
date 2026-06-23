@@ -1,17 +1,3 @@
-/*
-  # Agregar sistema de comprobantes de pago
-
-  1. Cambios en commission_records
-    - payment_method: método específico usado (transferencia, cheque, paypal, mercadopago)
-    - payment_receipt_url: URL del comprobante subido
-    - payment_receipt_filename: nombre del archivo original
-    - payment_notes: notas adicionales sobre el pago
-    - notified_at: timestamp cuando se notificó a la agencia
-
-  2. Seguridad
-    - Mantener RLS existente
-    - Solo admin puede actualizar estos campos
-*/
 
 -- Agregar campos para tracking de comprobantes de pago
 DO $$
