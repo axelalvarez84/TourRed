@@ -1,14 +1,3 @@
-/*
-  # Fix notifications: add to Realtime publication and add DELETE policy
-
-  1. Changes
-    - Add `notifications` table to the supabase_realtime publication so live subscriptions work
-    - Add DELETE policy so users can delete their own notifications
-    - Fix SELECT policy to avoid potential recursion by using auth.jwt() for admin check
-
-  2. Security
-    - DELETE restricted to the notification's own user_id
-*/
 
 -- Add notifications to realtime publication
 ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
