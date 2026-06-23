@@ -1,3 +1,85 @@
+-- Create agency_payouts table if it doesn't exist
+CREATE TABLE IF NOT EXISTS public.agency_payouts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  agency_id uuid REFERENCES public.agencies(id),
+  payment_date date DEFAULT CURRENT_DATE,
+  amount numeric CHECK (amount >= 0),
+  payment_method text CHECK (payment_method = ANY (ARRAY['spei_transfer','international_transfer','check','cash','other'])),
+  bank_reference text,
+  receipt_url text,
+  status text DEFAULT 'pending' CHECK (status = ANY (ARRAY['pending','processing','completed','failed','cancelled'])),
+  notes text,
+  external_transaction_id text,
+  bank_account_id text,
+  erp_sync_status text CHECK (erp_sync_status = ANY (ARRAY['synced','pending','failed','not_applicable'])),
+  erp_invoice_id text,
+  erp_reference text,
+  processed_by uuid REFERENCES public.users(id),
+  commission_records_count integer DEFAULT 0 CHECK (commission_records_count >= 0),
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Create payout_batches table if it doesn't exist
+CREATE TABLE IF NOT EXISTS public.payout_batches (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  batch_code text,
+  batch_date date DEFAULT CURRENT_DATE,
+  period_start date,
+  period_end date,
+  total_amount numeric DEFAULT 0 CHECK (total_amount >= 0),
+  agencies_count integer DEFAULT 0 CHECK (agencies_count >= 0),
+  payouts_count integer DEFAULT 0 CHECK (payouts_count >= 0),
+  status text DEFAULT 'draft' CHECK (status = ANY (ARRAY['draft','ready','processing','completed','cancelled'])),
+  processed_by uuid REFERENCES public.users(id),
+  notes text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  processed_at timestamptz
+);
+
+-- Create financial_transactions table if it doesn't exist
+CREATE TABLE IF NOT EXISTS public.financial_transactions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  transaction_date timestamptz DEFAULT now(),
+  transaction_type text CHECK (transaction_type = ANY (ARRAY['booking','cancellation_full','cancellation_partial','no_show','tour_cancellation_by_agency','adjustment','payout','refund','commission_correction'])),
+  agency_id uuid REFERENCES public.agencies(id),
+  booking_id uuid REFERENCES public.bookings(id),
+  tour_id uuid REFERENCES public.tours(id),
+  cancellation_id uuid,
+  payout_id uuid,
+  gross_amount numeric DEFAULT 0,
+  platform_commission numeric DEFAULT 0,
+  net_to_agency numeric DEFAULT 0,
+  platform_revenue numeric DEFAULT 0,
+  description text,
+  payment_status text DEFAULT 'pending' CHECK (payment_status = ANY (ARRAY['pending','paid','cancelled'])),
+  reconciliation_status text DEFAULT 'pending' CHECK (reconciliation_status = ANY (ARRAY['reconciled','pending','disputed'])),
+  metadata jsonb,
+  created_by_user_id uuid REFERENCES public.users(id),
+  created_at timestamptz DEFAULT now()
+);
+
+-- Create payout_schedules table if it doesn't exist
+CREATE TABLE IF NOT EXISTS public.payout_schedules (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  agency_id uuid UNIQUE REFERENCES public.agencies(id),
+  frequency text DEFAULT 'weekly' CHECK (frequency = ANY (ARRAY['weekly','biweekly','monthly'])),
+  day_of_week integer CHECK (day_of_week >= 1 AND day_of_week <= 7),
+  day_of_month integer CHECK (day_of_month >= 1 AND day_of_month <= 31),
+  minimum_payout_amount numeric DEFAULT 500.00 CHECK (minimum_payout_amount >= 0),
+  preferred_payment_method text DEFAULT 'spei_transfer' CHECK (preferred_payment_method = ANY (ARRAY['spei_transfer','international_transfer','check','cash','other'])),
+  bank_account_holder_name text,
+  bank_name text,
+  bank_account_number text,
+  bank_clabe text,
+  bank_swift_code text,
+  payment_currency text DEFAULT 'MXN' CHECK (payment_currency = ANY (ARRAY['MXN','USD','EUR'])),
+  automatic_payout_enabled boolean DEFAULT false,
+  is_active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
 
 -- Add missing columns to agency_payouts
 DO $$
@@ -169,23 +251,19 @@ BEGIN
   END IF;
 END $$;
 
--- Create indexes (only for columns that exist)
+-- Create indexes
 CREATE INDEX IF NOT EXISTS idx_agency_payouts_agency_id ON agency_payouts(agency_id);
 CREATE INDEX IF NOT EXISTS idx_agency_payouts_status ON agency_payouts(status);
 CREATE INDEX IF NOT EXISTS idx_agency_payouts_batch_id ON agency_payouts(payout_batch_id);
-
 CREATE INDEX IF NOT EXISTS idx_payout_batches_status ON payout_batches(status);
-
 CREATE INDEX IF NOT EXISTS idx_financial_transactions_agency_id ON financial_transactions(agency_id);
 CREATE INDEX IF NOT EXISTS idx_financial_transactions_tour_id ON financial_transactions(tour_id);
 CREATE INDEX IF NOT EXISTS idx_financial_transactions_booking_id ON financial_transactions(booking_id);
 CREATE INDEX IF NOT EXISTS idx_financial_transactions_payout_id ON financial_transactions(payout_id);
 CREATE INDEX IF NOT EXISTS idx_financial_transactions_type ON financial_transactions(transaction_type);
 CREATE INDEX IF NOT EXISTS idx_financial_transactions_payment_status ON financial_transactions(payment_status);
-
 CREATE INDEX IF NOT EXISTS idx_payout_schedules_agency_id ON payout_schedules(agency_id);
 CREATE INDEX IF NOT EXISTS idx_payout_schedules_next_scheduled ON payout_schedules(next_scheduled_payout);
-
 CREATE INDEX IF NOT EXISTS idx_commission_records_payout_id ON commission_records(payout_id);
 CREATE INDEX IF NOT EXISTS idx_commission_records_reconciliation ON commission_records(reconciliation_status);
 
@@ -197,18 +275,13 @@ DECLARE
   year_str text;
 BEGIN
   year_str := EXTRACT(YEAR FROM CURRENT_DATE)::text;
-  
-  SELECT COALESCE(MAX(
-    CAST(SUBSTRING(payout_code FROM 'PAY-\d{4}-(\d+)') AS integer)
-  ), 0) + 1
+  SELECT COALESCE(MAX(CAST(SUBSTRING(payout_code FROM 'PAY-\d{4}-(\d+)') AS integer)), 0) + 1
   INTO next_num
   FROM agency_payouts
   WHERE payout_code LIKE 'PAY-' || year_str || '-%';
-  
   RETURN 'PAY-' || year_str || '-' || LPAD(next_num::text, 6, '0');
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER
-SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Create function to generate batch codes
 CREATE OR REPLACE FUNCTION generate_batch_code(p_period_start date)
@@ -219,11 +292,9 @@ DECLARE
 BEGIN
   year_str := EXTRACT(YEAR FROM p_period_start)::text;
   week_num := 'W' || LPAD(EXTRACT(WEEK FROM p_period_start)::text, 2, '0');
-  
   RETURN 'BATCH-' || year_str || '-' || week_num;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER
-SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Create function to generate transaction codes
 CREATE OR REPLACE FUNCTION generate_transaction_code()
@@ -233,18 +304,13 @@ DECLARE
   year_str text;
 BEGIN
   year_str := EXTRACT(YEAR FROM CURRENT_DATE)::text;
-  
-  SELECT COALESCE(MAX(
-    CAST(SUBSTRING(transaction_code FROM 'TXN-\d{4}-(\d+)') AS integer)
-  ), 0) + 1
+  SELECT COALESCE(MAX(CAST(SUBSTRING(transaction_code FROM 'TXN-\d{4}-(\d+)') AS integer)), 0) + 1
   INTO next_num
   FROM financial_transactions
   WHERE transaction_code LIKE 'TXN-' || year_str || '-%';
-  
   RETURN 'TXN-' || year_str || '-' || LPAD(next_num::text, 9, '0');
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER
-SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Create update function for updated_at
 CREATE OR REPLACE FUNCTION update_financial_updated_at()
@@ -253,8 +319,7 @@ BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER
-SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Create triggers for updated_at
 DO $$
@@ -262,35 +327,30 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_agency_payouts_updated_at') THEN
     CREATE TRIGGER update_agency_payouts_updated_at
       BEFORE UPDATE ON agency_payouts
-      FOR EACH ROW
-      EXECUTE FUNCTION update_financial_updated_at();
+      FOR EACH ROW EXECUTE FUNCTION update_financial_updated_at();
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_payout_batches_updated_at') THEN
     CREATE TRIGGER update_payout_batches_updated_at
       BEFORE UPDATE ON payout_batches
-      FOR EACH ROW
-      EXECUTE FUNCTION update_financial_updated_at();
+      FOR EACH ROW EXECUTE FUNCTION update_financial_updated_at();
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_financial_transactions_updated_at') THEN
     CREATE TRIGGER update_financial_transactions_updated_at
       BEFORE UPDATE ON financial_transactions
-      FOR EACH ROW
-      EXECUTE FUNCTION update_financial_updated_at();
+      FOR EACH ROW EXECUTE FUNCTION update_financial_updated_at();
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_payout_schedules_updated_at') THEN
     CREATE TRIGGER update_payout_schedules_updated_at
       BEFORE UPDATE ON payout_schedules
-      FOR EACH ROW
-      EXECUTE FUNCTION update_financial_updated_at();
+      FOR EACH ROW EXECUTE FUNCTION update_financial_updated_at();
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_integration_configs_updated_at') THEN
     CREATE TRIGGER update_integration_configs_updated_at
       BEFORE UPDATE ON integration_configs
-      FOR EACH ROW
-      EXECUTE FUNCTION update_financial_updated_at();
+      FOR EACH ROW EXECUTE FUNCTION update_financial_updated_at();
   END IF;
 END $$;
