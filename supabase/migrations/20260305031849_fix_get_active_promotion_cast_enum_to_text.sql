@@ -1,10 +1,3 @@
-/*
-  # Fix get_active_promotion_for_tour function
-
-  The promotion_type column is an enum, but the function declares it as text in the
-  return type. This causes a type mismatch error that silently breaks the function call
-  from the frontend. This migration recreates the function with the correct cast.
-*/
 
 CREATE OR REPLACE FUNCTION public.get_active_promotion_for_tour(p_tour_id uuid)
 RETURNS TABLE(
