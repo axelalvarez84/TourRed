@@ -1,18 +1,3 @@
-/*
-  # Funcion RPC: auto_accept_expired_slot_reschedules
-
-  ## Descripcion
-  Funcion que se ejecuta periodicamente (via cron) para:
-  1. Auto-aceptar respuestas pendientes cuyo deadline ya expiro
-  2. Una vez que todos los viajeros de una solicitud respondieron o expiraron,
-     mover las reservas aceptadas/auto-aceptadas al slot destino de forma atomica
-  3. Cancelar el slot origen y actualizar booked_count del slot destino
-
-  ## Seguridad
-  - SECURITY DEFINER para poder actualizar bookings y slots sin restricciones de RLS
-  - SET search_path = public para evitar inyeccion de schema
-*/
-
 CREATE OR REPLACE FUNCTION public.auto_accept_expired_slot_reschedules()
 RETURNS jsonb
 LANGUAGE plpgsql
