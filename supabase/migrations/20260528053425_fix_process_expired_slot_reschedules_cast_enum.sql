@@ -1,10 +1,3 @@
-/*
-  # Corregir cast de enum en process_expired_slot_reschedules
-
-  La llamada a update_wallet_balance requiere que p_type sea del tipo
-  toursred_cash_transaction_type (enum), no texto plano.
-*/
-
 CREATE OR REPLACE FUNCTION public.process_expired_slot_reschedules()
 RETURNS jsonb
 LANGUAGE plpgsql
