@@ -1,15 +1,3 @@
-/*
-  # Fix refund_points_for_cancellation negative total_used
-
-  ## Issue
-  When cancelling a booking, the `refund_points_for_cancellation` trigger function
-  does `total_used = total_used - points_to_refund` without protection against going negative.
-  This violates the `toursred_points_wallets_total_used_check` constraint (total_used >= 0).
-
-  ## Fix
-  - Use `GREATEST(0, total_used - v_points_to_refund)` to prevent negative values
-  - Also add duplicate refund protection (check if already refunded)
-*/
 
 CREATE OR REPLACE FUNCTION refund_points_for_cancellation(
   p_booking_id uuid,
