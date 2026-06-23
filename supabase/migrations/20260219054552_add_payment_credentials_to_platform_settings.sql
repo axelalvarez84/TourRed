@@ -1,14 +1,3 @@
-/*
-  # Add payment provider credentials to platform_settings
-
-  ## Changes
-  - Adds `paypal_client_secret` column to store PayPal secret key securely in DB
-  - Adds `mercadopago_access_token` column to store MercadoPago access token in DB
-
-  ## Purpose
-  Allows admins to configure payment provider credentials directly from the admin UI
-  instead of requiring manual Supabase secret configuration.
-*/
 
 DO $$
 BEGIN
