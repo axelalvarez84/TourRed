@@ -1,14 +1,3 @@
-/*
-  # Add name and tags fields to newsletter_subscriptions
-
-  1. Changes
-    - Add `name` field (text, nullable) - Subscriber's name
-    - Add `tags` field (text array, default empty array) - Tags for categorizing subscriptions
-    
-  2. Notes
-    - These fields allow better segmentation of newsletter subscribers
-    - Tags can be used to identify the source or interest area (e.g., 'international_tours_waitlist')
-*/
 
 -- Add name column (nullable since existing records won't have it)
 DO $$
