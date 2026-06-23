@@ -1,15 +1,3 @@
-/*
-  # Fix Tour Promotions RLS Policies
-
-  ## Problem
-  The INSERT/UPDATE/DELETE policies were using a subquery on `agencies` table
-  which is also protected by RLS, causing the subquery to return no results
-  and blocking all agency writes.
-
-  ## Solution
-  Drop existing restrictive policies and replace them with ones that use
-  a SECURITY DEFINER helper function to bypass RLS when checking agency ownership.
-*/
 
 -- Helper function to get the agency id for the current user
 CREATE OR REPLACE FUNCTION public.get_current_user_agency_id()
