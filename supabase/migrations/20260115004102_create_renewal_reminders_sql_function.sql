@@ -1,20 +1,3 @@
-/*
-  # Create SQL Function for Renewal Reminders
-
-  1. Function Purpose
-    - Processes membership renewal reminders directly in PostgreSQL
-    - Finds memberships expiring in 5 days that haven't received reminders
-    - Calls the send-membership-renewal-reminder edge function for each
-  
-  2. Advantages
-    - No need for HTTP credentials in cron job
-    - More efficient than calling wrapper edge function
-    - Better error handling and logging
-  
-  3. Cron Schedule
-    - Updates existing cron job to call this function
-    - Runs daily at 9 AM Mexico City time (15:00 UTC)
-*/
 
 -- Drop the old function if exists
 DROP FUNCTION IF EXISTS public.trigger_renewal_reminders();
