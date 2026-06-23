@@ -1,20 +1,3 @@
-/*
-  # Optimize RLS policies - Part 1: Core tables
-
-  1. Changes
-    - Replace auth.uid() with (select auth.uid()) in RLS policies
-    - This prevents re-evaluation of auth functions for each row
-    - Significantly improves query performance at scale
-    - Part 1 covers: users, agencies, bookings, tours tables
-  
-  2. Security Notes
-    - No changes to security logic, only performance optimization
-    - All existing access controls remain the same
-*/
-
--- ============================================================================
--- USERS TABLE POLICIES
--- ============================================================================
 
 DROP POLICY IF EXISTS "Users can read own data" ON public.users;
 CREATE POLICY "Users can read own data"
