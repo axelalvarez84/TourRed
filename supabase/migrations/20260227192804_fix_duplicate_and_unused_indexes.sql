@@ -1,18 +1,3 @@
-/*
-  # Fix duplicate indexes and drop unused indexes
-
-  ## Summary
-  1. Drop duplicate indexes (keeping one of each pair)
-  2. Drop indexes that have never been used (based on pg_stat_user_indexes)
-
-  ## Duplicate indexes removed
-  - idx_commission_records_reconciliation (duplicate of idx_commission_records_reconciliation_status)
-  - idx_financial_transactions_type (duplicate of idx_financial_transactions_transaction_type)
-
-  ## Unused indexes removed
-  All indexes flagged as unused by the advisor. These add write overhead without
-  providing any read benefit. They can always be re-created if query patterns change.
-*/
 
 -- Drop duplicate indexes
 DROP INDEX IF EXISTS public.idx_commission_records_reconciliation;
