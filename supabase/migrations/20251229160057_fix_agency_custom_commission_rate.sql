@@ -1,16 +1,3 @@
-/*
-  # Fix Agency Custom Commission Rate
-
-  1. Changes
-    - Update create_commission_record function to use agency-specific commission_rate
-    - Previously used platform_settings.agency_commission_percentage for all agencies
-    - Now uses agencies.commission_rate to respect custom rates per agency
-  
-  2. Notes
-    - Falls back to platform_settings.agency_commission_percentage if agency has no custom rate
-    - Maintains all security and schema qualification
-*/
-
 CREATE OR REPLACE FUNCTION public.create_commission_record()
 RETURNS TRIGGER
 LANGUAGE plpgsql
