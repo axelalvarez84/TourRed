@@ -1,22 +1,3 @@
-/*
-  # Fix RLS auth() performance - financial_transactions, referral tables, wallets
-
-  ## Summary
-  Replace auth.uid() with (select auth.uid()) in RLS policies to allow PostgreSQL
-  to evaluate the function once per query instead of once per row, significantly
-  improving query performance at scale.
-
-  ## Tables fixed
-  - financial_transactions (4 policies)
-  - referral_relationships (3 policies)
-  - referral_bonuses (2 policies)
-  - referral_fraud_logs (1 policy)
-  - toursred_cash_wallets (3 policies)
-  - toursred_cash_transactions (2 policies)
-  - toursred_points_wallets (2 policies)
-  - toursred_points_transactions (2 policies)
-  - payout_schedules (5 policies)
-*/
 
 -- financial_transactions
 DROP POLICY IF EXISTS "Agencies can view own transactions" ON public.financial_transactions;
