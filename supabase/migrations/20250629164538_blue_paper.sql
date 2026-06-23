@@ -3,6 +3,8 @@ DROP FUNCTION IF EXISTS get_user_notifications(integer, integer, boolean);
 DROP FUNCTION IF EXISTS create_conversation_with_participants(text, text, uuid, uuid, uuid[]);
 DROP FUNCTION IF EXISTS get_user_conversations();
 DROP FUNCTION IF EXISTS mark_messages_as_read(uuid);
+DROP TRIGGER IF EXISTS update_conversation_last_message_trigger ON messages;
+DROP TRIGGER IF EXISTS mark_message_edited_trigger ON messages;
 DROP FUNCTION IF EXISTS update_conversation_last_message();
 DROP FUNCTION IF EXISTS mark_message_edited();
 
