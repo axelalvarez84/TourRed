@@ -1,17 +1,3 @@
-/*
-  # Fix Points Triggers - Use Correct Status Field
-  
-  ## Changes
-  This migration fixes the trigger functions to use the correct field name `status` instead of `booking_status`.
-  
-  ## Functions Updated
-  1. `auto_award_points_on_booking_completion()` - Changed NEW.booking_status to NEW.status
-  2. `auto_refund_points_on_cancellation()` - Changed NEW.booking_status to NEW.status
-  
-  ## Why This Fix Is Needed
-  The bookings table has a field called `status`, not `booking_status`. The triggers were failing 
-  with error: "record 'new' has no field 'booking_status'"
-*/
 
 -- Fix trigger function to award points - use 'status' instead of 'booking_status'
 CREATE OR REPLACE FUNCTION auto_award_points_on_booking_completion()
