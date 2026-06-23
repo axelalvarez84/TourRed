@@ -1,22 +1,3 @@
-/*
-  # Correccion de RFC duplicado y constraints faltantes
-
-  ## Cambios
-
-  ### 1. Limpiar RFC duplicado en viajeros
-  - El viajero aalvarez@coldview.com tiene el mismo RFC que axelalvarez@outlook.com (AAHA84102489A)
-  - Se establece su RFC en NULL para permitir crear el indice unico
-
-  ### 2. Indice unico parcial en users.rfc para viajeros
-  - Impide que dos viajeros tengan el mismo RFC
-  - Es parcial: solo aplica cuando role = 'traveler' y rfc IS NOT NULL
-  - No afecta agencias (tabla separada) ni viajeros sin RFC
-
-  ### 3. Constraint unico compuesto en accounting_sync_log
-  - Agrega UNIQUE(provider, record_type, record_id) que el upsert requiere
-  - Sin este constraint, el upsert con onConflict falla silenciosamente
-  - Causa raiz de que el historial de sincronizacion siempre aparece vacio
-*/
 
 -- 1. Limpiar RFC duplicado: dejar NULL al viajero con email aalvarez@coldview.com
 UPDATE users
