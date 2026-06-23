@@ -1,20 +1,3 @@
-/*
-  # Create Deduct Points Function for Confirmed Bookings
-  
-  ## Purpose
-  When a booking payment is confirmed, this function deducts the points from the user's wallet.
-  
-  ## Function
-  - `deduct_points_for_booking`: Deducts points when a booking is paid
-    - Decreases wallet balance
-    - Creates a redeemed transaction
-    - Marks as 'redeemed' type
-  
-  ## Security
-  - SECURITY DEFINER to allow system-level deductions
-  - Proper search_path to prevent injection
-  - Prevents duplicate deductions
-*/
 
 CREATE OR REPLACE FUNCTION deduct_points_for_booking(
   p_booking_id uuid,
