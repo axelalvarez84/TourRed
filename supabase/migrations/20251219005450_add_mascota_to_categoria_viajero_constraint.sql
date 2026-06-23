@@ -1,10 +1,3 @@
-/*
-  # Agregar 'mascota' al constraint de categoria_viajero
-
-  1. Cambios
-    - Eliminar el constraint existente
-    - Crear nuevo constraint que incluya 'mascota'
-*/
 
 -- Eliminar el constraint existente
 ALTER TABLE booking_travelers 
