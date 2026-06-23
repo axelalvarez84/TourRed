@@ -1,13 +1,15 @@
-
-
 CREATE INDEX IF NOT EXISTS idx_agency_payouts_agency_id
   ON public.agency_payouts (agency_id);
 
 CREATE INDEX IF NOT EXISTS idx_agency_payouts_payout_batch_id
   ON public.agency_payouts (payout_batch_id);
 
-CREATE INDEX IF NOT EXISTS idx_batch_payouts_payout_id
-  ON public.batch_payouts (payout_id);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'batch_payouts') THEN
+    CREATE INDEX IF NOT EXISTS idx_batch_payouts_payout_id ON public.batch_payouts (payout_id);
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_booking_cancellations_booking_id
   ON public.booking_cancellations (booking_id);
@@ -75,8 +77,12 @@ CREATE INDEX IF NOT EXISTS idx_gift_card_redemption_attempts_user_id
 CREATE INDEX IF NOT EXISTS idx_gift_cards_redeemed_by
   ON public.gift_cards (redeemed_by);
 
-CREATE INDEX IF NOT EXISTS idx_integration_configs_agency_id
-  ON public.integration_configs (agency_id);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'integration_configs') THEN
+    CREATE INDEX IF NOT EXISTS idx_integration_configs_agency_id ON public.integration_configs (agency_id);
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_platform_settings_updated_by
   ON public.platform_settings (updated_by);
