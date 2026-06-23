@@ -1,12 +1,3 @@
-/*
-  # Fix Award Points Function - Use Correct Table Name
-  
-  ## Problem
-  The function references 'toursred_plus_memberships' but the table is actually called 'memberships'
-  
-  ## Solution
-  Update function to use correct table name
-*/
 
 -- Drop and recreate with correct table name
 DROP FUNCTION IF EXISTS award_points_for_booking(uuid, uuid, numeric, integer, numeric);
