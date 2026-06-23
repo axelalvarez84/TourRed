@@ -1,34 +1,4 @@
-/*
-  # Modulo CFDI Manual
-
-  ## Descripcion
-  Infraestructura de base de datos para el modulo de facturacion CFDI manual
-  desde el panel admin. Permite emitir facturas de ingreso (I), notas de credito
-  (E) y complementos de pago (P) para mayoristas y proveedores externos.
-
-  ## Cambios
-
-  ### 1. cfdi_invoices — nuevas columnas
-  - `is_manual`: distingue facturas manuales de las automaticas del sistema
-  - `cfdi_type`: tipo de comprobante SAT ('I', 'E', 'P')
-  - `payment_method_sat`: 'PUE' o 'PPD' — persistido para consultar facturas PPD pendientes
-  - `source_notes`: nota interna del admin (no aparece en el XML)
-  - `accounting_account_code`: cuenta contable destino elegida al timbrar
-  - Ampliar CHECK de invoice_type para incluir 'manual'
-
-  ### 2. manual_cfdi_recipients — directorio de receptores frecuentes
-  Guarda mayoristas y proveedores para no recapturar datos en cada factura.
-
-  ### 3. create_accounting_entry_for_manual_cfdi(uuid)
-  Funcion RPC que genera el asiento contable automaticamente segun el tipo
-  de comprobante (I, E o P) inmediatamente despues de timbrar.
-
-  ### Seguridad
-  - RLS habilitado en manual_cfdi_recipients
-  - Solo admins pueden ver y modificar receptores frecuentes
-*/
-
--- ─── 1. Nuevas columnas en cfdi_invoices ─────────────────────────────────────
+-- 1. Nuevas columnas en cfdi_invoices
 
 DO $$
 BEGIN
@@ -82,7 +52,7 @@ EXCEPTION WHEN others THEN
   NULL; -- Si falla por filas existentes fuera del rango, ignorar (no deberia pasar)
 END $$;
 
--- ─── 2. Tabla manual_cfdi_recipients ─────────────────────────────────────────
+-- 2. Tabla manual_cfdi_recipients
 
 CREATE TABLE IF NOT EXISTS manual_cfdi_recipients (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -155,7 +125,7 @@ CREATE POLICY "Admins can delete manual cfdi recipients"
     )
   );
 
--- ─── 3. Funcion RPC: asiento contable para CFDI manual ───────────────────────
+-- 3. Funcion RPC: asiento contable para CFDI manual
 
 CREATE OR REPLACE FUNCTION create_accounting_entry_for_manual_cfdi(p_cfdi_invoice_id uuid)
 RETURNS uuid
@@ -229,7 +199,7 @@ BEGIN
   )
   RETURNING id INTO v_entry_id;
 
-  -- ── Asiento segun tipo ────────────────────────────────────────────────────
+  -- Asiento segun tipo
   IF v_cfdi.cfdi_type = 'I' THEN
     -- Ingreso: Debito Bancos / Credito cuenta de ingreso
     INSERT INTO accounting_entry_lines (entry_id, line_number, account_code, description, debit, credit, cfdi_uuid)
