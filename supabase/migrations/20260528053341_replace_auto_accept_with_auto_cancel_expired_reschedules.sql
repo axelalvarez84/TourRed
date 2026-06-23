@@ -1,27 +1,3 @@
-/*
-  # Reemplazar auto-aceptacion por auto-cancelacion en reagendaciones vencidas
-
-  ## Descripcion
-  Cuando vence el plazo de respuesta a una reagendacion de slot, en lugar de
-  auto-aceptar y mover la reserva al nuevo horario (comportamiento anterior),
-  ahora se cancela la reserva sin penalizacion para el viajero y se reembolsa
-  el 100% del deposito pagado en ToursRed Cash.
-
-  ## Razonamiento
-  - La agencia fue quien reagendo, no el viajero
-  - Si el viajero no respondio, lo mas probable es que no pueda/vaya al nuevo horario
-  - Auto-aceptar seria injusto: moverlo a un horario que quizas no le conviene
-  - La cancelacion sin penalizacion protege al viajero en este escenario
-
-  ## Cambios
-  1. Funcion `process_expired_slot_reschedules()` (reemplaza `auto_accept_expired_slot_reschedules`)
-     - Por cada respuesta pendiente vencida: cancela la reserva con reembolso en ToursRed Cash
-     - Actualiza contadores del slot origen
-     - Crea notificaciones para los viajeros afectados
-  2. Cron job actualizado para usar la nueva funcion
-  3. Cron job anterior eliminado
-*/
-
 -- Eliminar cron job anterior
 SELECT cron.unschedule('auto-accept-expired-slot-reschedules');
 
