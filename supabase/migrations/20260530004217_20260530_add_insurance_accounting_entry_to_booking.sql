@@ -1,27 +1,3 @@
-/*
-  # Asiento Contable del Seguro de Viaje en create_accounting_entry_for_booking
-
-  ## Descripcion
-  Modifica la funcion create_accounting_entry_for_booking para que, cuando un booking
-  incluye seguro de viaje, se agreguen partidas contables en la cuenta 405
-  (Ingresos por Seguros de Viaje), completamente aisladas de las partidas del tour
-  y del cargo por servicio.
-
-  ## Cambios
-
-  ### Logica de asiento con seguro
-  Cuando travel_insurance_included = true y travel_insurance_cost > 0:
-  - Debito adicional cuenta 102 (Bancos) por el monto del seguro con IVA
-  - Credito cuenta 405 (Ingresos por Seguros) por el monto base sin IVA
-  - El total_received incluye el seguro para que el debito a Bancos cuadre
-
-  ### Notas
-  - El IVA del seguro esta contenido implicitamente en la partida de 405:
-    Bancos recibe travel_insurance_cost (con IVA), 405 recibe travel_insurance_cost / 1.16
-    y la diferencia (IVA) se puede desglosar con cuenta de IVA trasladado si se requiere
-    en una etapa futura. Por ahora se registra como ingreso bruto en 405 para simplicidad.
-  - Las partidas del tour (208) y cargo de servicio (402) no se modifican.
-*/
 
 CREATE OR REPLACE FUNCTION create_accounting_entry_for_booking(p_booking_id uuid)
 RETURNS uuid
