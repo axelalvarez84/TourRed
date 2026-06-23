@@ -1,17 +1,3 @@
-/*
-  # Fix RLS auth() performance - gift cards, booking cancellations, reschedules, tour cancellations
-
-  ## Summary
-  Replace auth.uid() with (select auth.uid()) for per-row evaluation optimization.
-
-  ## Tables fixed
-  - gift_cards (3 policies)
-  - gift_card_redemption_attempts (2 policies)
-  - booking_cancellations (4 policies)
-  - booking_reschedule_responses (3 policies)
-  - tour_reschedules (4 policies)
-  - tour_cancellations (2 policies)
-*/
 
 -- gift_cards
 DROP POLICY IF EXISTS "Users can view their redeemed gift cards" ON public.gift_cards;
