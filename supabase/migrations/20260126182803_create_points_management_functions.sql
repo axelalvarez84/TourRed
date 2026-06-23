@@ -1,23 +1,3 @@
-/*
-  # Create Points Management Functions
-
-  ## Overview
-  This migration creates all the database functions needed to manage the ToursRed Points system.
-
-  ## Functions Created
-
-  1. **create_points_wallet_for_traveler** - Creates a new points wallet for a user
-  2. **get_or_create_points_wallet** - Gets existing wallet or creates new one
-  3. **calculate_available_points** - Calculates non-expired points available for use
-  4. **check_can_use_points** - Validates if user can use points (active membership)
-  5. **award_points_for_booking** - Awards points when booking is completed
-  6. **redeem_points_for_booking** - Redeems points with FIFO and 50% limit validation
-  7. **refund_points_for_cancellation** - Refunds points when booking is cancelled
-
-  ## Security
-  All functions use SECURITY DEFINER to bypass RLS and maintain data integrity
-  All functions have search_path set to public for security
-*/
 
 -- Function 1: Create points wallet for a traveler
 CREATE OR REPLACE FUNCTION create_points_wallet_for_traveler(p_user_id uuid)
