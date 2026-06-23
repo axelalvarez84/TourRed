@@ -1,13 +1,3 @@
-/*
-  # Corregir función get_conversation_messages
-
-  1. Cambios
-    - Especificar completamente las columnas para evitar ambigüedad
-    - m.id en lugar de solo id
-
-  2. Seguridad
-    - Sin cambios en seguridad
-*/
 
 DROP FUNCTION IF EXISTS get_conversation_messages(uuid);
 
