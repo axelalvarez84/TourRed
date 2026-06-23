@@ -1,15 +1,3 @@
-/*
-  # Corregir política de administradores para conversaciones
-
-  1. Cambios
-    - Eliminar la política que causa recursión consultando directamente la tabla users
-    - Crear nueva política usando la función is_super_admin() que evita recursión
-    - Agregar política para admins con permiso can_manage_messages
-
-  2. Seguridad
-    - Solo super admins y admins con permiso específico pueden ver todas las conversaciones
-    - Se evita recursión usando funciones SECURITY DEFINER
-*/
 
 -- Eliminar la política problemática
 DROP POLICY IF EXISTS "Admins can view all conversations" ON conversations;
