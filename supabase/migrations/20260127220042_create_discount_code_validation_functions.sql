@@ -1,17 +1,3 @@
-/*
-  # Create Discount Code Validation Functions
-
-  1. Functions
-    - `validate_discount_code` - Validates if a code can be used by a user
-    - `apply_discount_code` - Applies a discount code and records usage
-    - `get_discount_code_details` - Gets full details of a discount code including usage stats
-    - `check_user_code_usage` - Checks if a user has already used a specific code
-
-  2. Security
-    - All functions use SECURITY DEFINER with explicit search_path
-    - Proper authentication checks
-    - Input validation
-*/
 
 -- Function to check if user has already used a discount code
 CREATE OR REPLACE FUNCTION check_user_code_usage(
