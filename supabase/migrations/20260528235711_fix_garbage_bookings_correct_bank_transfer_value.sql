@@ -1,11 +1,3 @@
-/*
-  # Corregir valor de payment_method para transferencia bancaria
-
-  El valor almacenado en la columna payment_method para transferencias bancarias
-  es 'Transferencia Bancaria' (no 'bank_transfer' como se asumio inicialmente).
-  Se corrige la funcion get_garbage_bookings y la policy DELETE para usar
-  el valor correcto.
-*/
 
 DROP FUNCTION IF EXISTS get_garbage_bookings(integer);
 
