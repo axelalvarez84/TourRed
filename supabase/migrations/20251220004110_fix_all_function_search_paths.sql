@@ -1,16 +1,3 @@
-/*
-  # Fix function search paths for security
-
-  1. Changes
-    - Set search_path to '' for all public schema functions
-    - This prevents security issues from search_path manipulation
-  
-  2. Security Notes
-    - Functions with mutable search paths can be exploited
-    - Setting search_path to '' requires fully qualified table names
-    - This is a security best practice
-*/
-
 -- Update all functions in the public schema to have immutable search paths
 DO $$
 DECLARE
