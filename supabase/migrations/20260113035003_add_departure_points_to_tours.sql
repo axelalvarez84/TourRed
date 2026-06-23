@@ -1,17 +1,3 @@
-/*
-  # Agregar puntos de partida a tours
-
-  1. Cambios en la tabla tours
-    - Agregar columna `departure_points` (text array)
-      - Almacena los puntos de partida del tour
-      - Al menos uno es obligatorio
-      - Ejemplos: "Monumento a la Revolución", "Metro Oceanía", etc.
-
-  2. Notas
-    - Campo obligatorio (al menos un punto de partida)
-    - Permite múltiples puntos de partida
-    - Facilita búsqueda y filtrado por ubicación de salida
-*/
 
 -- Agregar columna departure_points
 DO $$
