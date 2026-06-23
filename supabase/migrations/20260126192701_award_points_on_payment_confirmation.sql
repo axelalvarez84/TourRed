@@ -1,17 +1,3 @@
-/*
-  # Award Points on Payment Confirmation
-  
-  ## Changes
-  This migration updates the points trigger to award points when payment is confirmed (status = 'confirmed'),
-  instead of waiting until the tour is completed (status = 'completed').
-  
-  ## Rationale
-  Users should receive their points immediately after completing payment, not after the tour ends.
-  This provides immediate value and better user experience.
-  
-  ## Functions Updated
-  - `auto_award_points_on_booking_completion()` - Now awards points on 'confirmed' status
-*/
 
 -- Update trigger function to award points when payment is confirmed
 CREATE OR REPLACE FUNCTION auto_award_points_on_booking_completion()
