@@ -1,19 +1,3 @@
-/*
-  # Create Refund Points Function for Cancelled Bookings
-  
-  ## Purpose
-  When a payment is cancelled or fails, this function returns the points to the user's wallet.
-  
-  ## Function
-  - `refund_points_for_cancelled_booking`: Refunds points when a booking is cancelled
-    - Increases wallet balance
-    - Creates a refund transaction
-    - Marks as 'refunded' type
-  
-  ## Security
-  - SECURITY DEFINER to allow system-level refunds
-  - Proper search_path to prevent injection
-*/
 
 CREATE OR REPLACE FUNCTION refund_points_for_cancelled_booking(
   p_booking_id uuid,
