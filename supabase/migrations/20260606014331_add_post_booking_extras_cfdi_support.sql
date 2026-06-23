@@ -1,22 +1,3 @@
-/*
-  # Soporte de CFDI para extras post-reserva (servicios opcionales y seguro post-reserva)
-
-  ## Cambios
-
-  1. Nuevos tipos de factura en cfdi_invoices:
-     - 'optional_service'      → servicio opcional comprado post-reserva (nodo terceros de agencia)
-     - 'post_booking_insurance' → seguro contratado post-reserva (directo ToursRed, sin terceros)
-
-  2. Nueva columna booking_optional_service_id en cfdi_invoices
-     para ligar la factura al registro específico de booking_optional_services
-
-  3. RLS: permite al viajero insertar en booking_optional_services
-     para la compra post-reserva (la reserva le pertenece)
-
-  4. RLS: permite al viajero actualizar travel_insurance_included y travel_insurance_cost
-     en bookings cuando el seguro aun no fue contratado
-*/
-
 -- ── 1. Nuevo tipo de invoice ────────────────────────────────────────────────
 
 ALTER TABLE public.cfdi_invoices DROP CONSTRAINT IF EXISTS cfdi_invoices_invoice_type_check;
