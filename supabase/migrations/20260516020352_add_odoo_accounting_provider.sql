@@ -1,14 +1,3 @@
-/*
-  # Agregar soporte para Odoo como proveedor contable
-
-  1. Cambios en platform_settings
-    - `odoo_url` (text) — URL de la instancia Odoo (ej. https://toursred.odoo.com)
-    - `odoo_api_key_encrypted` (text) — API key de Odoo (bearer token JSON-2 API)
-    - `odoo_database` (text) — Nombre de la base de datos Odoo (header X-Odoo-Database)
-
-  2. Constraint actualizado
-    - Se extiende accounting_provider para aceptar 'odoo' además de 'none', 'zoho_books', 'quickbooks'
-*/
 
 DO $$
 BEGIN
