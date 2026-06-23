@@ -1,24 +1,3 @@
-/*
-  # Fix Points Earned on All Real Money Payments
-  
-  ## Correction
-  Points should be earned on ALL real money payments:
-  - Payments with ToursRed Cash → YES, earn points (1 peso = 1 point)
-  - Payments with Stripe → YES, earn points (1 peso = 1 point)
-  - Payments with ToursRed Points → NO, don't earn points (can't earn points by spending points)
-  
-  ## Formula
-  Points earned = FLOOR(user_payment - (points_used / 100))
-  
-  This represents all money paid (ToursRed Cash + Stripe) excluding the points used.
-  
-  ## Example
-  - User pays $375 total
-  - Uses 1042 points ($10.42)
-  - Uses $354.16 ToursRed Cash
-  - Uses $10.42 Stripe
-  - Points earned = FLOOR(375 - 10.42) = FLOOR(364.58) = 364 points
-*/
 
 DROP FUNCTION IF EXISTS award_points_for_booking(uuid, uuid, numeric, integer, numeric);
 
