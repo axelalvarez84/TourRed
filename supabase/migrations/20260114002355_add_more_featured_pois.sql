@@ -1,26 +1,3 @@
-/*
-  # Add More Featured POIs
-  
-  1. Changes
-    - Add 13 new featured POIs commonly used as tour departure points
-    - Includes metro stations and bus terminals
-    - All with accurate coordinates and keywords for better search
-    
-  2. New POIs
-    - Metro Deportivo 18 de Marzo
-    - Metro Buenavista
-    - Metro Deportivo Oceanía
-    - Metro Bosque de Aragón
-    - Metro Villa de Cortés
-    - Metro Etiopía
-    - Metro División del Norte
-    - Metro Chabacano
-    - Central de Autobuses de Tepotzotlán
-    - Metro General Anaya
-    - Metro Santa Martha
-    - Caseta Chalco
-    - Metro Centro Médico
-*/
 
 -- Insert additional popular POIs
 INSERT INTO featured_pois (name, description, category, address, city, state, latitude, longitude, keywords) VALUES
