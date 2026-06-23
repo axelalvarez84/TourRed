@@ -1,22 +1,3 @@
-/*
-  # Revocar EXECUTE PUBLIC en funciones SECURITY DEFINER no protegidas
-
-  PostgreSQL otorga EXECUTE a PUBLIC por defecto al crear funciones. Estas funciones
-  usan SECURITY DEFINER (corren con permisos del owner) y no deben ser invocables
-  sin autenticación.
-
-  Funciones afectadas:
-  - activate_featured_slot: solo debe llamarse desde contextos autenticados
-  - confirm_featured_slot_payment: llamada por webhook/edge function (service_role)
-  - create_accounting_entry_for_featured_slot: interna, llamada desde edge functions
-  - deduct_points: interna, protegida por lógica de negocio
-  - expire_supplement_approvals: cron job (service_role)
-  - get_payment_plan_minimum_at_booking: consulta pública de planes de pago
-  - increment_featured_stat: interna, llamada desde edge functions
-  - process_payment_plan_deadlines: cron job (service_role)
-  - update_payment_plan_updated_at: trigger function
-*/
-
 -- activate_featured_slot: solo usuarios autenticados pueden activar slots
 REVOKE ALL ON FUNCTION public.activate_featured_slot(uuid, uuid, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.activate_featured_slot(uuid, uuid, uuid) TO authenticated;
