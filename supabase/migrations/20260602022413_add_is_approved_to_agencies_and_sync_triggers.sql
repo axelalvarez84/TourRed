@@ -1,19 +1,3 @@
-/*
-  # Agregar is_approved a agencies y sincronización bidireccional
-
-  ## Resumen
-  La tabla agencies no tenía columna is_approved propia — solo existía en users.
-  ExecutiveMisAgencias filtraba por agencies.is_approved y fallaba silenciosamente,
-  dejando la lista vacía.
-
-  ## Cambios
-  1. Nueva columna `agencies.is_approved` (boolean, DEFAULT false)
-  2. Backfill: sincroniza valores actuales desde users.is_approved
-  3. Trigger agencies → users: al aprobar desde el panel del ejecutivo actualiza users
-  4. Trigger users → agencies: al aprobar desde AdminAgencies actualiza agencies
-  5. RLS: admins y el ejecutivo dueño pueden actualizar is_approved en agencies
-*/
-
 -- 1. Agregar columna
 ALTER TABLE agencies ADD COLUMN IF NOT EXISTS is_approved boolean NOT NULL DEFAULT false;
 
