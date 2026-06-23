@@ -1,21 +1,3 @@
-/*
-  # Soporte de CFDI para cobros wallet en check-in
-
-  ## Cambios
-  
-  ### Tabla: cfdi_invoices
-  - Se agrega el valor 'checkin_wallet' al constraint cfdi_invoices_invoice_type_check
-    para permitir registrar facturas de cobros de wallet realizados durante el check-in.
-  - Se agrega columna checkin_charge_id (uuid, nullable) con FK a wallet_checkin_charges(id),
-    usada para deduplicar y asociar el CFDI al cobro específico de check-in.
-  - Se crea índice en checkin_charge_id para búsquedas eficientes.
-
-  ## Notas
-  - Los CFDIs de tipo 'checkin_wallet' usan forma de pago "17" (Compensación SAT)
-    ya que ToursRed Cash es un saldo interno de plataforma, no un monedero financiero regulado.
-  - La factura se emite al momento del cobro, no cuando se genera el saldo.
-*/
-
 -- 1. Ampliar el check constraint de invoice_type para incluir 'checkin_wallet'
 ALTER TABLE cfdi_invoices
   DROP CONSTRAINT IF EXISTS cfdi_invoices_invoice_type_check;
