@@ -1,13 +1,3 @@
-/*
-  # Corregir funciones de mensajería para usar tours.name
-
-  1. Cambios
-    - Cambiar t.title a t.name (la columna correcta de tours)
-    - Mantener toda la lógica existente
-
-  2. Seguridad
-    - Sin cambios en seguridad
-*/
 
 -- Eliminar funciones existentes
 DROP FUNCTION IF EXISTS _get_user_conversations_internal(uuid);
