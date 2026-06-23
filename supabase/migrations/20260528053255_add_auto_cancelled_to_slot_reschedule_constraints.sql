@@ -1,18 +1,3 @@
-/*
-  # Agregar auto_cancelled a constraints de reagendacion de slot
-
-  ## Cambios
-  1. Tabla `slot_reschedule_responses`
-     - Agrega 'auto_cancelled' como valor valido en columna `response`
-  2. Tabla `bookings`
-     - Agrega 'slot_reschedule_no_response' como valor valido en columna `cancellation_type`
-
-  ## Motivo
-  Cuando vence el plazo de respuesta del viajero a una reagendacion de slot,
-  la reserva se cancela automaticamente sin penalizacion. Se necesitan estos
-  nuevos valores para registrar el motivo correctamente.
-*/
-
 -- Agregar 'auto_cancelled' al CHECK constraint de slot_reschedule_responses.response
 ALTER TABLE slot_reschedule_responses
   DROP CONSTRAINT IF EXISTS slot_reschedule_responses_response_check;
