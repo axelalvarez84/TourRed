@@ -1,18 +1,3 @@
-/*
-  # Create Points System Triggers
-
-  ## Overview
-  This migration creates automated triggers for the points system.
-
-  ## Triggers Created
-
-  1. **auto_award_points_on_booking_completion** - Automatically awards points when booking status changes to 'completed'
-  2. **sync_membership_with_points_wallet** - Syncs membership status with points wallet is_active flag
-  3. **auto_create_wallet_on_membership_creation** - Creates points wallet when user gets first membership
-
-  ## Security
-  All trigger functions use SECURITY DEFINER to bypass RLS
-*/
 
 -- Trigger function to auto-award points when booking is completed
 CREATE OR REPLACE FUNCTION auto_award_points_on_booking_completion()
