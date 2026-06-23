@@ -1,14 +1,3 @@
-/*
-  # Fix deduct_points_for_partial_cancellation function
-
-  ## Problem
-  The function used type='partial_cancellation' and reference_type='booking_partial_cancellation'
-  which were not allowed by the table CHECK constraints. Now that constraints are fixed,
-  the function will work correctly.
-
-  No changes needed to the function logic itself — it was already correct.
-  This migration just re-creates it to ensure it's deployed cleanly.
-*/
 
 CREATE OR REPLACE FUNCTION deduct_points_for_partial_cancellation(
   p_booking_id uuid,
