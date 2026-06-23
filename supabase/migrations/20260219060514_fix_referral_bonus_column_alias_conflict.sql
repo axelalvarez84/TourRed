@@ -1,10 +1,3 @@
-/*
-  # Fix award_referral_bonus - resolve column alias conflict
-
-  The function was joining bookings and users and selecting b.*, u.referred_by_user_id
-  but bookings.* also expands to include user_id which caused ambiguity.
-  Using explicit alias u_referred_by for the users column to avoid conflict.
-*/
 
 CREATE OR REPLACE FUNCTION public.award_referral_bonus(p_booking_id uuid)
 RETURNS void
