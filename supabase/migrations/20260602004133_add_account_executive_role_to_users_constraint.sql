@@ -1,13 +1,3 @@
-/*
-  # Fix users role check constraint to include account_executive
-
-  1. Changes
-    - Drops the existing users_role_check constraint
-    - Recreates it including 'account_executive' as a valid role
-    - Creates the missing public.users profile for any orphaned auth user with meta_role=account_executive
-    - Creates the corresponding account_executives record
-*/
-
 -- Update the role check constraint to include account_executive
 ALTER TABLE public.users
   DROP CONSTRAINT IF EXISTS users_role_check;
