@@ -1,23 +1,3 @@
-/*
-  # Create generic deduct_points function
-
-  ## Purpose
-  The process-supplement-payment edge function calls `deduct_points` with generic
-  parameters (p_user_id, p_amount, p_description, p_reference_id, p_reference_type)
-  but only `deduct_points_for_booking` existed, causing a "function not found" error
-  when paying supplements with points.
-
-  ## New Function
-  - `deduct_points`: General-purpose point deduction for any payment type
-    - Accepts any reference_type (supplement_payment, booking, etc.)
-    - Decreases wallet balance and increases total_used
-    - Creates a 'redeemed' transaction
-    - Prevents duplicate deductions per reference_id
-
-  ## Security
-  - SECURITY DEFINER
-  - Proper search_path
-*/
 
 CREATE OR REPLACE FUNCTION public.deduct_points(
   p_user_id uuid,
