@@ -1,22 +1,3 @@
-/*
-  # Crear funcion RPC batch get_promotions_for_tours
-
-  ## Descripcion
-  Reemplaza el patron N+1 donde cada TourCard llamaba individualmente a
-  get_active_promotion_for_tour. Esta nueva funcion recibe un array de IDs
-  de tours y devuelve todas las promociones activas en una sola consulta,
-  reduciendo drasticamente el numero de requests a Supabase.
-
-  ## Nueva Funcion
-  - `get_promotions_for_tours(p_tour_ids uuid[])` - Recibe array de tour IDs,
-    devuelve tabla con tour_id y datos de la promocion activa para cada tour.
-    Usa la misma logica de filtrado que get_active_promotion_for_tour pero
-    para multiples tours a la vez (DISTINCT ON garantiza 1 resultado por tour).
-
-  ## Impacto en Egress
-  - Antes: 1 query por cada TourCard visible (20-30 queries por pagina)
-  - Despues: 1 sola query por carga de pagina
-*/
 
 CREATE OR REPLACE FUNCTION public.get_promotions_for_tours(p_tour_ids uuid[])
 RETURNS TABLE (
