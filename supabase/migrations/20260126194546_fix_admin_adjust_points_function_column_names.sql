@@ -1,13 +1,3 @@
-/*
-  # Fix Admin Adjust Points Function - Column Names
-  
-  ## Changes
-  This migration fixes the admin_adjust_points function to use the correct
-  column names from the toursred_points_transactions table:
-  - Use "type" instead of "transaction_type"
-  - Use "amount" instead of "points_amount"
-  - Calculate "balance_after" correctly
-*/
 
 -- Drop and recreate the function with correct column names
 DROP FUNCTION IF EXISTS admin_adjust_points(UUID, INTEGER, TEXT);
