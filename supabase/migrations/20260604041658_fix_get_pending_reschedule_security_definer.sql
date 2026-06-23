@@ -1,18 +1,3 @@
-/*
-  # Fix infinite recursion in get_pending_reschedule_for_booking
-
-  ## Problem
-  Calling the function causes PostgreSQL to detect infinite recursion:
-  - `booking_reschedule_responses` SELECT policy accesses `tour_reschedules`
-  - `tour_reschedules` SELECT policy accesses `booking_reschedule_responses`
-  
-  This creates a circular dependency when any authenticated user queries either table.
-
-  ## Fix
-  Convert `get_pending_reschedule_for_booking` to SECURITY DEFINER so it
-  executes as the function owner (bypassing RLS) instead of as the calling user.
-  The function already filters by booking_id so it does not expose unauthorized data.
-*/
 
 CREATE OR REPLACE FUNCTION public.get_pending_reschedule_for_booking(p_booking_id uuid)
 RETURNS json
