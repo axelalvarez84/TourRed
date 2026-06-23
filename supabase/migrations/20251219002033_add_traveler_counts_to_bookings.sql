@@ -1,14 +1,3 @@
-/*
-  # Agregar conteos de viajeros por categoría a la tabla bookings
-
-  1. Cambios
-    - Agregar columnas para almacenar conteos de cada categoría de viajero
-      - count_adultos (integer)
-      - count_ninos (integer)
-      - count_infantes (integer)
-      - count_adultos_mayores (integer)
-      - count_mascotas (integer)
-*/
 
 DO $$
 BEGIN
