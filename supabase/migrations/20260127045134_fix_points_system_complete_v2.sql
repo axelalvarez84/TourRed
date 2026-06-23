@@ -1,18 +1,3 @@
-/*
-  # Fix Points System - Complete Rewrite
-  
-  ## Problems Fixed
-  1. Triggers were checking 'booking_status' column which doesn't exist (should be 'status')
-  2. Functions reference 'toursred_plus_memberships' but table is 'memberships'
-  3. Points accumulation logic was disconnected from payment process
-  4. No atomic transaction handling
-  
-  ## Solution
-  1. Drop and recreate triggers with correct column name 'status'
-  2. Drop and recreate functions with correct table name 'memberships'
-  3. Create unified function to handle payment + points in single atomic operation
-  4. Update trigger to fire on 'confirmed' status with 'succeeded' payment
-*/
 
 -- Drop old broken triggers first
 DROP TRIGGER IF EXISTS trigger_auto_award_points_on_completion ON bookings;
