@@ -1,12 +1,4 @@
-/*
-  # Agregar campo de precio para mascotas
 
-  1. Cambios
-    - Agregar columna `precio_mascota` a la tabla `tours`
-      - Tipo: decimal(10,2)
-      - Nullable: true
-      - Descripción: Precio adicional por mascota si el tour es pet friendly
-*/
 
 DO $$
 BEGIN
