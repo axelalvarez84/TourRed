@@ -1,10 +1,3 @@
-/*
-  # Corregir notify_executive_by_email para usar URL y anon key hardcodeados
-
-  Las funciones SQL del proyecto usan la URL del proyecto y el anon key
-  directamente en el código (son valores públicos, no secretos).
-  Reemplaza la versión anterior que intentaba leer columnas inexistentes.
-*/
 
 CREATE OR REPLACE FUNCTION notify_executive_by_email(p_payload JSONB)
 RETURNS VOID
