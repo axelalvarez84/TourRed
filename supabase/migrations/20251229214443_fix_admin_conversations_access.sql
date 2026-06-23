@@ -1,15 +1,3 @@
-/*
-  # Corregir acceso de administradores a conversaciones
-
-  1. Cambios
-    - Cambiar INNER JOIN a LEFT JOIN para message_participants cuando sea admin
-    - Corregir la lógica de filtrado para que admins vean todas las conversaciones
-    - Corregir ambigüedad en referencias a columnas
-
-  2. Seguridad
-    - Mantiene restricciones para usuarios no-admin
-    - Administradores tienen acceso completo para moderación
-*/
 
 DROP FUNCTION IF EXISTS get_user_conversations(uuid);
 
