@@ -1,23 +1,3 @@
-/*
-  # Add Booking Code System
-
-  1. Changes
-    - Add `booking_code` field to `bookings` table with format TRG-XXXXXXXXXXX (11 alphanumeric chars)
-    - Create function to generate unique booking codes
-    - Add unique constraint to ensure no duplicates
-    - Backfill existing bookings with codes
-    - Set default to auto-generate codes for new bookings
-
-  2. Security
-    - Booking codes are publicly readable (easier for customer service)
-    - Only system can generate codes (via function)
-    
-  3. Format
-    - Prefix: TRG-
-    - Length: 11 alphanumeric characters (uppercase)
-    - Total: 15 characters including prefix
-    - Combinations: 36^11 ≈ 131 trillion possible codes
-*/
 
 -- Function to generate a random alphanumeric string
 CREATE OR REPLACE FUNCTION generate_random_alphanumeric(length INTEGER)
