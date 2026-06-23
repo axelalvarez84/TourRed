@@ -1,16 +1,3 @@
-/*
-  # RPC para reservas basura y politica DELETE para admins
-
-  ## Problema
-  La consulta directa desde el cliente con JOINs a users/tours/agencies falla
-  silenciosamente por RLS en esas tablas. La solucion es una funcion SECURITY DEFINER
-  que bypasea RLS internamente, y una politica DELETE para que admins puedan eliminar.
-
-  ## Cambios
-  1. Funcion `get_garbage_bookings(threshold_days int)` - SECURITY DEFINER, retorna
-     todas las reservas basura con datos de usuario, tour y agencia
-  2. Politica DELETE en bookings para admins (solo payment_status = pending)
-*/
 
 CREATE OR REPLACE FUNCTION get_garbage_bookings(threshold_days int DEFAULT 7)
 RETURNS TABLE (
