@@ -1,29 +1,3 @@
-/*
-  # Seguro de Viaje: Campo en commission_records y Cuenta Contable 405
-
-  ## Descripcion
-  Agrega soporte completo para el seguro de viaje como un cuarto flujo de dinero
-  completamente aislado de los flujos de agencia, plataforma y viajero (tour).
-
-  ## Cambios
-
-  ### 1. commission_records
-  - Nueva columna `travel_insurance_amount`: monto del seguro del booking.
-    Es puramente informativo/contable. NO afecta total_tour_price,
-    platform_total_revenue ni agency_net_amount.
-
-  ### 2. chart_of_accounts
-  - Nueva cuenta 405 "Ingresos por Seguros de Viaje" (ingreso, acreedora, nivel 3,
-    sat_group_code 405-01, parent_code 40).
-
-  ### 3. Trigger create_commission_record
-  - Actualizado para copiar travel_insurance_cost del booking al nuevo campo.
-
-  ### Notas
-  - Las agencias NO ven este campo en ningun reporte.
-  - El campo travel_insurance_amount es de solo lectura para logica de pagos.
-*/
-
 -- 1. Agregar columna travel_insurance_amount a commission_records
 DO $$
 BEGIN
