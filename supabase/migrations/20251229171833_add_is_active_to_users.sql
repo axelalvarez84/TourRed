@@ -1,13 +1,3 @@
-/*
-  # Add is_active field to users table
-
-  1. Changes
-    - Add is_active boolean field to users table (default true)
-    - This allows admins to activate/deactivate user accounts
-  
-  2. Security
-    - Field can only be modified by super admins
-*/
 
 -- Add is_active field to users table
 DO $$
