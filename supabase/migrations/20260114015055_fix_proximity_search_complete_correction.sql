@@ -1,20 +1,3 @@
-/*
-  # Fix: Complete Correction of Proximity Search Function
-
-  1. Problems Fixed
-    - Table `users` doesn't have `agency_name` - it's in `agencies.name`
-    - Table `users` doesn't have `approval_status` - it has `is_approved` (boolean)
-    - Need correct JOINs with both agencies and users tables
-
-  2. Solution
-    - JOIN with agencies table to get agency name
-    - Use `is_approved` instead of `approval_status = 'approved'`
-    - Ensure proper filtering for active agencies
-
-  3. Changes
-    - Correct table relationships
-    - Use existing columns only
-*/
 
 -- Drop and recreate with completely correct schema
 DROP FUNCTION IF EXISTS search_tours_by_departure_radius(double precision, double precision, double precision, text[], text, numeric, numeric, integer);
