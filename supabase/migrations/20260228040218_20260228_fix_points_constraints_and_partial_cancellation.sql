@@ -1,8 +1,6 @@
-
 -- 1. Expand the type constraint
 ALTER TABLE toursred_points_transactions
   DROP CONSTRAINT IF EXISTS toursred_points_transactions_type_check;
-
 ALTER TABLE toursred_points_transactions
   ADD CONSTRAINT toursred_points_transactions_type_check
   CHECK (type = ANY (ARRAY['earned','redeemed','expired','refund','adjustment','partial_cancellation']));
@@ -10,12 +8,11 @@ ALTER TABLE toursred_points_transactions
 -- 2. Expand the reference_type constraint
 ALTER TABLE toursred_points_transactions
   DROP CONSTRAINT IF EXISTS toursred_points_transactions_reference_type_check;
-
 ALTER TABLE toursred_points_transactions
   ADD CONSTRAINT toursred_points_transactions_reference_type_check
   CHECK (reference_type = ANY (ARRAY['booking','adjustment','promotion','referral','booking_partial_cancellation']));
 
--- 3. Apply missing deduction for TRG-ME6232SKDW2
+-- 3. Apply missing deduction for TRG-ME6232SKDW2 (solo si el wallet existe en este ambiente)
 DO $$
 DECLARE
   v_wallet_id uuid := '0656da12-0a98-48dc-9f89-7ec77c06e870';
@@ -25,6 +22,11 @@ DECLARE
   v_points_to_deduct integer := 1000;
   v_new_balance integer;
 BEGIN
+  -- Solo ejecutar si el wallet existe (fix de datos de producción)
+  IF NOT EXISTS (SELECT 1 FROM toursred_points_wallets WHERE id = v_wallet_id) THEN
+    RETURN;
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM toursred_points_transactions
     WHERE reference_id = v_partial_cancellation_id
