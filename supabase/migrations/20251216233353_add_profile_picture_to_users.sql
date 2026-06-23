@@ -1,14 +1,4 @@
-/*
-  # Add profile picture to users table
 
-  1. Changes
-    - Add `profile_picture_url` column to `users` table to store user profile pictures
-    - This allows travelers to upload their profile photo
-    - The photo will be visible in the navigation bar and to agencies when viewing bookings
-
-  2. Security
-    - No new RLS policies needed as existing user policies already cover this column
-*/
 
 DO $$
 BEGIN
