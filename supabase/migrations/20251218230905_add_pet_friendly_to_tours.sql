@@ -1,12 +1,3 @@
-/*
-  # Agregar campo Pet Friendly a tours
-
-  1. Cambios
-    - Agregar columna `pet_friendly` a la tabla `tours`
-      - Tipo: boolean
-      - Default: false
-      - Indica si el tour admite mascotas
-*/
 
 DO $$
 BEGIN
