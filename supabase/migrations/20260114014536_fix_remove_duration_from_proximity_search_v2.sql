@@ -1,21 +1,3 @@
-/*
-  # Fix: Remove Non-Existent Duration Column from Proximity Search
-
-  1. Problem
-    - The `search_tours_by_departure_radius` function references `t.duration`
-    - The `tours` table does not have a `duration` column
-    - This causes "column t.duration does not exist" error
-
-  2. Solution
-    - Drop the existing function
-    - Recreate it without the `tour_duration` field
-    - Add `tour_start_date` and `tour_end_date` instead
-    - Frontend can calculate duration if needed
-
-  3. Changes
-    - DROP FUNCTION first to allow changing return type
-    - Create new function without duration field
-*/
 
 -- Drop the existing function
 DROP FUNCTION IF EXISTS search_tours_by_departure_radius(double precision, double precision, double precision, text[], text, numeric, numeric, integer);
