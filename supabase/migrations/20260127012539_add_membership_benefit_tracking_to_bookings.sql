@@ -1,14 +1,3 @@
-/*
-  # Agregar tracking del beneficio de membresía en reservas
-
-  1. Cambios
-    - Agregar campo `membership_service_fee_saved` para rastrear cuánto se ahorró por el beneficio de membresía
-    - Agregar campo `used_membership_benefit` para indicar si se aplicó el beneficio en esta reserva
-    
-  2. Propósito
-    - Permitir mostrar el historial de reservas donde se aplicó el beneficio de ToursRed+
-    - Rastrear con precisión el uso del beneficio de exención de cargo por servicio
-*/
 
 DO $$ 
 BEGIN
