@@ -1,24 +1,3 @@
-/*
-  # Sistema Automático de Comisiones
-
-  ## Descripción
-  Crea el sistema para generar automáticamente commission_records cuando un tour finaliza
-  y tiene reservas confirmadas y pagadas.
-
-  ## Funcionalidades
-  1. Función para crear commission_records para un tour específico
-  2. Función para verificar si un tour está listo para pago (>= 3 días después de finalizar)
-  3. Vista para obtener tours completados con información de comisiones
-
-  ## Tablas Afectadas
-  - commission_records: Nueva columna tour_end_date para tracking
-  - tours: Consultas para tours finalizados
-  - bookings: Consultas para reservas confirmadas y pagadas
-
-  ## Seguridad
-  - Solo administradores pueden crear commission_records manualmente
-  - RLS aplicado correctamente
-*/
 
 -- Agregar columna tour_end_date a commission_records para tracking
 DO $$
