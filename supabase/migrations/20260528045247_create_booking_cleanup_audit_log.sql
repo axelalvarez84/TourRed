@@ -1,23 +1,3 @@
-/*
-  # Crear tabla de auditoria para limpieza de reservas basura
-
-  ## Descripcion
-  Registra cada operacion de limpieza masiva de reservas pendientes/canceladas sin pago
-  realizada por un administrador, para mantener trazabilidad completa.
-
-  ## Nueva tabla
-  - `booking_cleanup_logs`
-    - `id` (uuid, primary key)
-    - `deleted_count` (int) - cuantas reservas fueron eliminadas
-    - `deleted_by` (uuid) - admin que ejecuto la limpieza
-    - `deleted_at` (timestamptz) - fecha y hora de la operacion
-    - `criteria` (text) - descripcion de los criterios usados
-    - `booking_codes` (text[]) - array con los codigos de las reservas eliminadas
-
-  ## Seguridad
-  - RLS habilitado
-  - Solo admins pueden insertar y leer
-*/
 
 CREATE TABLE IF NOT EXISTS booking_cleanup_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
