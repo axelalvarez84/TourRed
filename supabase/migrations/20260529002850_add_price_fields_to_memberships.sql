@@ -1,25 +1,3 @@
-/*
-  # Agregar campos de precio a la tabla memberships
-
-  ## Resumen
-  Se agregan dos columnas para registrar los montos reales cobrados a cada suscriptor,
-  permitiendo distinguir casos donde hubo descuentos o cambios de precio desde que se
-  creó la membresía.
-
-  ## Nuevas columnas en `memberships`
-  - `price_paid` (numeric, default 0): Monto exacto cobrado al momento de suscribirse
-    (precio inicial, puede incluir descuento de primer pago)
-  - `renewal_amount` (numeric, default 0): Monto que se cobra en cada renovación
-    recurrente (base para calcular el MRR real)
-
-  ## Backfill de registros existentes
-  - Membresías mensuales: $49 en ambas columnas
-  - Membresías anuales: $490 en ambas columnas
-
-  ## Notas
-  - Los valores hardcodeados son los precios vigentes al momento de la migración
-  - Si algún suscriptor tuvo un precio especial, los valores deben ajustarse manualmente
-*/
 
 DO $$
 BEGIN
