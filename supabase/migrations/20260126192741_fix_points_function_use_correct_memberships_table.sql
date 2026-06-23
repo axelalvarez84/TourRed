@@ -1,17 +1,3 @@
-/*
-  # Fix Points Functions - Use Correct Memberships Table Name
-  
-  ## Changes
-  This migration fixes the points management functions to use the correct table name 'memberships'
-  instead of 'toursred_plus_memberships'.
-  
-  ## Functions Updated
-  1. `check_can_use_points()` - Changed toursred_plus_memberships to memberships
-  2. `award_points_for_booking()` - Changed toursred_plus_memberships to memberships
-  
-  ## Why This Fix Is Needed
-  The table was created as 'memberships' but functions were referencing 'toursred_plus_memberships'
-*/
 
 -- Fix check_can_use_points function to use correct table name
 CREATE OR REPLACE FUNCTION check_can_use_points(p_user_id uuid)
