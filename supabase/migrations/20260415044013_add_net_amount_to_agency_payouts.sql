@@ -1,13 +1,4 @@
 
-/*
-  # Agregar net_amount a agency_payouts
-
-  ## Cambios
-  - Agrega columna `net_amount` a `agency_payouts` como alias de `amount`
-    para compatibilidad con la funcion generate-commission-cfdi
-  - Se rellena con el valor de `amount` en registros existentes
-*/
-
 DO $$
 BEGIN
   IF NOT EXISTS (
