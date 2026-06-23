@@ -348,7 +348,9 @@ BEGIN
       FOR EACH ROW EXECUTE FUNCTION update_financial_updated_at();
   END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_integration_configs_updated_at') THEN
+  -- Solo crear si la tabla existe
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'integration_configs')
+    AND NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_integration_configs_updated_at') THEN
     CREATE TRIGGER update_integration_configs_updated_at
       BEFORE UPDATE ON integration_configs
       FOR EACH ROW EXECUTE FUNCTION update_financial_updated_at();
