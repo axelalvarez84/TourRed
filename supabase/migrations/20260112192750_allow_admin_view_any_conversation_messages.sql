@@ -1,13 +1,3 @@
-/*
-  # Permitir a admins ver mensajes de cualquier conversación
-
-  1. Cambios
-    - Modificar función get_conversation_messages para que admins puedan ver cualquier conversación
-
-  2. Seguridad
-    - Los admins pueden ver cualquier conversación para moderación
-    - Los usuarios normales solo ven conversaciones donde son participantes
-*/
 
 DROP FUNCTION IF EXISTS get_conversation_messages(uuid);
 
