@@ -1,9 +1,3 @@
-/*
-  # Add pending_payment status to gift_cards
-
-  Updates the status check constraint to allow 'pending_payment' for gift cards
-  that have been created but not yet paid (PayPal/MercadoPago flows).
-*/
 
 ALTER TABLE gift_cards DROP CONSTRAINT IF EXISTS gift_cards_status_check;
 
