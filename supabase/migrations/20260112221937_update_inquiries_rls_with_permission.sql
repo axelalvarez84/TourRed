@@ -1,14 +1,3 @@
-/*
-  # Update international_tour_inquiries RLS policies to use can_manage_inquiries permission
-
-  1. Changes
-    - Update existing admin policies to check for can_manage_inquiries permission
-    - This ensures only admins with the specific permission can access inquiries
-    
-  2. Security
-    - Super admins will still have access regardless
-    - Regular admins need the can_manage_inquiries permission explicitly granted
-*/
 
 -- Drop existing policies
 DROP POLICY IF EXISTS "Admins can view all inquiries" ON public.international_tour_inquiries;
