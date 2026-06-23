@@ -1,11 +1,3 @@
-/*
-  # Fix account_executives_safe Security Definer View
-
-  La vista account_executives_safe usa SECURITY DEFINER (el default), lo que significa
-  que corre con los permisos del owner (superuser) y puede bypassear RLS.
-  Se convierte a SECURITY INVOKER para que respete las políticas RLS del usuario que consulta.
-*/
-
 CREATE OR REPLACE VIEW public.account_executives_safe
 WITH (security_invoker = true)
 AS
