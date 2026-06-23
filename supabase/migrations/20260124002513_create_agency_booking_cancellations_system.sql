@@ -1,28 +1,3 @@
-/*
-  # Create Agency-Initiated Booking Cancellation System
-
-  ## Description
-  Allows agencies to cancel individual bookings (for overbooking, special traveler situations, etc.).
-  Since the traveler is not at fault, they receive 100% refund to ToursRed Cash, agency doesn't
-  receive commission, and both traveler and admin are notified via email.
-
-  ## New Columns in `booking_cancellations`
-  - `cancelled_by_agency` (boolean, default false) - Distinguishes agency-initiated vs traveler-initiated
-  - `agency_cancellation_reason` (text, nullable) - Agency's explanation (minimum 50 characters)
-
-  ## New Columns in `bookings`
-  - `cancelled_by_agency_at` (timestamptz, nullable) - When agency cancelled the booking
-
-  ## Security (RLS)
-  - Agencies can insert cancellations for their tour bookings
-  - Agencies can view cancellations for bookings on their tours
-  - Travelers can view their own booking cancellations
-  - Admins can view all cancellations
-
-  ## Indexes
-  - Index on booking_cancellations(cancelled_by_agency) for filtering
-  - Index on bookings(cancelled_by_agency_at) for queries
-*/
 
 -- Add new columns to booking_cancellations table
 DO $$
