@@ -1,14 +1,3 @@
-/*
-  # Permitir a admins enviar mensajes a cualquier conversación
-
-  1. Cambios
-    - Modificar función send_message para que admins puedan enviar a cualquier conversación
-    - Agregar política RLS para que admins puedan insertar mensajes en cualquier conversación
-
-  2. Seguridad
-    - Los admins pueden moderar y dar soporte a cualquier conversación
-    - Los usuarios normales siguen necesitando ser participantes
-*/
 
 -- Actualizar función send_message
 DROP FUNCTION IF EXISTS send_message(uuid, text, text);
