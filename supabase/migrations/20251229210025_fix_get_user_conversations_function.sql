@@ -1,15 +1,3 @@
-/*
-  # Corregir función get_user_conversations
-
-  1. Cambios
-    - Agregar SECURITY DEFINER a la función para evitar restricciones RLS
-    - Agregar search_path por seguridad
-    - Esto permite que la función acceda a la tabla users sin restricciones
-
-  2. Seguridad
-    - La función solo devuelve conversaciones donde el usuario es participante
-    - SECURITY DEFINER permite acceder a información de otros usuarios solo para mostrar el último remitente del mensaje
-*/
 
 CREATE OR REPLACE FUNCTION public.get_user_conversations()
 RETURNS TABLE(
