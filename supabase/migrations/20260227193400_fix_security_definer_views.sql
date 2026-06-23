@@ -1,3 +1,12 @@
+-- Asegurar que las columnas necesarias existen en commission_records
+ALTER TABLE public.commission_records ADD COLUMN IF NOT EXISTS reconciliation_notes text;
+ALTER TABLE public.commission_records ADD COLUMN IF NOT EXISTS tour_completion_date date;
+ALTER TABLE public.commission_records ADD COLUMN IF NOT EXISTS tour_end_date date;
+ALTER TABLE public.commission_records ADD COLUMN IF NOT EXISTS payment_method text;
+ALTER TABLE public.commission_records ADD COLUMN IF NOT EXISTS payment_receipt_url text;
+ALTER TABLE public.commission_records ADD COLUMN IF NOT EXISTS payment_receipt_filename text;
+ALTER TABLE public.commission_records ADD COLUMN IF NOT EXISTS payment_notes text;
+ALTER TABLE public.commission_records ADD COLUMN IF NOT EXISTS notified_at timestamptz;
 
 -- points_expiration_summary
 CREATE OR REPLACE VIEW public.points_expiration_summary
