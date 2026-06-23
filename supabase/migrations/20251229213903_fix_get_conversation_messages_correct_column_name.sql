@@ -1,12 +1,3 @@
-/*
-  # Corregir nombre de columna en get_conversation_messages
-
-  1. Cambios
-    - Cambiar profile_picture a profile_picture_url (nombre correcto de la columna)
-
-  2. Seguridad
-    - Mantiene todas las verificaciones de seguridad existentes
-*/
 
 DROP FUNCTION IF EXISTS get_conversation_messages(uuid);
 
