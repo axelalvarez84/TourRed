@@ -1,13 +1,3 @@
-/*
-  # Extender expiración automática de suplementos a estado pending_payment
-
-  ## Cambios
-  - Modifica la función `expire_supplement_approvals()` para que también cancele
-    suplementos en estado `pending_payment` cuyo `expires_at < now()`.
-  - Anteriormente solo cancelaba suplementos en estado `approved`.
-  - Esto permite que el cron job existente (cada hora) también limpie pagos
-    pendientes cuya ventana de 48h ya venció.
-*/
 
 CREATE OR REPLACE FUNCTION public.expire_supplement_approvals()
 RETURNS integer
