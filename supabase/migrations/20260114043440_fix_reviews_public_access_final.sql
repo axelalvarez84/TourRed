@@ -1,21 +1,3 @@
-/*
-  # Fix Reviews Public Access
-
-  1. Problem
-    - Agency reviews are not loading on public profile pages
-    - The get_agency_reviews_with_users function needs to access users table
-    - Current RLS policies are too restrictive
-
-  2. Solution
-    - Add policy to allow reading basic user info for reviews
-    - Ensure the function can access required data
-    - Make agency reviews truly public
-
-  3. Security
-    - Only exposes first_name and last_name for reviewers
-    - Does not expose sensitive user information
-    - Reviews remain public as intended
-*/
 
 -- Ensure users table has RLS enabled
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
