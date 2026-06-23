@@ -1,17 +1,3 @@
-/*
-  # Add ToursRed Cash field to bookings
-
-  1. Changes
-    - Add `toursred_cash_used` column to bookings table
-      - Stores the amount of ToursRed Cash applied to a booking
-      - Defaults to 0.00
-      - Must be >= 0
-  
-  2. Purpose
-    - Track ToursRed Cash usage per booking
-    - Enable proper accounting and wallet balance updates
-    - Support partial payments with wallet balance
-*/
 
 -- Add toursred_cash_used column to bookings table
 DO $$ BEGIN
