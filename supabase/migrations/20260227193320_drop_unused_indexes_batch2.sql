@@ -1,12 +1,4 @@
-/*
-  # Drop unused indexes - batch 2
 
-  ## Summary
-  These indexes were created in the previous migration run but flagged as unused
-  by the advisor. They cover optional/nullable FK columns that are rarely queried
-  directly and add unnecessary write overhead. Drop them to keep the index set lean.
-  They can be re-created if query patterns change.
-*/
 
 DROP INDEX IF EXISTS public.idx_agency_payouts_processed_by;
 DROP INDEX IF EXISTS public.idx_booking_cancellations_toursred_cash_transaction_id;
