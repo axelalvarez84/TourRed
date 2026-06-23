@@ -1,13 +1,3 @@
-/*
-  # Permitir a ejecutivos subir contratos firmados
-
-  ## Problema
-  La política INSERT del bucket 'signed-contracts' solo permitía admins.
-  Los ejecutivos de cuenta no podían subir el contrato al aprobar una agencia.
-
-  ## Cambio
-  Nueva política INSERT para ejecutivos activos en el bucket 'signed-contracts'.
-*/
 
 DO $$
 BEGIN
