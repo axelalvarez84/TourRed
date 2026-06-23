@@ -1,10 +1,3 @@
-/*
-  # Fix get_completed_tours_with_commission_status function
-
-  1. Changes
-    - Drop and recreate function to remove reference to non-existent tour_code column
-    - Function now returns tour data without tour_code field
-*/
 
 DROP FUNCTION IF EXISTS get_completed_tours_with_commission_status();
 
