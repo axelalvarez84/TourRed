@@ -1,21 +1,3 @@
-/*
-  # Sincronizar capacidad de slots al actualizar horario
-
-  ## Problema
-  Cuando una agencia actualiza el `slot_capacity` en `tour_schedules`,
-  los slots futuros ya generados en `tour_slots` conservan la capacidad
-  anterior porque no existe un mecanismo de sincronización.
-
-  ## Solución
-  1. Trigger en `tour_schedules` que, al detectar un cambio en `slot_capacity`,
-     actualiza todos los slots futuros (abiertos) asociados a ese horario,
-     siempre que el slot no tenga reservas activas que superen la nueva capacidad.
-  2. También sincroniza cuando cambia `default_slot_capacity` en `tours`.
-
-  ## Notas
-  - Solo actualiza slots con status = 'available' y fecha futura.
-  - No reduce la capacidad por debajo de `booked_count` para evitar overbooking.
-*/
 
 CREATE OR REPLACE FUNCTION public.sync_tour_slots_capacity_on_schedule_update()
 RETURNS TRIGGER
