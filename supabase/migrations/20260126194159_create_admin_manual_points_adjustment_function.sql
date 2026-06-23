@@ -1,25 +1,3 @@
-/*
-  # Create Admin Manual Points Adjustment Function
-  
-  ## Purpose
-  This migration creates a function that allows administrators to manually
-  adjust (add or subtract) points in a user's wallet.
-  
-  ## Function Details
-  - Function: admin_adjust_points
-  - Parameters:
-    - target_user_id: UUID of the user whose points to adjust
-    - points_amount: Integer amount to add (positive) or subtract (negative)
-    - adjustment_reason: Text description of why the adjustment was made
-  - Security: SECURITY DEFINER with admin role check
-  
-  ## What it does
-  1. Validates admin permissions
-  2. Ensures wallet exists (creates if needed)
-  3. Prevents negative balances
-  4. Creates transaction record with "manual_adjustment" type
-  5. Updates wallet balances appropriately
-*/
 
 -- Create transaction type for manual adjustments if not exists
 DO $$
