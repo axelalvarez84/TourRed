@@ -1,18 +1,3 @@
-/*
-  # Fix definitive: eliminate all cross-table recursion in slot reschedule RLS
-
-  ## Root cause
-  Circular dependency between slot_reschedule_requests and slot_reschedule_responses:
-  - slot_reschedule_requests policy "Travelers can view..." joins slot_reschedule_responses
-  - slot_reschedule_responses policy "Agencies can view..." joins slot_reschedule_requests
-  - tour_slots policy joins slot_reschedule_requests which triggers the above cycle
-
-  ## Fix
-  - Drop ALL policies that cross-join between these two tables
-  - Replace with simple, non-recursive policies using only direct column checks
-  - tour_slots traveler policy: only use slot_reschedule_responses.user_id directly
-*/
-
 -- 1. Drop the recursive policy on tour_slots (the new one we added)
 DROP POLICY IF EXISTS "Travelers can view target slots via their responses" ON tour_slots;
 
