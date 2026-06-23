@@ -1,10 +1,3 @@
-/*
-  # Cron job: expirar aprobaciones de suplementos vencidas cada hora
-
-  ## Descripción
-  Configura pg_cron para llamar a la edge function expire-supplement-approvals
-  cada hora, cancelando suplementos aprobados cuyas 48h de pago vencieron.
-*/
 
 DO $$
 BEGIN
