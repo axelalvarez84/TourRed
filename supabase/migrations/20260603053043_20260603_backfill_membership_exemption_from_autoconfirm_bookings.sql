@@ -1,25 +1,3 @@
-/*
-  # Corregir exención de membresía en reservas con aprobación automática
-
-  ## Problema
-  Las reservas pagadas completamente con ToursRed Points y/o ToursRed Cash
-  (aprobación automática sin pasar por Stripe) no actualizaban el campo
-  `service_fee_exemption_used` en la tabla `memberships`. El viajero veía
-  su límite mensual intacto aunque ya hubiera usado parte de la exención.
-
-  ## Cambios
-  - Para cada booking confirmado con método de pago `toursred_cash`,
-    `toursred_points` o `toursred_points_and_cash` donde:
-      - `used_membership_benefit = false`
-      - El viajero tiene membresía activa con `status = 'active'`
-      - La exención usada calculada (fullServiceCharge - actualServiceCharge - codeDiscount) > 0
-  - Se acumula esa exención en `memberships.service_fee_exemption_used`
-  - Se marca el booking con `used_membership_benefit = true`
-
-  ## Notas
-  - Se usa la tasa del 5% como fallback si no hay registro en platform_settings
-  - No se toca ningún monto monetario de bookings ni membresías, solo el contador de exención
-*/
 
 DO $$
 DECLARE
