@@ -1,16 +1,3 @@
-/*
-  # Add departure time and special instructions to tour departure points
-
-  1. Changes
-    - Add `departure_time` column to `tour_departure_points` table (time of day)
-    - Add `special_instructions` column to `tour_departure_points` table (text for references)
-    - These fields allow agencies to specify when the tour departs from each point
-      and provide special instructions or landmarks for travelers
-    
-  2. Security
-    - Existing RLS policies continue to apply
-    - No changes needed to security model
-*/
 
 -- Add departure_time column (stores time without date)
 DO $$
