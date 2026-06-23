@@ -1,21 +1,3 @@
-/*
-  # Crear funcion RPC batch get_optional_services_capacity
-
-  ## Descripcion
-  Reemplaza el patron N+1 en BookingForm donde se llamaba a
-  get_optional_service_available_capacity una vez por cada servicio opcional.
-  Esta nueva funcion recibe un array de IDs y devuelve todas las capacidades
-  disponibles en una sola consulta.
-
-  ## Nueva Funcion
-  - `get_optional_services_capacity(p_service_ids uuid[])` - Recibe array de
-    IDs de servicios opcionales y devuelve una tabla con service_id y
-    available_capacity para cada uno.
-
-  ## Impacto
-  - Antes: 1 query por cada servicio opcional (5+ queries si hay 5 servicios)
-  - Despues: 1 sola query independientemente del numero de servicios
-*/
 
 CREATE OR REPLACE FUNCTION public.get_optional_services_capacity(p_service_ids uuid[])
 RETURNS TABLE (
