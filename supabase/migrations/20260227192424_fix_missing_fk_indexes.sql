@@ -1,28 +1,3 @@
-/*
-  # Add missing foreign key indexes
-
-  ## Summary
-  Several foreign key columns lack covering indexes, causing full sequential scans
-  when resolving foreign key constraints or joining on these columns.
-
-  ## New Indexes
-  - agency_payouts.processed_by
-  - booking_cancellations.toursred_cash_transaction_id
-  - booking_reschedule_responses.refund_transaction_id
-  - bookings.agency_cancellation_id
-  - bookings.no_show_marked_by
-  - discount_code_usage.booking_id, gift_card_id, membership_id
-  - discount_codes.created_by
-  - financial_transactions.cancellation_id, created_by_user_id
-  - payout_batches.processed_by
-  - referral_bonuses.referral_relationship_id
-  - referral_fraud_logs.referral_relationship_id
-  - referral_relationships.first_booking_id
-  - tour_cancellations.cancelled_by_user_id
-  - tour_promotions.created_by
-  - tour_reschedules.created_by
-  - tours.agency_cancellation_id
-*/
 
 CREATE INDEX IF NOT EXISTS idx_agency_payouts_processed_by
   ON public.agency_payouts (processed_by);
