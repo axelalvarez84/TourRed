@@ -115,6 +115,8 @@ END;
 $$;
 
 -- Fix the get_user_notifications function
+DROP FUNCTION IF EXISTS get_user_notifications(integer, integer, boolean);
+
 CREATE OR REPLACE FUNCTION get_user_notifications(
   limit_count integer DEFAULT 20,
   offset_count integer DEFAULT 0,
