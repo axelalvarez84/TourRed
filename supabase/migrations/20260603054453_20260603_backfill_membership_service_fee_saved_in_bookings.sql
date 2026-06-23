@@ -1,25 +1,3 @@
-/*
-  # Corregir membership_service_fee_saved en reservas con aprobación automática
-
-  ## Problema
-  La migración anterior actualizó `memberships.service_fee_exemption_used` correctamente,
-  pero olvidó escribir el valor calculado en `bookings.membership_service_fee_saved`.
-  Resultado: la sección "Reservas con Beneficio Aplicado Este Mes" mostraba $0.00
-  por reserva aunque el total mensual era correcto.
-
-  ## Cambios
-  Para todas las reservas con:
-    - `used_membership_benefit = true`
-    - `membership_service_fee_saved = 0` o NULL
-    - `payment_method` IN ('toursred_cash', 'toursred_points', 'toursred_points_and_cash')
-
-  Se recalcula exemptionUsed = (total_price * rate / 100) - service_charge - service_charge_discount
-  y se escribe en `bookings.membership_service_fee_saved`.
-
-  ## Notas
-  - Solo afecta reservas de aprobación automática (puntos/cash); las de Stripe ya tenían el campo correcto
-  - Se usa la tasa configurada en platform_settings, con fallback de 5%
-*/
 
 DO $$
 DECLARE
