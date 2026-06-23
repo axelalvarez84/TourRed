@@ -1,15 +1,3 @@
-/*
-  # Crear funciones auxiliares para mensajería
-
-  1. Nuevas Funciones
-    - create_conversation: Crear una nueva conversación con participantes
-    - send_message: Enviar un mensaje a una conversación
-
-  2. Seguridad
-    - Solo usuarios autenticados pueden crear conversaciones
-    - Solo participantes pueden enviar mensajes
-    - Verificaciones automáticas de permisos
-*/
 
 -- Función para crear conversación
 CREATE OR REPLACE FUNCTION create_conversation(
