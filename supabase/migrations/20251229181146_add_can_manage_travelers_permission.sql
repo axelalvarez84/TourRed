@@ -1,15 +1,3 @@
-/*
-  # Agregar permiso para gestionar viajeros
-
-  1. Cambios
-    - Agregar columna `can_manage_travelers` a la tabla `admin_permissions`
-    - Establecer valor predeterminado como `false`
-    - Permitir que el super admin y otros usuarios con este permiso accedan a la sección de viajeros
-
-  2. Notas
-    - Los administradores existentes no tendrán este permiso hasta que se les asigne manualmente
-    - El super admin siempre tiene acceso completo sin necesidad de permisos específicos
-*/
 
 DO $$
 BEGIN
