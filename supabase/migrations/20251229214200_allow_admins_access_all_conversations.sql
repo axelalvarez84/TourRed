@@ -1,15 +1,3 @@
-/*
-  # Permitir acceso de administradores a todas las conversaciones
-
-  1. Cambios
-    - Modificar get_conversation_messages para permitir acceso a administradores
-    - Los administradores pueden ver todas las conversaciones sin estar en message_participants
-    - Los usuarios normales siguen necesitando estar en message_participants
-
-  2. Seguridad
-    - Mantiene restricciones para usuarios no-admin
-    - Administradores tienen acceso completo para moderación
-*/
 
 DROP FUNCTION IF EXISTS get_conversation_messages(uuid);
 
