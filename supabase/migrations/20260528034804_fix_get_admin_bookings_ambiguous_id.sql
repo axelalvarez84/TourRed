@@ -1,10 +1,3 @@
-/*
-  # Fix get_admin_bookings: calificar columnas id ambiguas
-
-  El error 42702 ocurre porque varias tablas (bookings, users, tours, agencies,
-  commission_records) tienen columna "id" y PL/pgSQL no puede distinguir cual
-  retornar en el RETURN TABLE. Se califica cada id con su alias de tabla.
-*/
 
 CREATE OR REPLACE FUNCTION get_admin_bookings()
 RETURNS TABLE (
