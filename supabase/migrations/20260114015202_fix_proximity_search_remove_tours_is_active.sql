@@ -1,19 +1,3 @@
-/*
-  # Fix: Remove Non-Existent is_active Column from Tours
-
-  1. Problems Fixed
-    - Table `tours` doesn't have `is_active` column
-    - Only filter by agency and user active status
-    - Tours are visible based on their dates and agency status
-
-  2. Solution
-    - Remove `t.is_active` condition
-    - Keep filters for agencies.is_active and users.is_active
-    - Use only columns that actually exist
-
-  3. Changes
-    - Remove incorrect WHERE clause for tours.is_active
-*/
 
 -- Drop and recreate with only existing columns
 DROP FUNCTION IF EXISTS search_tours_by_departure_radius(double precision, double precision, double precision, text[], text, numeric, numeric, integer);
