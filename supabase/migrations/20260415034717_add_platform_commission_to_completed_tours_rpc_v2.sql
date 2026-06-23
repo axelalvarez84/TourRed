@@ -1,12 +1,3 @@
-/*
-  # Actualizar función get_completed_tours_with_commission_status
-
-  ## Cambios
-  - Drop y recreación de la función para agregar nuevos campos de retorno:
-    - `total_platform_commission_pending`: comisión retenida por ToursRed de registros pendientes
-    - `total_platform_commission_processed`: comisión retenida por ToursRed de registros procesados
-  - Permite mostrar en la UI cuánto se queda la plataforma vs cuánto se le paga a la agencia
-*/
 
 DROP FUNCTION IF EXISTS public.get_completed_tours_with_commission_status();
 
