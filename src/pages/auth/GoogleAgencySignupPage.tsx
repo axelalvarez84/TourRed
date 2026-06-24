@@ -9,7 +9,7 @@ const isLeakedPasswordError = (message: string) =>
 
 const GoogleAgencySignupPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, completeOnboarding } = useAuth();
 
   const meta = user?.user_metadata ?? {};
   const googleFullName: string = meta.full_name || meta.name || '';
@@ -109,16 +109,7 @@ const GoogleAgencySignupPage: React.FC = () => {
     try {
       if (!user) throw new Error('Sesión no encontrada');
 
-      // 1. Set password so user can also login with email+password
-      const { error: pwError } = await supabase.auth.updateUser({ password });
-      if (pwError) {
-        if (isLeakedPasswordError(pwError.message)) {
-          throw new Error('Esta contraseña ha sido expuesta en brechas de datos. Por favor elige una más segura.');
-        }
-        throw pwError;
-      }
-
-      // 2. Insert profile into users table
+      // 1. Insert profile into users table FIRST so RLS checks pass immediately
       const { error: insertError } = await supabase.from('users').insert({
         id: user.id,
         email: email,
@@ -131,6 +122,15 @@ const GoogleAgencySignupPage: React.FC = () => {
       });
 
       if (insertError) throw insertError;
+
+      // 2. Set password after insert so any auth events find the users record
+      const { error: pwError } = await supabase.auth.updateUser({ password });
+      if (pwError) {
+        if (isLeakedPasswordError(pwError.message)) {
+          throw new Error('Esta contraseña ha sido expuesta en brechas de datos. Por favor elige una más segura.');
+        }
+        throw pwError;
+      }
 
       // 3. Create agency profile
       const { error: agencyError } = await supabase.from('agencies').insert({
@@ -198,6 +198,9 @@ const GoogleAgencySignupPage: React.FC = () => {
           });
         }
       } catch { /* best-effort */ }
+
+      // 8. Refresh auth state so isOnboardingPending is cleared before navigating
+      await completeOnboarding();
 
       navigate('/agency/dashboard');
     } catch (err: any) {

@@ -134,6 +134,7 @@ interface AuthContextType {
   needsTermsAcceptance: boolean;
   markTermsAccepted: () => void;
   signInWithGoogle: () => Promise<void>;
+  completeOnboarding: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -159,6 +160,7 @@ const AuthContext = createContext<AuthContextType>({
   needsTermsAcceptance: false,
   markTermsAccepted: () => {},
   signInWithGoogle: async () => {},
+  completeOnboarding: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -776,6 +778,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return allStaffInfo.find(s => s.agencyId === activeAgencyId) ?? allStaffInfo[0];
   }, [allStaffInfo, activeAgencyId]);
 
+  const completeOnboarding = useCallback(async () => {
+    const { data: { user: freshUser } } = await supabase.auth.getUser();
+    if (freshUser) {
+      initializedUserIdRef.current = null;
+      isUpdatingRef.current = false;
+      await updateAuthState(freshUser, true);
+    }
+  }, []);
+
   const contextValue = useMemo(() => ({
     user,
     userRole,
@@ -799,7 +810,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     needsTermsAcceptance,
     markTermsAccepted,
     signInWithGoogle,
-  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isAccountant, isAccountExecutive, isEmailVerified, isSuperAdmin, isOnboardingPending, permissions, accountantPermissions, accountExecutiveInfo, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency, needsTermsAcceptance, markTermsAccepted, signInWithGoogle]);
+    completeOnboarding,
+  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isAccountant, isAccountExecutive, isEmailVerified, isSuperAdmin, isOnboardingPending, permissions, accountantPermissions, accountExecutiveInfo, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency, needsTermsAcceptance, markTermsAccepted, signInWithGoogle, completeOnboarding]);
 
   return (
     <AuthContext.Provider value={contextValue}>

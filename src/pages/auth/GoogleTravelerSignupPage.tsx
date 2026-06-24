@@ -9,7 +9,7 @@ const isLeakedPasswordError = (message: string) =>
 
 const GoogleTravelerSignupPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, completeOnboarding } = useAuth();
 
   const meta = user?.user_metadata ?? {};
   const googleFullName: string = meta.full_name || meta.name || '';
@@ -128,16 +128,7 @@ const GoogleTravelerSignupPage: React.FC = () => {
     try {
       if (!user) throw new Error('Sesión no encontrada');
 
-      // 1. Update password via Supabase Auth
-      const { error: pwError } = await supabase.auth.updateUser({ password });
-      if (pwError) {
-        if (isLeakedPasswordError(pwError.message)) {
-          throw new Error('Esta contraseña ha sido expuesta en brechas de datos. Por favor elige una más segura.');
-        }
-        throw pwError;
-      }
-
-      // 2. Insert profile into users table
+      // 1. Insert profile into users table FIRST so RLS checks pass immediately
       const { error: insertError } = await supabase.from('users').insert({
         id: user.id,
         email: email,
@@ -167,7 +158,16 @@ const GoogleTravelerSignupPage: React.FC = () => {
         throw insertError;
       }
 
-      // 3. Register auth provider
+      // 2. Update password via Supabase Auth (after insert so users record exists)
+      const { error: pwError } = await supabase.auth.updateUser({ password });
+      if (pwError) {
+        if (isLeakedPasswordError(pwError.message)) {
+          throw new Error('Esta contraseña ha sido expuesta en brechas de datos. Por favor elige una más segura.');
+        }
+        throw pwError;
+      }
+
+      // 3. Register auth providers
       await supabase.from('user_auth_providers').upsert(
         { user_id: user.id, provider: 'google', provider_user_id: user.id },
         { onConflict: 'user_id,provider' }
@@ -210,6 +210,9 @@ const GoogleTravelerSignupPage: React.FC = () => {
           });
         } catch { /* best-effort */ }
       }
+
+      // 7. Refresh auth state so isOnboardingPending is cleared before navigating
+      await completeOnboarding();
 
       navigate('/traveler/dashboard');
     } catch (err: any) {
