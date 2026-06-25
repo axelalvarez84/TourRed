@@ -53,7 +53,7 @@ const MaintenancePage: React.FC<MaintenancePageProps> = ({
               className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors text-sm"
             >
               <Mail className="h-4 w-4 text-red-400" />
-              hola@toursred.mx
+              contacto@toursred.com
             </a>
             <span className="hidden sm:block w-px h-4 bg-slate-600" />
             <a
