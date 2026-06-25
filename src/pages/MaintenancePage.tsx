@@ -16,7 +16,7 @@ const MaintenancePage: React.FC<MaintenancePageProps> = ({
           <img
             src="/LogoFinal.jpg"
             alt="ToursRed"
-            className="h-11 rounded-xl shadow-2xl"
+            className="h-21 rounded-xl shadow-2xl"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
             }}
