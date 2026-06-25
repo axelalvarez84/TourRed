@@ -12,7 +12,7 @@ const MaintenancePage: React.FC<MaintenancePageProps> = ({
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center px-4">
       <div className="max-w-lg w-full text-center">
         {/* Logo */}
-        <div className="mb-10 flex justify-center">
+        <div className="mb-11 flex justify-center">
           <img
             src="/LogoFinal.jpg"
             alt="ToursRed"
