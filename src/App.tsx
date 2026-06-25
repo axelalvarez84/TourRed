@@ -119,6 +119,10 @@ import AdminSupportAgents from './pages/admin/AdminSupportAgents';
 import AdminAuditLog from './pages/admin/AdminAuditLog';
 import { useAuth } from './context/AuthContext';
 import { UserRole, supabase } from './lib/supabase';
+import MaintenanceGate from './components/MaintenanceGate';
+import MaintenanceBanner from './components/MaintenanceBanner';
+import AnnouncementPopup from './components/AnnouncementPopup';
+import MaintenanceAdminPage from './pages/auth/MaintenanceAdminPage';
 
 const App: React.FC = () => {
   const { isLoading } = useAuth();
@@ -135,9 +139,12 @@ const App: React.FC = () => {
     <div className="flex flex-col min-h-screen">
       <ScrollToTop />
       <GoogleAnalytics />
+      <MaintenanceBanner />
+      <MaintenanceGate>
       <NavBar />
       <main className="flex-grow">
         <Routes>
+          <Route path="/mantenimiento-admin" element={<MaintenanceAdminPage />} />
           <Route path="/" element={<HomePage />} />
           <Route path="/tours" element={<TourCatalogPage />} />
           <Route path="/tours/:id" element={<TourDetailPage />} />
@@ -787,6 +794,8 @@ const App: React.FC = () => {
       </main>
       <Footer />
       <CookieBanner />
+      </MaintenanceGate>
+      <AnnouncementPopup />
     </div>
   );
 };

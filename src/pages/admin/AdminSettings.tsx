@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard, Crown, Gift, Award, Users, Globe, FileText, Shield, BookOpen, Link, Unlink, RefreshCw, ExternalLink, Tag, Image, Upload, RotateCcw, X } from 'lucide-react';
+import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard, Crown, Gift, Award, Users, Globe, FileText, Shield, BookOpen, Link, Unlink, RefreshCw, ExternalLink, Tag, Image, Upload, RotateCcw, X, Wrench, Megaphone, Power, PowerOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../utils/formatCurrency';
 
@@ -52,6 +52,14 @@ interface PlatformSettings {
   travel_insurance_price_per_day_per_traveler: number;
   supplement_commission_percentage: number;
   hero_background_url: string | null;
+  maintenance_mode: boolean;
+  maintenance_message: string;
+  maintenance_enabled_at: string | null;
+  announcement_active: boolean;
+  announcement_title: string;
+  announcement_message: string;
+  announcement_cta_text: string;
+  announcement_activated_at: string | null;
 }
 
 const AdminSettings: React.FC = () => {
@@ -103,6 +111,14 @@ const AdminSettings: React.FC = () => {
     travel_insurance_price_per_day_per_traveler: 79,
     supplement_commission_percentage: 10,
     hero_background_url: null,
+    maintenance_mode: false,
+    maintenance_message: 'Estamos realizando tareas de mantenimiento. Estaremos de vuelta muy pronto.',
+    maintenance_enabled_at: null,
+    announcement_active: false,
+    announcement_title: '',
+    announcement_message: '',
+    announcement_cta_text: 'Aceptar',
+    announcement_activated_at: null,
   });
   const [zohoStatus, setZohoStatus] = useState<{
     connected: boolean;
@@ -348,6 +364,18 @@ const AdminSettings: React.FC = () => {
             odoo_database: platformSettings.odoo_database,
             travel_insurance_price_per_day_per_traveler: platformSettings.travel_insurance_price_per_day_per_traveler,
             supplement_commission_percentage: platformSettings.supplement_commission_percentage,
+            maintenance_mode: platformSettings.maintenance_mode,
+            maintenance_message: platformSettings.maintenance_message,
+            maintenance_enabled_at: platformSettings.maintenance_mode
+              ? (platformSettings.maintenance_enabled_at || new Date().toISOString())
+              : null,
+            announcement_active: platformSettings.announcement_active,
+            announcement_title: platformSettings.announcement_title,
+            announcement_message: platformSettings.announcement_message,
+            announcement_cta_text: platformSettings.announcement_cta_text,
+            announcement_activated_at: platformSettings.announcement_active
+              ? (platformSettings.announcement_activated_at || new Date().toISOString())
+              : platformSettings.announcement_activated_at,
             updated_at: new Date().toISOString(),
             updated_by: user?.id
           })
@@ -1780,6 +1808,162 @@ const AdminSettings: React.FC = () => {
                   )}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Modo Mantenimiento ─────────────────────────────────── */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <Wrench className="w-6 h-6 text-amber-500" />
+            <h2 className="text-xl font-semibold text-gray-900">Modo Mantenimiento</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-5">
+            Cuando está activo, los viajeros y agencias ven una pantalla de mantenimiento y no pueden iniciar sesión ni hacer reservas. El super administrador puede acceder al sistema normalmente.
+          </p>
+
+          {/* Toggle */}
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 mb-5">
+            <div>
+              <p className="font-medium text-gray-900">Estado del sistema</p>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {platformSettings.maintenance_mode
+                  ? 'Sistema bloqueado — en mantenimiento'
+                  : 'Sistema operativo — acceso normal'}
+              </p>
+              {platformSettings.maintenance_enabled_at && platformSettings.maintenance_mode && (
+                <p className="text-xs text-amber-600 mt-1">
+                  Activado: {new Date(platformSettings.maintenance_enabled_at).toLocaleString('es-MX')}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                setPlatformSettings((prev) => ({
+                  ...prev,
+                  maintenance_mode: !prev.maintenance_mode,
+                  maintenance_enabled_at: !prev.maintenance_mode ? new Date().toISOString() : null,
+                }))
+              }
+              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none ${
+                platformSettings.maintenance_mode ? 'bg-amber-500' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                  platformSettings.maintenance_mode ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {platformSettings.maintenance_mode && (
+            <div className="mb-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-amber-500" />
+              <p>El sistema se bloqueará al guardar la configuración. Asegúrate de guardar antes de comenzar el mantenimiento.</p>
+            </div>
+          )}
+
+          {/* Message */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Mensaje de mantenimiento
+            </label>
+            <p className="text-xs text-gray-500 mb-2">Este texto se muestra a los usuarios durante el mantenimiento.</p>
+            <textarea
+              rows={3}
+              value={platformSettings.maintenance_message}
+              onChange={(e) =>
+                setPlatformSettings((prev) => ({ ...prev, maintenance_message: e.target.value }))
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
+              placeholder="Estamos realizando tareas de mantenimiento. Estaremos de vuelta muy pronto."
+            />
+          </div>
+        </div>
+
+        {/* ── Anuncio / Aviso Importante ─────────────────────────── */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <Megaphone className="w-6 h-6 text-red-500" />
+            <h2 className="text-xl font-semibold text-gray-900">Anuncio / Aviso Importante</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-5">
+            Muestra un popup de aviso a todos los usuarios al ingresar al sitio. Puede usarse para anunciar mantenimientos, novedades o cualquier comunicado importante. El usuario lo descarta haciendo clic en el botón.
+          </p>
+
+          {/* Toggle */}
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 mb-5">
+            <div>
+              <p className="font-medium text-gray-900">Estado del anuncio</p>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {platformSettings.announcement_active ? 'Anuncio activo — visible para los usuarios' : 'Anuncio inactivo'}
+              </p>
+              {platformSettings.announcement_activated_at && platformSettings.announcement_active && (
+                <p className="text-xs text-red-600 mt-1">
+                  Activado: {new Date(platformSettings.announcement_activated_at).toLocaleString('es-MX')}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                setPlatformSettings((prev) => ({
+                  ...prev,
+                  announcement_active: !prev.announcement_active,
+                  announcement_activated_at: !prev.announcement_active ? new Date().toISOString() : prev.announcement_activated_at,
+                }))
+              }
+              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none ${
+                platformSettings.announcement_active ? 'bg-red-500' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                  platformSettings.announcement_active ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Título del anuncio</label>
+              <input
+                type="text"
+                value={platformSettings.announcement_title}
+                onChange={(e) =>
+                  setPlatformSettings((prev) => ({ ...prev, announcement_title: e.target.value }))
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Ej: Mantenimiento programado el viernes 28"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Mensaje del anuncio</label>
+              <textarea
+                rows={4}
+                value={platformSettings.announcement_message}
+                onChange={(e) =>
+                  setPlatformSettings((prev) => ({ ...prev, announcement_message: e.target.value }))
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
+                placeholder="Ej: El próximo viernes 28 de junio de 12:00 a 14:00 hrs realizaremos una ventana de mantenimiento. Durante ese periodo el sitio no estará disponible."
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Texto del botón</label>
+              <input
+                type="text"
+                value={platformSettings.announcement_cta_text}
+                onChange={(e) =>
+                  setPlatformSettings((prev) => ({ ...prev, announcement_cta_text: e.target.value }))
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Aceptar"
+              />
+              <p className="text-xs text-gray-400 mt-1">Texto que aparecerá en el botón para cerrar el popup.</p>
             </div>
           </div>
         </div>
