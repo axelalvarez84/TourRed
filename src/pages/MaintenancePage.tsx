@@ -49,7 +49,7 @@ const MaintenancePage: React.FC<MaintenancePageProps> = ({
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <a
-              href="mailto:hola@toursred.mx"
+              href="mailto:contacto@toursred.com"
               className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors text-sm"
             >
               <Mail className="h-4 w-4 text-red-400" />
@@ -57,11 +57,11 @@ const MaintenancePage: React.FC<MaintenancePageProps> = ({
             </a>
             <span className="hidden sm:block w-px h-4 bg-slate-600" />
             <a
-              href="tel:+528001234567"
+              href="https://wa.me/525547127668"
               className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors text-sm"
             >
               <Phone className="h-4 w-4 text-red-400" />
-              800 123 4567
+              +52 55 4712 7668
             </a>
           </div>
         </div>
