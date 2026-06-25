@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 
 const MaintenanceBanner: React.FC = () => {
   const { isSuperAdmin } = useAuth();
+  const [settingsId, setSettingsId] = useState<string>('');
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
@@ -15,10 +16,13 @@ const MaintenanceBanner: React.FC = () => {
     const load = async () => {
       const { data } = await supabase
         .from('platform_settings')
-        .select('maintenance_mode')
+        .select('id, maintenance_mode')
         .limit(1)
         .maybeSingle();
-      if (data) setMaintenanceMode(data.maintenance_mode);
+      if (data) {
+        setSettingsId(data.id);
+        setMaintenanceMode(data.maintenance_mode);
+      }
     };
 
     load();
@@ -43,18 +47,19 @@ const MaintenanceBanner: React.FC = () => {
   }, [isSuperAdmin]);
 
   const handleDeactivate = async () => {
+    if (!settingsId) return;
     setIsDeactivating(true);
     await supabase
       .from('platform_settings')
       .update({ maintenance_mode: false, maintenance_enabled_at: null })
-      .neq('id', '00000000-0000-0000-0000-000000000000');
+      .eq('id', settingsId);
     setIsDeactivating(false);
   };
 
   if (!isSuperAdmin || !maintenanceMode || dismissed) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-500 text-amber-950 px-4 py-2 flex items-center justify-between gap-3 shadow-lg text-sm font-medium">
+    <div className="w-full bg-amber-500 text-amber-950 px-4 py-2 flex items-center justify-between gap-3 shadow-lg text-sm font-medium">
       <div className="flex items-center gap-2 min-w-0">
         <AlertTriangle className="h-4 w-4 shrink-0" />
         <span className="truncate">
