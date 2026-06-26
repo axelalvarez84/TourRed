@@ -3,6 +3,7 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, CheckCircle, XCircle, Loader } from 'lucide-react';
 import { signUp, supabase, UserRole } from '../../lib/supabase';
 import { calcularPrefijoCurp } from '../../utils/curpUtils';
+import { useFieldAvailability } from '../../hooks/useFieldAvailability';
 
 const isLeakedPasswordError = (message: string) =>
   /leaked|pwned|compromised|common password/i.test(message);
@@ -139,6 +140,28 @@ const SignupPage: React.FC = () => {
 
     return () => clearTimeout(timeoutId);
   }, [referralCode]);
+
+  const curpAvailability = useFieldAvailability(
+    !isForeignTraveler ? formData.curp : '',
+    'check_curp_available',
+    18,
+    18
+  );
+  const passportAvailability = useFieldAvailability(
+    isForeignTraveler ? formData.passportNumber : '',
+    'check_passport_available',
+    6
+  );
+  const emailAvailability = useFieldAvailability(
+    formData.email,
+    'check_email_available',
+    5
+  );
+
+  const identifierUnavailable =
+    (!isForeignTraveler && curpAvailability.isAvailable === false) ||
+    (isForeignTraveler && passportAvailability.isAvailable === false) ||
+    emailAvailability.isAvailable === false;
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -548,12 +571,28 @@ const SignupPage: React.FC = () => {
                     required
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm uppercase"
                   />
-                  {!curpManuallyEdited.current && formData.curp.length > 0 ? (
+                  {!curpManuallyEdited.current && formData.curp.length > 0 && formData.curp.length < 18 && (
                     <p className="mt-1 text-xs text-blue-600">
                       Prellenado con tus datos. Completa o corrige los caracteres restantes.
                     </p>
-                  ) : (
+                  )}
+                  {formData.curp.length < 18 && (curpManuallyEdited.current || formData.curp.length === 0) && (
                     <p className="mt-1 text-xs text-gray-500">18 caracteres alfanuméricos</p>
+                  )}
+                  {curpAvailability.isChecking && (
+                    <p className="mt-1 text-xs text-gray-500 flex items-center gap-1">
+                      <Loader className="h-3 w-3 animate-spin" /> Verificando CURP...
+                    </p>
+                  )}
+                  {!curpAvailability.isChecking && curpAvailability.isAvailable === true && (
+                    <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3" /> CURP disponible
+                    </p>
+                  )}
+                  {!curpAvailability.isChecking && curpAvailability.isAvailable === false && (
+                    <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                      <XCircle className="h-3 w-3" /> Esta CURP ya tiene una cuenta. <a href="/login" className="underline">Inicia sesión</a>
+                    </p>
                   )}
                 </div>
               </div>
@@ -573,6 +612,21 @@ const SignupPage: React.FC = () => {
                     required
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm uppercase"
                   />
+                  {passportAvailability.isChecking && (
+                    <p className="mt-1 text-xs text-gray-500 flex items-center gap-1">
+                      <Loader className="h-3 w-3 animate-spin" /> Verificando pasaporte...
+                    </p>
+                  )}
+                  {!passportAvailability.isChecking && passportAvailability.isAvailable === true && (
+                    <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3" /> Pasaporte disponible
+                    </p>
+                  )}
+                  {!passportAvailability.isChecking && passportAvailability.isAvailable === false && (
+                    <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                      <XCircle className="h-3 w-3" /> Este pasaporte ya tiene una cuenta. <a href="/login" className="underline">Inicia sesión</a>
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -593,6 +647,21 @@ const SignupPage: React.FC = () => {
                   required
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                 />
+                {emailAvailability.isChecking && (
+                  <p className="mt-1 text-xs text-gray-500 flex items-center gap-1">
+                    <Loader className="h-3 w-3 animate-spin" /> Verificando correo...
+                  </p>
+                )}
+                {!emailAvailability.isChecking && emailAvailability.isAvailable === true && (
+                  <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                    <CheckCircle className="h-3 w-3" /> Correo disponible
+                  </p>
+                )}
+                {!emailAvailability.isChecking && emailAvailability.isAvailable === false && (
+                  <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                    <XCircle className="h-3 w-3" /> Este correo ya tiene una cuenta. <a href="/login" className="underline">Inicia sesión</a>
+                  </p>
+                )}
               </div>
             </div>
 
@@ -892,7 +961,7 @@ const SignupPage: React.FC = () => {
             <div>
               <button
                 type="submit"
-                disabled={isLoading || !termsAccepted}
+                disabled={isLoading || !termsAccepted || identifierUnavailable}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Creando cuenta...' : 'Registrarse'}

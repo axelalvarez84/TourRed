@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle, XCircle, Loader } from 'lucide-react';
 import { signUp, supabase } from '../../lib/supabase';
 import { UserRole } from '../../lib/supabase';
+import { useFieldAvailability } from '../../hooks/useFieldAvailability';
 
 const isLeakedPasswordError = (message: string) =>
   /leaked|pwned|compromised|common password/i.test(message);
@@ -303,6 +304,12 @@ const AgencySignupPage: React.FC = () => {
     }
   };
 
+  const curpAvailability = useFieldAvailability(formData.curp, 'check_curp_available', 18, 18);
+  const emailAvailability = useFieldAvailability(formData.email, 'check_email_available', 5);
+
+  const identifierUnavailable =
+    curpAvailability.isAvailable === false || emailAvailability.isAvailable === false;
+
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -425,6 +432,21 @@ const AgencySignupPage: React.FC = () => {
                       className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm uppercase"
                       placeholder="ABCD123456HDFRRL09"
                     />
+                    {curpAvailability.isChecking && (
+                      <p className="mt-1 text-xs text-gray-500 flex items-center gap-1">
+                        <Loader className="h-3 w-3 animate-spin" /> Verificando CURP...
+                      </p>
+                    )}
+                    {!curpAvailability.isChecking && curpAvailability.isAvailable === true && (
+                      <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" /> CURP disponible
+                      </p>
+                    )}
+                    {!curpAvailability.isChecking && curpAvailability.isAvailable === false && (
+                      <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                        <XCircle className="h-3 w-3" /> Esta CURP ya tiene una cuenta. <a href="/login" className="underline">Inicia sesión</a>
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -490,6 +512,21 @@ const AgencySignupPage: React.FC = () => {
                       required
                       className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                     />
+                    {emailAvailability.isChecking && (
+                      <p className="mt-1 text-xs text-gray-500 flex items-center gap-1">
+                        <Loader className="h-3 w-3 animate-spin" /> Verificando correo...
+                      </p>
+                    )}
+                    {!emailAvailability.isChecking && emailAvailability.isAvailable === true && (
+                      <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" /> Correo disponible
+                      </p>
+                    )}
+                    {!emailAvailability.isChecking && emailAvailability.isAvailable === false && (
+                      <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                        <XCircle className="h-3 w-3" /> Este correo ya tiene una cuenta. <a href="/login" className="underline">Inicia sesión</a>
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -878,7 +915,7 @@ const AgencySignupPage: React.FC = () => {
             <div>
               <button
                 type="submit"
-                disabled={isLoading || !termsAccepted}
+                disabled={isLoading || !termsAccepted || identifierUnavailable}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Creando cuenta...' : 'Registrar Agencia'}
