@@ -52,6 +52,10 @@ const AzureAgencySignupPage: React.FC = () => {
     rfc: '',
     razonSocial: '',
     rnt: '',
+    regimenFiscal: '',
+    banco: '',
+    cuentaClabe: '',
+    titularCuenta: '',
     street: '',
     exteriorNumber: '',
     interiorNumber: '',
@@ -94,7 +98,7 @@ const AzureAgencySignupPage: React.FC = () => {
 
     const {
       firstName, apellidoPaterno, apellidoMaterno, dateOfBirth, sexo, curp, email, password, confirmPassword,
-      agencyName, phoneNumber, website, rfc, razonSocial, rnt,
+      agencyName, phoneNumber, website, rfc, razonSocial, rnt, regimenFiscal, banco, cuentaClabe, titularCuenta,
       street, exteriorNumber, interiorNumber, colony, city, state, postalCode, country,
     } = formData;
 
@@ -151,6 +155,10 @@ const AzureAgencySignupPage: React.FC = () => {
         rfc: rfc || null,
         razon_social: razonSocial.trim(),
         rnt: rnt || null,
+        regimen_fiscal: regimenFiscal || null,
+        banco: banco || null,
+        cuenta_clabe: cuentaClabe || null,
+        titular_cuenta: titularCuenta || null,
         street: street || null,
         exterior_number: exteriorNumber || null,
         interior_number: interiorNumber || null,
@@ -331,6 +339,51 @@ const AzureAgencySignupPage: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700">RNT <span className="text-gray-400 font-normal">(Opcional)</span></label>
                 <input name="rnt" type="text" value={formData.rnt} onChange={handleInputChange} placeholder="Registro Nacional de Turismo" className={`mt-1 ${inputClass}`} />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Régimen Fiscal <span className="text-gray-400 font-normal">(opcional)</span>
+                </label>
+                <select
+                  name="regimenFiscal"
+                  value={formData.regimenFiscal}
+                  onChange={(e) => setFormData(prev => ({ ...prev, regimenFiscal: e.target.value }))}
+                  className={`mt-1 ${inputClass} bg-white`}
+                >
+                  <option value="">Selecciona tu régimen fiscal</option>
+                  <option value="601">601 — General de Ley Personas Morales</option>
+                  <option value="612">612 — Personas Físicas con Actividades Empresariales y Profesionales</option>
+                  <option value="621">621 — Incorporación Fiscal (RIF)</option>
+                  <option value="625">625 — Régimen de las Actividades Empresariales con ingresos a través de Plataformas Tecnológicas</option>
+                  <option value="626">626 — Régimen Simplificado de Confianza (RESICO)</option>
+                  <option value="608">608 — Demás Ingresos</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Banking info */}
+            <div className="border-t pt-4 space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Información Bancaria</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Opcional, pero recomendable completarla desde el inicio para agilizar pagos.</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Banco <span className="text-gray-400 font-normal">(opcional)</span></label>
+                  <input name="banco" type="text" value={formData.banco} onChange={handleInputChange} placeholder="Ej: BBVA, Banorte, Santander..." className={`mt-1 ${inputClass}`} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Titular de la Cuenta <span className="text-gray-400 font-normal">(opcional)</span></label>
+                  <input name="titularCuenta" type="text" value={formData.titularCuenta} onChange={handleInputChange} placeholder="Nombre del titular" className={`mt-1 ${inputClass}`} />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">CLABE Interbancaria <span className="text-gray-400 font-normal">(opcional)</span></label>
+                <input name="cuentaClabe" type="text" value={formData.cuentaClabe} onChange={handleInputChange} placeholder="18 dígitos" maxLength={18} className={`mt-1 ${inputClass}`} />
+                <p className="mt-1 text-xs text-gray-500">18 dígitos — necesaria para recibir transferencias</p>
               </div>
             </div>
 

@@ -37,6 +37,10 @@ const AgencySignupPage: React.FC = () => {
     rfc: '',
     razonSocial: '',
     rnt: '',
+    regimenFiscal: '',
+    banco: '',
+    cuentaClabe: '',
+    titularCuenta: '',
     street: '',
     exteriorNumber: '',
     interiorNumber: '',
@@ -58,7 +62,7 @@ const AgencySignupPage: React.FC = () => {
     setIsLoading(true);
     setError('');
 
-    const { firstName, apellidoPaterno, apellidoMaterno, dateOfBirth, sexo, curp, email, password, confirmPassword, agencyName, phoneNumber, website, rfc, razonSocial, rnt, street, exteriorNumber, interiorNumber, colony, city, state, postalCode, country } = formData;
+    const { firstName, apellidoPaterno, apellidoMaterno, dateOfBirth, sexo, curp, email, password, confirmPassword, agencyName, phoneNumber, website, rfc, razonSocial, rnt, regimenFiscal, banco, cuentaClabe, titularCuenta, street, exteriorNumber, interiorNumber, colony, city, state, postalCode, country } = formData;
 
     if (password.trim() !== confirmPassword.trim()) {
       setError('Las contraseñas no coinciden');
@@ -177,6 +181,10 @@ const AgencySignupPage: React.FC = () => {
           rfc: rfc || null,
           razon_social: razonSocial.trim(),
           rnt: rnt || null,
+          regimen_fiscal: regimenFiscal || null,
+          banco: banco || null,
+          cuenta_clabe: cuentaClabe || null,
+          titular_cuenta: titularCuenta || null,
           street: street || null,
           exterior_number: exteriorNumber || null,
           interior_number: interiorNumber || null,
@@ -633,6 +641,89 @@ const AgencySignupPage: React.FC = () => {
                   <p className="mt-1 text-xs text-gray-500">
                     Nombre legal completo del propietario (persona física) o razón social de la empresa (persona moral)
                   </p>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label htmlFor="regimenFiscal" className="block text-sm font-medium text-gray-700">
+                    Régimen Fiscal <span className="text-gray-400 font-normal">(opcional)</span>
+                  </label>
+                  <div className="mt-1">
+                    <select
+                      id="regimenFiscal"
+                      name="regimenFiscal"
+                      value={formData.regimenFiscal}
+                      onChange={(e) => handleInputChange('regimenFiscal', e.target.value)}
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm bg-white"
+                    >
+                      <option value="">Selecciona tu régimen fiscal</option>
+                      <option value="601">601 — General de Ley Personas Morales</option>
+                      <option value="612">612 — Personas Físicas con Actividades Empresariales y Profesionales</option>
+                      <option value="621">621 — Incorporación Fiscal (RIF)</option>
+                      <option value="625">625 — Régimen de las Actividades Empresariales con ingresos a través de Plataformas Tecnológicas</option>
+                      <option value="626">626 — Régimen Simplificado de Confianza (RESICO)</option>
+                      <option value="608">608 — Demás Ingresos</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Información Bancaria */}
+            <div className="border-b border-gray-200 pb-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-1">Información Bancaria</h3>
+              <p className="text-sm text-gray-500 mb-4">Opcional, pero recomendable completarla desde el inicio para agilizar pagos.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="banco" className="block text-sm font-medium text-gray-700">
+                    Banco <span className="text-gray-400 font-normal">(opcional)</span>
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="banco"
+                      name="banco"
+                      type="text"
+                      value={formData.banco}
+                      onChange={(e) => handleInputChange('banco', e.target.value)}
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      placeholder="Ej: BBVA, Banorte, Santander..."
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="titularCuenta" className="block text-sm font-medium text-gray-700">
+                    Titular de la Cuenta <span className="text-gray-400 font-normal">(opcional)</span>
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="titularCuenta"
+                      name="titularCuenta"
+                      type="text"
+                      value={formData.titularCuenta}
+                      onChange={(e) => handleInputChange('titularCuenta', e.target.value)}
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      placeholder="Nombre del titular tal como aparece en el banco"
+                    />
+                  </div>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label htmlFor="cuentaClabe" className="block text-sm font-medium text-gray-700">
+                    CLABE Interbancaria <span className="text-gray-400 font-normal">(opcional)</span>
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="cuentaClabe"
+                      name="cuentaClabe"
+                      type="text"
+                      value={formData.cuentaClabe}
+                      onChange={(e) => handleInputChange('cuentaClabe', e.target.value)}
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      placeholder="18 dígitos"
+                      maxLength={18}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">18 dígitos — necesaria para recibir transferencias</p>
                 </div>
               </div>
             </div>
