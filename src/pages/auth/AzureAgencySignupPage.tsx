@@ -26,6 +26,7 @@ const AzureAgencySignupPage: React.FC = () => {
   const azureFirstName = meta.given_name || azureFullName.split(' ')[0] || '';
   const azureLastName = meta.family_name || azureFullName.split(' ').slice(1).join(' ') || '';
   const azureEmail: string = user?.email || meta.email || '';
+  const msAvatarUrl: string = meta.ms_avatar_url || '';
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -36,7 +37,11 @@ const AzureAgencySignupPage: React.FC = () => {
 
   const [formData, setFormData] = useState({
     firstName: azureFirstName,
-    lastName: azureLastName,
+    apellidoPaterno: azureLastName,
+    apellidoMaterno: '',
+    dateOfBirth: '',
+    sexo: '' as '' | 'masculino' | 'femenino' | 'no_binario',
+    curp: '',
     email: azureEmail,
     password: '',
     confirmPassword: '',
@@ -70,8 +75,12 @@ const AzureAgencySignupPage: React.FC = () => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'rfc' ? value.toUpperCase() : value,
+      [name]: name === 'rfc' || name === 'curp' ? value.toUpperCase() : value,
     }));
+  };
+
+  const handleSexoChange = (value: 'masculino' | 'femenino' | 'no_binario') => {
+    setFormData(prev => ({ ...prev, sexo: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -80,10 +89,13 @@ const AzureAgencySignupPage: React.FC = () => {
     setError('');
 
     const {
-      firstName, lastName, email, password, confirmPassword,
+      firstName, apellidoPaterno, apellidoMaterno, dateOfBirth, sexo, curp, email, password, confirmPassword,
       agencyName, phoneNumber, website, rfc, razonSocial, rnt,
       street, exteriorNumber, interiorNumber, colony, city, state, postalCode, country,
     } = formData;
+
+    if (!apellidoPaterno.trim()) { setError('El apellido paterno es obligatorio'); setIsLoading(false); return; }
+    if (!sexo) { setError('El sexo es obligatorio'); setIsLoading(false); return; }
 
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden');
@@ -104,10 +116,16 @@ const AzureAgencySignupPage: React.FC = () => {
         email: email,
         role: UserRole.AGENCY,
         first_name: firstName.trim(),
-        last_name: lastName.trim(),
+        last_name: apellidoPaterno.trim(),
+        apellido_paterno: apellidoPaterno.trim(),
+        apellido_materno: apellidoMaterno.trim() || null,
+        date_of_birth: dateOfBirth || null,
+        sexo: sexo || null,
+        curp: curp.trim() || null,
         phone_number: phoneNumber.trim(),
         email_verified: true,
         onboarding_completed: true,
+        profile_picture_url: msAvatarUrl || null,
       });
 
       if (insertError) throw insertError;
@@ -213,14 +231,49 @@ const AzureAgencySignupPage: React.FC = () => {
           )}
 
           <form className="space-y-5" onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-gray-900">Información Personal</h3>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700">Nombre</label>
+                <label className="block text-sm font-medium text-gray-700">Nombre(s)</label>
                 <input name="firstName" type="text" value={formData.firstName} onChange={handleInputChange} required className={`mt-1 ${inputClass}`} />
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Apellido Paterno</label>
+                  <input name="apellidoPaterno" type="text" value={formData.apellidoPaterno} onChange={handleInputChange} required className={`mt-1 ${inputClass}`} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Apellido Materno <span className="text-gray-400 font-normal">(opcional)</span></label>
+                  <input name="apellidoMaterno" type="text" value={formData.apellidoMaterno} onChange={handleInputChange} className={`mt-1 ${inputClass}`} />
+                </div>
+              </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700">Apellido</label>
-                <input name="lastName" type="text" value={formData.lastName} onChange={handleInputChange} required className={`mt-1 ${inputClass}`} />
+                <label className="block text-sm font-medium text-gray-700">Fecha de Nacimiento</label>
+                <input name="dateOfBirth" type="date" value={formData.dateOfBirth} onChange={handleInputChange} className={`mt-1 ${inputClass}`} />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Sexo</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['masculino', 'femenino', 'no_binario'] as const).map((opcion) => (
+                    <label key={opcion} className={`flex items-center justify-center px-3 py-2 border rounded-md cursor-pointer text-sm font-medium transition-colors ${
+                      formData.sexo === opcion
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}>
+                      <input type="radio" name="sexo" value={opcion} checked={formData.sexo === opcion} onChange={() => handleSexoChange(opcion)} className="sr-only" />
+                      {opcion === 'masculino' ? 'Masculino' : opcion === 'femenino' ? 'Femenino' : 'No Binario'}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">CURP <span className="text-gray-400 font-normal">(opcional)</span></label>
+                <input name="curp" type="text" value={formData.curp} onChange={handleInputChange} placeholder="ABCD123456HDFRRL09" maxLength={18} className={`mt-1 ${inputClass} uppercase`} />
               </div>
             </div>
 

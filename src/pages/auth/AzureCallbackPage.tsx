@@ -2,8 +2,35 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 
+async function fetchAndStoreMsAvatar(providerToken: string): Promise<string | null> {
+  try {
+    const photoRes = await fetch('https://graph.microsoft.com/v1.0/me/photo/$value', {
+      headers: { Authorization: `Bearer ${providerToken}` },
+    });
+    if (!photoRes.ok) return null;
+
+    const blob = await photoRes.blob();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const path = `avatars/${user.id}/ms-avatar.jpg`;
+    const { error: uploadError } = await supabase.storage
+      .from('images')
+      .upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
+
+    if (uploadError) return null;
+
+    const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(path);
+    await supabase.auth.updateUser({ data: { ms_avatar_url: publicUrl } });
+    return publicUrl;
+  } catch {
+    return null;
+  }
+}
+
 async function redirectForUser(
   user: any,
+  session: any,
   navigate: (path: string, opts?: any) => void,
   setError: (msg: string) => void,
 ) {
@@ -29,6 +56,9 @@ async function redirectForUser(
           else if (role === 'agency') navigate('/agency/dashboard', { replace: true });
           else navigate('/traveler/dashboard', { replace: true });
         } else {
+          if (session?.provider_token) {
+            await fetchAndStoreMsAvatar(session.provider_token);
+          }
           navigate('/auth/azure-onboarding', { replace: true });
         }
         return;
@@ -55,7 +85,7 @@ const AzureCallbackPage: React.FC = () => {
       if (done) return;
       if (session?.user) {
         done = true;
-        redirectForUser(session.user, navigate, setError);
+        redirectForUser(session.user, session, navigate, setError);
       }
     });
 
@@ -63,7 +93,7 @@ const AzureCallbackPage: React.FC = () => {
       if (done) return;
       if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
         done = true;
-        redirectForUser(session.user, navigate, setError);
+        redirectForUser(session.user, session, navigate, setError);
       }
     });
 

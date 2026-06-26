@@ -351,7 +351,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const redirectTo = `${window.location.origin}/auth/azure-callback`;
     await supabase.auth.signInWithOAuth({
       provider: 'azure',
-      options: { redirectTo, scopes: 'email profile openid' },
+      options: { redirectTo, scopes: 'email profile openid User.Read' },
     });
   }, []);
 

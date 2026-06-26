@@ -22,7 +22,11 @@ const AgencySignupPage: React.FC = () => {
 
   const [formData, setFormData] = useState({
     firstName: '',
-    lastName: '',
+    apellidoPaterno: '',
+    apellidoMaterno: '',
+    dateOfBirth: '',
+    sexo: '' as '' | 'masculino' | 'femenino' | 'no_binario',
+    curp: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -53,7 +57,7 @@ const AgencySignupPage: React.FC = () => {
     setIsLoading(true);
     setError('');
 
-    const { firstName, lastName, email, password, confirmPassword, agencyName, phoneNumber, website, rfc, razonSocial, rnt, street, exteriorNumber, interiorNumber, colony, city, state, postalCode, country } = formData;
+    const { firstName, apellidoPaterno, apellidoMaterno, dateOfBirth, sexo, curp, email, password, confirmPassword, agencyName, phoneNumber, website, rfc, razonSocial, rnt, street, exteriorNumber, interiorNumber, colony, city, state, postalCode, country } = formData;
 
     if (password.trim() !== confirmPassword.trim()) {
       setError('Las contraseñas no coinciden');
@@ -68,8 +72,14 @@ const AgencySignupPage: React.FC = () => {
       return;
     }
 
-    if (!lastName.trim()) {
-      setError('El apellido es obligatorio');
+    if (!apellidoPaterno.trim()) {
+      setError('El apellido paterno es obligatorio');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!sexo) {
+      setError('El sexo es obligatorio');
       setIsLoading(false);
       return;
     }
@@ -140,7 +150,12 @@ const AgencySignupPage: React.FC = () => {
         .from('users')
         .update({
           first_name: firstName.trim(),
-          last_name: lastName.trim(),
+          last_name: apellidoPaterno.trim(),
+          apellido_paterno: apellidoPaterno.trim(),
+          apellido_materno: apellidoMaterno.trim() || null,
+          date_of_birth: dateOfBirth || null,
+          sexo: sexo || null,
+          curp: curp.trim() || null,
         })
         .eq('id', data.user.id);
 
@@ -322,11 +337,11 @@ const AgencySignupPage: React.FC = () => {
           )}
 
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {/* Información Básica */}
+            {/* Información Personal */}
             <div className="border-b border-gray-200 pb-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Información Personal</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div className="md:col-span-2">
                   <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
                     Nombre(s) *
                   </label>
@@ -345,20 +360,94 @@ const AgencySignupPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
-                    Apellido(s) *
+                  <label htmlFor="apellidoPaterno" className="block text-sm font-medium text-gray-700">
+                    Apellido Paterno *
                   </label>
                   <div className="mt-1">
                     <input
-                      id="lastName"
-                      name="lastName"
+                      id="apellidoPaterno"
+                      name="apellidoPaterno"
                       type="text"
-                      value={formData.lastName}
-                      onChange={(e) => handleInputChange('lastName', e.target.value)}
+                      value={formData.apellidoPaterno}
+                      onChange={(e) => handleInputChange('apellidoPaterno', e.target.value)}
                       required
                       className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      placeholder="Ej: Pérez García"
+                      placeholder="Ej: Pérez"
                     />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="apellidoMaterno" className="block text-sm font-medium text-gray-700">
+                    Apellido Materno <span className="text-gray-400 font-normal">(opcional)</span>
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="apellidoMaterno"
+                      name="apellidoMaterno"
+                      type="text"
+                      value={formData.apellidoMaterno}
+                      onChange={(e) => handleInputChange('apellidoMaterno', e.target.value)}
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      placeholder="Ej: García"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700">
+                    Fecha de Nacimiento <span className="text-gray-400 font-normal">(opcional)</span>
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="dateOfBirth"
+                      name="dateOfBirth"
+                      type="date"
+                      value={formData.dateOfBirth}
+                      onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="curp" className="block text-sm font-medium text-gray-700">
+                    CURP <span className="text-gray-400 font-normal">(opcional)</span>
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="curp"
+                      name="curp"
+                      type="text"
+                      value={formData.curp}
+                      onChange={(e) => handleInputChange('curp', e.target.value.toUpperCase())}
+                      maxLength={18}
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm uppercase"
+                      placeholder="ABCD123456HDFRRL09"
+                    />
+                  </div>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Sexo *</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['masculino', 'femenino', 'no_binario'] as const).map((opcion) => (
+                      <label key={opcion} className={`flex items-center justify-center px-3 py-2 border rounded-md cursor-pointer text-sm font-medium transition-colors ${
+                        formData.sexo === opcion
+                          ? 'border-primary-500 bg-primary-50 text-primary-700'
+                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                      }`}>
+                        <input
+                          type="radio"
+                          name="sexo"
+                          value={opcion}
+                          checked={formData.sexo === opcion}
+                          onChange={() => handleInputChange('sexo', opcion)}
+                          className="sr-only"
+                        />
+                        {opcion === 'masculino' ? 'Masculino' : opcion === 'femenino' ? 'Femenino' : 'No Binario'}
+                      </label>
+                    ))}
                   </div>
                 </div>
               </div>

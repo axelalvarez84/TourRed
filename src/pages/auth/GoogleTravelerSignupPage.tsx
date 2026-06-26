@@ -32,7 +32,9 @@ const GoogleTravelerSignupPage: React.FC = () => {
 
   const [formData, setFormData] = useState({
     firstName: googleFirstName,
-    lastName: googleLastName,
+    apellidoPaterno: googleLastName,
+    apellidoMaterno: '',
+    sexo: '' as '' | 'masculino' | 'femenino' | 'no_binario',
     email: googleEmail,
     password: '',
     confirmPassword: '',
@@ -69,6 +71,10 @@ const GoogleTravelerSignupPage: React.FC = () => {
     }));
   };
 
+  const handleSexoChange = (value: 'masculino' | 'femenino' | 'no_binario') => {
+    setFormData(prev => ({ ...prev, sexo: value }));
+  };
+
   const validateReferralCode = async (code: string) => {
     if (!code.trim()) { setReferralValidation(null); return; }
     setIsValidatingReferral(true);
@@ -102,10 +108,20 @@ const GoogleTravelerSignupPage: React.FC = () => {
     setIsLoading(true);
     setError('');
 
-    const { firstName, lastName, email, password, confirmPassword, phoneNumber, curp, passportNumber, dateOfBirth, street, exteriorNumber, interiorNumber, colony, city, state, postalCode, country } = formData;
+    const { firstName, apellidoPaterno, apellidoMaterno, sexo, email, password, confirmPassword, phoneNumber, curp, passportNumber, dateOfBirth, street, exteriorNumber, interiorNumber, colony, city, state, postalCode, country } = formData;
 
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden');
+      setIsLoading(false);
+      return;
+    }
+    if (!apellidoPaterno.trim()) {
+      setError('El apellido paterno es requerido');
+      setIsLoading(false);
+      return;
+    }
+    if (!sexo) {
+      setError('El sexo es requerido');
       setIsLoading(false);
       return;
     }
@@ -134,7 +150,10 @@ const GoogleTravelerSignupPage: React.FC = () => {
         email: email,
         role: UserRole.TRAVELER,
         first_name: firstName,
-        last_name: lastName,
+        last_name: apellidoPaterno,
+        apellido_paterno: apellidoPaterno,
+        apellido_materno: apellidoMaterno || null,
+        sexo: sexo || null,
         phone_number: phoneNumber,
         curp: isForeignTraveler ? null : curp,
         passport_number: isForeignTraveler ? passportNumber : null,
@@ -256,15 +275,36 @@ const GoogleTravelerSignupPage: React.FC = () => {
           )}
 
           <form className="space-y-5" onSubmit={handleSubmit}>
-            {/* Name */}
+            {/* Tipo de viajero */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de viajero</label>
+              <div className="flex items-center space-x-4">
+                <label className="flex items-center cursor-pointer">
+                  <input type="radio" checked={!isForeignTraveler} onChange={() => setIsForeignTraveler(false)} className="h-4 w-4 text-primary-600" />
+                  <span className="ml-2 text-sm font-medium text-gray-700">Viajero Nacional</span>
+                </label>
+                <label className="flex items-center cursor-pointer">
+                  <input type="radio" checked={isForeignTraveler} onChange={() => setIsForeignTraveler(true)} className="h-4 w-4 text-primary-600" />
+                  <span className="ml-2 text-sm font-medium text-gray-700">Viajero Extranjero</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Nombre */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Nombre(s)</label>
+              <input name="firstName" type="text" value={formData.firstName} onChange={handleInputChange} required className={`mt-1 ${inputClass}`} />
+            </div>
+
+            {/* Apellidos */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Nombre</label>
-                <input name="firstName" type="text" value={formData.firstName} onChange={handleInputChange} required className={`mt-1 ${inputClass}`} />
+                <label className="block text-sm font-medium text-gray-700">Apellido Paterno</label>
+                <input name="apellidoPaterno" type="text" value={formData.apellidoPaterno} onChange={handleInputChange} required className={`mt-1 ${inputClass}`} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Apellido</label>
-                <input name="lastName" type="text" value={formData.lastName} onChange={handleInputChange} required className={`mt-1 ${inputClass}`} />
+                <label className="block text-sm font-medium text-gray-700">Apellido Materno <span className="text-gray-400 font-normal">(opcional)</span></label>
+                <input name="apellidoMaterno" type="text" value={formData.apellidoMaterno} onChange={handleInputChange} className={`mt-1 ${inputClass}`} />
               </div>
             </div>
 
@@ -294,42 +334,47 @@ const GoogleTravelerSignupPage: React.FC = () => {
               )}
             </div>
 
+            {/* Fecha de Nacimiento */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Fecha de Nacimiento</label>
+              <input name="dateOfBirth" type="date" value={formData.dateOfBirth} onChange={handleInputChange} required className={`mt-1 ${inputClass}`} />
+            </div>
+
+            {/* Sexo */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Sexo</label>
+              <div className="grid grid-cols-3 gap-2">
+                {(['masculino', 'femenino', 'no_binario'] as const).map((opcion) => (
+                  <label key={opcion} className={`flex items-center justify-center px-3 py-2 border rounded-md cursor-pointer text-sm font-medium transition-colors ${
+                    formData.sexo === opcion
+                      ? 'border-primary-500 bg-primary-50 text-primary-700'
+                      : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                  }`}>
+                    <input type="radio" name="sexo" value={opcion} checked={formData.sexo === opcion} onChange={() => handleSexoChange(opcion)} className="sr-only" />
+                    {opcion === 'masculino' ? 'Masculino' : opcion === 'femenino' ? 'Femenino' : 'No Binario'}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* CURP o Pasaporte */}
+            {!isForeignTraveler ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">CURP</label>
+                <input name="curp" type="text" value={formData.curp} onChange={handleInputChange} placeholder="ABCD123456HDFRRL09" maxLength={18} required className={`mt-1 ${inputClass} uppercase`} />
+                <p className="mt-1 text-xs text-gray-500">18 caracteres</p>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Número de Pasaporte</label>
+                <input name="passportNumber" type="text" value={formData.passportNumber} onChange={handleInputChange} placeholder="A12345678" required className={`mt-1 ${inputClass} uppercase`} />
+              </div>
+            )}
+
             {/* Phone */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Número de celular</label>
               <input name="phoneNumber" type="tel" value={formData.phoneNumber} onChange={handleInputChange} placeholder="+52 55 1234 5678" required className={`mt-1 ${inputClass}`} />
-            </div>
-
-            {/* National / Foreign */}
-            <div className="space-y-3">
-              <div className="flex items-center space-x-4">
-                <label className="flex items-center cursor-pointer">
-                  <input type="radio" checked={!isForeignTraveler} onChange={() => setIsForeignTraveler(false)} className="h-4 w-4 text-primary-600" />
-                  <span className="ml-2 text-sm font-medium text-gray-700">Viajero Nacional</span>
-                </label>
-                <label className="flex items-center cursor-pointer">
-                  <input type="radio" checked={isForeignTraveler} onChange={() => setIsForeignTraveler(true)} className="h-4 w-4 text-primary-600" />
-                  <span className="ml-2 text-sm font-medium text-gray-700">Viajero Extranjero</span>
-                </label>
-              </div>
-              {!isForeignTraveler ? (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">CURP</label>
-                  <input name="curp" type="text" value={formData.curp} onChange={handleInputChange} placeholder="ABCD123456HDFRRL09" maxLength={18} required className={`mt-1 ${inputClass} uppercase`} />
-                  <p className="mt-1 text-xs text-gray-500">18 caracteres</p>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Número de Pasaporte</label>
-                  <input name="passportNumber" type="text" value={formData.passportNumber} onChange={handleInputChange} placeholder="A12345678" required className={`mt-1 ${inputClass} uppercase`} />
-                </div>
-              )}
-            </div>
-
-            {/* Date of birth */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Fecha de Nacimiento</label>
-              <input name="dateOfBirth" type="date" value={formData.dateOfBirth} onChange={handleInputChange} required className={`mt-1 ${inputClass}`} />
             </div>
 
             {/* Address */}

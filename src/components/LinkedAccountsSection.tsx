@@ -100,7 +100,7 @@ const LinkedAccountsSection: React.FC = () => {
         provider,
         options: {
           redirectTo,
-          ...(provider === 'azure' ? { scopes: 'email profile openid' } : {}),
+          ...(provider === 'azure' ? { scopes: 'email profile openid User.Read' } : {}),
         },
       });
       if (linkError) throw linkError;
