@@ -598,52 +598,7 @@ const SignupPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 8. Referido */}
-            <div>
-              <label htmlFor="referralCode" className="block text-sm font-medium text-gray-700">
-                Código de Referido <span className="text-gray-400 font-normal">(Opcional)</span>
-              </label>
-              <div className="mt-1 relative">
-                <input
-                  id="referralCode"
-                  name="referralCode"
-                  type="text"
-                  value={referralCode}
-                  onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                  placeholder="Ej: ABC12345"
-                  maxLength={8}
-                  className="appearance-none block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm uppercase"
-                />
-                {isValidatingReferral && (
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <Loader className="h-5 w-5 text-gray-400 animate-spin" />
-                  </div>
-                )}
-                {!isValidatingReferral && referralValidation && (
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    {referralValidation.valid ? (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-red-500" />
-                    )}
-                  </div>
-                )}
-              </div>
-              {referralValidation && (
-                <p className={`mt-1 text-sm ${referralValidation.valid ? 'text-green-600' : 'text-red-600'}`}>
-                  {referralValidation.valid && referralValidation.referrer_name
-                    ? `Código válido - Referido por ${referralValidation.referrer_name}`
-                    : referralValidation.message}
-                </p>
-              )}
-              {!referralValidation && !isValidatingReferral && (
-                <p className="mt-1 text-xs text-gray-500">
-                  Gana 5,000 puntos al completar tu primera reserva
-                </p>
-              )}
-            </div>
-
-            {/* 9. Celular */}
+            {/* 8. Celular */}
             <div>
               <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
                 Número de celular
@@ -803,6 +758,50 @@ const SignupPage: React.FC = () => {
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div>
+              <label htmlFor="referralCode" className="block text-sm font-medium text-gray-700">
+                Código de Referido <span className="text-gray-400 font-normal">(Opcional)</span>
+              </label>
+              <div className="mt-1 relative">
+                <input
+                  id="referralCode"
+                  name="referralCode"
+                  type="text"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                  placeholder="Ej: ABC12345"
+                  maxLength={8}
+                  className="appearance-none block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm uppercase"
+                />
+                {isValidatingReferral && (
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <Loader className="h-5 w-5 text-gray-400 animate-spin" />
+                  </div>
+                )}
+                {!isValidatingReferral && referralValidation && (
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    {referralValidation.valid ? (
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-500" />
+                    )}
+                  </div>
+                )}
+              </div>
+              {referralValidation && (
+                <p className={`mt-1 text-sm ${referralValidation.valid ? 'text-green-600' : 'text-red-600'}`}>
+                  {referralValidation.valid && referralValidation.referrer_name
+                    ? `Código válido - Referido por ${referralValidation.referrer_name}`
+                    : referralValidation.message}
+                </p>
+              )}
+              {!referralValidation && !isValidatingReferral && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Gana 5,000 puntos al completar tu primera reserva
+                </p>
+              )}
             </div>
 
             <div>
