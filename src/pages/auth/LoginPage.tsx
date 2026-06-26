@@ -47,11 +47,12 @@ const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isAzureLoading, setIsAzureLoading] = useState(false);
   const [ipBlocked, setIpBlocked] = useState(false);
   const deviceFingerprintRef = useRef<string>(computeDeviceFingerprint());
   const navigate = useNavigate();
   const location = useLocation();
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle, signInWithAzure } = useAuth();
 
   const searchParams = new URLSearchParams(location.search);
   const redirectUrl = searchParams.get('redirect');
@@ -148,6 +149,16 @@ const LoginPage: React.FC = () => {
     } catch {
       setError('No se pudo iniciar sesión con Google. Por favor intenta de nuevo.');
       setIsGoogleLoading(false);
+    }
+  };
+
+  const handleAzureSignIn = async () => {
+    setIsAzureLoading(true);
+    try {
+      await signInWithAzure();
+    } catch {
+      setError('No se pudo iniciar sesión con Microsoft. Por favor intenta de nuevo.');
+      setIsAzureLoading(false);
     }
   };
 
@@ -270,11 +281,11 @@ const LoginPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="mt-4">
+            <div className="mt-4 flex flex-col gap-3">
               <button
                 type="button"
                 onClick={handleGoogleSignIn}
-                disabled={isGoogleLoading}
+                disabled={isGoogleLoading || isAzureLoading}
                 className="w-full inline-flex justify-center items-center gap-3 py-2.5 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 transition-colors"
               >
                 {isGoogleLoading ? (
@@ -288,6 +299,26 @@ const LoginPage: React.FC = () => {
                   </svg>
                 )}
                 Continuar con Google
+              </button>
+
+              <button
+                type="button"
+                onClick={handleAzureSignIn}
+                disabled={isAzureLoading || isGoogleLoading}
+                className="w-full inline-flex justify-center items-center gap-3 py-2.5 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 transition-colors"
+              >
+                {isAzureLoading ? (
+                  <div className="w-5 h-5 border-t-2 border-b-2 border-gray-400 rounded-full animate-spin" />
+                ) : (
+                  <svg viewBox="0 0 23 23" className="w-5 h-5 flex-shrink-0" aria-hidden="true">
+                    <path fill="#f3f3f3" d="M0 0h23v23H0z"/>
+                    <path fill="#f35325" d="M1 1h10v10H1z"/>
+                    <path fill="#81bc06" d="M12 1h10v10H12z"/>
+                    <path fill="#05a6f0" d="M1 12h10v10H1z"/>
+                    <path fill="#ffba08" d="M12 12h10v10H12z"/>
+                  </svg>
+                )}
+                Continuar con Microsoft
               </button>
             </div>
 

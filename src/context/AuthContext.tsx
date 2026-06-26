@@ -134,6 +134,7 @@ interface AuthContextType {
   needsTermsAcceptance: boolean;
   markTermsAccepted: () => void;
   signInWithGoogle: () => Promise<void>;
+  signInWithAzure: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
 }
 
@@ -160,6 +161,7 @@ const AuthContext = createContext<AuthContextType>({
   needsTermsAcceptance: false,
   markTermsAccepted: () => {},
   signInWithGoogle: async () => {},
+  signInWithAzure: async () => {},
   completeOnboarding: async () => {},
 });
 
@@ -345,6 +347,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
+  const signInWithAzure = useCallback(async () => {
+    const redirectTo = `${window.location.origin}/auth/azure-callback`;
+    await supabase.auth.signInWithOAuth({
+      provider: 'azure',
+      options: { redirectTo, scopes: 'email profile openid' },
+    });
+  }, []);
+
   const updateAuthState = async (authUser: any, forceRefresh: boolean = false) => {
     if (isUpdatingRef.current) return;
     isUpdatingRef.current = true;
@@ -352,12 +362,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(authUser);
 
       if (authUser) {
-        // Check if Google OAuth user hasn't completed onboarding yet
-        const isGoogleProvider = authUser.app_metadata?.provider === 'google' ||
-          (authUser.identities ?? []).some((i: any) => i.provider === 'google');
+        // Check if Google or Azure OAuth user hasn't completed onboarding yet
+        const isOAuthProvider =
+          authUser.app_metadata?.provider === 'google' ||
+          authUser.app_metadata?.provider === 'azure' ||
+          (authUser.identities ?? []).some((i: any) => i.provider === 'google' || i.provider === 'azure');
         const metaOnboarding = authUser.user_metadata?.onboarding_completed;
 
-        if (isGoogleProvider && (metaOnboarding === false || metaOnboarding === null || metaOnboarding === undefined)) {
+        if (isOAuthProvider && (metaOnboarding === false || metaOnboarding === null || metaOnboarding === undefined)) {
           // Check if profile exists in users table
           const { data: existingProfile } = await supabase
             .from('users')
@@ -810,8 +822,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     needsTermsAcceptance,
     markTermsAccepted,
     signInWithGoogle,
+    signInWithAzure,
     completeOnboarding,
-  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isAccountant, isAccountExecutive, isEmailVerified, isSuperAdmin, isOnboardingPending, permissions, accountantPermissions, accountExecutiveInfo, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency, needsTermsAcceptance, markTermsAccepted, signInWithGoogle, completeOnboarding]);
+  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isAccountant, isAccountExecutive, isEmailVerified, isSuperAdmin, isOnboardingPending, permissions, accountantPermissions, accountExecutiveInfo, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency, needsTermsAcceptance, markTermsAccepted, signInWithGoogle, signInWithAzure, completeOnboarding]);
 
   return (
     <AuthContext.Provider value={contextValue}>

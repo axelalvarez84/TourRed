@@ -8,6 +8,7 @@ import { es } from 'date-fns/locale';
 import TravelerReviewsDisplay from '../../components/TravelerReviewsDisplay';
 import ProfilePictureUploader from '../../components/ProfilePictureUploader';
 import ChangePasswordSection from '../../components/ChangePasswordSection';
+import LinkedAccountsSection from '../../components/LinkedAccountsSection';
 
 interface TravelerProfile {
   id: string;
@@ -1382,6 +1383,11 @@ const TravelerProfile: React.FC = () => {
         {/* Seguridad - Cambiar Contraseña */}
         <div className="mt-6">
           <ChangePasswordSection />
+        </div>
+
+        {/* Cuentas vinculadas */}
+        <div className="mt-6">
+          <LinkedAccountsSection />
         </div>
 
         {/* Seguridad - Historial de acceso */}

@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { useAgencyId } from '../../hooks/useAgencyId';
 import ImageUploader from '../../components/ImageUploader';
 import ChangePasswordSection from '../../components/ChangePasswordSection';
+import LinkedAccountsSection from '../../components/LinkedAccountsSection';
 
 interface AgencyProfile {
   id: string;
@@ -1026,6 +1027,11 @@ const AgencyProfile: React.FC = () => {
             {/* Seguridad - Cambiar Contraseña */}
             <div className="mt-6">
               <ChangePasswordSection />
+            </div>
+
+            {/* Cuentas vinculadas */}
+            <div className="mt-6">
+              <LinkedAccountsSection />
             </div>
           </div>
         </div>

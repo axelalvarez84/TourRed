@@ -16,6 +16,10 @@ import GoogleOnboardingPage from './pages/auth/GoogleOnboardingPage';
 import GoogleTravelerSignupPage from './pages/auth/GoogleTravelerSignupPage';
 import GoogleAgencySignupPage from './pages/auth/GoogleAgencySignupPage';
 import GoogleCallbackPage from './pages/auth/GoogleCallbackPage';
+import AzureCallbackPage from './pages/auth/AzureCallbackPage';
+import AzureOnboardingPage from './pages/auth/AzureOnboardingPage';
+import AzureTravelerSignupPage from './pages/auth/AzureTravelerSignupPage';
+import AzureAgencySignupPage from './pages/auth/AzureAgencySignupPage';
 import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
@@ -168,6 +172,10 @@ const App: React.FC = () => {
           <Route path="/auth/google-onboarding" element={<GoogleOnboardingPage />} />
           <Route path="/auth/google-signup/traveler" element={<GoogleTravelerSignupPage />} />
           <Route path="/auth/google-signup/agency" element={<GoogleAgencySignupPage />} />
+          <Route path="/auth/azure-callback" element={<AzureCallbackPage />} />
+          <Route path="/auth/azure-onboarding" element={<AzureOnboardingPage />} />
+          <Route path="/auth/azure-signup/traveler" element={<AzureTravelerSignupPage />} />
+          <Route path="/auth/azure-signup/agency" element={<AzureAgencySignupPage />} />
           <Route path="/success" element={<SuccessPage />} />
           <Route path="/cancel" element={<CancelPage />} />
           <Route path="/booking-success" element={<BookingSuccessPage />} />
