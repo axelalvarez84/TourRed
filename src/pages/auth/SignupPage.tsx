@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, CheckCircle, XCircle, Loader } from 'lucide-react';
 import { signUp, supabase, UserRole } from '../../lib/supabase';
+import { calcularPrefijoCurp } from '../../utils/curpUtils';
 
 const isLeakedPasswordError = (message: string) =>
   /leaked|pwned|compromised|common password/i.test(message);
@@ -31,7 +32,9 @@ const SignupPage: React.FC = () => {
 
   const [formData, setFormData] = useState({
     firstName: '',
-    lastName: '',
+    apellidoPaterno: '',
+    apellidoMaterno: '',
+    sexo: '' as '' | 'masculino' | 'femenino' | 'no_binario',
     email: '',
     password: '',
     confirmPassword: '',
@@ -49,6 +52,10 @@ const SignupPage: React.FC = () => {
     country: 'México'
   });
 
+  // Track if the user has manually edited the CURP field
+  const curpManuallyEdited = useRef(false);
+  const lastAutofillPrefix = useRef('');
+
   useEffect(() => {
     if (refCode) {
       setReferralCode(refCode.toUpperCase());
@@ -61,13 +68,32 @@ const SignupPage: React.FC = () => {
     });
   }, []);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    if (name === 'curp') {
+      curpManuallyEdited.current = true;
+    }
     setFormData(prev => ({
       ...prev,
       [name]: name === 'curp' || name === 'passportNumber' ? value.toUpperCase() : value
     }));
   };
+
+  // Auto-fill CURP prefix when enough data is available (only for national travelers)
+  useEffect(() => {
+    if (isForeignTraveler) return;
+    if (curpManuallyEdited.current) return;
+    const { firstName, apellidoPaterno, apellidoMaterno, dateOfBirth, sexo } = formData;
+    if (!firstName || !apellidoPaterno || !dateOfBirth || !sexo) return;
+    const prefix = calcularPrefijoCurp(firstName, apellidoPaterno, apellidoMaterno, dateOfBirth, sexo);
+    if (prefix && prefix !== lastAutofillPrefix.current) {
+      lastAutofillPrefix.current = prefix;
+      setFormData(prev => ({
+        ...prev,
+        curp: prefix
+      }));
+    }
+  }, [formData.firstName, formData.apellidoPaterno, formData.apellidoMaterno, formData.dateOfBirth, formData.sexo, isForeignTraveler]);
 
   const validateReferralCode = async (code: string) => {
     if (!code || code.trim().length === 0) {
@@ -119,7 +145,8 @@ const SignupPage: React.FC = () => {
     setIsLoading(true);
     setError('');
 
-    const { email, password, confirmPassword, firstName, lastName, phoneNumber, curp, passportNumber, dateOfBirth, street, exteriorNumber, interiorNumber, colony, city, state, postalCode, country } = formData;
+    const { email, password, confirmPassword, firstName, apellidoPaterno, apellidoMaterno, sexo, phoneNumber, curp, passportNumber, dateOfBirth, street, exteriorNumber, interiorNumber, colony, city, state, postalCode, country } = formData;
+    const lastName = apellidoPaterno;
 
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden');
@@ -160,7 +187,10 @@ const SignupPage: React.FC = () => {
         UserRole.TRAVELER,
         {
           first_name: firstName,
-          last_name: lastName,
+          last_name: apellidoPaterno,
+          apellido_paterno: apellidoPaterno,
+          apellido_materno: apellidoMaterno || null,
+          sexo: sexo || null,
           phone_number: phoneNumber,
           curp: isForeignTraveler ? null : curp,
           passport_number: isForeignTraveler ? passportNumber : null,
@@ -370,17 +400,34 @@ const SignupPage: React.FC = () => {
           )}
 
           <form className="space-y-6" onSubmit={handleSubmit}>
+            <div>
+              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+                Nombre(s)
+              </label>
+              <div className="mt-1">
+                <input
+                  id="firstName"
+                  name="firstName"
+                  type="text"
+                  value={formData.firstName}
+                  onChange={handleInputChange}
+                  required
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                />
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
-                  Nombre
+                <label htmlFor="apellidoPaterno" className="block text-sm font-medium text-gray-700">
+                  Apellido Paterno
                 </label>
                 <div className="mt-1">
                   <input
-                    id="firstName"
-                    name="firstName"
+                    id="apellidoPaterno"
+                    name="apellidoPaterno"
                     type="text"
-                    value={formData.firstName}
+                    value={formData.apellidoPaterno}
                     onChange={handleInputChange}
                     required
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
@@ -389,20 +436,49 @@ const SignupPage: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
-                  Apellido
+                <label htmlFor="apellidoMaterno" className="block text-sm font-medium text-gray-700">
+                  Apellido Materno
+                  <span className="text-gray-400 font-normal ml-1">(opcional)</span>
                 </label>
                 <div className="mt-1">
                   <input
-                    id="lastName"
-                    name="lastName"
+                    id="apellidoMaterno"
+                    name="apellidoMaterno"
                     type="text"
-                    value={formData.lastName}
+                    value={formData.apellidoMaterno}
                     onChange={handleInputChange}
-                    required
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                   />
                 </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sexo
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {(['masculino', 'femenino', 'no_binario'] as const).map((opcion) => (
+                  <label
+                    key={opcion}
+                    className={`flex items-center justify-center px-3 py-2 border rounded-md cursor-pointer text-sm font-medium transition-colors ${
+                      formData.sexo === opcion
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="sexo"
+                      value={opcion}
+                      checked={formData.sexo === opcion}
+                      onChange={handleInputChange}
+                      className="sr-only"
+                      required
+                    />
+                    {opcion === 'masculino' ? 'Masculino' : opcion === 'femenino' ? 'Femenino' : 'No Binario'}
+                  </label>
+                ))}
               </div>
             </div>
 
@@ -525,7 +601,13 @@ const SignupPage: React.FC = () => {
                       required
                       className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm uppercase"
                     />
-                    <p className="mt-1 text-xs text-gray-500">18 caracteres alfanuméricos</p>
+                    {!curpManuallyEdited.current && formData.curp.length > 0 ? (
+                      <p className="mt-1 text-xs text-blue-600">
+                        Prellenado con tus datos. Completa o corrige los caracteres restantes.
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs text-gray-500">18 caracteres alfanuméricos</p>
+                    )}
                   </div>
                 </div>
               ) : (

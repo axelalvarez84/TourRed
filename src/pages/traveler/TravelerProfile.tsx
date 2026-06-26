@@ -13,6 +13,9 @@ interface TravelerProfile {
   id: string;
   first_name?: string;
   last_name?: string;
+  apellido_paterno?: string;
+  apellido_materno?: string;
+  sexo?: string;
   email: string;
   role: string;
   created_at: string;
@@ -177,7 +180,9 @@ const TravelerProfile: React.FC = () => {
 
   const [editForm, setEditForm] = useState({
     first_name: '',
-    last_name: '',
+    apellido_paterno: '',
+    apellido_materno: '',
+    sexo: '' as '' | 'masculino' | 'femenino' | 'no_binario',
     phone_number: '',
     date_of_birth: '',
     street: '',
@@ -267,7 +272,9 @@ const TravelerProfile: React.FC = () => {
       // Inicializar formulario de edición
       setEditForm({
         first_name: profileData.first_name || '',
-        last_name: profileData.last_name || '',
+        apellido_paterno: profileData.apellido_paterno || profileData.last_name || '',
+        apellido_materno: profileData.apellido_materno || '',
+        sexo: (profileData.sexo || '') as '' | 'masculino' | 'femenino' | 'no_binario',
         phone_number: profileData.phone_number || '',
         date_of_birth: profileData.date_of_birth || '',
         street: profileData.street || '',
@@ -326,7 +333,10 @@ const TravelerProfile: React.FC = () => {
 
       const updateData: any = {
         first_name: editForm.first_name?.trim() || null,
-        last_name: editForm.last_name?.trim() || null,
+        last_name: editForm.apellido_paterno?.trim() || null,
+        apellido_paterno: editForm.apellido_paterno?.trim() || null,
+        apellido_materno: editForm.apellido_materno?.trim() || null,
+        sexo: editForm.sexo || null,
         phone_number: editForm.phone_number?.trim() || null,
         date_of_birth: editForm.date_of_birth || null,
         street: editForm.street?.trim() || null,
@@ -380,7 +390,9 @@ const TravelerProfile: React.FC = () => {
 
     setEditForm({
       first_name: profile.first_name || '',
-      last_name: profile.last_name || '',
+      apellido_paterno: profile.apellido_paterno || profile.last_name || '',
+      apellido_materno: profile.apellido_materno || '',
+      sexo: (profile.sexo || '') as '' | 'masculino' | 'femenino' | 'no_binario',
       phone_number: profile.phone_number || '',
       date_of_birth: profile.date_of_birth || '',
       street: profile.street || '',
@@ -399,7 +411,9 @@ const TravelerProfile: React.FC = () => {
       uso_cfdi: profile.uso_cfdi || '',
       codigo_postal_fiscal: profile.codigo_postal_fiscal || '',
       num_reg_id_trib: profile.num_reg_id_trib || '',
-      residencia_fiscal: profile.residencia_fiscal || ''
+      residencia_fiscal: profile.residencia_fiscal || '',
+      emergency_contact_name: profile.emergency_contact_name || '',
+      emergency_contact_phone: profile.emergency_contact_phone || ''
     });
     setIsEditing(false);
     setError('');
@@ -497,8 +511,8 @@ const TravelerProfile: React.FC = () => {
                 </div>
                 <div className="ml-6">
                   <h1 className="text-2xl font-bold text-white">
-                    {profile.first_name || profile.last_name 
-                      ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
+                    {profile.first_name || profile.apellido_paterno || profile.last_name
+                      ? [profile.first_name, profile.apellido_paterno || profile.last_name, profile.apellido_materno].filter(Boolean).join(' ')
                       : 'Viajero'
                     }
                   </h1>
@@ -589,9 +603,9 @@ const TravelerProfile: React.FC = () => {
               {isEditing ? (
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
+                    <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Nombre
+                        Nombre(s)
                       </label>
                       <input
                         type="text"
@@ -604,15 +618,55 @@ const TravelerProfile: React.FC = () => {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Apellido
+                        Apellido Paterno
                       </label>
                       <input
                         type="text"
-                        value={editForm.last_name}
-                        onChange={(e) => setEditForm({...editForm, last_name: e.target.value})}
+                        value={editForm.apellido_paterno}
+                        onChange={(e) => setEditForm({...editForm, apellido_paterno: e.target.value})}
                         className="input"
-                        placeholder="Tu apellido"
+                        placeholder="Apellido paterno"
                       />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Apellido Materno
+                        <span className="text-gray-400 font-normal ml-1">(opcional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.apellido_materno}
+                        onChange={(e) => setEditForm({...editForm, apellido_materno: e.target.value})}
+                        className="input"
+                        placeholder="Apellido materno"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(['masculino', 'femenino', 'no_binario'] as const).map((opcion) => (
+                          <label
+                            key={opcion}
+                            className={`flex items-center justify-center px-3 py-2 border rounded-md cursor-pointer text-sm font-medium transition-colors ${
+                              editForm.sexo === opcion
+                                ? 'border-primary-500 bg-primary-50 text-primary-700'
+                                : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="sexo_edit"
+                              value={opcion}
+                              checked={editForm.sexo === opcion}
+                              onChange={() => setEditForm({...editForm, sexo: opcion})}
+                              className="sr-only"
+                            />
+                            {opcion === 'masculino' ? 'Masculino' : opcion === 'femenino' ? 'Femenino' : 'No Binario'}
+                          </label>
+                        ))}
+                      </div>
                     </div>
 
                     <div>
@@ -985,15 +1039,45 @@ const TravelerProfile: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-500 mb-1">
-                        Nombre Completo
+                        Nombre(s)
+                      </label>
+                      <div className="flex items-center p-3 bg-gray-50 rounded-md">
+                        <User className="h-4 w-4 text-gray-400 mr-2" />
+                        <span>{profile.first_name || 'No especificado'}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        Apellido Paterno
+                      </label>
+                      <div className="flex items-center p-3 bg-gray-50 rounded-md">
+                        <User className="h-4 w-4 text-gray-400 mr-2" />
+                        <span>{profile.apellido_paterno || profile.last_name || 'No especificado'}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        Apellido Materno
+                      </label>
+                      <div className="flex items-center p-3 bg-gray-50 rounded-md">
+                        <User className="h-4 w-4 text-gray-400 mr-2" />
+                        <span>{profile.apellido_materno || 'No especificado'}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        Sexo
                       </label>
                       <div className="flex items-center p-3 bg-gray-50 rounded-md">
                         <User className="h-4 w-4 text-gray-400 mr-2" />
                         <span>
-                          {profile.first_name || profile.last_name
-                            ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
-                            : 'No especificado'
-                          }
+                          {profile.sexo === 'masculino' ? 'Masculino'
+                            : profile.sexo === 'femenino' ? 'Femenino'
+                            : profile.sexo === 'no_binario' ? 'No Binario'
+                            : 'No especificado'}
                         </span>
                       </div>
                     </div>
