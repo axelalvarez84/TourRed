@@ -81,19 +81,27 @@ const AzureCallbackPage: React.FC = () => {
   useEffect(() => {
     let done = false;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (done) return;
-      if (session?.user) {
-        done = true;
-        redirectForUser(session.user, session, navigate, setError);
-      }
-    });
-
+    // Register onAuthStateChange FIRST — its SIGNED_IN event carries provider_token
+    // which is required to fetch the Microsoft profile photo for new users.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (done) return;
       if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
         done = true;
         redirectForUser(session.user, session, navigate, setError);
+      }
+    });
+
+    // getSession() only fast-tracks users who already finished onboarding.
+    // New OAuth users (no onboarding_completed flag) intentionally wait for
+    // the SIGNED_IN event above so provider_token is available for avatar fetch.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (done) return;
+      if (session?.user) {
+        const onboardingCompleted = session.user.user_metadata?.onboarding_completed;
+        if (onboardingCompleted) {
+          done = true;
+          redirectForUser(session.user, session, navigate, setError);
+        }
       }
     });
 

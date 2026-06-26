@@ -20,7 +20,7 @@ const AzureOnboardingPage: React.FC = () => {
 
   const meta = user?.user_metadata ?? {};
   const displayName = meta.full_name || meta.name || user?.email?.split('@')[0] || 'Usuario';
-  const avatarUrl = meta.avatar_url || meta.picture || null;
+  const avatarUrl = meta.ms_avatar_url || meta.avatar_url || meta.picture || null;
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
