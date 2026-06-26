@@ -268,7 +268,7 @@ const GoogleAgencySignupPage: React.FC = () => {
                 <input name="firstName" type="text" value={formData.firstName} onChange={handleInputChange} required className={`mt-1 ${inputClass}`} />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Apellido Paterno</label>
                   <input name="apellidoPaterno" type="text" value={formData.apellidoPaterno} onChange={handleInputChange} required className={`mt-1 ${inputClass}`} />
