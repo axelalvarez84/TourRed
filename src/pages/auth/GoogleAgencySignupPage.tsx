@@ -219,7 +219,7 @@ const GoogleAgencySignupPage: React.FC = () => {
           await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-agency-registration-admin`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ agencyName: agencyName.trim(), email, firstName, lastName, phone: phoneNumber || null }),
+            body: JSON.stringify({ agencyName: agencyName.trim(), email, firstName, lastName: apellidoPaterno, phone: phoneNumber || null }),
           });
           await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-agency-welcome`, {
             method: 'POST',

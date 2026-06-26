@@ -224,7 +224,7 @@ const AgencySignupPage: React.FC = () => {
                 agencyName: agencyName.trim(),
                 email: email,
                 firstName: firstName,
-                lastName: lastName,
+                lastName: apellidoPaterno,
                 phone: phoneNumber || null,
               }),
             }
