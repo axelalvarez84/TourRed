@@ -445,44 +445,42 @@ const SignupPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 3. Apellidos — solo nacionales */}
-            {!isForeignTraveler && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="apellidoPaterno" className="block text-sm font-medium text-gray-700">
-                    Apellido Paterno
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="apellidoPaterno"
-                      name="apellidoPaterno"
-                      type="text"
-                      value={formData.apellidoPaterno}
-                      onChange={handleInputChange}
-                      required
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="apellidoMaterno" className="flex items-baseline gap-1 text-sm font-medium text-gray-700">
-                    Apellido Materno
-                    <span className="text-gray-400 font-normal text-xs">(opcional)</span>
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="apellidoMaterno"
-                      name="apellidoMaterno"
-                      type="text"
-                      value={formData.apellidoMaterno}
-                      onChange={handleInputChange}
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                    />
-                  </div>
+            {/* 3. Apellidos */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="apellidoPaterno" className="block text-sm font-medium text-gray-700">
+                  Apellido Paterno
+                </label>
+                <div className="mt-1">
+                  <input
+                    id="apellidoPaterno"
+                    name="apellidoPaterno"
+                    type="text"
+                    value={formData.apellidoPaterno}
+                    onChange={handleInputChange}
+                    required
+                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                  />
                 </div>
               </div>
-            )}
+
+              <div>
+                <label htmlFor="apellidoMaterno" className="flex items-baseline gap-1 text-sm font-medium text-gray-700">
+                  Apellido Materno
+                  <span className="text-gray-400 font-normal text-xs">(opcional)</span>
+                </label>
+                <div className="mt-1">
+                  <input
+                    id="apellidoMaterno"
+                    name="apellidoMaterno"
+                    type="text"
+                    value={formData.apellidoMaterno}
+                    onChange={handleInputChange}
+                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                  />
+                </div>
+              </div>
+            </div>
 
             {/* 4. Fecha de Nacimiento */}
             <div>
