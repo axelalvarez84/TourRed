@@ -400,6 +400,34 @@ const SignupPage: React.FC = () => {
           )}
 
           <form className="space-y-6" onSubmit={handleSubmit}>
+            {/* 1. Nacionalidad */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tipo de viajero
+              </label>
+              <div className="flex items-center space-x-4">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={!isForeignTraveler}
+                    onChange={() => setIsForeignTraveler(false)}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                  />
+                  <span className="ml-2 text-sm font-medium text-gray-700">Viajero Nacional</span>
+                </label>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={isForeignTraveler}
+                    onChange={() => setIsForeignTraveler(true)}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                  />
+                  <span className="ml-2 text-sm font-medium text-gray-700">Viajero Extranjero</span>
+                </label>
+              </div>
+            </div>
+
+            {/* 2. Nombre(s) */}
             <div>
               <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
                 Nombre(s)
@@ -417,42 +445,64 @@ const SignupPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="apellidoPaterno" className="block text-sm font-medium text-gray-700">
-                  Apellido Paterno
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="apellidoPaterno"
-                    name="apellidoPaterno"
-                    type="text"
-                    value={formData.apellidoPaterno}
-                    onChange={handleInputChange}
-                    required
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  />
+            {/* 3. Apellidos — solo nacionales */}
+            {!isForeignTraveler && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="apellidoPaterno" className="block text-sm font-medium text-gray-700">
+                    Apellido Paterno
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="apellidoPaterno"
+                      name="apellidoPaterno"
+                      type="text"
+                      value={formData.apellidoPaterno}
+                      onChange={handleInputChange}
+                      required
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="apellidoMaterno" className="flex items-baseline gap-1 text-sm font-medium text-gray-700">
+                    Apellido Materno
+                    <span className="text-gray-400 font-normal text-xs">(opcional)</span>
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="apellidoMaterno"
+                      name="apellidoMaterno"
+                      type="text"
+                      value={formData.apellidoMaterno}
+                      onChange={handleInputChange}
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                    />
+                  </div>
                 </div>
               </div>
+            )}
 
-              <div>
-                <label htmlFor="apellidoMaterno" className="flex items-baseline gap-1 text-sm font-medium text-gray-700">
-                  Apellido Materno
-                  <span className="text-gray-400 font-normal text-xs">(opcional)</span>
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="apellidoMaterno"
-                    name="apellidoMaterno"
-                    type="text"
-                    value={formData.apellidoMaterno}
-                    onChange={handleInputChange}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  />
-                </div>
+            {/* 4. Fecha de Nacimiento */}
+            <div>
+              <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700">
+                Fecha de Nacimiento
+              </label>
+              <div className="mt-1">
+                <input
+                  id="dateOfBirth"
+                  name="dateOfBirth"
+                  type="date"
+                  value={formData.dateOfBirth}
+                  onChange={handleInputChange}
+                  required
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                />
               </div>
             </div>
 
+            {/* 5. Sexo */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Sexo
@@ -482,6 +532,54 @@ const SignupPage: React.FC = () => {
               </div>
             </div>
 
+            {/* 6. CURP / Pasaporte */}
+            {!isForeignTraveler ? (
+              <div>
+                <label htmlFor="curp" className="block text-sm font-medium text-gray-700">
+                  CURP
+                </label>
+                <div className="mt-1">
+                  <input
+                    id="curp"
+                    name="curp"
+                    type="text"
+                    value={formData.curp}
+                    onChange={handleInputChange}
+                    placeholder="Ej: ABCD123456HDFRRL09"
+                    maxLength={18}
+                    required
+                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm uppercase"
+                  />
+                  {!curpManuallyEdited.current && formData.curp.length > 0 ? (
+                    <p className="mt-1 text-xs text-blue-600">
+                      Prellenado con tus datos. Completa o corrige los caracteres restantes.
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-xs text-gray-500">18 caracteres alfanuméricos</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label htmlFor="passportNumber" className="block text-sm font-medium text-gray-700">
+                  Número de Pasaporte
+                </label>
+                <div className="mt-1">
+                  <input
+                    id="passportNumber"
+                    name="passportNumber"
+                    type="text"
+                    value={formData.passportNumber}
+                    onChange={handleInputChange}
+                    placeholder="Ej: A12345678"
+                    required
+                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm uppercase"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* 7. Email */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Correo electrónico
@@ -500,6 +598,7 @@ const SignupPage: React.FC = () => {
               </div>
             </div>
 
+            {/* 8. Referido */}
             <div>
               <label htmlFor="referralCode" className="block text-sm font-medium text-gray-700">
                 Código de Referido <span className="text-gray-400 font-normal">(Opcional)</span>
@@ -544,6 +643,7 @@ const SignupPage: React.FC = () => {
               )}
             </div>
 
+            {/* 9. Celular */}
             <div>
               <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
                 Número de celular
@@ -560,92 +660,6 @@ const SignupPage: React.FC = () => {
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                 />
               </div>
-            </div>
-
-            <div>
-              <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700">
-                Fecha de Nacimiento
-              </label>
-              <div className="mt-1">
-                <input
-                  id="dateOfBirth"
-                  name="dateOfBirth"
-                  type="date"
-                  value={formData.dateOfBirth}
-                  onChange={handleInputChange}
-                  required
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center space-x-4">
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={!isForeignTraveler}
-                    onChange={() => setIsForeignTraveler(false)}
-                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
-                  />
-                  <span className="ml-2 text-sm font-medium text-gray-700">Viajero Nacional</span>
-                </label>
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={isForeignTraveler}
-                    onChange={() => setIsForeignTraveler(true)}
-                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
-                  />
-                  <span className="ml-2 text-sm font-medium text-gray-700">Viajero Extranjero</span>
-                </label>
-              </div>
-
-              {!isForeignTraveler ? (
-                <div>
-                  <label htmlFor="curp" className="block text-sm font-medium text-gray-700">
-                    CURP
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="curp"
-                      name="curp"
-                      type="text"
-                      value={formData.curp}
-                      onChange={handleInputChange}
-                      placeholder="Ej: ABCD123456HDFRRL09"
-                      maxLength={18}
-                      required
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm uppercase"
-                    />
-                    {!curpManuallyEdited.current && formData.curp.length > 0 ? (
-                      <p className="mt-1 text-xs text-blue-600">
-                        Prellenado con tus datos. Completa o corrige los caracteres restantes.
-                      </p>
-                    ) : (
-                      <p className="mt-1 text-xs text-gray-500">18 caracteres alfanuméricos</p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <label htmlFor="passportNumber" className="block text-sm font-medium text-gray-700">
-                    Número de Pasaporte
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="passportNumber"
-                      name="passportNumber"
-                      type="text"
-                      value={formData.passportNumber}
-                      onChange={handleInputChange}
-                      placeholder="Ej: A12345678"
-                      required
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm uppercase"
-                    />
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="space-y-4">
