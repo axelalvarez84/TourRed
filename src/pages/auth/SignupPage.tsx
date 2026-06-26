@@ -436,9 +436,9 @@ const SignupPage: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="apellidoMaterno" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="apellidoMaterno" className="flex items-baseline gap-1 text-sm font-medium text-gray-700">
                   Apellido Materno
-                  <span className="text-gray-400 font-normal ml-1">(opcional)</span>
+                  <span className="text-gray-400 font-normal text-xs">(opcional)</span>
                 </label>
                 <div className="mt-1">
                   <input
@@ -562,6 +562,23 @@ const SignupPage: React.FC = () => {
               </div>
             </div>
 
+            <div>
+              <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700">
+                Fecha de Nacimiento
+              </label>
+              <div className="mt-1">
+                <input
+                  id="dateOfBirth"
+                  name="dateOfBirth"
+                  type="date"
+                  value={formData.dateOfBirth}
+                  onChange={handleInputChange}
+                  required
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                />
+              </div>
+            </div>
+
             <div className="space-y-4">
               <div className="flex items-center space-x-4">
                 <label className="flex items-center cursor-pointer">
@@ -629,23 +646,6 @@ const SignupPage: React.FC = () => {
                   </div>
                 </div>
               )}
-            </div>
-
-            <div>
-              <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700">
-                Fecha de Nacimiento
-              </label>
-              <div className="mt-1">
-                <input
-                  id="dateOfBirth"
-                  name="dateOfBirth"
-                  type="date"
-                  value={formData.dateOfBirth}
-                  onChange={handleInputChange}
-                  required
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                />
-              </div>
             </div>
 
             <div className="space-y-4">
