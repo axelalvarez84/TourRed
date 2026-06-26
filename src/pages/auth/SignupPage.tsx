@@ -145,7 +145,8 @@ const SignupPage: React.FC = () => {
     !isForeignTraveler ? formData.curp : '',
     'check_curp_available',
     18,
-    18
+    18,
+    'traveler'
   );
   const passportAvailability = useFieldAvailability(
     isForeignTraveler ? formData.passportNumber : '',

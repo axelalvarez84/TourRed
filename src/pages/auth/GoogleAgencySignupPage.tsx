@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Eye, EyeOff, Info } from 'lucide-react';
+import { Eye, EyeOff, Info, CheckCircle, XCircle, Loader } from 'lucide-react';
 import { supabase, UserRole } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useFieldAvailability } from '../../hooks/useFieldAvailability';
 
 const isLeakedPasswordError = (message: string) =>
   /leaked|pwned|compromised|common password/i.test(message);
@@ -72,6 +73,9 @@ const GoogleAgencySignupPage: React.FC = () => {
   const handleSexoChange = (value: 'masculino' | 'femenino' | 'no_binario') => {
     setFormData(prev => ({ ...prev, sexo: value }));
   };
+
+  const curpAvailability = useFieldAvailability(formData.curp, 'check_curp_available', 18, 18, 'agency');
+  const identifierUnavailable = curpAvailability.isAvailable === false;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -305,6 +309,21 @@ const GoogleAgencySignupPage: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700">CURP <span className="text-gray-400 font-normal">(opcional)</span></label>
                 <input name="curp" type="text" value={formData.curp} onChange={handleInputChange} placeholder="ABCD123456HDFRRL09" maxLength={18} className={`mt-1 ${inputClass} uppercase`} />
+                {curpAvailability.isChecking && (
+                  <p className="mt-1 text-xs text-gray-500 flex items-center gap-1">
+                    <Loader className="h-3 w-3 animate-spin" /> Verificando CURP...
+                  </p>
+                )}
+                {!curpAvailability.isChecking && curpAvailability.isAvailable === true && (
+                  <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                    <CheckCircle className="h-3 w-3" /> CURP disponible como agencia
+                  </p>
+                )}
+                {!curpAvailability.isChecking && curpAvailability.isAvailable === false && (
+                  <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                    <XCircle className="h-3 w-3" /> Esta CURP ya tiene una cuenta de agencia registrada.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -452,7 +471,7 @@ const GoogleAgencySignupPage: React.FC = () => {
 
             <button
               type="submit"
-              disabled={isLoading || !termsAccepted}
+              disabled={isLoading || !termsAccepted || identifierUnavailable}
               className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? 'Completando registro...' : 'Crear cuenta de Agencia'}

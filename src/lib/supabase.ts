@@ -76,13 +76,13 @@ export const signUp = async (
       return { data, error: null, profileData: existingUser, isExistingUser };
     }
 
-    // Check if CURP already exists using security-definer RPC (works for anon)
-    if (role === UserRole.TRAVELER && profileData.curp) {
+    // Check if CURP already exists for this role using security-definer RPC (works for anon)
+    if (profileData.curp) {
       const { data: curpAvailable } = await supabase
-        .rpc('check_curp_available', { p_curp: profileData.curp.toUpperCase() });
+        .rpc('check_curp_available', { p_curp: profileData.curp.toUpperCase(), p_role: role });
 
       if (curpAvailable === false) {
-        console.log('⚠️ CURP ya existe en la base de datos');
+        console.log('⚠️ CURP ya existe en la base de datos para este rol');
         throw new Error('CURP_DUPLICADO');
       }
     }
@@ -156,8 +156,8 @@ export const signUp = async (
         console.error('Error limpiando usuario auth huérfano:', cleanupErr);
       }
 
-      // Check if it's a unique constraint violation on CURP
-      if (profileError.code === '23505' && profileError.message.includes('curp')) {
+      // Check if it's a unique constraint violation on CURP (global or per-role index)
+      if (profileError.code === '23505' && (profileError.message.includes('curp') || profileError.message.includes('users_curp_role_unique'))) {
         throw new Error('CURP_DUPLICADO');
       }
 

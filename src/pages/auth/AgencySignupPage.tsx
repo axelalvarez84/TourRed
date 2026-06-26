@@ -304,7 +304,7 @@ const AgencySignupPage: React.FC = () => {
     }
   };
 
-  const curpAvailability = useFieldAvailability(formData.curp, 'check_curp_available', 18, 18);
+  const curpAvailability = useFieldAvailability(formData.curp, 'check_curp_available', 18, 18, 'agency');
   const emailAvailability = useFieldAvailability(formData.email, 'check_email_available', 5);
 
   const identifierUnavailable =

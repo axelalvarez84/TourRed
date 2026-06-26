@@ -13,7 +13,8 @@ export function useFieldAvailability(
   value: string,
   rpcFunction: 'check_curp_available' | 'check_passport_available' | 'check_email_available',
   minLength: number,
-  exactLength?: number
+  exactLength?: number,
+  role?: string
 ): AvailabilityState {
   const [state, setState] = useState<AvailabilityState>(IDLE);
 
@@ -29,9 +30,16 @@ export function useFieldAvailability(
 
     const timeoutId = setTimeout(async () => {
       try {
-        const { data, error } = await supabase.rpc(rpcFunction, {
-          [`p_${rpcFunction === 'check_curp_available' ? 'curp' : rpcFunction === 'check_passport_available' ? 'passport' : 'email'}`]: trimmed,
-        });
+        let params: Record<string, string>;
+        if (rpcFunction === 'check_curp_available') {
+          params = { p_curp: trimmed, ...(role ? { p_role: role } : {}) };
+        } else if (rpcFunction === 'check_passport_available') {
+          params = { p_passport: trimmed };
+        } else {
+          params = { p_email: trimmed };
+        }
+
+        const { data, error } = await supabase.rpc(rpcFunction, params);
 
         if (error) throw error;
 
@@ -43,7 +51,7 @@ export function useFieldAvailability(
     }, 600);
 
     return () => clearTimeout(timeoutId);
-  }, [value, rpcFunction, minLength, exactLength]);
+  }, [value, rpcFunction, minLength, exactLength, role]);
 
   return state;
 }
