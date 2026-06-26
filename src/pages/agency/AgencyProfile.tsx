@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building, Mail, Phone, Globe, Star, CreditCard as Edit, Save, X, Upload, User, Calendar, MapPin } from 'lucide-react';
+import { Building, Mail, Phone, Globe, Star, CreditCard as Edit, Save, X, Upload, User, Calendar, MapPin, FileText, Landmark, Hash, Shield, Link2, Building2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { useAgencyId } from '../../hooks/useAgencyId';
@@ -386,392 +386,348 @@ const AgencyProfile: React.FC = () => {
           </div>
         </div>
 
-        {/* Información Fiscal y Bancaria */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-          {/* Información Fiscal */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Información Fiscal
-              </h2>
-
-              {isEditing ? (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      RFC *
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.rfc || ''}
-                      onChange={(e) => setEditForm({ ...editForm, rfc: e.target.value })}
-                      className="input"
-                      placeholder="Ej: XAXX010101000"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Razón Social
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.razon_social || ''}
-                      onChange={(e) => setEditForm({ ...editForm, razon_social: e.target.value })}
-                      className="input"
-                      placeholder="Nombre legal de la empresa"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Régimen Fiscal
-                    </label>
-                    <select
-                      value={editForm.regimen_fiscal || ''}
-                      onChange={(e) => setEditForm({ ...editForm, regimen_fiscal: e.target.value })}
-                      className="input"
-                    >
-                      <option value="">Seleccionar régimen fiscal</option>
-                      <option value="601">601 - General de Ley</option>
-                      <option value="612">612 - Personas Físicas con Actividades Empresariales</option>
-                      <option value="621">621 - Incorporación Fiscal</option>
-                      <option value="625">625 - Régimen Simplificado de Confianza</option>
-                      <option value="626">626 - Régimen Simplificado de Confianza (RESICO)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-3">
-                      Domicilio de la Agencia
-                    </label>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Calle
-                        </label>
-                        <input
-                          type="text"
-                          value={editForm.street || ''}
-                          onChange={(e) => setEditForm({ ...editForm, street: e.target.value })}
-                          className="input"
-                          placeholder="Ej: Av. Insurgentes Sur"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Número Exterior
-                          </label>
-                          <input
-                            type="text"
-                            value={editForm.exterior_number || ''}
-                            onChange={(e) => setEditForm({ ...editForm, exterior_number: e.target.value })}
-                            className="input"
-                            placeholder="Ej: 123"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Número Interior
-                            <span className="text-gray-400 font-normal ml-1">(opcional)</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={editForm.interior_number || ''}
-                            onChange={(e) => setEditForm({ ...editForm, interior_number: e.target.value })}
-                            className="input"
-                            placeholder="Ej: 4B"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Colonia
-                        </label>
-                        <input
-                          type="text"
-                          value={editForm.colony || ''}
-                          onChange={(e) => setEditForm({ ...editForm, colony: e.target.value })}
-                          className="input"
-                          placeholder="Ej: Roma Norte"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Ciudad
-                          </label>
-                          <input
-                            type="text"
-                            value={editForm.city || ''}
-                            onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
-                            className="input"
-                            placeholder="Ej: Ciudad de México"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Estado
-                          </label>
-                          <input
-                            type="text"
-                            value={editForm.state || ''}
-                            onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
-                            className="input"
-                            placeholder="Ej: CDMX"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Código Postal
-                          </label>
-                          <input
-                            type="text"
-                            value={editForm.postal_code || ''}
-                            onChange={(e) => setEditForm({ ...editForm, postal_code: e.target.value })}
-                            className="input"
-                            placeholder="Ej: 06700"
-                            maxLength={5}
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            País
-                          </label>
-                          <input
-                            type="text"
-                            value={editForm.country || ''}
-                            onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
-                            className="input"
-                            placeholder="México"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      RNT (Registro Nacional de Turismo)
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.rnt || ''}
-                      onChange={(e) => setEditForm({ ...editForm, rnt: e.target.value })}
-                      className="input"
-                      placeholder="Ej: 12345678 (opcional)"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Registro Nacional de Turismo (opcional)
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3">
-                      <span className="text-sm font-bold">RFC</span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">RFC</div>
-                      <div className="text-sm text-gray-600">{agency.rfc || 'No especificado'}</div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3">
-                      <span className="text-sm font-bold">RS</span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">Razón Social</div>
-                      <div className="text-sm text-gray-600">{agency.razon_social || 'No especificado'}</div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3">
-                      <span className="text-sm font-bold">RF</span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">Régimen Fiscal</div>
-                      <div className="text-sm text-gray-600">
-                        {agency.regimen_fiscal 
-                          ? `${agency.regimen_fiscal} - ${getRegimenFiscalName(agency.regimen_fiscal)}` 
-                          : 'No especificado'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {(agency.street || agency.city || agency.state) && (
-                    <div className="flex items-start">
-                      <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3 mt-1">
-                        <MapPin className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-sm font-medium text-gray-900">Domicilio de la Agencia</div>
-                        <div className="text-sm text-gray-600 space-y-0.5">
-                          {agency.street && (
-                            <div>
-                              <span className="font-medium">{agency.street}</span>
-                              {agency.exterior_number && <span> #{agency.exterior_number}</span>}
-                              {agency.interior_number && <span> Int. {agency.interior_number}</span>}
-                            </div>
-                          )}
-                          {agency.colony && <div>{agency.colony}</div>}
-                          <div>
-                            {agency.city && <span>{agency.city}</span>}
-                            {agency.city && agency.state && <span>, </span>}
-                            {agency.state && <span>{agency.state}</span>}
-                            {agency.postal_code && <span> {agency.postal_code}</span>}
-                          </div>
-                          {agency.country && <div>{agency.country}</div>}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3">
-                      <span className="text-sm font-bold">RNT</span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">RNT</div>
-                      <div className="text-sm text-gray-600">{agency.rnt || 'No especificado (opcional)'}</div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Información Bancaria */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Información Bancaria
-              </h2>
-
-              {isEditing ? (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Banco
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.banco || ''}
-                      onChange={(e) => setEditForm({ ...editForm, banco: e.target.value })}
-                      className="input"
-                      placeholder="Ej: BBVA, Santander, etc."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Cuenta CLABE
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.cuenta_clabe || ''}
-                      onChange={(e) => setEditForm({ ...editForm, cuenta_clabe: e.target.value })}
-                      className="input"
-                      placeholder="18 dígitos"
-                      maxLength={18}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Titular de la Cuenta
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.titular_cuenta || ''}
-                      onChange={(e) => setEditForm({ ...editForm, titular_cuenta: e.target.value })}
-                      className="input"
-                      placeholder="Nombre del titular"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 mr-3">
-                      <span className="text-sm font-bold">B</span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">Banco</div>
-                      <div className="text-sm text-gray-600">{agency.banco || 'No especificado'}</div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 mr-3">
-                      <span className="text-sm font-bold">C</span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">Cuenta CLABE</div>
-                      <div className="text-sm text-gray-600">
-                        {agency.cuenta_clabe 
-                          ? formatClabe(agency.cuenta_clabe) 
-                          : 'No especificado'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 mr-3">
-                      <span className="text-sm font-bold">T</span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">Titular</div>
-                      <div className="text-sm text-gray-600">{agency.titular_cuenta || 'No especificado'}</div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
         {/* Mensajes */}
         {error && (
-          <div className="mb-6 bg-error-50 text-error-600 p-4 rounded-md">
-            {error}
+          <div className="mt-6 bg-error-50 border border-error-200 text-error-700 p-4 rounded-lg flex items-start gap-3">
+            <X className="h-5 w-5 mt-0.5 flex-shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 
         {success && (
-          <div className="mb-6 bg-success-50 text-success-600 p-4 rounded-md">
+          <div className="mt-6 bg-success-50 border border-success-200 text-success-700 p-4 rounded-lg">
             {success}
           </div>
         )}
 
-        {/* Contenido Principal */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Información Principal */}
+        {/* Fila 1: Fiscal + Bancaria en columnas iguales */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          {/* Información Fiscal */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                <FileText className="h-4 w-4 text-blue-600" />
+              </div>
+              <h2 className="text-base font-semibold text-gray-900">Información Fiscal</h2>
+            </div>
+
+            {isEditing ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">RFC *</label>
+                  <input
+                    type="text"
+                    value={editForm.rfc || ''}
+                    onChange={(e) => setEditForm({ ...editForm, rfc: e.target.value })}
+                    className="input"
+                    placeholder="Ej: XAXX010101000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Razón Social</label>
+                  <input
+                    type="text"
+                    value={editForm.razon_social || ''}
+                    onChange={(e) => setEditForm({ ...editForm, razon_social: e.target.value })}
+                    className="input"
+                    placeholder="Nombre legal de la empresa"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Régimen Fiscal</label>
+                  <select
+                    value={editForm.regimen_fiscal || ''}
+                    onChange={(e) => setEditForm({ ...editForm, regimen_fiscal: e.target.value })}
+                    className="input"
+                  >
+                    <option value="">Seleccionar régimen fiscal</option>
+                    <option value="601">601 — General de Ley Personas Morales</option>
+                    <option value="608">608 — Demás Ingresos</option>
+                    <option value="612">612 — Personas Físicas con Actividades Empresariales</option>
+                    <option value="621">621 — Incorporación Fiscal (RIF)</option>
+                    <option value="625">625 — Plataformas Tecnológicas</option>
+                    <option value="626">626 — RESICO</option>
+                  </select>
+                </div>
+
+                <div className="pt-1">
+                  <label className="block text-sm font-semibold text-gray-800 mb-3">Domicilio de la Agencia</label>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Calle</label>
+                      <input
+                        type="text"
+                        value={editForm.street || ''}
+                        onChange={(e) => setEditForm({ ...editForm, street: e.target.value })}
+                        className="input"
+                        placeholder="Ej: Av. Insurgentes Sur"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">No. Exterior</label>
+                        <input
+                          type="text"
+                          value={editForm.exterior_number || ''}
+                          onChange={(e) => setEditForm({ ...editForm, exterior_number: e.target.value })}
+                          className="input"
+                          placeholder="123"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          No. Interior <span className="text-gray-400 font-normal">(opc.)</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.interior_number || ''}
+                          onChange={(e) => setEditForm({ ...editForm, interior_number: e.target.value })}
+                          className="input"
+                          placeholder="4B"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Colonia</label>
+                      <input
+                        type="text"
+                        value={editForm.colony || ''}
+                        onChange={(e) => setEditForm({ ...editForm, colony: e.target.value })}
+                        className="input"
+                        placeholder="Ej: Roma Norte"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Ciudad</label>
+                        <input
+                          type="text"
+                          value={editForm.city || ''}
+                          onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                          className="input"
+                          placeholder="Ciudad de México"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                        <input
+                          type="text"
+                          value={editForm.state || ''}
+                          onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
+                          className="input"
+                          placeholder="CDMX"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">C.P.</label>
+                        <input
+                          type="text"
+                          value={editForm.postal_code || ''}
+                          onChange={(e) => setEditForm({ ...editForm, postal_code: e.target.value })}
+                          className="input"
+                          placeholder="06700"
+                          maxLength={5}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">País</label>
+                        <input
+                          type="text"
+                          value={editForm.country || ''}
+                          onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
+                          className="input"
+                          placeholder="México"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    RNT <span className="text-gray-400 font-normal">(Registro Nacional de Turismo)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.rnt || ''}
+                    onChange={(e) => setEditForm({ ...editForm, rnt: e.target.value })}
+                    className="input"
+                    placeholder="Opcional"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+                  <button onClick={handleCancel} className="btn btn-outline" disabled={isSaving}>
+                    <X className="h-4 w-4 mr-2" />Cancelar
+                  </button>
+                  <button onClick={handleSave} className="btn btn-primary" disabled={isSaving || !editForm.name.trim()}>
+                    <Save className="h-4 w-4 mr-2" />
+                    {isSaving ? 'Guardando...' : 'Guardar'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border-l-4 border-blue-200">
+                  <FileText className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">RFC</div>
+                    <div className="text-sm font-medium text-gray-900 mt-0.5">{agency.rfc || <span className="text-gray-400 font-normal">No especificado</span>}</div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border-l-4 border-blue-200">
+                  <Building2 className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Razón Social</div>
+                    <div className="text-sm font-medium text-gray-900 mt-0.5">{agency.razon_social || <span className="text-gray-400 font-normal">No especificado</span>}</div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border-l-4 border-blue-200">
+                  <Hash className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Régimen Fiscal</div>
+                    <div className="text-sm font-medium text-gray-900 mt-0.5">
+                      {agency.regimen_fiscal
+                        ? `${agency.regimen_fiscal} — ${getRegimenFiscalName(agency.regimen_fiscal)}`
+                        : <span className="text-gray-400 font-normal">No especificado</span>}
+                    </div>
+                  </div>
+                </div>
+
+                {(agency.street || agency.city || agency.state) && (
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border-l-4 border-blue-200">
+                    <MapPin className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Domicilio</div>
+                      <div className="text-sm text-gray-900 mt-0.5 space-y-0.5">
+                        {agency.street && (
+                          <div>{agency.street}{agency.exterior_number && ` #${agency.exterior_number}`}{agency.interior_number && ` Int. ${agency.interior_number}`}</div>
+                        )}
+                        {agency.colony && <div>{agency.colony}</div>}
+                        <div>
+                          {agency.city}{agency.city && agency.state && ', '}{agency.state}{agency.postal_code && ` ${agency.postal_code}`}
+                        </div>
+                        {agency.country && <div>{agency.country}</div>}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border-l-4 border-blue-200">
+                  <Globe className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">RNT</div>
+                    <div className="text-sm font-medium text-gray-900 mt-0.5">{agency.rnt || <span className="text-gray-400 font-normal">No especificado</span>}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Información Bancaria */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                <Landmark className="h-4 w-4 text-emerald-600" />
+              </div>
+              <h2 className="text-base font-semibold text-gray-900">Información Bancaria</h2>
+            </div>
+
+            {isEditing ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Banco</label>
+                  <input
+                    type="text"
+                    value={editForm.banco || ''}
+                    onChange={(e) => setEditForm({ ...editForm, banco: e.target.value })}
+                    className="input"
+                    placeholder="Ej: BBVA, Santander, etc."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta CLABE</label>
+                  <input
+                    type="text"
+                    value={editForm.cuenta_clabe || ''}
+                    onChange={(e) => setEditForm({ ...editForm, cuenta_clabe: e.target.value })}
+                    className="input"
+                    placeholder="18 dígitos"
+                    maxLength={18}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Titular de la Cuenta</label>
+                  <input
+                    type="text"
+                    value={editForm.titular_cuenta || ''}
+                    onChange={(e) => setEditForm({ ...editForm, titular_cuenta: e.target.value })}
+                    className="input"
+                    placeholder="Nombre del titular"
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+                  <button onClick={handleCancel} className="btn btn-outline" disabled={isSaving}>
+                    <X className="h-4 w-4 mr-2" />Cancelar
+                  </button>
+                  <button onClick={handleSave} className="btn btn-primary" disabled={isSaving || !editForm.name.trim()}>
+                    <Save className="h-4 w-4 mr-2" />
+                    {isSaving ? 'Guardando...' : 'Guardar'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border-l-4 border-emerald-200">
+                  <Landmark className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Banco</div>
+                    <div className="text-sm font-medium text-gray-900 mt-0.5">{agency.banco || <span className="text-gray-400 font-normal">No especificado</span>}</div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border-l-4 border-emerald-200">
+                  <Hash className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cuenta CLABE</div>
+                    <div className="text-sm font-medium text-gray-900 mt-0.5 font-mono tracking-wider">
+                      {agency.cuenta_clabe ? formatClabe(agency.cuenta_clabe) : <span className="text-gray-400 font-normal font-sans">No especificado</span>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border-l-4 border-emerald-200">
+                  <User className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Titular</div>
+                    <div className="text-sm font-medium text-gray-900 mt-0.5">{agency.titular_cuenta || <span className="text-gray-400 font-normal">No especificado</span>}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Fila 2: Info Agencia (2/3) + Contacto & Propietario (1/3) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+          {/* Información de la Agencia */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Información de la Agencia
-              </h2>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 h-full">
+              <div className="flex items-center gap-2 mb-5">
+                <div className="h-8 w-8 rounded-lg bg-primary-50 flex items-center justify-center">
+                  <Building className="h-4 w-4 text-primary-600" />
+                </div>
+                <h2 className="text-base font-semibold text-gray-900">Información de la Agencia</h2>
+              </div>
 
               {isEditing ? (
-                <div className="space-y-6">
+                <div className="space-y-5">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nombre de la Agencia *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de la Agencia *</label>
                     <input
                       type="text"
                       value={editForm.name}
@@ -780,11 +736,8 @@ const AgencyProfile: React.FC = () => {
                       required
                     />
                   </div>
-
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Descripción
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
                     <textarea
                       value={editForm.description}
                       onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
@@ -793,11 +746,8 @@ const AgencyProfile: React.FC = () => {
                       placeholder="Describe tu agencia, servicios y experiencia..."
                     />
                   </div>
-
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Logo de la Agencia
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Logo de la Agencia</label>
                     <ImageUploader
                       onImageSelect={handleLogoSelect}
                       currentImage={editForm.logo}
@@ -805,21 +755,11 @@ const AgencyProfile: React.FC = () => {
                       placeholder="Subir logo de la agencia"
                     />
                   </div>
-
-                  <div className="flex justify-end space-x-4 pt-4">
-                    <button
-                      onClick={handleCancel}
-                      className="btn btn-outline"
-                      disabled={isSaving}
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Cancelar
+                  <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+                    <button onClick={handleCancel} className="btn btn-outline" disabled={isSaving}>
+                      <X className="h-4 w-4 mr-2" />Cancelar
                     </button>
-                    <button
-                      onClick={handleSave}
-                      className="btn btn-primary"
-                      disabled={isSaving || !editForm.name.trim()}
-                    >
+                    <button onClick={handleSave} className="btn btn-primary" disabled={isSaving || !editForm.name.trim()}>
                       <Save className="h-4 w-4 mr-2" />
                       {isSaving ? 'Guardando...' : 'Guardar Cambios'}
                     </button>
@@ -828,33 +768,26 @@ const AgencyProfile: React.FC = () => {
               ) : (
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-1">Descripción</h3>
-                    <p className="text-gray-900">
-                      {agency.description || 'No hay descripción disponible.'}
+                    <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Descripción</h3>
+                    <p className="text-sm text-gray-800 leading-relaxed">
+                      {agency.description || <span className="text-gray-400 italic">Sin descripción disponible.</span>}
                     </p>
                   </div>
 
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-1">Fecha de Registro</h3>
-                    <div className="flex items-center text-gray-900">
-                      <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                      {new Date(agency.created_at).toLocaleDateString('es-ES', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
+                  <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100">
+                    <div>
+                      <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Fecha de Registro</h3>
+                      <div className="flex items-center text-sm text-gray-800">
+                        <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+                        {new Date(agency.created_at).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}
+                      </div>
                     </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-1">Última Actualización</h3>
-                    <div className="flex items-center text-gray-900">
-                      <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                      {new Date(agency.updated_at).toLocaleDateString('es-ES', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
+                    <div>
+                      <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Última Actualización</h3>
+                      <div className="flex items-center text-sm text-gray-800">
+                        <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+                        {new Date(agency.updated_at).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -862,20 +795,21 @@ const AgencyProfile: React.FC = () => {
             </div>
           </div>
 
-          {/* Información de Contacto y Usuario */}
+          {/* Columna derecha: Contacto + Propietario */}
           <div className="space-y-6">
             {/* Información de Contacto */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Información de Contacto
-              </h2>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <div className="h-8 w-8 rounded-lg bg-violet-50 flex items-center justify-center">
+                  <Mail className="h-4 w-4 text-violet-600" />
+                </div>
+                <h2 className="text-base font-semibold text-gray-900">Contacto</h2>
+              </div>
 
               {isEditing ? (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email de Contacto *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email de Contacto *</label>
                     <input
                       type="email"
                       value={editForm.contact_email}
@@ -884,11 +818,8 @@ const AgencyProfile: React.FC = () => {
                       required
                     />
                   </div>
-
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Teléfono
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
                     <input
                       type="tel"
                       value={editForm.contact_phone}
@@ -897,11 +828,8 @@ const AgencyProfile: React.FC = () => {
                       placeholder="+52 (55) 1234-5678"
                     />
                   </div>
-
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Sitio Web
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Sitio Web</label>
                     <input
                       type="url"
                       value={editForm.website}
@@ -910,38 +838,42 @@ const AgencyProfile: React.FC = () => {
                       placeholder="https://www.tuagencia.com"
                     />
                   </div>
+                  <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+                    <button onClick={handleCancel} className="btn btn-outline" disabled={isSaving}>
+                      <X className="h-4 w-4 mr-2" />Cancelar
+                    </button>
+                    <button onClick={handleSave} className="btn btn-primary" disabled={isSaving || !editForm.name.trim()}>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isSaving ? 'Guardando...' : 'Guardar'}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="flex items-center">
-                    <Mail className="h-4 w-4 text-gray-400 mr-3" />
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border-l-4 border-violet-200">
+                    <Mail className="h-4 w-4 text-violet-500 mt-0.5 flex-shrink-0" />
                     <div>
-                      <div className="text-sm font-medium text-gray-900">Email</div>
-                      <div className="text-sm text-gray-600">{agency.contact_email}</div>
+                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Email</div>
+                      <div className="text-sm font-medium text-gray-900 mt-0.5 break-all">{agency.contact_email}</div>
                     </div>
                   </div>
 
                   {agency.contact_phone && (
-                    <div className="flex items-center">
-                      <Phone className="h-4 w-4 text-gray-400 mr-3" />
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border-l-4 border-violet-200">
+                      <Phone className="h-4 w-4 text-violet-500 mt-0.5 flex-shrink-0" />
                       <div>
-                        <div className="text-sm font-medium text-gray-900">Teléfono</div>
-                        <div className="text-sm text-gray-600">{agency.contact_phone}</div>
+                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Teléfono</div>
+                        <div className="text-sm font-medium text-gray-900 mt-0.5">{agency.contact_phone}</div>
                       </div>
                     </div>
                   )}
 
                   {agency.website && (
-                    <div className="flex items-center">
-                      <Globe className="h-4 w-4 text-gray-400 mr-3" />
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border-l-4 border-violet-200">
+                      <Globe className="h-4 w-4 text-violet-500 mt-0.5 flex-shrink-0" />
                       <div>
-                        <div className="text-sm font-medium text-gray-900">Sitio Web</div>
-                        <a
-                          href={agency.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-primary-600 hover:text-primary-700"
-                        >
+                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Sitio Web</div>
+                        <a href={agency.website} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary-600 hover:text-primary-700 mt-0.5 block break-all">
                           {agency.website}
                         </a>
                       </div>
@@ -951,88 +883,101 @@ const AgencyProfile: React.FC = () => {
               )}
             </div>
 
-            {/* Información del Usuario Propietario */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Datos del Propietario
-              </h2>
+            {/* Datos del Propietario */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <div className="h-8 w-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                  <User className="h-4 w-4 text-amber-600" />
+                </div>
+                <h2 className="text-base font-semibold text-gray-900">Propietario</h2>
+              </div>
 
               {isEditing ? (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nombre
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
                     <input
                       type="text"
                       value={editForm.first_name}
                       onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
                       className="input"
-                      placeholder="Nombre del propietario"
+                      placeholder="Nombre"
                     />
                   </div>
-
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Apellido
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Apellido</label>
                     <input
                       type="text"
                       value={editForm.last_name}
                       onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
                       className="input"
-                      placeholder="Apellido del propietario"
+                      placeholder="Apellido"
                     />
                   </div>
-
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email del Usuario
-                    </label>
-                    <div className="flex items-center p-3 bg-gray-50 rounded-md">
-                      <Mail className="h-4 w-4 text-gray-400 mr-2" />
-                      <span className="text-sm text-gray-600">{agency.users?.email}</span>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email del Usuario</label>
+                    <div className="flex items-center p-3 bg-gray-50 rounded-md border border-gray-200">
+                      <Mail className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
+                      <span className="text-sm text-gray-600 break-all">{agency.users?.email}</span>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      El email del usuario no se puede modificar desde aquí
-                    </p>
+                    <p className="text-xs text-gray-400 mt-1">El email no se puede modificar desde aquí</p>
+                  </div>
+                  <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+                    <button onClick={handleCancel} className="btn btn-outline" disabled={isSaving}>
+                      <X className="h-4 w-4 mr-2" />Cancelar
+                    </button>
+                    <button onClick={handleSave} className="btn btn-primary" disabled={isSaving || !editForm.name.trim()}>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isSaving ? 'Guardando...' : 'Guardar'}
+                    </button>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="flex items-center">
-                    <User className="h-4 w-4 text-gray-400 mr-3" />
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border-l-4 border-amber-200">
+                    <User className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
                     <div>
-                      <div className="text-sm font-medium text-gray-900">Nombre Completo</div>
-                      <div className="text-sm text-gray-600">
+                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Nombre Completo</div>
+                      <div className="text-sm font-medium text-gray-900 mt-0.5">
                         {editForm.first_name || editForm.last_name
                           ? `${editForm.first_name || ''} ${editForm.last_name || ''}`.trim()
-                          : 'No especificado'
-                        }
+                          : <span className="text-gray-400 font-normal">No especificado</span>}
                       </div>
                     </div>
                   </div>
-
-                  <div className="flex items-center">
-                    <Mail className="h-4 w-4 text-gray-400 mr-3" />
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border-l-4 border-amber-200">
+                    <Mail className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
                     <div>
-                      <div className="text-sm font-medium text-gray-900">Email del Usuario</div>
-                      <div className="text-sm text-gray-600">{agency.users?.email}</div>
+                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Email</div>
+                      <div className="text-sm font-medium text-gray-900 mt-0.5 break-all">{agency.users?.email}</div>
                     </div>
                   </div>
                 </div>
               )}
             </div>
+          </div>
+        </div>
 
-            {/* Seguridad - Cambiar Contraseña */}
-            <div className="mt-6">
-              <ChangePasswordSection />
+        {/* Fila 3: Seguridad + Cuentas Vinculadas */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+            <div className="flex items-center gap-2 px-6 pt-6 pb-1">
+              <div className="h-8 w-8 rounded-lg bg-slate-50 flex items-center justify-center">
+                <Shield className="h-4 w-4 text-slate-600" />
+              </div>
+              <h2 className="text-base font-semibold text-gray-900">Seguridad</h2>
             </div>
+            <ChangePasswordSection />
+          </div>
 
-            {/* Cuentas vinculadas */}
-            <div className="mt-6">
-              <LinkedAccountsSection />
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+            <div className="flex items-center gap-2 px-6 pt-6 pb-1">
+              <div className="h-8 w-8 rounded-lg bg-slate-50 flex items-center justify-center">
+                <Link2 className="h-4 w-4 text-slate-600" />
+              </div>
+              <h2 className="text-base font-semibold text-gray-900">Cuentas Vinculadas</h2>
             </div>
+            <LinkedAccountsSection />
           </div>
         </div>
       </div>
