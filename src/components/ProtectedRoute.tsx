@@ -60,9 +60,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles,
     );
   }
 
-  // Google user who hasn't completed onboarding yet
+  // OAuth user who hasn't completed onboarding yet — route to the correct provider's onboarding
   if (isOnboardingPending) {
-    return <Navigate to="/auth/google-onboarding" replace />;
+    const provider = user?.app_metadata?.provider;
+    const onboardingPath = provider === 'azure' ? '/auth/azure-onboarding' : '/auth/google-onboarding';
+    return <Navigate to={onboardingPath} replace />;
   }
 
   // Roles that bypass email verification (created with email pre-confirmed)

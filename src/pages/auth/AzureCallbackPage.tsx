@@ -2,36 +2,46 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 
-async function redirectForUser(user: any, navigate: (path: string, opts?: any) => void) {
-  const isAzureProvider =
-    user.app_metadata?.provider === 'azure' ||
-    (user.identities ?? []).some((i: any) => i.provider === 'azure');
+async function redirectForUser(
+  user: any,
+  navigate: (path: string, opts?: any) => void,
+  setError: (msg: string) => void,
+) {
+  try {
+    const isAzureProvider =
+      user.app_metadata?.provider === 'azure' ||
+      (user.identities ?? []).some((i: any) => i.provider === 'azure');
 
-  if (isAzureProvider) {
-    const onboardingCompleted = user.user_metadata?.onboarding_completed;
-    if (!onboardingCompleted) {
-      const { data: existingProfile } = await supabase
-        .from('users')
-        .select('id, role')
-        .eq('id', user.id)
-        .maybeSingle();
+    if (isAzureProvider) {
+      const onboardingCompleted = user.user_metadata?.onboarding_completed;
+      if (!onboardingCompleted) {
+        const { data: existingProfile, error: profileError } = await supabase
+          .from('users')
+          .select('id, role')
+          .eq('id', user.id)
+          .maybeSingle();
 
-      if (existingProfile) {
-        const role = existingProfile.role;
-        if (role === 'admin') navigate('/admin/dashboard', { replace: true });
-        else if (role === 'agency') navigate('/agency/dashboard', { replace: true });
-        else navigate('/traveler/dashboard', { replace: true });
-      } else {
-        navigate('/auth/azure-onboarding', { replace: true });
+        if (profileError) throw profileError;
+
+        if (existingProfile) {
+          const role = existingProfile.role;
+          if (role === 'admin') navigate('/admin/dashboard', { replace: true });
+          else if (role === 'agency') navigate('/agency/dashboard', { replace: true });
+          else navigate('/traveler/dashboard', { replace: true });
+        } else {
+          navigate('/auth/azure-onboarding', { replace: true });
+        }
+        return;
       }
-      return;
     }
-  }
 
-  const role = user.user_metadata?.role;
-  if (role === 'admin') navigate('/admin/dashboard', { replace: true });
-  else if (role === 'agency') navigate('/agency/dashboard', { replace: true });
-  else navigate('/traveler/dashboard', { replace: true });
+    const role = user.user_metadata?.role;
+    if (role === 'admin') navigate('/admin/dashboard', { replace: true });
+    else if (role === 'agency') navigate('/agency/dashboard', { replace: true });
+    else navigate('/traveler/dashboard', { replace: true });
+  } catch {
+    setError('No se pudo completar el inicio de sesión. Por favor intenta de nuevo.');
+  }
 }
 
 const AzureCallbackPage: React.FC = () => {
@@ -45,7 +55,7 @@ const AzureCallbackPage: React.FC = () => {
       if (done) return;
       if (session?.user) {
         done = true;
-        redirectForUser(session.user, navigate);
+        redirectForUser(session.user, navigate, setError);
       }
     });
 
@@ -53,7 +63,7 @@ const AzureCallbackPage: React.FC = () => {
       if (done) return;
       if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
         done = true;
-        redirectForUser(session.user, navigate);
+        redirectForUser(session.user, navigate, setError);
       }
     });
 

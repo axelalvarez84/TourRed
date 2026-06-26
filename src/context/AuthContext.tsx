@@ -378,7 +378,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .maybeSingle();
 
           if (!existingProfile) {
-            // New Google user — needs onboarding
+            // New OAuth user — needs onboarding; OAuth providers always verify email
+            setIsEmailVerified(true);
             setIsOnboardingPending(true);
             setIsLoading(false);
             isUpdatingRef.current = false;
