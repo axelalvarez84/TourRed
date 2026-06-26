@@ -16,6 +16,7 @@ const GoogleTravelerSignupPage: React.FC = () => {
   const googleFirstName = meta.given_name || googleFullName.split(' ')[0] || '';
   const googleLastName = meta.family_name || googleFullName.split(' ').slice(1).join(' ') || '';
   const googleEmail: string = user?.email || meta.email || '';
+  const googleAvatarUrl: string = meta.avatar_url || meta.picture || '';
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -169,6 +170,7 @@ const GoogleTravelerSignupPage: React.FC = () => {
         country: country || 'México',
         email_verified: true,
         onboarding_completed: true,
+        profile_picture_url: googleAvatarUrl || null,
       });
 
       if (insertError) {

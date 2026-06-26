@@ -12,11 +12,22 @@ async function redirectForUser(user: any, navigate: (path: string, opts?: any) =
     if (!onboardingCompleted) {
       const { data: existingProfile } = await supabase
         .from('users')
-        .select('id, role')
+        .select('id, role, profile_picture_url')
         .eq('id', user.id)
         .maybeSingle();
 
       if (existingProfile) {
+        // User linked Google to an existing account — save avatar if not set yet
+        if (!existingProfile.profile_picture_url) {
+          const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture;
+          if (avatarUrl) {
+            await supabase
+              .from('users')
+              .update({ profile_picture_url: avatarUrl })
+              .eq('id', user.id);
+          }
+        }
+
         const role = existingProfile.role;
         if (role === 'admin') navigate('/admin/dashboard', { replace: true });
         else if (role === 'agency') navigate('/agency/dashboard', { replace: true });

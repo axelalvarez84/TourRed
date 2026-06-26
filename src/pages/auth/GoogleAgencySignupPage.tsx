@@ -16,6 +16,7 @@ const GoogleAgencySignupPage: React.FC = () => {
   const googleFirstName = meta.given_name || googleFullName.split(' ')[0] || '';
   const googleLastName = meta.family_name || googleFullName.split(' ').slice(1).join(' ') || '';
   const googleEmail: string = user?.email || meta.email || '';
+  const googleAvatarUrl: string = meta.avatar_url || meta.picture || '';
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -135,6 +136,7 @@ const GoogleAgencySignupPage: React.FC = () => {
         phone_number: phoneNumber.trim(),
         email_verified: true,
         onboarding_completed: true,
+        profile_picture_url: googleAvatarUrl || null,
       });
 
       if (insertError) throw insertError;
