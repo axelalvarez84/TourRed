@@ -33,6 +33,7 @@ interface AgencyProfile {
     first_name?: string;
     last_name?: string;
     email: string;
+    profile_picture_url?: string;
   };
   tour_count?: number;
   booking_count?: number;
@@ -90,7 +91,7 @@ const AgencyProfile: React.FC = () => {
         .from('agencies')
         .select(`
           *,
-          users(first_name, last_name, email)
+          users(first_name, last_name, email, profile_picture_url)
         `)
         .eq('id', currentAgencyId)
         .maybeSingle();
@@ -324,6 +325,12 @@ const AgencyProfile: React.FC = () => {
                   {(isEditing ? editForm.logo : agency.logo) ? (
                     <img
                       src={isEditing ? editForm.logo : agency.logo}
+                      alt={agency.name}
+                      className="h-20 w-20 rounded-full object-cover"
+                    />
+                  ) : agency.users?.profile_picture_url ? (
+                    <img
+                      src={agency.users.profile_picture_url}
                       alt={agency.name}
                       className="h-20 w-20 rounded-full object-cover"
                     />
