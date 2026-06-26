@@ -91,17 +91,15 @@ const AzureCallbackPage: React.FC = () => {
       }
     });
 
-    // getSession() only fast-tracks users who already finished onboarding.
-    // New OAuth users (no onboarding_completed flag) intentionally wait for
-    // the SIGNED_IN event above so provider_token is available for avatar fetch.
+    // getSession() handles users whose session was already established before
+    // our onAuthStateChange listener registered. If provider_token is missing
+    // here (it's not stored across refreshes), the avatar fetch simply returns
+    // null and the user still proceeds to onboarding normally.
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (done) return;
       if (session?.user) {
-        const onboardingCompleted = session.user.user_metadata?.onboarding_completed;
-        if (onboardingCompleted) {
-          done = true;
-          redirectForUser(session.user, session, navigate, setError);
-        }
+        done = true;
+        redirectForUser(session.user, session, navigate, setError);
       }
     });
 
