@@ -7,7 +7,7 @@ import { Mail, ArrowLeft, CheckCircle, XCircle, Clock } from 'lucide-react';
 const VerifyEmailPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, userRole, refreshAuthState } = useAuth();
+  const { user, userRole, isEmailVerified, refreshAuthState } = useAuth();
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -27,6 +27,23 @@ const VerifyEmailPage: React.FC = () => {
 
     checkVerificationStatus();
   }, [user, navigate]);
+
+  // Navigate as soon as the context confirms isEmailVerified = true after success
+  useEffect(() => {
+    if (!success || !isEmailVerified) return;
+    const timer = setTimeout(() => {
+      if (redirectUrl) {
+        navigate(redirectUrl, { replace: true });
+      } else if (userRole === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+      } else if (userRole === 'agency') {
+        navigate('/agency/dashboard', { replace: true });
+      } else {
+        navigate('/traveler/dashboard', { replace: true });
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [success, isEmailVerified, navigate, redirectUrl, userRole]);
 
   const checkVerificationStatus = async () => {
     if (!user) return;
@@ -144,21 +161,11 @@ const VerifyEmailPage: React.FC = () => {
         }
       ).catch(() => {});
 
-      // Refresh auth state so isEmailVerified becomes true before navigating
-      await refreshAuthState();
-
+      // Fire refresh without awaiting so the success screen shows immediately.
+      // The useEffect above watches isEmailVerified and navigates once the
+      // context confirms the DB change.
+      refreshAuthState();
       setSuccess(true);
-      setTimeout(() => {
-        if (redirectUrl) {
-          navigate(redirectUrl);
-        } else if (userRole === 'admin') {
-          navigate('/admin/dashboard');
-        } else if (userRole === 'agency') {
-          navigate('/agency/dashboard');
-        } else {
-          navigate('/traveler/dashboard');
-        }
-      }, 2000);
 
     } catch (err: any) {
       console.error('Error verifying code:', err);
