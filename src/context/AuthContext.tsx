@@ -724,6 +724,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(session.user);
           const cachedRole = getCachedRole(session.user.id);
           if (cachedRole) setUserRole(cachedRole);
+          // Restaurar isEmailVerified desde el cache para no pisar el valor
+          // que initializeAuth ya cargo de la BD
+          try {
+            const raw = sessionStorage.getItem('auth_state');
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed.userId === session.user.id && typeof parsed.emailVerified === 'boolean') {
+                setIsEmailVerified(parsed.emailVerified);
+              }
+            }
+          } catch { /**/ }
         }
         // Siempre liberar el loading en TOKEN_REFRESHED para evitar ciclo infinito
         setIsLoading(false);

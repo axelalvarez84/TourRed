@@ -144,6 +144,15 @@ const VerifyEmailPage: React.FC = () => {
         }
       ).catch(() => {});
 
+      // Limpiar cache para que initializeAuth consulte la BD fresca en el reload
+      try {
+        sessionStorage.removeItem('auth_state');
+        if (user?.id) {
+          sessionStorage.removeItem(`user_role_${user.id}`);
+          localStorage.removeItem(`user_role_${user.id}`);
+        }
+      } catch { /**/ }
+
       setSuccess(true);
       setTimeout(() => {
         if (redirectUrl) {
