@@ -136,6 +136,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   signInWithAzure: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
+  refreshAuthState: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -163,6 +164,7 @@ const AuthContext = createContext<AuthContextType>({
   signInWithGoogle: async () => {},
   signInWithAzure: async () => {},
   completeOnboarding: async () => {},
+  refreshAuthState: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -800,6 +802,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const refreshAuthState = useCallback(async () => {
+    const { data: { user: freshUser } } = await supabase.auth.getUser();
+    if (freshUser) {
+      // Clear stale cached email-verified flag so forceRefresh re-queries the DB
+      try {
+        sessionStorage.removeItem('auth_state');
+        sessionStorage.removeItem(`user_role_${freshUser.id}`);
+        localStorage.removeItem(`user_role_${freshUser.id}`);
+      } catch { /**/ }
+      isUpdatingRef.current = false;
+      await updateAuthState(freshUser, true);
+    }
+  }, []);
+
   const contextValue = useMemo(() => ({
     user,
     userRole,
@@ -825,7 +841,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signInWithGoogle,
     signInWithAzure,
     completeOnboarding,
-  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isAccountant, isAccountExecutive, isEmailVerified, isSuperAdmin, isOnboardingPending, permissions, accountantPermissions, accountExecutiveInfo, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency, needsTermsAcceptance, markTermsAccepted, signInWithGoogle, signInWithAzure, completeOnboarding]);
+    refreshAuthState,
+  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isAccountant, isAccountExecutive, isEmailVerified, isSuperAdmin, isOnboardingPending, permissions, accountantPermissions, accountExecutiveInfo, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency, needsTermsAcceptance, markTermsAccepted, signInWithGoogle, signInWithAzure, completeOnboarding, refreshAuthState]);
 
   return (
     <AuthContext.Provider value={contextValue}>

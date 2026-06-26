@@ -7,7 +7,7 @@ import { Mail, ArrowLeft, CheckCircle, XCircle, Clock } from 'lucide-react';
 const VerifyEmailPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, userRole, refreshAuthState } = useAuth();
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -144,12 +144,19 @@ const VerifyEmailPage: React.FC = () => {
         }
       ).catch(() => {});
 
+      // Refresh auth state so isEmailVerified becomes true before navigating
+      await refreshAuthState();
+
       setSuccess(true);
       setTimeout(() => {
         if (redirectUrl) {
           navigate(redirectUrl);
+        } else if (userRole === 'admin') {
+          navigate('/admin/dashboard');
+        } else if (userRole === 'agency') {
+          navigate('/agency/dashboard');
         } else {
-          navigate('/');
+          navigate('/traveler/dashboard');
         }
       }, 2000);
 
