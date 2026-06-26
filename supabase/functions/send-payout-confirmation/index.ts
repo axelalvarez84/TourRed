@@ -75,10 +75,11 @@ Deno.serve(async (req: Request) => {
 
     const { data: platformSettings } = await supabase
       .from("platform_settings")
-      .select("admin_email, logo_url")
+      .select("admin_email, logo_url, platform_url")
       .eq("id", 1)
       .maybeSingle();
 
+    const appUrl = platformSettings?.platform_url || "https://toursredmx.netlify.app";
     const logoUrl = platformSettings?.logo_url || "https://huzsedewwzjywcpbkjkm.supabase.co/storage/v1/object/public/images/email-logo.png";
     const agencyEmail = agency.users?.email || agency.email;
     const agencyName = agency.name;
@@ -206,7 +207,7 @@ Deno.serve(async (req: Request) => {
               <table style="width: 100%; margin: 30px 0 10px 0;">
                 <tr>
                   <td style="text-align: center;">
-                    <a href="https://www.toursred.com/agency/financials"
+                    <a href="${appUrl}/agency/financials"
                        style="display: inline-block; padding: 14px 32px; background-color: #dc2626; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">
                       Ver Estado Financiero
                     </a>
@@ -263,7 +264,7 @@ DETALLE DEL PAGO:
 ${payment_notes ? `- Notas: ${payment_notes}` : ''}
 ${receipt_url ? `- Comprobante: ${receipt_url}` : ''}
 
-Puedes consultar tu estado financiero en: https://www.toursred.com/agency/financials
+Puedes consultar tu estado financiero en: ${appUrl}/agency/financials
 
 El pago puede tardar de 1 a 3 dias habiles en reflejarse en tu cuenta.
 

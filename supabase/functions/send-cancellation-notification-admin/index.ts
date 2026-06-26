@@ -88,10 +88,11 @@ Deno.serve(async (req: Request) => {
 
     const { data: platformSettings } = await supabase
       .from('platform_settings')
-      .select('agency_commission_percentage')
+      .select('agency_commission_percentage, platform_url')
       .single();
 
     const commissionRate = platformSettings?.agency_commission_percentage || 15;
+    const appUrl = platformSettings?.platform_url || "https://toursredmx.netlify.app";
 
     let policyTitle = '';
     let policyColor = '';
@@ -253,11 +254,11 @@ Deno.serve(async (req: Request) => {
               </div>
 
               <div style="text-align: center; margin-top: 30px;">
-                <a href="https://toursred.com/admin/dashboard"
+                <a href="${appUrl}/admin/dashboard"
                    style="display: inline-block; background-color: #667eea; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; font-size: 15px; margin-right: 10px;">
                   Ver Dashboard
                 </a>
-                <a href="https://toursred.com/admin/agencies"
+                <a href="${appUrl}/admin/agencies"
                    style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; font-size: 15px;">
                   Gestionar Agencias
                 </a>

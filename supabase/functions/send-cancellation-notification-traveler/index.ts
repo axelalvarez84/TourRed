@@ -77,14 +77,16 @@ Deno.serve(async (req: Request) => {
 
     const currentBalance = wallet?.balance || 0;
 
-    const { data: settings } = await supabase
-      .from('email_settings')
-      .select('contact_email, smtp_host, smtp_port, smtp_user, smtp_password, smtp_api_key')
-      .single();
+    const [{ data: settings }, { data: platformSettingsData }] = await Promise.all([
+      supabase.from('email_settings').select('contact_email, smtp_host, smtp_port, smtp_user, smtp_password, smtp_api_key').single(),
+      supabase.from('platform_settings').select('platform_url').maybeSingle(),
+    ]);
 
     if (!settings || !settings.smtp_host) {
       throw new Error('SMTP no configurado');
     }
+
+    const appUrl = platformSettingsData?.platform_url || "https://toursredmx.netlify.app";
 
     let policyTitle = '';
     let policyColor = '';
@@ -231,7 +233,7 @@ Deno.serve(async (req: Request) => {
               </p>
 
               <div style="text-align: center; margin-top: 30px;">
-                <a href="https://toursred.com/traveler/bookings"
+                <a href="${appUrl}/traveler/bookings"
                    style="display: inline-block; background-color: #667eea; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; font-size: 15px;">
                   Ver Mis Reservas
                 </a>

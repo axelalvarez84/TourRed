@@ -54,17 +54,17 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: emailSettings } = await supabase
-      .from("email_settings")
-      .select("smtp_api_key")
-      .single();
+    const [{ data: emailSettings }, { data: platformSettingsData }] = await Promise.all([
+      supabase.from("email_settings").select("smtp_api_key").single(),
+      supabase.from("platform_settings").select("platform_url").maybeSingle(),
+    ]);
 
     if (!emailSettings?.smtp_api_key) {
       throw new Error("Email settings not configured");
     }
 
-    const originUrl = req.headers.get("origin") || "https://toursred.com";
-    const redeemUrl = `${originUrl}/gift-card/redeem?code=${giftCard.code}`;
+    const appUrl = platformSettingsData?.platform_url || "https://toursredmx.netlify.app";
+    const redeemUrl = `${appUrl}/gift-card/redeem?code=${giftCard.code}`;
 
     const results = {
       recipientSent: false,
@@ -80,7 +80,8 @@ Deno.serve(async (req: Request) => {
           giftCard.recipient_email,
           giftCard.recipient_name || "Estimado viajero",
           redeemUrl,
-          false
+          false,
+          appUrl
         );
         results.recipientSent = true;
       } catch (error) {
@@ -96,7 +97,8 @@ Deno.serve(async (req: Request) => {
           giftCard.purchaser_email,
           giftCard.purchaser_name,
           redeemUrl,
-          true
+          true,
+          appUrl
         );
         results.purchaserSent = true;
       } catch (error) {
@@ -141,7 +143,8 @@ async function sendGiftCardEmail(
   recipientEmail: string,
   recipientName: string,
   redeemUrl: string,
-  isPurchaserCopy: boolean
+  isPurchaserCopy: boolean,
+  appUrl: string
 ): Promise<void> {
   const formattedAmount = new Intl.NumberFormat("es-MX", {
     style: "currency",
@@ -299,7 +302,7 @@ async function sendGiftCardEmail(
               </p>
               <p style="margin: 0; color: #9CA3AF; font-size: 12px;">© 2025 ToursRed. Todos los derechos reservados.</p>
               <p style="margin: 10px 0 0 0; color: #9CA3AF; font-size: 11px;">
-                <a href="https://www.toursred.com" style="color: #9CA3AF; text-decoration: none;">www.toursred.com</a>
+                <a href="${appUrl}" style="color: #9CA3AF; text-decoration: none;">${appUrl.replace(/^https?:\/\//, '')}</a>
               </p>
             </td>
           </tr>

@@ -69,7 +69,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: platformSettings, error: platformError } = await supabase
       .from("platform_settings")
-      .select("membership_monthly_price, membership_annual_price")
+      .select("membership_monthly_price, membership_annual_price, platform_url")
       .maybeSingle();
 
     if (platformError || !platformSettings) {
@@ -83,6 +83,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const appUrl = platformSettings.platform_url || "https://toursredmx.netlify.app";
     const monthlyPrice = parseFloat(platformSettings.membership_monthly_price) || 49;
     const annualPrice = parseFloat(platformSettings.membership_annual_price) || 490;
     const annualSavings = (monthlyPrice * 12) - annualPrice;
@@ -312,8 +313,8 @@ Equipo ToursRed
 
       <div class=\"cta-section\">
         <h3>¡Comienza a Disfrutar tus Beneficios!</h3>
-        <a href=\"https://www.toursred.com/tours\" class=\"button\">Explorar Tours</a>
-        <a href=\"https://www.toursred.com/traveler/membership\" class=\"button\" style=\"background-color: #6b7280;\">Ver mi Membresía</a>
+        <a href=\"${appUrl}/tours\" class=\"button\">Explorar Tours</a>
+        <a href=\"${appUrl}/traveler/membership\" class=\"button\" style=\"background-color: #6b7280;\">Ver mi Membresía</a>
       </div>
 
       <p style=\"text-align: center; color: #6b7280; margin-top: 30px;\">

@@ -71,10 +71,11 @@ Deno.serve(async (req: Request) => {
 
     const { data: platformSettings } = await supabase
       .from('platform_settings')
-      .select('agency_commission_percentage')
+      .select('agency_commission_percentage, platform_url')
       .single();
 
     const commissionRate = platformSettings?.agency_commission_percentage || 15;
+    const appUrl = platformSettings?.platform_url || "https://toursredmx.netlify.app";
 
     const travelers: any[] = pc.travelers_cancelled || [];
     const categoryLabels: Record<string, string> = {
@@ -220,7 +221,7 @@ Deno.serve(async (req: Request) => {
               </div>
 
               <div style="text-align: center; margin-top: 25px;">
-                <a href="https://toursred.com/agency/bookings"
+                <a href="${appUrl}/agency/bookings"
                    style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; font-size: 15px;">
                   Ver Reservas
                 </a>

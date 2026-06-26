@@ -92,8 +92,10 @@ Deno.serve(async (req: Request) => {
     // Send email via platform email service
     const { data: emailSettings } = await supabase
       .from("platform_settings")
-      .select("smtp_host, smtp_port, smtp_user, smtp_password, smtp_from_name, smtp_from_email, supabase_service_key")
+      .select("smtp_host, smtp_port, smtp_user, smtp_password, smtp_from_name, smtp_from_email, supabase_service_key, platform_url")
       .maybeSingle();
+
+    const appUrl = (emailSettings as any)?.platform_url || "https://toursredmx.netlify.app";
 
     const { data: traveler } = await supabase
       .from("users")
@@ -117,7 +119,7 @@ Deno.serve(async (req: Request) => {
                 <p><strong>Monto pendiente:</strong> $${amountPending.toFixed(2)} MXN</p>
                 <p><strong>Fecha de vencimiento:</strong> ${installment.due_date}</p>
                 <br>
-                <a href="${Deno.env.get("SUPABASE_URL")?.replace("supabase.co", "toursred.com") || "https://toursred.com"}/traveler/bookings"
+                <a href="${appUrl}/traveler/bookings"
                    style="background: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
                   Realizar pago
                 </a>

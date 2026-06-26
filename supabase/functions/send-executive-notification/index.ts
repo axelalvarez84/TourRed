@@ -247,10 +247,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: emailSettings } = await supabase
-      .from("email_settings")
-      .select("smtp_api_key, contact_email")
-      .maybeSingle();
+    const [{ data: emailSettings }, { data: platformSettingsData }] = await Promise.all([
+      supabase.from("email_settings").select("smtp_api_key, contact_email").maybeSingle(),
+      supabase.from("platform_settings").select("platform_url").maybeSingle(),
+    ]);
 
     if (!emailSettings?.smtp_api_key) {
       console.error("SMTP API key not configured");
@@ -262,7 +262,7 @@ Deno.serve(async (req: Request) => {
 
     const fromEmail = emailSettings.contact_email || "contacto@toursred.com";
     const logoUrl = `${supabaseUrl}/storage/v1/object/public/images/email-logo.png`;
-    const appUrl = "https://toursred.com";
+    const appUrl = platformSettingsData?.platform_url || "https://toursredmx.netlify.app";
 
     const { subject, html, text } = buildEmailContent(payload, logoUrl, fromEmail, appUrl);
 

@@ -91,8 +91,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const [emailSettingsResult] = await Promise.all([
+    const [emailSettingsResult, platformSettingsResult] = await Promise.all([
       supabase.from("email_settings").select("*").maybeSingle(),
+      supabase.from("platform_settings").select("platform_url").maybeSingle(),
     ]);
 
     if (emailSettingsResult.error || !emailSettingsResult.data || !emailSettingsResult.data.smtp_api_key) {
@@ -110,6 +111,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const emailSettings = emailSettingsResult.data;
+    const appUrl = platformSettingsResult.data?.platform_url || "https://toursredmx.netlify.app";
 
     const bookingDate = new Date(booking.booking_date).toLocaleDateString('es-MX', {
       weekday: 'long',
@@ -195,7 +197,7 @@ Deno.serve(async (req: Request) => {
       </div>
 
       <p style="text-align: center; margin-top: 30px;">
-        <a href="https://www.toursred.com/traveler/bookings" class="button">
+        <a href="${appUrl}/traveler/bookings" class="button">
           Completar Pago
         </a>
       </p>
@@ -281,7 +283,7 @@ Deno.serve(async (req: Request) => {
       <p>Te invitamos a explorar otros tours disponibles en nuestra plataforma.</p>
 
       <p style="text-align: center; margin-top: 30px;">
-        <a href="https://www.toursred.com/tours" class="button">
+        <a href="${appUrl}/tours" class="button">
           Ver Otros Tours
         </a>
       </p>

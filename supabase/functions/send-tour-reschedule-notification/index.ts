@@ -54,11 +54,11 @@ Deno.serve(async (req: Request) => {
       throw new Error("Reschedule not found");
     }
 
-    // Obtener configuración de email
-    const { data: emailSettings } = await supabase
-      .from("email_settings")
-      .select("*")
-      .single();
+    // Obtener configuración de email y URL de plataforma
+    const [{ data: emailSettings }, { data: platformSettingsData }] = await Promise.all([
+      supabase.from("email_settings").select("*").single(),
+      supabase.from("platform_settings").select("platform_url").maybeSingle(),
+    ]);
 
     if (!emailSettings?.smtp_api_key) {
       throw new Error("Email settings not configured");
@@ -93,7 +93,7 @@ Deno.serve(async (req: Request) => {
     });
 
     // URLs para aceptar/rechazar (apuntan a la página de reservas del viajero)
-    const appUrl = Deno.env.get("APP_URL") || "https://toursredmx.netlify.app";
+    const appUrl = platformSettingsData?.platform_url || "https://toursredmx.netlify.app";
     const acceptUrl = `${appUrl}/traveler/bookings?action=accept&booking=${booking_id}`;
     const rejectUrl = `${appUrl}/traveler/bookings?action=reject&booking=${booking_id}`;
 

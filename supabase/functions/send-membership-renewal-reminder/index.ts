@@ -40,10 +40,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: emailSettings, error: settingsError } = await supabase
-      .from("email_settings")
-      .select("*")
-      .maybeSingle();
+    const [{ data: emailSettings, error: settingsError }, { data: platformSettings }] = await Promise.all([
+      supabase.from("email_settings").select("*").maybeSingle(),
+      supabase.from("platform_settings").select("platform_url").maybeSingle(),
+    ]);
 
     if (settingsError || !emailSettings) {
       console.error("Error fetching email settings:", settingsError);
@@ -67,6 +67,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const appUrl = platformSettings?.platform_url || "https://toursredmx.netlify.app";
     const planName = planType === 'monthly' ? 'Mensual' : 'Anual';
 
     const formattedRenewalDate = new Date(renewalDate).toLocaleDateString('es-MX', {
@@ -227,7 +228,7 @@ Equipo ToursRed
           </ol>
           <p style=\"color: #dc2626; margin-top: 15px;\"><strong>Importante:</strong> Si cancelas, mantendrás acceso a todos tus beneficios hasta el ${formattedRenewalDate}. No se realizarán reembolsos por el tiempo restante.</p>
           <div style=\"text-align: center; margin-top: 20px;\">
-            <a href=\"https://www.toursred.com/traveler/membership\" class=\"button button-cancel\">Gestionar mi Membresía</a>
+            <a href=\"${appUrl}/traveler/membership\" class=\"button button-cancel\">Gestionar mi Membresía</a>
           </div>
         </div>
 
@@ -248,7 +249,7 @@ Equipo ToursRed
             `}
           </ul>
           <div style=\"text-align: center; margin-top: 20px;\">
-            <a href=\"https://www.toursred.com/tours\" class=\"button button-primary\">Explorar Tours</a>
+            <a href=\"${appUrl}/tours\" class=\"button button-primary\">Explorar Tours</a>
           </div>
         </div>
       </div>

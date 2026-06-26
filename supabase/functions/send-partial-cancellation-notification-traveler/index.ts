@@ -64,12 +64,14 @@ Deno.serve(async (req: Request) => {
 
     const currentBalance = wallet?.balance || 0;
 
-    const { data: settings } = await supabase
-      .from('email_settings')
-      .select('contact_email, smtp_api_key, smtp_host')
-      .single();
+    const [{ data: settings }, { data: platformSettingsData }] = await Promise.all([
+      supabase.from('email_settings').select('contact_email, smtp_api_key, smtp_host').single(),
+      supabase.from('platform_settings').select('platform_url').maybeSingle(),
+    ]);
 
     if (!settings || !settings.smtp_host) throw new Error('SMTP no configurado');
+
+    const appUrl = platformSettingsData?.platform_url || "https://toursredmx.netlify.app";
 
     const travelers: any[] = pc.travelers_cancelled || [];
 
@@ -217,7 +219,7 @@ Deno.serve(async (req: Request) => {
               </p>
 
               <div style="text-align: center; margin-top: 25px;">
-                <a href="https://toursred.com/traveler/bookings"
+                <a href="${appUrl}/traveler/bookings"
                    style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; font-size: 15px;">
                   Ver Mis Reservas
                 </a>

@@ -46,12 +46,14 @@ Deno.serve(async (req: Request) => {
 
     if (bookingError || !booking) throw new Error("Reserva no encontrada");
 
-    const { data: emailSettings } = await adminClient
-      .from("email_settings")
-      .select("smtp_api_key, contact_email, platform_name")
-      .single();
+    const [{ data: emailSettings }, { data: platformSettingsData }] = await Promise.all([
+      adminClient.from("email_settings").select("smtp_api_key, contact_email, platform_name").single(),
+      adminClient.from("platform_settings").select("platform_url").maybeSingle(),
+    ]);
 
     if (!emailSettings?.smtp_api_key) throw new Error("Configuracion de email no encontrada");
+
+    const appUrl = platformSettingsData?.platform_url || "https://toursredmx.netlify.app";
 
     const recipientEmail = (booking.user as any).email;
     const recipientName = `${(booking.user as any).first_name} ${(booking.user as any).last_name}`;
@@ -84,7 +86,6 @@ Deno.serve(async (req: Request) => {
       });
     };
 
-    const appUrl = "https://toursredmx.netlify.app";
 
     const htmlContent = `
 <!DOCTYPE html>

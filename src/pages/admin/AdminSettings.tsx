@@ -60,6 +60,7 @@ interface PlatformSettings {
   announcement_message: string;
   announcement_cta_text: string;
   announcement_activated_at: string | null;
+  platform_url: string;
 }
 
 const AdminSettings: React.FC = () => {
@@ -119,6 +120,7 @@ const AdminSettings: React.FC = () => {
     announcement_message: '',
     announcement_cta_text: 'Aceptar',
     announcement_activated_at: null,
+    platform_url: 'https://toursredmx.netlify.app',
   });
   const [zohoStatus, setZohoStatus] = useState<{
     connected: boolean;
@@ -376,6 +378,7 @@ const AdminSettings: React.FC = () => {
             announcement_activated_at: platformSettings.announcement_active
               ? (platformSettings.announcement_activated_at || new Date().toISOString())
               : platformSettings.announcement_activated_at,
+            platform_url: platformSettings.platform_url,
             updated_at: new Date().toISOString(),
             updated_by: user?.id
           })
@@ -1809,6 +1812,34 @@ const AdminSettings: React.FC = () => {
                 </button>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* ── URL de la Plataforma ─────────────────────────────────── */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <Globe className="w-6 h-6 text-primary-600" />
+            <h2 className="text-xl font-semibold text-gray-900">URL de la Plataforma</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-5">
+            URL base que se incluye en los enlaces de todos los correos electrónicos enviados a usuarios, agencias y administradores. Actualízala cuando cambies de dominio.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              URL base de la plataforma
+            </label>
+            <input
+              type="url"
+              value={platformSettings.platform_url}
+              onChange={(e) =>
+                setPlatformSettings((prev) => ({ ...prev, platform_url: e.target.value }))
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="https://www.toursred.com.mx"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Sin barra al final. Ejemplo: <code className="bg-gray-100 px-1 rounded">https://www.toursred.com.mx</code>
+            </p>
           </div>
         </div>
 

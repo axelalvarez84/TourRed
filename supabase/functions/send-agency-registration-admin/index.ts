@@ -40,10 +40,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: emailSettings, error: settingsError } = await supabase
-      .from("email_settings")
-      .select("*")
-      .maybeSingle();
+    const [{ data: emailSettings, error: settingsError }, { data: platformSettings }] = await Promise.all([
+      supabase.from("email_settings").select("*").maybeSingle(),
+      supabase.from("platform_settings").select("platform_url").maybeSingle(),
+    ]);
+
+    const platformUrl = platformSettings?.platform_url || "https://toursredmx.netlify.app";
 
     if (settingsError || !emailSettings) {
       console.error("Error fetching email settings:", settingsError);
@@ -136,7 +138,7 @@ ToursRed - Sistema de Gestión
       
       <p style="margin-top: 20px;">Por favor, ingresa al panel de administración para revisar y aprobar esta agencia.</p>
       
-      <a href="https://www.toursred.com/admin/agencies" class="button">Ir al Panel de Admin</a>
+      <a href="${platformUrl}/admin/agencies" class="button">Ir al Panel de Admin</a>
     </div>
     <div class="footer">
       <p>ToursRed - Sistema de Gestión de Agencias</p>

@@ -20,10 +20,10 @@ Deno.serve(async (req: Request) => {
 
     const { referrerEmail, referrerName, referredName, pointsAwarded, bookingCode, isReferredUser } = await req.json();
 
-    const { data: emailSettings, error: settingsError } = await supabase
-      .from('email_settings')
-      .select('*')
-      .maybeSingle();
+    const [{ data: emailSettings, error: settingsError }, { data: platformSettingsData }] = await Promise.all([
+      supabase.from('email_settings').select('*').maybeSingle(),
+      supabase.from('platform_settings').select('platform_url').maybeSingle(),
+    ]);
 
     if (settingsError || !emailSettings?.smtp_api_key) {
       console.log('Email settings not configured, skipping');
@@ -34,7 +34,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const appUrl = 'https://toursred.com';
+    const appUrl = platformSettingsData?.platform_url || 'https://toursredmx.netlify.app';
     const logoUrl = `${supabaseUrl}/storage/v1/object/public/images/email-logo.png`;
 
     const htmlContent = `

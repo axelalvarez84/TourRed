@@ -60,14 +60,16 @@ Deno.serve(async (req: Request) => {
 
     const currentBalance = wallet?.balance || 0;
 
-    const { data: emailSettings } = await supabase
-      .from("email_settings")
-      .select("*")
-      .single();
+    const [{ data: emailSettings }, { data: platformSettingsData }] = await Promise.all([
+      supabase.from("email_settings").select("*").single(),
+      supabase.from("platform_settings").select("platform_url").maybeSingle(),
+    ]);
 
     if (!emailSettings?.smtp_api_key) {
       throw new Error("Email settings not configured");
     }
+
+    const appUrl = platformSettingsData?.platform_url || "https://toursredmx.netlify.app";
 
     const recipientEmail = booking.user.email;
     const recipientName = `${booking.user.first_name} ${booking.user.last_name}`;
@@ -190,7 +192,7 @@ Deno.serve(async (req: Request) => {
                 <p style="margin: 0 0 20px 0; color: #1e3a8a; font-size: 14px;">
                   Tenemos muchos otros tours disponibles para tu próxima aventura
                 </p>
-                <a href="https://toursredmx.netlify.app/tours"
+                <a href="${appUrl}/tours"
                    style="display: inline-block; background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; font-size: 15px;">
                   Ver Tours Disponibles
                 </a>

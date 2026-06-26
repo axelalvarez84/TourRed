@@ -55,14 +55,16 @@ Deno.serve(async (req: Request) => {
       throw new Error("Booking cancellation not found");
     }
 
-    const { data: emailSettings } = await supabase
-      .from("email_settings")
-      .select("*")
-      .single();
+    const [{ data: emailSettings }, { data: platformSettingsData }] = await Promise.all([
+      supabase.from("email_settings").select("*").single(),
+      supabase.from("platform_settings").select("platform_url").maybeSingle(),
+    ]);
 
     if (!emailSettings?.smtp_api_key || !emailSettings.contact_email) {
       throw new Error("Email settings not configured");
     }
+
+    const appUrl = platformSettingsData?.platform_url || "https://toursredmx.netlify.app";
 
     const formatDate = (dateStr: string) => {
       const date = new Date(dateStr);
@@ -253,11 +255,11 @@ Deno.serve(async (req: Request) => {
               </div>
 
               <div style="text-align: center; margin-top: 30px;">
-                <a href="https://toursredmx.netlify.app/admin/agencies"
+                <a href="${appUrl}/admin/agencies"
                    style="display: inline-block; background-color: #667eea; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; font-size: 15px; margin-right: 10px;">
                   Ver Agencias
                 </a>
-                <a href="https://toursredmx.netlify.app/admin/dashboard"
+                <a href="${appUrl}/admin/dashboard"
                    style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; font-size: 15px;">
                   Ver Dashboard
                 </a>

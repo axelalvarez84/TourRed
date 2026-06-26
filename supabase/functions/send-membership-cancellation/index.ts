@@ -39,10 +39,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: emailSettings, error: settingsError } = await supabase
-      .from("email_settings")
-      .select("*")
-      .maybeSingle();
+    const [{ data: emailSettings, error: settingsError }, { data: platformSettings }] = await Promise.all([
+      supabase.from("email_settings").select("*").maybeSingle(),
+      supabase.from("platform_settings").select("platform_url").maybeSingle(),
+    ]);
 
     if (settingsError || !emailSettings) {
       console.error("Error fetching email settings:", settingsError);
@@ -66,6 +66,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const appUrl = platformSettings?.platform_url || "https://toursredmx.netlify.app";
     const planName = planType === 'monthly' ? 'Mensual' : 'Anual';
     const planPrice = planType === 'monthly' ? '$49 MXN/mes' : '$490 MXN/año';
 
@@ -217,7 +218,7 @@ Equipo ToursRed
         </ol>
         <p style=\"margin-top: 15px;\">Si reactivas tu membresía, <strong>continuarás disfrutando sin interrupciones</strong> de todos los beneficios ToursRed+.</p>
         <div style=\"text-align: center; margin-top: 20px;\">
-          <a href=\"https://www.toursred.com/traveler/membership\" class=\"button button-primary\">Reactivar mi Membresía</a>
+          <a href=\"${appUrl}/traveler/membership\" class=\"button button-primary\">Reactivar mi Membresía</a>
         </div>
       </div>
 
@@ -230,7 +231,7 @@ Equipo ToursRed
           Tus datos y preferencias se mantendrán guardados para cuando decidas volver.
         </p>
         <div style=\"margin-top: 20px;\">
-          <a href=\"https://www.toursred.com/traveler/membership\" class=\"button\" style=\"background-color: #6366f1;\">Ver Planes de Membresía</a>
+          <a href=\"${appUrl}/traveler/membership\" class=\"button\" style=\"background-color: #6366f1;\">Ver Planes de Membresía</a>
         </div>
       </div>
 
