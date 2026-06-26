@@ -102,7 +102,7 @@ Mientras tanto, puedes:
 Una vez que recibamos y validemos tus documentos, aprobaremos tu cuenta y podrás comenzar a publicar tours.
 
 Para cualquier duda o para agilizar el proceso, contáctanos a:
-contacto@toursred.com
+agencias@toursred.com.mx
 
 ¡Bienvenido a la familia ToursRed!
 
@@ -192,7 +192,7 @@ Equipo ToursRed
       <div class="contact-box">
         <h3 style="margin-top: 0; color: #f59e0b;">📧 Contáctanos</h3>
         <p>Para cualquier duda o para agilizar el proceso de validación:</p>
-        <p><strong>Email:</strong> <a href="mailto:contacto@toursred.com">contacto@toursred.com</a></p>
+        <p><strong>Email:</strong> <a href="mailto:agencias@toursred.com.mx">agencias@toursred.com.mx</a></p>
       </div>
       
       <p style="text-align: center; margin-top: 30px; font-size: 18px; color: #1e40af;">

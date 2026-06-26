@@ -148,7 +148,7 @@ ToursRed - Sistema de Gestión
 
     const emailPayload = {
       api_key: emailSettings.smtp_api_key,
-      to: ["contacto@toursred.com"],
+      to: ["agencias@toursred.com.mx"],
       sender: "no-reply@toursred.com",
       subject: `Nueva Agencia Registrada: ${agencyName}`,
       text_body: textContent,
