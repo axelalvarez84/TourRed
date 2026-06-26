@@ -1,5 +1,5 @@
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import NavBar from './components/NavBar';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
@@ -129,7 +129,19 @@ import AnnouncementPopup from './components/AnnouncementPopup';
 import MaintenanceAdminPage from './pages/auth/MaintenanceAdminPage';
 
 const App: React.FC = () => {
-  const { isLoading } = useAuth();
+  const { isLoading, isOnboardingPending, user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && isOnboardingPending && user) {
+      if (!location.pathname.startsWith('/auth/')) {
+        const provider = user?.app_metadata?.provider;
+        const path = provider === 'azure' ? '/auth/azure-onboarding' : '/auth/google-onboarding';
+        navigate(path, { replace: true });
+      }
+    }
+  }, [isLoading, isOnboardingPending, user, navigate, location.pathname]);
 
   if (isLoading) {
     return (
