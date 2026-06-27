@@ -362,10 +362,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signInWithTwitter = useCallback(async () => {
-    const redirectTo = `${window.location.origin}/auth/twitter-callback`;
+    const redirectTo = `${window.location.origin}/auth/x-callback`;
     await supabase.auth.signInWithOAuth({
-      provider: 'twitter',
-      options: { redirectTo, scopes: 'tweet.read users.read' },
+      provider: 'x',
+      options: { redirectTo },
     });
   }, []);
 
@@ -388,9 +388,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const isOAuthProvider =
           authUser.app_metadata?.provider === 'google' ||
           authUser.app_metadata?.provider === 'azure' ||
-          authUser.app_metadata?.provider === 'twitter' ||
+          authUser.app_metadata?.provider === 'x' ||
           authUser.app_metadata?.provider === 'facebook' ||
-          (authUser.identities ?? []).some((i: any) => ['google', 'azure', 'twitter', 'facebook'].includes(i.provider));
+          (authUser.identities ?? []).some((i: any) => ['google', 'azure', 'x', 'facebook'].includes(i.provider));
         const metaOnboarding = authUser.user_metadata?.onboarding_completed;
 
         if (isOAuthProvider && (metaOnboarding === false || metaOnboarding === null || metaOnboarding === undefined)) {

@@ -12,7 +12,7 @@ interface Identity {
 interface OAuthLinkToggles {
   google: boolean;
   azure: boolean;
-  twitter: boolean;
+  x: boolean;
   facebook: boolean;
 }
 
@@ -87,11 +87,11 @@ const ALL_PROVIDERS: ProviderConfig[] = [
     toggleKey: 'azure',
   },
   {
-    key: 'twitter',
+    key: 'x',
     label: 'X (Twitter)',
     icon: <TwitterXIcon />,
     description: 'Inicia sesión con tu cuenta de X',
-    toggleKey: 'twitter',
+    toggleKey: 'x',
   },
   {
     key: 'facebook',
@@ -111,7 +111,7 @@ const LinkedAccountsSection: React.FC = () => {
   const [linkToggles, setLinkToggles] = useState<OAuthLinkToggles>({
     google: true,
     azure: true,
-    twitter: false,
+    x: false,
     facebook: false,
   });
 
@@ -135,7 +135,7 @@ const LinkedAccountsSection: React.FC = () => {
         setLinkToggles({
           google: d.oauth_google_link_enabled ?? true,
           azure: d.oauth_azure_link_enabled ?? true,
-          twitter: d.oauth_twitter_link_enabled ?? false,
+          x: d.oauth_twitter_link_enabled ?? false,
           facebook: d.oauth_facebook_link_enabled ?? false,
         });
       }
@@ -150,7 +150,7 @@ const LinkedAccountsSection: React.FC = () => {
     loadIdentities();
   }, [loadIdentities]);
 
-  const handleLink = async (provider: 'google' | 'azure' | 'twitter' | 'facebook') => {
+  const handleLink = async (provider: 'google' | 'azure' | 'x' | 'facebook') => {
     setError('');
     setSuccess('');
     setActionLoading(provider);
@@ -158,7 +158,6 @@ const LinkedAccountsSection: React.FC = () => {
       const redirectTo = `${window.location.origin}/auth/${provider}-callback`;
       const providerScopes: Partial<Record<string, string>> = {
         azure: 'email profile openid https://graph.microsoft.com/User.Read',
-        twitter: 'tweet.read users.read',
       };
       const { error: linkError } = await supabase.auth.linkIdentity({
         provider,
@@ -208,9 +207,8 @@ const LinkedAccountsSection: React.FC = () => {
     return identity?.identity_data?.email || null;
   };
 
-  // Show a provider if: it's email, OR it's enabled via toggle, OR it's already linked (so user can unlink)
   const visibleProviders = ALL_PROVIDERS.filter(p => {
-    if (p.toggleKey === null) return true; // always show email
+    if (p.toggleKey === null) return true;
     return linkToggles[p.toggleKey] || isLinked(p.key);
   });
 
@@ -305,7 +303,7 @@ const LinkedAccountsSection: React.FC = () => {
                 ) : (
                   provider.key !== 'email' && canLink && (
                     <button
-                      onClick={() => handleLink(provider.key as 'google' | 'azure' | 'twitter' | 'facebook')}
+                      onClick={() => handleLink(provider.key as 'google' | 'azure' | 'x' | 'facebook')}
                       disabled={isActing || actionLoading !== null}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-600 border border-primary-200 rounded-md hover:bg-primary-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >

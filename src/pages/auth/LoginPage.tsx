@@ -7,7 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 interface OAuthToggles {
   google: boolean;
   azure: boolean;
-  twitter: boolean;
+  x: boolean;
   facebook: boolean;
 }
 
@@ -58,7 +58,7 @@ const LoginPage: React.FC = () => {
   const [isTwitterLoading, setIsTwitterLoading] = useState(false);
   const [isFacebookLoading, setIsFacebookLoading] = useState(false);
   const [ipBlocked, setIpBlocked] = useState(false);
-  const [oauthToggles, setOauthToggles] = useState<OAuthToggles>({ google: true, azure: true, twitter: false, facebook: false });
+  const [oauthToggles, setOauthToggles] = useState<OAuthToggles>({ google: true, azure: true, x: false, facebook: false });
   const deviceFingerprintRef = useRef<string>(computeDeviceFingerprint());
   const navigate = useNavigate();
   const location = useLocation();
@@ -85,7 +85,7 @@ const LoginPage: React.FC = () => {
           setOauthToggles({
             google: data.oauth_google_login_enabled ?? true,
             azure: data.oauth_azure_login_enabled ?? true,
-            twitter: data.oauth_twitter_login_enabled ?? false,
+            x: data.oauth_twitter_login_enabled ?? false,
             facebook: data.oauth_facebook_login_enabled ?? false,
           });
         }
@@ -319,7 +319,7 @@ const LoginPage: React.FC = () => {
             </div>
           </form>
 
-          {(oauthToggles.google || oauthToggles.azure || oauthToggles.twitter || oauthToggles.facebook) && (
+          {(oauthToggles.google || oauthToggles.azure || oauthToggles.x || oauthToggles.facebook) && (
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -374,7 +374,7 @@ const LoginPage: React.FC = () => {
               </button>
               )}
 
-              {oauthToggles.twitter && (
+              {oauthToggles.x && (
               <button
                 type="button"
                 onClick={handleTwitterSignIn}
