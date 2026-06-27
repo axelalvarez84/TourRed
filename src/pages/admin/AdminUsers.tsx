@@ -215,7 +215,8 @@ const AdminUsers: React.FC = () => {
 
       const { error: updateError } = await supabase
         .from('admin_permissions')
-        .update({
+        .upsert({
+          user_id: userId,
           can_manage_agencies: tempPermissions.canManageAgencies,
           can_manage_users: tempPermissions.canManageUsers,
           can_manage_travelers: tempPermissions.canManageTravelers,
@@ -232,8 +233,7 @@ const AdminUsers: React.FC = () => {
           can_view_audit_log: tempPermissions.canViewAuditLog,
           can_view_audit_sensitive_data: tempPermissions.canViewAuditSensitiveData,
           can_export_audit_log: tempPermissions.canExportAuditLog,
-        })
-        .eq('user_id', userId);
+        }, { onConflict: 'user_id' });
 
       if (updateError) throw updateError;
 
@@ -248,15 +248,26 @@ const AdminUsers: React.FC = () => {
   };
 
   const startEditPermissions = (user: StaffUser) => {
-    if (user.permissions) {
-      setTempPermissions({
-        ...user.permissions,
-        canViewAuditLog: user.permissions.canViewAuditLog ?? false,
-        canViewAuditSensitiveData: user.permissions.canViewAuditSensitiveData ?? false,
-        canExportAuditLog: user.permissions.canExportAuditLog ?? false,
-      });
-      setEditingPermissions(user.id);
-    }
+    const base = {
+      canManageAgencies: false,
+      canManageUsers: false,
+      canManageTravelers: false,
+      canManageDestinations: false,
+      canManageCategories: false,
+      canManageDeparturePoints: false,
+      canManageReviews: false,
+      canManageMessages: false,
+      canManageSettings: false,
+      canManageMemberships: false,
+      canManageInquiries: false,
+      canManagePoints: false,
+      canManageDiscountCodes: false,
+      canViewAuditLog: false,
+      canViewAuditSensitiveData: false,
+      canExportAuditLog: false,
+    };
+    setTempPermissions(user.permissions ? { ...base, ...user.permissions } : base);
+    setEditingPermissions(user.id);
   };
 
   const cancelEditPermissions = () => {
@@ -481,7 +492,7 @@ const AdminUsers: React.FC = () => {
                       El super administrador tiene acceso completo a todas las secciones del sistema.
                     </p>
                   </div>
-                ) : user.permissions ? (
+                ) : (user.permissions || editingPermissions === user.id) ? (
                   <div className="border-t border-gray-200 pt-4">
                     <h4 className="text-sm font-semibold text-gray-700 mb-3">Permisos de Acceso:</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -572,79 +583,79 @@ const AdminUsers: React.FC = () => {
                         <>
                           <PermissionCheckbox
                             label="Gestionar Agencias"
-                            checked={user.permissions.canManageAgencies}
+                            checked={user.permissions?.canManageAgencies ?? false}
                             onChange={() => {}}
                             disabled
                           />
                           <PermissionCheckbox
                             label="Gestionar Usuarios"
-                            checked={user.permissions.canManageUsers}
+                            checked={user.permissions?.canManageUsers ?? false}
                             onChange={() => {}}
                             disabled
                           />
                           <PermissionCheckbox
                             label="Gestionar Viajeros"
-                            checked={user.permissions.canManageTravelers}
+                            checked={user.permissions?.canManageTravelers ?? false}
                             onChange={() => {}}
                             disabled
                           />
                           <PermissionCheckbox
                             label="Gestionar Destinos"
-                            checked={user.permissions.canManageDestinations}
+                            checked={user.permissions?.canManageDestinations ?? false}
                             onChange={() => {}}
                             disabled
                           />
                           <PermissionCheckbox
                             label="Gestionar Categorías"
-                            checked={user.permissions.canManageCategories}
+                            checked={user.permissions?.canManageCategories ?? false}
                             onChange={() => {}}
                             disabled
                           />
                           <PermissionCheckbox
                             label="Gestionar Puntos de Partida"
-                            checked={user.permissions.canManageDeparturePoints}
+                            checked={user.permissions?.canManageDeparturePoints ?? false}
                             onChange={() => {}}
                             disabled
                           />
                           <PermissionCheckbox
                             label="Gestionar Reseñas"
-                            checked={user.permissions.canManageReviews}
+                            checked={user.permissions?.canManageReviews ?? false}
                             onChange={() => {}}
                             disabled
                           />
                           <PermissionCheckbox
                             label="Ver Mensajes"
-                            checked={user.permissions.canManageMessages}
+                            checked={user.permissions?.canManageMessages ?? false}
                             onChange={() => {}}
                             disabled
                           />
                           <PermissionCheckbox
                             label="Configuración"
-                            checked={user.permissions.canManageSettings}
+                            checked={user.permissions?.canManageSettings ?? false}
                             onChange={() => {}}
                             disabled
                           />
                           <PermissionCheckbox
                             label="Gestionar Membresías"
-                            checked={user.permissions.canManageMemberships}
+                            checked={user.permissions?.canManageMemberships ?? false}
                             onChange={() => {}}
                             disabled
                           />
                           <PermissionCheckbox
                             label="Gestionar Cotizaciones"
-                            checked={user.permissions.canManageInquiries}
+                            checked={user.permissions?.canManageInquiries ?? false}
                             onChange={() => {}}
                             disabled
                           />
                           <PermissionCheckbox
                             label="Gestionar Puntos"
-                            checked={user.permissions.canManagePoints}
+                            checked={user.permissions?.canManagePoints ?? false}
                             onChange={() => {}}
                             disabled
                           />
                           <PermissionCheckbox
                             label="Códigos de Descuento"
-                            checked={user.permissions.canManageDiscountCodes}
+                            checked={user.permissions?.canManageDiscountCodes ?? false}
                             onChange={() => {}}
                             disabled
                           />
