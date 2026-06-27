@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 
 interface DashboardStats {
   totalUsers: number;
+  totalTravelers: number;
   totalAgencies: number;
   activeAgencies: number;
   totalTours: number;
@@ -28,6 +29,7 @@ const AdminDashboard: React.FC = () => {
 
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
+    totalTravelers: 0,
     totalAgencies: 0,
     activeAgencies: 0,
     totalTours: 0,
@@ -80,12 +82,14 @@ const AdminDashboard: React.FC = () => {
       // OPTIMIZED: Only count IDs instead of selecting all columns
       const [
         usersResult,
+        travelersResult,
         agenciesResult,
         toursResult,
         bookingsResult,
         destinationsResult
       ] = await Promise.all([
         supabase.from('users').select('id', { count: 'exact', head: true }),
+        supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'traveler'),
         supabase.from('agencies').select('id', { count: 'exact', head: true }),
         supabase.from('tours').select('id', { count: 'exact', head: true }),
         supabase.from('bookings').select('id', { count: 'exact', head: true }).neq('status', 'draft'),
@@ -115,6 +119,7 @@ const AdminDashboard: React.FC = () => {
 
       setStats({
         totalUsers: usersResult.count || 0,
+        totalTravelers: travelersResult.count || 0,
         totalAgencies: agenciesResult.count || 0,
         activeAgencies: activeAgenciesCount || 0,
         totalTours: toursResult.count || 0,
@@ -125,6 +130,7 @@ const AdminDashboard: React.FC = () => {
 
       console.log('✅ Estadísticas cargadas:', {
         users: usersResult.count,
+        travelers: travelersResult.count,
         agencies: agenciesResult.count,
         tours: toursResult.count,
         bookings: bookingsResult.count,
@@ -185,7 +191,7 @@ const AdminDashboard: React.FC = () => {
       )}
 
       {/* Estadísticas principales */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-6 mb-8">
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center">
             <div className="flex-shrink-0">
@@ -194,6 +200,18 @@ const AdminDashboard: React.FC = () => {
             <div className="ml-4">
               <div className="text-2xl font-bold text-gray-900">{stats.totalUsers}</div>
               <div className="text-sm text-gray-500">Total Usuarios</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <Users className="h-8 w-8 text-blue-500" />
+            </div>
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-gray-900">{stats.totalTravelers}</div>
+              <div className="text-sm text-gray-500">Total Viajeros</div>
             </div>
           </div>
         </div>
