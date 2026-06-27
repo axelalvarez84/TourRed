@@ -50,7 +50,7 @@ const AdminDashboard: React.FC = () => {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
-      const [failedRes, activeRes] = await Promise.all([
+      const [failedRes, activeRes, blockedRes] = await Promise.all([
         supabase.rpc('get_audit_logs', {
           p_action: 'FAILED_LOGIN',
           p_date_from: todayStart.toISOString(),
@@ -63,6 +63,7 @@ const AdminDashboard: React.FC = () => {
           p_limit: 1000,
           p_offset: 0,
         }),
+        supabase.rpc('get_blocked_ips_count'),
       ]);
 
       const failedCount = failedRes.data?.[0]?.total_count ?? failedRes.data?.length ?? 0;
@@ -71,7 +72,7 @@ const AdminDashboard: React.FC = () => {
       setSecStats({
         failedLoginsToday: Number(failedCount),
         activeSessions: Number(loginCount),
-        blockedIps: 0,
+        blockedIps: Number(blockedRes.data ?? 0),
       });
     } catch {
       // best-effort

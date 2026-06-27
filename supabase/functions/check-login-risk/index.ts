@@ -9,8 +9,24 @@ const corsHeaders = {
 
 interface RiskCheckBody {
   email: string;
-  ip_address?: string;
   device_fingerprint?: string;
+}
+
+function extractClientIp(req: Request): string | null {
+  const candidates = [
+    req.headers.get("cf-connecting-ip"),
+    req.headers.get("x-real-ip"),
+    req.headers.get("x-forwarded-for"),
+    req.headers.get("true-client-ip"),
+    req.headers.get("fastly-client-ip"),
+  ];
+  for (const candidate of candidates) {
+    if (candidate) {
+      const ip = candidate.split(",")[0].trim();
+      if (ip) return ip;
+    }
+  }
+  return null;
 }
 
 interface RiskResult {
@@ -33,7 +49,8 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body: RiskCheckBody = await req.json();
-    const { email, ip_address, device_fingerprint } = body;
+    const { email, device_fingerprint } = body;
+    const ip_address = extractClientIp(req);
 
     if (!email) {
       return new Response(
