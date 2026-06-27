@@ -135,6 +135,8 @@ interface AuthContextType {
   markTermsAccepted: () => void;
   signInWithGoogle: () => Promise<void>;
   signInWithAzure: () => Promise<void>;
+  signInWithTwitter: () => Promise<void>;
+  signInWithFacebook: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
   refreshAuthState: () => Promise<void>;
 }
@@ -163,6 +165,8 @@ const AuthContext = createContext<AuthContextType>({
   markTermsAccepted: () => {},
   signInWithGoogle: async () => {},
   signInWithAzure: async () => {},
+  signInWithTwitter: async () => {},
+  signInWithFacebook: async () => {},
   completeOnboarding: async () => {},
   refreshAuthState: async () => {},
 });
@@ -357,6 +361,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
+  const signInWithTwitter = useCallback(async () => {
+    const redirectTo = `${window.location.origin}/auth/twitter-callback`;
+    await supabase.auth.signInWithOAuth({
+      provider: 'twitter',
+      options: { redirectTo },
+    });
+  }, []);
+
+  const signInWithFacebook = useCallback(async () => {
+    const redirectTo = `${window.location.origin}/auth/facebook-callback`;
+    await supabase.auth.signInWithOAuth({
+      provider: 'facebook',
+      options: { redirectTo },
+    });
+  }, []);
+
   const updateAuthState = async (authUser: any, forceRefresh: boolean = false) => {
     if (isUpdatingRef.current) return;
     isUpdatingRef.current = true;
@@ -368,7 +388,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const isOAuthProvider =
           authUser.app_metadata?.provider === 'google' ||
           authUser.app_metadata?.provider === 'azure' ||
-          (authUser.identities ?? []).some((i: any) => i.provider === 'google' || i.provider === 'azure');
+          authUser.app_metadata?.provider === 'twitter' ||
+          authUser.app_metadata?.provider === 'facebook' ||
+          (authUser.identities ?? []).some((i: any) => ['google', 'azure', 'twitter', 'facebook'].includes(i.provider));
         const metaOnboarding = authUser.user_metadata?.onboarding_completed;
 
         if (isOAuthProvider && (metaOnboarding === false || metaOnboarding === null || metaOnboarding === undefined)) {
@@ -851,9 +873,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     markTermsAccepted,
     signInWithGoogle,
     signInWithAzure,
+    signInWithTwitter,
+    signInWithFacebook,
     completeOnboarding,
     refreshAuthState,
-  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isAccountant, isAccountExecutive, isEmailVerified, isSuperAdmin, isOnboardingPending, permissions, accountantPermissions, accountExecutiveInfo, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency, needsTermsAcceptance, markTermsAccepted, signInWithGoogle, signInWithAzure, completeOnboarding, refreshAuthState]);
+  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isAccountant, isAccountExecutive, isEmailVerified, isSuperAdmin, isOnboardingPending, permissions, accountantPermissions, accountExecutiveInfo, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency, needsTermsAcceptance, markTermsAccepted, signInWithGoogle, signInWithAzure, signInWithTwitter, signInWithFacebook, completeOnboarding, refreshAuthState]);
 
   return (
     <AuthContext.Provider value={contextValue}>

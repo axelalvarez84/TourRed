@@ -1,8 +1,15 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, ShieldAlert } from 'lucide-react';
 import { signIn, supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+
+interface OAuthToggles {
+  google: boolean;
+  azure: boolean;
+  twitter: boolean;
+  facebook: boolean;
+}
 
 function computeDeviceFingerprint(): string {
   try {
@@ -48,11 +55,14 @@ const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isAzureLoading, setIsAzureLoading] = useState(false);
+  const [isTwitterLoading, setIsTwitterLoading] = useState(false);
+  const [isFacebookLoading, setIsFacebookLoading] = useState(false);
   const [ipBlocked, setIpBlocked] = useState(false);
+  const [oauthToggles, setOauthToggles] = useState<OAuthToggles>({ google: true, azure: true, twitter: false, facebook: false });
   const deviceFingerprintRef = useRef<string>(computeDeviceFingerprint());
   const navigate = useNavigate();
   const location = useLocation();
-  const { signInWithGoogle, signInWithAzure } = useAuth();
+  const { signInWithGoogle, signInWithAzure, signInWithTwitter, signInWithFacebook } = useAuth();
 
   const searchParams = new URLSearchParams(location.search);
   const redirectUrl = searchParams.get('redirect');
@@ -64,6 +74,24 @@ const LoginPage: React.FC = () => {
       ? 'Su cuenta ha sido bloqueada. Para mayor información contáctenos.'
       : ''
   );
+
+  useEffect(() => {
+    supabase
+      .from('platform_settings')
+      .select('oauth_google_login_enabled, oauth_azure_login_enabled, oauth_twitter_login_enabled, oauth_facebook_login_enabled')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setOauthToggles({
+            google: data.oauth_google_login_enabled ?? true,
+            azure: data.oauth_azure_login_enabled ?? true,
+            twitter: data.oauth_twitter_login_enabled ?? false,
+            facebook: data.oauth_facebook_login_enabled ?? false,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const recordFailedLogin = (failureReason: string) => {
     try {
@@ -159,6 +187,26 @@ const LoginPage: React.FC = () => {
     } catch {
       setError('No se pudo iniciar sesión con Microsoft. Por favor intenta de nuevo.');
       setIsAzureLoading(false);
+    }
+  };
+
+  const handleTwitterSignIn = async () => {
+    setIsTwitterLoading(true);
+    try {
+      await signInWithTwitter();
+    } catch {
+      setError('No se pudo iniciar sesión con X. Por favor intenta de nuevo.');
+      setIsTwitterLoading(false);
+    }
+  };
+
+  const handleFacebookSignIn = async () => {
+    setIsFacebookLoading(true);
+    try {
+      await signInWithFacebook();
+    } catch {
+      setError('No se pudo iniciar sesión con Facebook. Por favor intenta de nuevo.');
+      setIsFacebookLoading(false);
     }
   };
 
@@ -271,6 +319,7 @@ const LoginPage: React.FC = () => {
             </div>
           </form>
 
+          {(oauthToggles.google || oauthToggles.azure || oauthToggles.twitter || oauthToggles.facebook) && (
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -282,10 +331,11 @@ const LoginPage: React.FC = () => {
             </div>
 
             <div className="mt-4 flex flex-col gap-3">
+              {oauthToggles.google && (
               <button
                 type="button"
                 onClick={handleGoogleSignIn}
-                disabled={isGoogleLoading || isAzureLoading}
+                disabled={isGoogleLoading || isAzureLoading || isTwitterLoading || isFacebookLoading}
                 className="w-full inline-flex justify-center items-center gap-3 py-2.5 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 transition-colors"
               >
                 {isGoogleLoading ? (
@@ -300,11 +350,13 @@ const LoginPage: React.FC = () => {
                 )}
                 Continuar con Google
               </button>
+              )}
 
+              {oauthToggles.azure && (
               <button
                 type="button"
                 onClick={handleAzureSignIn}
-                disabled={isAzureLoading || isGoogleLoading}
+                disabled={isAzureLoading || isGoogleLoading || isTwitterLoading || isFacebookLoading}
                 className="w-full inline-flex justify-center items-center gap-3 py-2.5 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 transition-colors"
               >
                 {isAzureLoading ? (
@@ -320,22 +372,61 @@ const LoginPage: React.FC = () => {
                 )}
                 Continuar con Microsoft
               </button>
+              )}
+
+              {oauthToggles.twitter && (
+              <button
+                type="button"
+                onClick={handleTwitterSignIn}
+                disabled={isTwitterLoading || isGoogleLoading || isAzureLoading || isFacebookLoading}
+                className="w-full inline-flex justify-center items-center gap-3 py-2.5 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 transition-colors"
+              >
+                {isTwitterLoading ? (
+                  <div className="w-5 h-5 border-t-2 border-b-2 border-gray-400 rounded-full animate-spin" />
+                ) : (
+                  <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0" aria-hidden="true" fill="currentColor">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                  </svg>
+                )}
+                Continuar con X
+              </button>
+              )}
+
+              {oauthToggles.facebook && (
+              <button
+                type="button"
+                onClick={handleFacebookSignIn}
+                disabled={isFacebookLoading || isGoogleLoading || isAzureLoading || isTwitterLoading}
+                className="w-full inline-flex justify-center items-center gap-3 py-2.5 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 transition-colors"
+              >
+                {isFacebookLoading ? (
+                  <div className="w-5 h-5 border-t-2 border-b-2 border-gray-400 rounded-full animate-spin" />
+                ) : (
+                  <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0" aria-hidden="true">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" fill="#1877F2"/>
+                  </svg>
+                )}
+                Continuar con Facebook
+              </button>
+              )}
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <Link
-                to={redirectUrl ? `/agency-signup?redirect=${encodeURIComponent(redirectUrl)}` : "/agency-signup"}
-                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                ¿Eres una agencia?
-              </Link>
-              <Link
-                to={redirectUrl ? `/signup?redirect=${encodeURIComponent(redirectUrl)}` : "/signup"}
-                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Registrarse como viajero
-              </Link>
-            </div>
+          </div>
+          )}
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <Link
+              to={redirectUrl ? `/agency-signup?redirect=${encodeURIComponent(redirectUrl)}` : "/agency-signup"}
+              className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              ¿Eres una agencia?
+            </Link>
+            <Link
+              to={redirectUrl ? `/signup?redirect=${encodeURIComponent(redirectUrl)}` : "/signup"}
+              className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Registrarse como viajero
+            </Link>
           </div>
         </div>
       </div>

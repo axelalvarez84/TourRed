@@ -9,11 +9,19 @@ interface Identity {
   created_at?: string;
 }
 
+interface OAuthLinkToggles {
+  google: boolean;
+  azure: boolean;
+  twitter: boolean;
+  facebook: boolean;
+}
+
 interface ProviderConfig {
   key: string;
   label: string;
   icon: React.ReactNode;
   description: string;
+  toggleKey: keyof OAuthLinkToggles | null;
 }
 
 const GoogleIcon = () => (
@@ -35,6 +43,18 @@ const MicrosoftIcon = () => (
   </svg>
 );
 
+const TwitterXIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0" aria-hidden="true" fill="currentColor">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+  </svg>
+);
+
+const FacebookIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0" aria-hidden="true">
+    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" fill="#1877F2"/>
+  </svg>
+);
+
 const EmailIcon = () => (
   <div className="w-5 h-5 flex-shrink-0 bg-gray-600 rounded-sm flex items-center justify-center">
     <svg viewBox="0 0 20 20" fill="white" className="w-3.5 h-3.5">
@@ -44,24 +64,41 @@ const EmailIcon = () => (
   </div>
 );
 
-const PROVIDERS: ProviderConfig[] = [
+const ALL_PROVIDERS: ProviderConfig[] = [
   {
     key: 'email',
     label: 'Correo y contraseña',
     icon: <EmailIcon />,
     description: 'Inicia sesión con tu correo y contraseña',
+    toggleKey: null,
   },
   {
     key: 'google',
     label: 'Google',
     icon: <GoogleIcon />,
     description: 'Inicia sesión con tu cuenta de Google',
+    toggleKey: 'google',
   },
   {
     key: 'azure',
     label: 'Microsoft',
     icon: <MicrosoftIcon />,
     description: 'Inicia sesión con tu cuenta de Microsoft',
+    toggleKey: 'azure',
+  },
+  {
+    key: 'twitter',
+    label: 'X (Twitter)',
+    icon: <TwitterXIcon />,
+    description: 'Inicia sesión con tu cuenta de X',
+    toggleKey: 'twitter',
+  },
+  {
+    key: 'facebook',
+    label: 'Facebook',
+    icon: <FacebookIcon />,
+    description: 'Inicia sesión con tu cuenta de Facebook',
+    toggleKey: 'facebook',
   },
 ];
 
@@ -71,13 +108,36 @@ const LinkedAccountsSection: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [linkToggles, setLinkToggles] = useState<OAuthLinkToggles>({
+    google: true,
+    azure: true,
+    twitter: false,
+    facebook: false,
+  });
 
   const loadIdentities = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setIdentities(user.identities ?? []);
+      const [userResult, togglesResult] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase
+          .from('platform_settings')
+          .select('oauth_google_link_enabled, oauth_azure_link_enabled, oauth_twitter_link_enabled, oauth_facebook_link_enabled')
+          .maybeSingle(),
+      ]);
+
+      if (userResult.data.user) {
+        setIdentities(userResult.data.user.identities ?? []);
+      }
+
+      if (togglesResult.data) {
+        const d = togglesResult.data;
+        setLinkToggles({
+          google: d.oauth_google_link_enabled ?? true,
+          azure: d.oauth_azure_link_enabled ?? true,
+          twitter: d.oauth_twitter_link_enabled ?? false,
+          facebook: d.oauth_facebook_link_enabled ?? false,
+        });
       }
     } catch {
       setError('Error al cargar las cuentas vinculadas');
@@ -90,7 +150,7 @@ const LinkedAccountsSection: React.FC = () => {
     loadIdentities();
   }, [loadIdentities]);
 
-  const handleLink = async (provider: 'google' | 'azure') => {
+  const handleLink = async (provider: 'google' | 'azure' | 'twitter' | 'facebook') => {
     setError('');
     setSuccess('');
     setActionLoading(provider);
@@ -105,7 +165,7 @@ const LinkedAccountsSection: React.FC = () => {
       });
       if (linkError) throw linkError;
     } catch (err: any) {
-      setError(err.message || `Error al vincular cuenta de ${provider === 'google' ? 'Google' : 'Microsoft'}`);
+      setError(err.message || `Error al vincular cuenta`);
       setActionLoading(null);
     }
   };
@@ -131,13 +191,11 @@ const LinkedAccountsSection: React.FC = () => {
   };
 
   const getProviderLabel = (key: string) => {
-    return PROVIDERS.find(p => p.key === key)?.label ?? key;
+    return ALL_PROVIDERS.find(p => p.key === key)?.label ?? key;
   };
 
   const isLinked = (providerKey: string) => {
-    if (providerKey === 'email') {
-      return identities.some(i => i.provider === 'email');
-    }
+    if (providerKey === 'email') return identities.some(i => i.provider === 'email');
     return identities.some(i => i.provider === providerKey);
   };
 
@@ -145,6 +203,12 @@ const LinkedAccountsSection: React.FC = () => {
     const identity = identities.find(i => i.provider === providerKey);
     return identity?.identity_data?.email || null;
   };
+
+  // Show a provider if: it's email, OR it's enabled via toggle, OR it's already linked (so user can unlink)
+  const visibleProviders = ALL_PROVIDERS.filter(p => {
+    if (p.toggleKey === null) return true; // always show email
+    return linkToggles[p.toggleKey] || isLinked(p.key);
+  });
 
   if (isLoading) {
     return (
@@ -183,11 +247,12 @@ const LinkedAccountsSection: React.FC = () => {
       )}
 
       <div className="space-y-3">
-        {PROVIDERS.map((provider) => {
+        {visibleProviders.map((provider) => {
           const linked = isLinked(provider.key);
           const linkedEmail = getIdentityEmail(provider.key);
           const isActing = actionLoading === provider.key;
           const identity = identities.find(i => i.provider === provider.key);
+          const canLink = provider.toggleKey ? linkToggles[provider.toggleKey] : false;
 
           return (
             <div
@@ -234,9 +299,9 @@ const LinkedAccountsSection: React.FC = () => {
                     )}
                   </>
                 ) : (
-                  provider.key !== 'email' && (
+                  provider.key !== 'email' && canLink && (
                     <button
-                      onClick={() => handleLink(provider.key as 'google' | 'azure')}
+                      onClick={() => handleLink(provider.key as 'google' | 'azure' | 'twitter' | 'facebook')}
                       disabled={isActing || actionLoading !== null}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-600 border border-primary-200 rounded-md hover:bg-primary-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
