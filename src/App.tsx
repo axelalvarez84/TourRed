@@ -17,6 +17,8 @@ import GoogleTravelerSignupPage from './pages/auth/GoogleTravelerSignupPage';
 import GoogleAgencySignupPage from './pages/auth/GoogleAgencySignupPage';
 import GoogleCallbackPage from './pages/auth/GoogleCallbackPage';
 import AzureCallbackPage from './pages/auth/AzureCallbackPage';
+import FacebookCallbackPage from './pages/auth/FacebookCallbackPage';
+import XCallbackPage from './pages/auth/XCallbackPage';
 import AzureOnboardingPage from './pages/auth/AzureOnboardingPage';
 import AzureTravelerSignupPage from './pages/auth/AzureTravelerSignupPage';
 import AzureAgencySignupPage from './pages/auth/AzureAgencySignupPage';
@@ -185,6 +187,8 @@ const App: React.FC = () => {
           <Route path="/auth/google-signup/traveler" element={<GoogleTravelerSignupPage />} />
           <Route path="/auth/google-signup/agency" element={<GoogleAgencySignupPage />} />
           <Route path="/auth/azure-callback" element={<AzureCallbackPage />} />
+          <Route path="/auth/facebook-callback" element={<FacebookCallbackPage />} />
+          <Route path="/auth/x-callback" element={<XCallbackPage />} />
           <Route path="/auth/azure-onboarding" element={<AzureOnboardingPage />} />
           <Route path="/auth/azure-signup/traveler" element={<AzureTravelerSignupPage />} />
           <Route path="/auth/azure-signup/agency" element={<AzureAgencySignupPage />} />
