@@ -72,7 +72,7 @@ const NavBar: React.FC = () => {
     if (user?.id) {
       if (isAccountExecutive && accountExecutiveInfo?.executiveId) {
         const channel = supabase
-          .channel('executive-avatar-changes')
+          .channel(`executive-avatar-changes-${user.id}`)
           .on(
             'postgres_changes',
             {
@@ -98,7 +98,7 @@ const NavBar: React.FC = () => {
       }
 
       const channel = supabase
-        .channel('profile-picture-changes')
+        .channel(`profile-picture-changes-${user.id}`)
         .on(
           'postgres_changes',
           {
