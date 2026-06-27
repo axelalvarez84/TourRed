@@ -51,21 +51,26 @@ const AdminDashboard: React.FC = () => {
       todayStart.setHours(0, 0, 0, 0);
 
       const [failedRes, activeRes] = await Promise.all([
-        supabase
-          .from('audit_logs')
-          .select('id', { count: 'exact', head: true })
-          .eq('action', 'FAILED_LOGIN')
-          .gte('created_at', todayStart.toISOString()),
-        supabase
-          .from('audit_logs')
-          .select('id', { count: 'exact', head: true })
-          .eq('action', 'LOGIN')
-          .gte('created_at', todayStart.toISOString()),
+        supabase.rpc('get_audit_logs', {
+          p_action: 'FAILED_LOGIN',
+          p_date_from: todayStart.toISOString(),
+          p_limit: 1000,
+          p_offset: 0,
+        }),
+        supabase.rpc('get_audit_logs', {
+          p_action: 'LOGIN',
+          p_date_from: todayStart.toISOString(),
+          p_limit: 1000,
+          p_offset: 0,
+        }),
       ]);
 
+      const failedCount = failedRes.data?.[0]?.total_count ?? failedRes.data?.length ?? 0;
+      const loginCount = activeRes.data?.[0]?.total_count ?? activeRes.data?.length ?? 0;
+
       setSecStats({
-        failedLoginsToday: failedRes.count ?? 0,
-        activeSessions: activeRes.count ?? 0,
+        failedLoginsToday: Number(failedCount),
+        activeSessions: Number(loginCount),
         blockedIps: 0,
       });
     } catch {
