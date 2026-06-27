@@ -33,7 +33,7 @@ const MaintenanceGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
     load();
 
     channel = supabase
-      .channel('platform_settings_maintenance')
+      .channel(`platform_settings_maintenance_${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'platform_settings' },

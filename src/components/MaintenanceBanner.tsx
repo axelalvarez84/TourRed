@@ -28,7 +28,7 @@ const MaintenanceBanner: React.FC = () => {
     load();
 
     const channel = supabase
-      .channel('maintenance_banner')
+      .channel(`maintenance_banner_${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'platform_settings' },

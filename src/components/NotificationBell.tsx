@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Bell, X, Check, CheckCheck, Clock, MessageSquare, Building2, HeadphonesIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase, getUserNotifications, getUnreadNotificationCount, markNotificationAsRead, markAllNotificationsAsRead } from '../lib/supabase';
@@ -9,6 +9,7 @@ import { Link, useNavigate } from 'react-router-dom';
 const NotificationBell: React.FC = () => {
   const { user, role, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const channelId = useMemo(() => `notification-bell-${Math.random().toString(36).slice(2)}`, []);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -22,7 +23,7 @@ const NotificationBell: React.FC = () => {
       fetchNotifications();
 
       const channel = supabase
-        .channel(`notifications-${user.id}`)
+        .channel(channelId)
         .on(
           'postgres_changes',
           {
@@ -45,7 +46,7 @@ const NotificationBell: React.FC = () => {
         supabase.removeChannel(channel);
       };
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, channelId]);
 
   useEffect(() => {
     // Close dropdown when clicking outside

@@ -53,7 +53,7 @@ const AnnouncementPopup: React.FC = () => {
     load();
 
     const channel = supabase
-      .channel('announcement_popup')
+      .channel(`announcement_popup_${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'platform_settings' },
