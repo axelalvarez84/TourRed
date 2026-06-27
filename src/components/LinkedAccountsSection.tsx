@@ -156,11 +156,15 @@ const LinkedAccountsSection: React.FC = () => {
     setActionLoading(provider);
     try {
       const redirectTo = `${window.location.origin}/auth/${provider}-callback`;
+      const providerScopes: Partial<Record<string, string>> = {
+        azure: 'email profile openid https://graph.microsoft.com/User.Read',
+        twitter: 'tweet.read users.read',
+      };
       const { error: linkError } = await supabase.auth.linkIdentity({
         provider,
         options: {
           redirectTo,
-          ...(provider === 'azure' ? { scopes: 'email profile openid https://graph.microsoft.com/User.Read' } : {}),
+          ...(providerScopes[provider] ? { scopes: providerScopes[provider] } : {}),
         },
       });
       if (linkError) throw linkError;

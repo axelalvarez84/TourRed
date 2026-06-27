@@ -365,7 +365,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const redirectTo = `${window.location.origin}/auth/twitter-callback`;
     await supabase.auth.signInWithOAuth({
       provider: 'twitter',
-      options: { redirectTo },
+      options: { redirectTo, scopes: 'tweet.read users.read' },
     });
   }, []);
 
