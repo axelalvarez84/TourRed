@@ -52,13 +52,15 @@ const AdminDashboard: React.FC = () => {
 
       const [failedRes, activeRes] = await Promise.all([
         supabase
-          .from('failed_login_attempts')
+          .from('audit_logs')
           .select('id', { count: 'exact', head: true })
-          .gte('attempted_at', todayStart.toISOString()),
+          .eq('action', 'FAILED_LOGIN')
+          .gte('created_at', todayStart.toISOString()),
         supabase
-          .from('user_sessions')
+          .from('audit_logs')
           .select('id', { count: 'exact', head: true })
-          .is('logout_at', null),
+          .eq('action', 'LOGIN')
+          .gte('created_at', todayStart.toISOString()),
       ]);
 
       setSecStats({
@@ -389,7 +391,7 @@ const AdminDashboard: React.FC = () => {
               <LogIn className="w-7 h-7 text-emerald-500 flex-shrink-0" />
               <div>
                 <div className="text-2xl font-bold text-gray-900">{secStats.activeSessions}</div>
-                <div className="text-xs text-gray-500">Sesiones activas</div>
+                <div className="text-xs text-gray-500">Logins exitosos hoy</div>
               </div>
             </div>
             <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 flex items-center gap-3">
