@@ -18,7 +18,13 @@ import GoogleAgencySignupPage from './pages/auth/GoogleAgencySignupPage';
 import GoogleCallbackPage from './pages/auth/GoogleCallbackPage';
 import AzureCallbackPage from './pages/auth/AzureCallbackPage';
 import FacebookCallbackPage from './pages/auth/FacebookCallbackPage';
+import FacebookOnboardingPage from './pages/auth/FacebookOnboardingPage';
+import FacebookTravelerSignupPage from './pages/auth/FacebookTravelerSignupPage';
+import FacebookAgencySignupPage from './pages/auth/FacebookAgencySignupPage';
 import XCallbackPage from './pages/auth/XCallbackPage';
+import XOnboardingPage from './pages/auth/XOnboardingPage';
+import XTravelerSignupPage from './pages/auth/XTravelerSignupPage';
+import XAgencySignupPage from './pages/auth/XAgencySignupPage';
 import AzureOnboardingPage from './pages/auth/AzureOnboardingPage';
 import AzureTravelerSignupPage from './pages/auth/AzureTravelerSignupPage';
 import AzureAgencySignupPage from './pages/auth/AzureAgencySignupPage';
@@ -188,7 +194,13 @@ const App: React.FC = () => {
           <Route path="/auth/google-signup/agency" element={<GoogleAgencySignupPage />} />
           <Route path="/auth/azure-callback" element={<AzureCallbackPage />} />
           <Route path="/auth/facebook-callback" element={<FacebookCallbackPage />} />
+          <Route path="/auth/facebook-onboarding" element={<FacebookOnboardingPage />} />
+          <Route path="/auth/facebook-signup/traveler" element={<FacebookTravelerSignupPage />} />
+          <Route path="/auth/facebook-signup/agency" element={<FacebookAgencySignupPage />} />
           <Route path="/auth/x-callback" element={<XCallbackPage />} />
+          <Route path="/auth/x-onboarding" element={<XOnboardingPage />} />
+          <Route path="/auth/x-signup/traveler" element={<XTravelerSignupPage />} />
+          <Route path="/auth/x-signup/agency" element={<XAgencySignupPage />} />
           <Route path="/auth/azure-onboarding" element={<AzureOnboardingPage />} />
           <Route path="/auth/azure-signup/traveler" element={<AzureTravelerSignupPage />} />
           <Route path="/auth/azure-signup/agency" element={<AzureAgencySignupPage />} />

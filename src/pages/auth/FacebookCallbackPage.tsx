@@ -2,7 +2,42 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 
-function redirectForUser(user: any, navigate: (path: string, opts?: any) => void) {
+async function redirectForUser(user: any, navigate: (path: string, opts?: any) => void) {
+  const isFacebookProvider =
+    user.app_metadata?.provider === 'facebook' ||
+    (user.identities ?? []).some((i: any) => i.provider === 'facebook');
+
+  if (isFacebookProvider) {
+    const onboardingCompleted = user.user_metadata?.onboarding_completed;
+    if (!onboardingCompleted) {
+      const { data: existingProfile } = await supabase
+        .from('users')
+        .select('id, role, profile_picture_url')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (existingProfile) {
+        // User linked Facebook to an existing account — save avatar if not set yet
+        if (!existingProfile.profile_picture_url) {
+          const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture;
+          if (avatarUrl) {
+            await supabase
+              .from('users')
+              .update({ profile_picture_url: avatarUrl })
+              .eq('id', user.id);
+          }
+        }
+        const role = existingProfile.role;
+        if (role === 'admin') navigate('/admin/dashboard', { replace: true });
+        else if (role === 'agency') navigate('/agency/dashboard', { replace: true });
+        else navigate('/traveler/dashboard', { replace: true });
+      } else {
+        navigate('/auth/facebook-onboarding', { replace: true });
+      }
+      return;
+    }
+  }
+
   const role = user.user_metadata?.role;
   if (role === 'admin') navigate('/admin/dashboard', { replace: true });
   else if (role === 'agency') navigate('/agency/dashboard', { replace: true });
@@ -16,17 +51,19 @@ const FacebookCallbackPage: React.FC = () => {
   useEffect(() => {
     let done = false;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // 1. Listen FIRST to capture provider_token before getSession()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (done) return;
-      if (session?.user) {
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
         done = true;
         redirectForUser(session.user, navigate);
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    // 2. Check if session already exists
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (done) return;
-      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+      if (session?.user) {
         done = true;
         redirectForUser(session.user, navigate);
       }
