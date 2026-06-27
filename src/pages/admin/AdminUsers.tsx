@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth, AdminPermissions } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { UserPlus, Shield, X, Check, AlertCircle, Lock, Unlock, Trash2 } from 'lucide-react';
+import { UserPlus, Shield, X, Check, AlertCircle, Lock, Unlock, Trash2, Eye, EyeOff } from 'lucide-react';
 
 interface StaffUser {
   id: string;
@@ -22,6 +22,7 @@ const AdminUsers: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingPermissions, setEditingPermissions] = useState<string | null>(null);
 
+  const [showNewUserPassword, setShowNewUserPassword] = useState(false);
   const [newUser, setNewUser] = useState({
     email: '',
     password: '',
@@ -729,13 +730,22 @@ const AdminUsers: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Contraseña
                     </label>
-                    <input
-                      type="password"
-                      value={newUser.password}
-                      onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Contraseña segura"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showNewUserPassword ? 'text' : 'password'}
+                        value={newUser.password}
+                        onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                        className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Contraseña segura"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewUserPassword(!showNewUserPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showNewUserPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
