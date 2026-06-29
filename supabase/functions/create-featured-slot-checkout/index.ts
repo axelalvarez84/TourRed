@@ -209,6 +209,7 @@ Deno.serve(async (req: Request) => {
             },
           ],
           external_reference: slot_id,
+          notification_url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/mercadopago-webhook`,
           back_urls: {
             success: successUrl,
             failure: cancelUrl,

@@ -45,6 +45,8 @@ Deno.serve(async (req: Request) => {
 
     const paymentPayload = {
       ...formData,
+      external_reference: bookingId,
+      notification_url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/mercadopago-webhook`,
       metadata: {
         ...(formData.metadata || {}),
         preference_id: preferenceId,

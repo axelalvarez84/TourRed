@@ -378,6 +378,8 @@ Deno.serve(async (req: Request) => {
       const mpPayload = {
         ...mp_form_data,
         transaction_amount: totalToPay,
+        external_reference: booking_supplement_id,
+        notification_url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/mercadopago-webhook`,
         metadata: { ...(mp_form_data.metadata || {}), booking_supplement_id, payment_for: "supplement" },
       };
 
