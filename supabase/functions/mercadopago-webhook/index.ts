@@ -184,6 +184,45 @@ Deno.serve(async (req: Request) => {
         });
       }
 
+      // Check if this is a booking supplement payment
+      const { data: bookingSupplement } = await supabase
+        .from("booking_supplements")
+        .select("id, status")
+        .eq("id", externalReference)
+        .eq("status", "pending_payment")
+        .maybeSingle();
+
+      if (bookingSupplement) {
+        const { error: suppUpdateError } = await supabase
+          .from("booking_supplements")
+          .update({
+            status: "paid",
+            payment_id: String(notificationId),
+            payment_provider: "mercadopago",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", externalReference);
+
+        if (suppUpdateError) {
+          console.error("Error updating supplement payment status (MP webhook):", suppUpdateError);
+        } else {
+          fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-supplement-cfdi`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+              },
+              body: JSON.stringify({ supplement_id: externalReference }),
+            }
+          ).catch((err) => console.error("Error triggering supplement CFDI (MP webhook):", err));
+        }
+        return new Response(JSON.stringify({ received: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const { data: booking } = await supabase
         .from("bookings")
         .select("id, user_id, payment_status")
