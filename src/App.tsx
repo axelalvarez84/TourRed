@@ -53,6 +53,7 @@ import AgencyFinancials from './pages/agency/AgencyFinancials';
 import AgencyInvoices from './pages/agency/AgencyInvoices';
 import AgencyStaff from './pages/agency/AgencyStaff';
 import AgencyFeaturedTours from './pages/agency/AgencyFeaturedTours';
+import AgencyPendingApproval from './pages/agency/AgencyPendingApproval';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminAgencies from './pages/admin/AdminAgencies';
 import AdminUsers from './pages/admin/AdminUsers';
@@ -397,6 +398,15 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.AGENCY]}>
                 <AgencyFeaturedTours />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/agency/pending-approval"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.AGENCY]}>
+                <AgencyPendingApproval />
               </ProtectedRoute>
             }
           />

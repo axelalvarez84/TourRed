@@ -12,7 +12,7 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles, staffPermission }) => {
-  const { user, userRole, isLoading, isEmailVerified, isAgencyStaff, staffInfo, needsTermsAcceptance, markTermsAccepted, isOnboardingPending } = useAuth();
+  const { user, userRole, isLoading, isEmailVerified, isAgencyStaff, staffInfo, needsTermsAcceptance, markTermsAccepted, isOnboardingPending, isAgencyApproved } = useAuth();
   const location = useLocation();
   const [shouldRedirect, setShouldRedirect] = useState(false);
   const redirectTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -84,6 +84,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles,
       if (!staffInfo.permissions[staffPermission]) {
         return <Navigate to="/agency/dashboard" replace />;
       }
+    }
+
+    // Block unapproved agencies from all pages except the pending-approval page itself
+    if (userRole === UserRole.AGENCY && !isAgencyApproved && location.pathname !== '/agency/pending-approval') {
+      return <Navigate to="/agency/pending-approval" replace />;
     }
 
     // Show T&C gate for traveler/agency routes if terms need acceptance

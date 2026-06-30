@@ -131,6 +131,7 @@ interface AuthContextType {
   allStaffInfo: AgencyStaffInfo[];
   activeAgencyId: string | null;
   switchActiveAgency: (agencyId: string) => void;
+  isAgencyApproved: boolean;
   needsTermsAcceptance: boolean;
   markTermsAccepted: () => void;
   signInWithGoogle: () => Promise<void>;
@@ -161,6 +162,7 @@ const AuthContext = createContext<AuthContextType>({
   allStaffInfo: [],
   activeAgencyId: null,
   switchActiveAgency: () => {},
+  isAgencyApproved: true,
   needsTermsAcceptance: false,
   markTermsAccepted: () => {},
   signInWithGoogle: async () => {},
@@ -194,6 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [needsTermsAcceptance, setNeedsTermsAcceptance] = useState(false);
   const [isOnboardingPending, setIsOnboardingPending] = useState(false);
+  const [isAgencyApproved, setIsAgencyApproved] = useState(true);
 
   const initializedUserIdRef = useRef<string | null>(null);
   const isUpdatingRef = useRef(false);
@@ -602,6 +605,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } catch {
             setNeedsTermsAcceptance(false);
           }
+
+          // Verificar si la agencia está aprobada
+          try {
+            const { data: agencyData } = await supabase
+              .from('agencies')
+              .select('is_approved')
+              .eq('user_id', authUser.id)
+              .maybeSingle();
+            setIsAgencyApproved(agencyData?.is_approved === true);
+          } catch {
+            setIsAgencyApproved(false);
+          }
         } else {
           setIsSuperAdmin(false);
           setPermissions(null);
@@ -620,6 +635,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setAccountExecutiveInfo(null);
         setAllStaffInfo([]);
         setActiveAgencyId(null);
+        setIsAgencyApproved(true);
         clearAuthCache();
       }
     } catch (err: any) {
@@ -869,6 +885,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     allStaffInfo,
     activeAgencyId,
     switchActiveAgency,
+    isAgencyApproved,
     needsTermsAcceptance,
     markTermsAccepted,
     signInWithGoogle,
@@ -877,7 +894,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signInWithFacebook,
     completeOnboarding,
     refreshAuthState,
-  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isAccountant, isAccountExecutive, isEmailVerified, isSuperAdmin, isOnboardingPending, permissions, accountantPermissions, accountExecutiveInfo, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency, needsTermsAcceptance, markTermsAccepted, signInWithGoogle, signInWithAzure, signInWithTwitter, signInWithFacebook, completeOnboarding, refreshAuthState]);
+  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isAccountant, isAccountExecutive, isEmailVerified, isSuperAdmin, isOnboardingPending, permissions, accountantPermissions, accountExecutiveInfo, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency, isAgencyApproved, needsTermsAcceptance, markTermsAccepted, signInWithGoogle, signInWithAzure, signInWithTwitter, signInWithFacebook, completeOnboarding, refreshAuthState]);
 
   return (
     <AuthContext.Provider value={contextValue}>

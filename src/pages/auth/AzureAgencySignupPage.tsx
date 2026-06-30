@@ -207,7 +207,7 @@ const AzureAgencySignupPage: React.FC = () => {
       } catch { /* best-effort */ }
 
       await completeOnboarding();
-      navigate('/agency/dashboard');
+      navigate('/agency/pending-approval');
     } catch (err: any) {
       setError(err.message || 'Ocurrió un error al completar el registro');
     } finally {
