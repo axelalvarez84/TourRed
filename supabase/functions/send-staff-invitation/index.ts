@@ -137,20 +137,26 @@ Deno.serve(async (req: Request) => {
       invitationToken = newInvitation.token;
     }
 
-    // Obtener URL de la plataforma y configuracion de email
-    const { data: settings } = await supabase
-      .from("platform_settings")
-      .select("smtp_api_key, platform_url")
+    // Obtener API key de email desde email_settings
+    const { data: emailSettings } = await supabase
+      .from("email_settings")
+      .select("smtp_api_key")
       .maybeSingle();
 
-    if (!settings?.smtp_api_key) {
+    if (!emailSettings?.smtp_api_key) {
       return new Response(
         JSON.stringify({ error: "API key de email no configurada" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const platformUrl = settings.platform_url || "https://toursred.com.mx";
+    // Obtener URL de la plataforma desde platform_settings
+    const { data: platformSettings } = await supabase
+      .from("platform_settings")
+      .select("platform_url")
+      .maybeSingle();
+
+    const platformUrl = platformSettings?.platform_url || "https://toursred.com.mx";
     const registrationLink = `${platformUrl}/signup?invitation_token=${invitationToken}&email=${encodeURIComponent(normalizedEmail)}`;
 
     const htmlContent = `
@@ -226,7 +232,7 @@ Si no solicitaste esta invitacion, puedes ignorar este mensaje.
 Equipo ToursRed`;
 
     const emailPayload = {
-      api_key: settings.smtp_api_key,
+      api_key: emailSettings.smtp_api_key,
       to: [normalizedEmail],
       sender: "no-reply@toursred.com",
       subject: `${agency.name} te invita a ser Coordinador en ToursRed`,
