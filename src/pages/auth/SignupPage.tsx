@@ -30,13 +30,15 @@ const SignupPage: React.FC = () => {
   const searchParams = new URLSearchParams(location.search);
   const redirectUrl = searchParams.get('redirect');
   const refCode = searchParams.get('ref');
+  const invitationToken = searchParams.get('invitation_token');
+  const invitationEmail = searchParams.get('email');
 
   const [formData, setFormData] = useState({
     firstName: '',
     apellidoPaterno: '',
     apellidoMaterno: '',
     sexo: '' as '' | 'masculino' | 'femenino' | 'no_binario',
-    email: '',
+    email: invitationEmail || '',
     password: '',
     confirmPassword: '',
     phoneNumber: '',
@@ -265,6 +267,20 @@ const SignupPage: React.FC = () => {
         }
       } catch (termsErr) {
         console.error('Error registrando aceptación de T&C:', termsErr);
+      }
+
+      // Aceptar invitacion de coordinador si existe un token en la URL
+      if (invitationToken && !isExistingUser) {
+        try {
+          const { error: invErr } = await supabase.rpc('accept_staff_invitation', {
+            p_token: invitationToken,
+          });
+          if (invErr) {
+            console.error('Error aceptando invitacion de coordinador:', invErr);
+          }
+        } catch (invitationErr) {
+          console.error('Error procesando invitacion de coordinador:', invitationErr);
+        }
       }
 
       if (referralValidation?.valid && referralValidation.referrer_id && !isExistingUser) {

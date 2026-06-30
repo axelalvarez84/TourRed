@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, UserCheck, UserX, CreditCard as Edit2, Search, Shield, ChevronDown, ChevronUp, AlertCircle, CheckCircle, X, Loader2, Eye, Pencil, Settings } from 'lucide-react';
+import { Users, Plus, UserCheck, UserX, CreditCard as Edit2, Search, Shield, ChevronDown, ChevronUp, AlertCircle, CheckCircle, X, Loader2, Eye, Pencil, Settings, Mail, Clock, Send, Ban } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useAgencyId } from '../../hooks/useAgencyId';
@@ -30,6 +30,15 @@ interface StaffMember {
     can_view_messages: boolean;
     can_manage_destinations: boolean;
   } | null;
+}
+
+interface PendingInvitation {
+  id: string;
+  invited_email: string;
+  title: string;
+  permissions: Record<string, boolean>;
+  expires_at: string;
+  created_at: string;
 }
 
 type TourPermLevel = 'none' | 'view' | 'edit' | 'manage';
@@ -100,11 +109,17 @@ function tourLevelLabel(p: StaffMember['permissions']): string {
   return tourLevels.find(l => l.value === level)?.label ?? 'Sin acceso';
 }
 
+function daysUntil(dateStr: string): number {
+  const diff = new Date(dateStr).getTime() - Date.now();
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
+
 export default function AgencyStaff() {
   const { user, isAgencyStaff } = useAuth();
   const { agencyId: resolvedAgencyId } = useAgencyId();
   const [agencyId, setAgencyId] = useState<string | null>(null);
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
@@ -118,12 +133,21 @@ export default function AgencyStaff() {
   const [foundUser, setFoundUser] = useState<{ id: string; first_name: string; last_name: string; email: string } | null>(null);
   const [searchingUser, setSearchingUser] = useState(false);
   const [userSearchError, setUserSearchError] = useState('');
+  const [userNotFound, setUserNotFound] = useState(false);
   const [title, setTitle] = useState('Coordinador');
   const [permissions, setPermissions] = useState<PermissionsForm>({ ...defaultPermissions });
   const [saving, setSaving] = useState(false);
+  const [sendingInvitation, setSendingInvitation] = useState(false);
+  const [cancellingInvitationId, setCancellingInvitationId] = useState<string | null>(null);
+  const [resendingInvitationId, setResendingInvitationId] = useState<string | null>(null);
 
   useEffect(() => { if (resolvedAgencyId) setAgencyId(resolvedAgencyId); }, [resolvedAgencyId]);
-  useEffect(() => { if (agencyId) fetchStaff(); }, [agencyId]);
+  useEffect(() => {
+    if (agencyId) {
+      fetchStaff();
+      fetchPendingInvitations();
+    }
+  }, [agencyId]);
 
   const fetchStaff = async () => {
     if (!agencyId) return;
@@ -151,33 +175,151 @@ export default function AgencyStaff() {
     }
   };
 
+  const fetchPendingInvitations = async () => {
+    if (!agencyId) return;
+    const { data } = await supabase
+      .from('agency_staff_invitations')
+      .select('id, invited_email, title, permissions, expires_at, created_at')
+      .eq('agency_id', agencyId)
+      .eq('status', 'pending')
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false });
+    setPendingInvitations(data || []);
+  };
+
   const handleSearchUser = async () => {
     if (!emailSearch.trim()) return;
     setSearchingUser(true);
     setUserSearchError('');
     setFoundUser(null);
+    setUserNotFound(false);
     try {
       const { data: results } = await supabase
         .rpc('search_user_by_email_for_staff', { p_email: emailSearch.trim().toLowerCase() });
       const data = results?.[0] ?? null;
-      if (!data) { setUserSearchError('No se encontro un usuario con ese correo.'); return; }
+      if (!data) {
+        setUserNotFound(true);
+        return;
+      }
       if (staffList.find(s => s.user_id === data.id && s.is_active)) {
-        setUserSearchError('Este usuario ya es coordinador activo de tu agencia.'); return;
+        setUserSearchError('Este usuario ya es coordinador activo de tu agencia.');
+        return;
       }
       setFoundUser(data);
-    } catch { setUserSearchError('Error al buscar el usuario. Intenta de nuevo.'); }
-    finally { setSearchingUser(false); }
+    } catch {
+      setUserSearchError('Error al buscar el usuario. Intenta de nuevo.');
+    } finally {
+      setSearchingUser(false);
+    }
+  };
+
+  const handleSendInvitation = async () => {
+    if (!agencyId || !emailSearch.trim()) return;
+    setSendingInvitation(true);
+    setError('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sin sesion activa');
+
+      const dbPerms = buildDbPerms();
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-staff-invitation`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            agency_id: agencyId,
+            invited_email: emailSearch.trim().toLowerCase(),
+            title,
+            permissions: dbPerms,
+          }),
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Error al enviar la invitacion');
+      }
+
+      setShowModal(false);
+      await fetchPendingInvitations();
+      setSuccess('Invitacion enviada correctamente.');
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (e: any) {
+      setError(e.message || 'Error al enviar la invitacion.');
+    } finally {
+      setSendingInvitation(false);
+    }
+  };
+
+  const handleResendInvitation = async (invitation: PendingInvitation) => {
+    if (!agencyId) return;
+    setResendingInvitationId(invitation.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sin sesion activa');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-staff-invitation`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            agency_id: agencyId,
+            invited_email: invitation.invited_email,
+            title: invitation.title,
+            permissions: invitation.permissions,
+          }),
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Error al reenviar');
+
+      setSuccess('Invitacion reenviada correctamente.');
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (e: any) {
+      setError(e.message || 'Error al reenviar la invitacion.');
+    } finally {
+      setResendingInvitationId(null);
+    }
+  };
+
+  const handleCancelInvitation = async (invitation: PendingInvitation) => {
+    if (!confirm(`Cancelar la invitacion enviada a ${invitation.invited_email}?`)) return;
+    setCancellingInvitationId(invitation.id);
+    try {
+      const { error: err } = await supabase
+        .from('agency_staff_invitations')
+        .update({ status: 'cancelled' })
+        .eq('id', invitation.id);
+      if (err) throw err;
+      await fetchPendingInvitations();
+      setSuccess('Invitacion cancelada.');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (e: any) {
+      setError(e.message || 'Error al cancelar la invitacion.');
+    } finally {
+      setCancellingInvitationId(null);
+    }
   };
 
   const openAddModal = () => {
     setEditingStaff(null); setEmailSearch(''); setFoundUser(null);
-    setUserSearchError(''); setTitle('Coordinador');
+    setUserSearchError(''); setUserNotFound(false); setTitle('Coordinador');
     setPermissions({ ...defaultPermissions }); setError(''); setShowModal(true);
   };
 
   const openEditModal = (staff: StaffMember) => {
     setEditingStaff(staff); setEmailSearch(staff.user.email);
-    setFoundUser(null); setUserSearchError(''); setTitle(staff.title);
+    setFoundUser(null); setUserSearchError(''); setUserNotFound(false); setTitle(staff.title);
     setPermissions({
       can_scan_checkin: staff.permissions?.can_scan_checkin ?? false,
       can_view_bookings: staff.permissions?.can_view_bookings ?? false,
@@ -305,6 +447,11 @@ export default function AgencyStaff() {
             <h1 className="text-2xl font-bold text-gray-900">Coordinadores</h1>
             <p className="text-gray-500 mt-1 text-sm">
               {activeCount} coordinador{activeCount !== 1 ? 'es' : ''} activo{activeCount !== 1 ? 's' : ''}
+              {pendingInvitations.length > 0 && (
+                <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
+                  <Mail className="w-3 h-3" /> {pendingInvitations.length} invitacion{pendingInvitations.length !== 1 ? 'es' : ''} pendiente{pendingInvitations.length !== 1 ? 's' : ''}
+                </span>
+              )}
             </p>
           </div>
           <button onClick={openAddModal} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors text-sm">
@@ -321,6 +468,56 @@ export default function AgencyStaff() {
           <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-800 rounded-lg px-4 py-3 mb-6 text-sm">
             <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
             <button onClick={() => setError('')} className="ml-auto"><X className="w-4 h-4" /></button>
+          </div>
+        )}
+
+        {/* Invitaciones pendientes */}
+        {pendingInvitations.length > 0 && (
+          <div className="bg-white rounded-xl border border-amber-200 shadow-sm mb-6">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-amber-100 bg-amber-50 rounded-t-xl">
+              <Mail className="w-4 h-4 text-amber-600" />
+              <h2 className="text-sm font-semibold text-amber-800">Invitaciones pendientes</h2>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {pendingInvitations.map(inv => {
+                const days = daysUntil(inv.expires_at);
+                const isCancelling = cancellingInvitationId === inv.id;
+                const isResending = resendingInvitationId === inv.id;
+                return (
+                  <div key={inv.id} className="flex items-center gap-4 p-4">
+                    <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
+                      <Mail className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{inv.invited_email}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{inv.title} &bull; Enviada {formatDate(inv.created_at)}</p>
+                      <div className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${days <= 1 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                        <Clock className="w-3 h-3" />
+                        {days === 0 ? 'Expira hoy' : `Expira en ${days} dia${days !== 1 ? 's' : ''}`}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => handleResendInvitation(inv)}
+                        disabled={isResending || isCancelling}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-600 border border-primary-200 hover:bg-primary-50 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {isResending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                        Reenviar
+                      </button>
+                      <button
+                        onClick={() => handleCancelInvitation(inv)}
+                        disabled={isCancelling || isResending}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {isCancelling ? <Loader2 className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />}
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -453,7 +650,7 @@ export default function AgencyStaff() {
                 ) : (
                   <div className="flex gap-2">
                     <input type="email" value={emailSearch}
-                      onChange={e => { setEmailSearch(e.target.value); setFoundUser(null); setUserSearchError(''); }}
+                      onChange={e => { setEmailSearch(e.target.value); setFoundUser(null); setUserSearchError(''); setUserNotFound(false); }}
                       placeholder="correo@ejemplo.com"
                       className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                       onKeyDown={e => e.key === 'Enter' && handleSearchUser()} />
@@ -470,6 +667,19 @@ export default function AgencyStaff() {
                     <div>
                       <p className="text-green-800 text-sm font-medium">{foundUser.first_name} {foundUser.last_name}</p>
                       <p className="text-green-600 text-xs">{foundUser.email}</p>
+                    </div>
+                  </div>
+                )}
+                {userNotFound && !foundUser && (
+                  <div className="mt-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-amber-800 text-sm font-medium">Usuario no encontrado</p>
+                        <p className="text-amber-700 text-xs mt-1">
+                          No existe ninguna cuenta con ese correo. Puedes enviarle una invitacion para que se registre y quede vinculado automaticamente como coordinador.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -538,11 +748,30 @@ export default function AgencyStaff() {
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
                 Cancelar
               </button>
-              <button onClick={handleSave} disabled={saving || (!editingStaff && !foundUser)}
-                className="px-5 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50 transition-colors flex items-center gap-2">
-                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                {editingStaff ? 'Guardar cambios' : 'Vincular coordinador'}
-              </button>
+              {editingStaff && (
+                <button onClick={handleSave} disabled={saving}
+                  className="px-5 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50 transition-colors flex items-center gap-2">
+                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Guardar cambios
+                </button>
+              )}
+              {!editingStaff && foundUser && (
+                <button onClick={handleSave} disabled={saving}
+                  className="px-5 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50 transition-colors flex items-center gap-2">
+                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Vincular coordinador
+                </button>
+              )}
+              {!editingStaff && userNotFound && !foundUser && (
+                <button
+                  onClick={handleSendInvitation}
+                  disabled={sendingInvitation || !emailSearch.trim() || !title.trim()}
+                  className="px-5 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-lg disabled:opacity-50 transition-colors flex items-center gap-2"
+                >
+                  {sendingInvitation ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                  Enviar invitacion
+                </button>
+              )}
             </div>
           </div>
         </div>
