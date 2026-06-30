@@ -154,22 +154,35 @@ export default function AgencyStaff() {
     setLoading(true);
     try {
       const { data, error: err } = await supabase
-        .from('agency_staff')
-        .select(`
-          id, user_id, title, is_active, linked_at, unlinked_at,
-          user:users!agency_staff_user_id_fkey(first_name, last_name, email, profile_picture_url),
-          permissions:agency_staff_permissions(id, can_scan_checkin, can_view_bookings, can_view_tours, can_edit_tours, can_manage_tours, can_view_financials, can_view_reports, can_manage_discount_codes, can_view_messages, can_manage_destinations)
-        `)
-        .eq('agency_id', agencyId)
-        .order('linked_at', { ascending: false });
+        .rpc('get_agency_staff_for_owner', { p_agency_id: agencyId });
       if (err) throw err;
-      setStaffList((data || [])
-        .map((s: any) => ({
-          ...s,
-          user: Array.isArray(s.user) ? s.user[0] : s.user,
-          permissions: Array.isArray(s.permissions) ? s.permissions[0] || null : s.permissions,
-        }))
-        .filter((s: any) => s.user != null));
+      setStaffList((data || []).map((r: any) => ({
+        id: r.staff_id,
+        user_id: r.user_id,
+        title: r.title,
+        is_active: r.is_active,
+        linked_at: r.linked_at,
+        unlinked_at: r.unlinked_at,
+        user: {
+          first_name: r.first_name,
+          last_name: r.last_name,
+          email: r.email,
+          profile_picture_url: r.profile_picture_url,
+        },
+        permissions: r.perm_id ? {
+          id: r.perm_id,
+          can_scan_checkin: r.can_scan_checkin,
+          can_view_bookings: r.can_view_bookings,
+          can_view_tours: r.can_view_tours,
+          can_edit_tours: r.can_edit_tours,
+          can_manage_tours: r.can_manage_tours,
+          can_view_financials: r.can_view_financials,
+          can_view_reports: r.can_view_reports,
+          can_manage_discount_codes: r.can_manage_discount_codes,
+          can_view_messages: r.can_view_messages,
+          can_manage_destinations: r.can_manage_destinations,
+        } : null,
+      })));
     } catch (e) {
       console.error(e);
     } finally {
