@@ -157,11 +157,9 @@ export default function AgencyStaff() {
     setUserSearchError('');
     setFoundUser(null);
     try {
-      const { data } = await supabase
-        .from('users')
-        .select('id, first_name, last_name, email')
-        .eq('email', emailSearch.trim().toLowerCase())
-        .maybeSingle();
+      const { data: results } = await supabase
+        .rpc('search_user_by_email_for_staff', { p_email: emailSearch.trim().toLowerCase() });
+      const data = results?.[0] ?? null;
       if (!data) { setUserSearchError('No se encontro un usuario con ese correo.'); return; }
       if (staffList.find(s => s.user_id === data.id && s.is_active)) {
         setUserSearchError('Este usuario ya es coordinador activo de tu agencia.'); return;
