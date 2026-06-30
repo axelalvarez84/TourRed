@@ -86,8 +86,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles,
       }
     }
 
-    // Block unapproved agencies from all pages except the pending-approval page itself
-    if (userRole === UserRole.AGENCY && !isAgencyApproved && location.pathname !== '/agency/pending-approval') {
+    // Block unapproved agencies from all pages except pending-approval and profile
+    const approvalExemptPaths = ['/agency/pending-approval', '/agency/profile'];
+    if (userRole === UserRole.AGENCY && !isAgencyApproved && !approvalExemptPaths.includes(location.pathname)) {
       return <Navigate to="/agency/pending-approval" replace />;
     }
 
