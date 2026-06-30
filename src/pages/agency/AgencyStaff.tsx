@@ -216,6 +216,10 @@ export default function AgencyStaff() {
         setUserNotFound(true);
         return;
       }
+      if (data.is_restricted_role) {
+        setUserSearchError('Este correo pertenece a una cuenta de agencia u otro tipo de usuario que no puede ser agregado como coordinador.');
+        return;
+      }
       if (staffList.find(s => s.user_id === data.id && s.is_active)) {
         setUserSearchError('Este usuario ya es coordinador activo de tu agencia.');
         return;
