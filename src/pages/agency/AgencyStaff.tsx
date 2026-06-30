@@ -163,11 +163,13 @@ export default function AgencyStaff() {
         .eq('agency_id', agencyId)
         .order('linked_at', { ascending: false });
       if (err) throw err;
-      setStaffList((data || []).map((s: any) => ({
-        ...s,
-        user: Array.isArray(s.user) ? s.user[0] : s.user,
-        permissions: Array.isArray(s.permissions) ? s.permissions[0] || null : s.permissions,
-      })));
+      setStaffList((data || [])
+        .map((s: any) => ({
+          ...s,
+          user: Array.isArray(s.user) ? s.user[0] : s.user,
+          permissions: Array.isArray(s.permissions) ? s.permissions[0] || null : s.permissions,
+        }))
+        .filter((s: any) => s.user != null));
     } catch (e) {
       console.error(e);
     } finally {
