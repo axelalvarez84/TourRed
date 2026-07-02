@@ -860,7 +860,12 @@ const TravelersInfoPage: React.FC = () => {
             body: JSON.stringify({
               bookingId: bookingId,
               customerEmail: user?.email,
-              amount: amountToCharge,
+              amount: (() => {
+                const addMembership = (booking as any)?.membership_purchased || false;
+                if (!addMembership) return amountToCharge;
+                const membershipCost = (booking as any)?.membership_cost || 0;
+                return Math.max(0, Math.round((amountToCharge - membershipCost) * 100) / 100);
+              })(),
               description: `Depósito para ${tour?.name}`,
               success_url: `${window.location.origin}/booking-success?booking_id=${bookingId}`,
               cancel_url: `${window.location.origin}/booking-cancel?booking_id=${bookingId}`,
