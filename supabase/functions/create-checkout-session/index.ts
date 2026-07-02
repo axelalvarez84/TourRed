@@ -214,15 +214,6 @@ Deno.serve(async (req) => {
 
     let sessionConfig: any = {
       customer: customerId,
-      payment_method_types: ['card', 'oxxo', 'customer_balance'],
-      payment_method_options: {
-        customer_balance: {
-          funding_type: 'bank_transfer',
-          bank_transfer: {
-            type: 'mx_bank_transfer',
-          },
-        },
-      },
       success_url: success_url || `${req.headers.get("origin")}/booking-success?booking_id=${bookingId}`,
       cancel_url: cancel_url || `${req.headers.get("origin")}/booking-cancel?booking_id=${bookingId}`,
       metadata: {
@@ -273,6 +264,7 @@ Deno.serve(async (req) => {
       const priceId = membershipPlan === 'monthly' ? monthlyPriceId : annualPriceId;
 
       sessionConfig.mode = "subscription";
+      sessionConfig.payment_method_types = ['card'];
       sessionConfig.line_items = [
         {
           price: priceId,
@@ -300,6 +292,15 @@ Deno.serve(async (req) => {
       });
     } else {
       sessionConfig.mode = "payment";
+      sessionConfig.payment_method_types = ['card', 'oxxo', 'customer_balance'];
+      sessionConfig.payment_method_options = {
+        customer_balance: {
+          funding_type: 'bank_transfer',
+          bank_transfer: {
+            type: 'mx_bank_transfer',
+          },
+        },
+      };
       sessionConfig.line_items = [
         {
           price_data: {
