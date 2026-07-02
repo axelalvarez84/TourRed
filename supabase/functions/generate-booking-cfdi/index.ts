@@ -345,6 +345,7 @@ Deno.serve(async (req: Request) => {
         id, total_price, deposit_amount, service_charge, user_id, tour_id, booking_code,
         discount_amount, service_charge_discount,
         travel_insurance_included, travel_insurance_cost,
+        membership_purchased, membership_cost, membership_plan,
         tours (name, agency_id)
       `)
       .eq("id", booking_id)
@@ -398,6 +399,7 @@ Deno.serve(async (req: Request) => {
     let precioTourBruto: number;
     let precioServicioBruto: number;
     let precioSeguroBruto: number;
+    let precioMembresiaBruto: number;
     let descuentoTour: number;
     let descuentoServicio: number;
     let invoiceType: string;
@@ -428,6 +430,7 @@ Deno.serve(async (req: Request) => {
       precioTourBruto = r6(amountCharged / 1.16);
       precioServicioBruto = netServiceCharge > 0 ? r6(netServiceCharge / 1.16) : 0;
       precioSeguroBruto = 0;
+      precioMembresiaBruto = 0;
       descuentoTour = 0;
       descuentoServicio = 0;
       exactTotal = amountCharged + (netServiceCharge > 0 ? netServiceCharge : 0);
@@ -444,12 +447,16 @@ Deno.serve(async (req: Request) => {
       // r6 definido en bloque anterior; también aplica aquí
       const r6b = (n: number) => Math.round(n * 1000000) / 1000000;
 
+      const membershipIncluded = (booking as any).membership_purchased === true;
+      const membershipCost = membershipIncluded ? Number((booking as any).membership_cost || 0) : 0;
+
       precioTourBruto = r6b(depositAmount / 1.16);
       precioServicioBruto = serviceCharge > 0 ? r6b(serviceCharge / 1.16) : 0;
       precioSeguroBruto = insuranceCost > 0 ? r6b(insuranceCost / 1.16) : 0;
+      precioMembresiaBruto = membershipCost > 0 ? r6b(membershipCost / 1.16) : 0;
       descuentoTour = discountAmountRaw > 0 ? r6b(discountAmountRaw / 1.16) : 0;
       descuentoServicio = serviceChargeDiscountRaw > 0 ? r6b(serviceChargeDiscountRaw / 1.16) : 0;
-      exactTotal = Math.round((depositAmount + serviceCharge + insuranceCost - discountAmountRaw - serviceChargeDiscountRaw) * 100) / 100;
+      exactTotal = Math.round((depositAmount + serviceCharge + insuranceCost + membershipCost - discountAmountRaw - serviceChargeDiscountRaw) * 100) / 100;
       invoiceType = "booking";
       effectivePaymentForm = payment_form || "03";
 
@@ -554,6 +561,17 @@ Deno.serve(async (req: Request) => {
         clave_unidad: "E48",
         descripcion: `Seguro de asistencia de viaje (Reserva ${bookingRef})`,
         valor_unitario: precioSeguroBruto,
+      });
+    }
+
+    if (precioMembresiaBruto > 0) {
+      const planLabel = (booking as any).membership_plan === "annual" ? "anual" : "mensual";
+      conceptos.push({
+        clave_prod_serv: "92111500",
+        cantidad: 1,
+        clave_unidad: "E48",
+        descripcion: `Membresia ToursRed Plus (${planLabel}) - Reserva ${bookingRef}`,
+        valor_unitario: precioMembresiaBruto,
       });
     }
 
