@@ -286,21 +286,17 @@ Deno.serve(async (req) => {
         },
       };
 
-      const invoiceItem = await stripe.invoiceItems.create({
-        customer: customerId,
-        amount: Math.round(amount * 100),
-        currency: currency,
-        description: description || "Reserva de Tour",
-      });
-
-      sessionConfig.invoice_creation = {
-        enabled: true,
-        invoice_data: {
-          metadata: {
-            booking_id: bookingId,
+      // Include the deposit as a second line_item so it's charged in the same session
+      sessionConfig.line_items.push({
+        price_data: {
+          currency: currency,
+          product_data: {
+            name: description || "Reserva de Tour",
           },
+          unit_amount: Math.round(amount * 100),
         },
-      };
+        quantity: 1,
+      });
     } else {
       sessionConfig.mode = "payment";
       sessionConfig.line_items = [

@@ -1601,7 +1601,7 @@ Deno.serve(async (req) => {
 
         const { data: booking } = await supabase
           .from('bookings')
-          .select('user_id, points_used, toursred_cash_used, booking_code')
+          .select('user_id, points_used, toursred_cash_used, booking_code, membership_purchased, service_charge, total_price')
           .eq('id', bookingId)
           .single();
 
@@ -1629,12 +1629,27 @@ Deno.serve(async (req) => {
           }
         }
 
+        const expiredUpdate: Record<string, any> = {
+          status: 'cancelled',
+          payment_status: 'expired',
+        };
+        if (booking?.membership_purchased) {
+          // Revert the optimistic service_charge waiver since payment did not complete
+          const { data: settings } = await supabase
+            .from('platform_settings')
+            .select('service_charge_percentage')
+            .maybeSingle();
+          const pct = settings?.service_charge_percentage ?? 5;
+          expiredUpdate.service_charge = Math.round((booking.total_price || 0) * (pct / 100) * 100) / 100;
+          expiredUpdate.membership_purchased = false;
+          expiredUpdate.membership_plan = null;
+          expiredUpdate.membership_cost = 0;
+          console.log(`Reverted optimistic service_charge waiver for expired booking ${bookingId}`);
+        }
+
         const { error: bookingError } = await supabase
           .from('bookings')
-          .update({
-            status: 'cancelled',
-            payment_status: 'expired'
-          })
+          .update(expiredUpdate)
           .eq('id', bookingId);
 
         if (bookingError) {
@@ -1660,7 +1675,7 @@ Deno.serve(async (req) => {
 
         const { data: booking } = await supabase
           .from('bookings')
-          .select('user_id, points_used, toursred_cash_used, booking_code')
+          .select('user_id, points_used, toursred_cash_used, booking_code, membership_purchased, service_charge, total_price')
           .eq('id', bookingId)
           .single();
 
@@ -1688,12 +1703,26 @@ Deno.serve(async (req) => {
           }
         }
 
+        const failedUpdate: Record<string, any> = {
+          status: 'cancelled',
+          payment_status: 'failed',
+        };
+        if (booking?.membership_purchased) {
+          const { data: settings } = await supabase
+            .from('platform_settings')
+            .select('service_charge_percentage')
+            .maybeSingle();
+          const pct = settings?.service_charge_percentage ?? 5;
+          failedUpdate.service_charge = Math.round((booking.total_price || 0) * (pct / 100) * 100) / 100;
+          failedUpdate.membership_purchased = false;
+          failedUpdate.membership_plan = null;
+          failedUpdate.membership_cost = 0;
+          console.log(`Reverted optimistic service_charge waiver for failed booking ${bookingId}`);
+        }
+
         const { error: bookingError } = await supabase
           .from('bookings')
-          .update({
-            status: 'cancelled',
-            payment_status: 'failed'
-          })
+          .update(failedUpdate)
           .eq('id', bookingId);
 
         if (bookingError) {

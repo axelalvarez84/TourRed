@@ -1103,7 +1103,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         deposit_amount: effectiveDepositAmount,
         commission_amount: agencyCommission,
         service_charge: serviceCharge,
-        user_payment: userPayment + effectiveInsuranceCost,
+        user_payment: userPayment + effectiveInsuranceCost + membershipCost,
         platform_revenue: platformRevenue,
         booking_date: isReceptivo && selectedSlot ? selectedSlot.slot_date : (isTransferCustomTime && selectedSlotDate ? selectedSlotDate.toISOString().split('T')[0] : tour.start_date),
         slot_id: isReceptivo && selectedSlot ? selectedSlot.id : null,
@@ -1140,6 +1140,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         insurance_discount_code_id: appliedInsuranceDiscount?.code_id || null,
         insurance_discount_amount: insuranceDiscountAmount,
         selected_payment_mode: hasPaymentPlan ? selectedPaymentMode : 'standard',
+        membership_purchased: addMembershipToBooking,
+        membership_plan: addMembershipToBooking ? selectedMembershipPlan : null,
+        membership_cost: membershipCost,
       };
 
       console.log('📝 Creando reserva con datos:', bookingData);

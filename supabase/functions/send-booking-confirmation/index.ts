@@ -168,6 +168,9 @@ Deno.serve(async (req: Request) => {
     const languageExtraCost = Number(booking.language_extra_cost) || 0;
     const travelInsuranceCost = booking.travel_insurance_included ? (Number(booking.travel_insurance_cost) || 0) : 0;
     const insuranceDiscountAmount = Number(booking.insurance_discount_amount) || 0;
+    const membershipPurchased = booking.membership_purchased || false;
+    const membershipPlan = booking.membership_plan || null;
+    const membershipCost = Number(booking.membership_cost) || 0;
 
     const formatDate = (dateString: string | null | undefined) => {
       if (!dateString) return 'No disponible';
@@ -390,9 +393,14 @@ Deno.serve(async (req: Request) => {
           <span class="info-value" style="color:#059669;">-${formatCurrency(insuranceDiscountAmount)}</span>
         </div>` : ''}
         ` : ''}
-        <div class="info-row" style="${travelInsuranceCost > 0 ? 'background-color: #f0fdf4; padding: 8px 5px; margin: 5px -5px;' : ''}">
-          <span class="info-label" style="font-weight: ${travelInsuranceCost > 0 ? '700' : '400'};">Total cobrado hoy${travelInsuranceCost > 0 ? ' (anticipo + seguro)' : ''}:</span>
-          <span class="info-value" style="${travelInsuranceCost > 0 ? 'font-weight: 700;' : ''}">${formatCurrency(userPayment)}</span>
+        ${membershipPurchased && membershipCost > 0 ? `
+        <div class="info-row" style="background-color:#eef2ff;padding:8px 5px;margin:5px -5px;">
+          <span class="info-label" style="color:#4338ca;font-weight:600;">⭐ Membresía ToursRed Plus (${membershipPlan === 'monthly' ? 'Mensual' : 'Anual'}):</span>
+          <span class="info-value" style="color:#4338ca;font-weight:600;">${formatCurrency(membershipCost)}</span>
+        </div>` : ''}
+        <div class="info-row" style="${travelInsuranceCost > 0 || membershipPurchased ? 'background-color: #f0fdf4; padding: 8px 5px; margin: 5px -5px;' : ''}">
+          <span class="info-label" style="font-weight: ${travelInsuranceCost > 0 || membershipPurchased ? '700' : '400'};">Total cobrado hoy${travelInsuranceCost > 0 && membershipPurchased ? ' (anticipo + seguro + membresía)' : travelInsuranceCost > 0 ? ' (anticipo + seguro)' : membershipPurchased ? ' (anticipo + membresía)' : ''}:</span>
+          <span class="info-value" style="${travelInsuranceCost > 0 || membershipPurchased ? 'font-weight: 700;' : ''}">${formatCurrency(userPayment)}</span>
         </div>
         ${serviceChargeDiscount > 0 ? `
         <div class="info-row">

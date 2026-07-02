@@ -425,6 +425,18 @@ const BookingSuccessPage: React.FC = () => {
                     </div>
                   )}
 
+                  {(booking as any).membership_purchased && (
+                    <div className="flex justify-between items-center bg-indigo-50 border border-indigo-200 rounded px-2 py-1.5 -mx-1">
+                      <span className="text-indigo-700 font-medium flex items-center">
+                        <Award className="h-4 w-4 mr-1" />
+                        Membresía ToursRed Plus ({(booking as any).membership_plan === 'monthly' ? 'Mensual' : 'Anual'}):
+                      </span>
+                      <span className="font-bold text-indigo-700">
+                        {formatCurrencyMXN(Number((booking as any).membership_cost) || 0)}
+                      </span>
+                    </div>
+                  )}
+
                   {(booking as any).travel_insurance_included && (
                     <div className="flex justify-between items-center bg-blue-50 border border-blue-200 rounded px-2 py-1.5 -mx-1">
                       <span className="text-blue-700 font-medium flex items-center">

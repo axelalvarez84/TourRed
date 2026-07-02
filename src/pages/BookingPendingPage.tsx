@@ -201,6 +201,13 @@ const BookingPendingPage: React.FC = () => {
                     <span className="font-medium">{formatCurrencyMXN(booking.service_charge ?? 0)}</span>
                   </div>
 
+                  {(booking as any).membership_purchased && (
+                    <div className="flex justify-between text-indigo-700">
+                      <span>Membresía ToursRed Plus ({(booking as any).membership_plan === 'monthly' ? 'Mensual' : 'Anual'}):</span>
+                      <span className="font-medium">+{formatCurrencyMXN(Number((booking as any).membership_cost) || 0)}</span>
+                    </div>
+                  )}
+
                   {(booking as any).travel_insurance_cost > 0 && (
                     <div className="flex justify-between text-emerald-700">
                       <span>Seguro de Viaje:</span>
