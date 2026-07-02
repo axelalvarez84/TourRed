@@ -121,13 +121,11 @@ const PublishModal: React.FC<{
     setSaving(true);
     setError('');
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       const { data, error: rpcError } = await supabase.rpc('publish_new_terms_version', {
         p_type: termsType,
         p_title: title.trim(),
         p_content: content,
         p_change_summary: changeSummary.trim(),
-        p_admin_id: user!.id,
       });
       if (rpcError) throw rpcError;
       if (!data?.success) throw new Error(data?.error || 'Error al publicar');

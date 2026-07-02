@@ -80,6 +80,8 @@ const AgencySlotCalendar: React.FC<AgencySlotCalendarProps> = ({ tourId, agencyI
       await onGenerateSlots(genStart, genEnd);
       await fetchSlots(currentMonth);
       setShowGenerateModal(false);
+    } catch (err: any) {
+      alert(`Error al generar slots: ${err.message || 'Error desconocido'}`);
     } finally {
       setIsGenerating(false);
     }

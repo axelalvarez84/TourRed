@@ -42,7 +42,6 @@ const BookingCancelPage: React.FC = () => {
       if (pointsUsed > 0) {
         const { error: pointsError } = await supabase.rpc('refund_points_for_cancelled_booking', {
           p_booking_id: id,
-          p_user_id: booking.user_id,
           p_points_to_refund: pointsUsed
         });
 
