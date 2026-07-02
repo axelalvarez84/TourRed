@@ -283,6 +283,7 @@ Deno.serve(async (req) => {
         metadata: {
           user_id: booking.user_id,
           booking_id: bookingId,
+          plan_type: membershipPlan,
         },
       };
 

@@ -465,6 +465,18 @@ Deno.serve(async (req) => {
         const paymentMethod = await getPaymentMethodType(session);
         console.log(`Checkout session completed for booking ${bookingId}, payment status: ${paymentStatus}, method: ${paymentMethod}`);
 
+        // In subscription mode session.payment_intent is null; retrieve it from the invoice
+        let paymentIntentId: string | null = session.payment_intent as string | null;
+        if (!paymentIntentId && session.mode === 'subscription' && session.invoice) {
+          try {
+            const invoice = await stripe.invoices.retrieve(session.invoice as string);
+            paymentIntentId = invoice.payment_intent as string | null;
+            console.log(`Retrieved payment_intent ${paymentIntentId} from invoice ${session.invoice}`);
+          } catch (invoiceErr: any) {
+            console.error(`Error retrieving invoice for payment_intent: ${invoiceErr.message}`);
+          }
+        }
+
         if (paymentStatus === 'paid') {
           const { data: booking, error: bookingFetchError } = await supabase
             .from('bookings')
@@ -495,7 +507,7 @@ Deno.serve(async (req) => {
             .from('bookings')
             .update({
               payment_status: 'succeeded',
-              payment_intent_id: session.payment_intent,
+              payment_intent_id: paymentIntentId,
               paid_at: new Date().toISOString(),
               status: 'confirmed',
               payment_method: paymentMethod
@@ -912,7 +924,7 @@ Deno.serve(async (req) => {
             .from('bookings')
             .update({
               payment_status: 'processing',
-              payment_intent_id: session.payment_intent,
+              payment_intent_id: paymentIntentId,
               status: 'pending',
               payment_method: paymentMethod
             })
@@ -929,7 +941,7 @@ Deno.serve(async (req) => {
           .from('payment_transactions')
           .insert({
             booking_id: bookingId,
-            stripe_payment_intent_id: session.payment_intent,
+            stripe_payment_intent_id: paymentIntentId,
             amount: session.amount_total / 100,
             currency: session.currency,
             status: 'succeeded',
@@ -946,7 +958,7 @@ Deno.serve(async (req) => {
           .from('stripe_orders')
           .insert({
             checkout_session_id: session.id,
-            payment_intent_id: session.payment_intent,
+            payment_intent_id: paymentIntentId,
             customer_id: session.customer,
             amount_subtotal: session.amount_subtotal / 100,
             amount_total: session.amount_total / 100,
