@@ -923,6 +923,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   }, [hasPaymentPlan, payPlanMode, installmentDefs, totalPrice, isReceptivo, selectedSlotDate, tour.start_date]);
 
 
+  const membershipMonthlyPrice = membershipPrices?.monthlyPrice || 49;
   const membershipAnnualPrice = membershipPrices?.annualPrice || 490;
 
   const fullServiceCharge = totalPrice * (serviceChargePercentage / 100);
