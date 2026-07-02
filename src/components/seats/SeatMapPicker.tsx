@@ -219,21 +219,39 @@ const SeatMapPicker: React.FC<SeatMapPickerProps> = ({
       };
       setLayout(parsedLayout);
 
-      let query = supabase
-        .from('slot_seat_status')
-        .select('seat_number, status, booking_id, block_note')
-        .eq('tour_id', tourId);
-
+      // When a slot is selected, fetch both slot-specific statuses AND global blocks (slot_id = null).
+      // Global blocks are created when the agency blocks a seat before any slots exist.
+      let statusData: any[] = [];
       if (slotId) {
-        query = query.eq('slot_id', slotId);
+        const [slotResult, globalResult] = await Promise.all([
+          supabase
+            .from('slot_seat_status')
+            .select('seat_number, status, booking_id, block_note')
+            .eq('tour_id', tourId)
+            .eq('slot_id', slotId),
+          supabase
+            .from('slot_seat_status')
+            .select('seat_number, status, booking_id, block_note')
+            .eq('tour_id', tourId)
+            .is('slot_id', null)
+            .in('status', ['bloqueado_agencia']),
+        ]);
+        // Slot-specific records take precedence; globals fill in the rest
+        const slotMap: Record<number, any> = {};
+        (globalResult.data || []).forEach((s: any) => { slotMap[s.seat_number] = s; });
+        (slotResult.data || []).forEach((s: any) => { slotMap[s.seat_number] = s; });
+        statusData = Object.values(slotMap);
       } else {
-        query = query.is('slot_id', null);
+        const { data } = await supabase
+          .from('slot_seat_status')
+          .select('seat_number, status, booking_id, block_note')
+          .eq('tour_id', tourId)
+          .is('slot_id', null);
+        statusData = data || [];
       }
 
-      const { data: statusData } = await query;
-
       const statusMap: Record<number, { status: string; booking_id: string | null; block_note: string | null }> = {};
-      (statusData || []).forEach((s: any) => {
+      statusData.forEach((s: any) => {
         const normalized = s.status === 'bloqueado_agencia' ? 'bloqueado'
           : s.status === 'reservado_online' ? 'reservado'
           : s.status;
