@@ -286,7 +286,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Explicit audit log — DB trigger uses auth.uid() which is null under service role
-    supabase.rpc("insert_audit_log", {
+    Promise.resolve(supabase.rpc("insert_audit_log", {
       p_tenant_type: "traveler",
       p_actor_id: user.id,
       p_actor_email: user.email ?? null,
@@ -298,7 +298,7 @@ Deno.serve(async (req: Request) => {
       p_old_values: { status: booking.status },
       p_new_values: { status: "cancelled", cancellation_type: policyType },
       p_metadata: { cancellation_id: cancellationRecord.id, policy_type: policyType },
-    }).catch((e: unknown) => console.error("Error insertando audit log:", e));
+    })).catch((e: unknown) => console.error("Error insertando audit log:", e));
 
     // Create penalty record if applicable
     if (penaltyAmount > 0 && (policyType === "50_percent" || policyType === "no_refund")) {
