@@ -727,7 +727,7 @@ const TravelerProfile: React.FC = () => {
 
                   <div className="space-y-3 border-t pt-3">
                     <h4 className="text-sm font-semibold text-gray-900">Contacto de Emergencia</h4>
-                    <p className="text-xs text-gray-500">Persona a contactar en caso de emergencia durante el viaje. Requerido para contratar seguro de viajero.</p>
+                    <p className="text-xs text-gray-500">Persona a contactar en caso de emergencia durante el viaje. Este contacto se cargará automáticamente en tus reservas. Es opcional.</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1157,11 +1157,11 @@ const TravelerProfile: React.FC = () => {
                       </div>
                     </div>
 
-                    {(profile.emergency_contact_name || profile.emergency_contact_phone) && (
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-500 mb-1">
-                          Contacto de Emergencia
-                        </label>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        Contacto de Emergencia
+                      </label>
+                      {(profile.emergency_contact_name || profile.emergency_contact_phone) ? (
                         <div className="flex items-center p-3 bg-amber-50 rounded-md border border-amber-200">
                           <Phone className="h-4 w-4 text-amber-500 mr-2 flex-shrink-0" />
                           <div>
@@ -1171,8 +1171,21 @@ const TravelerProfile: React.FC = () => {
                             )}
                           </div>
                         </div>
-                      </div>
-                    )}
+                      ) : (
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md border border-dashed border-gray-300">
+                          <div className="flex items-center gap-2 text-gray-500">
+                            <Phone className="h-4 w-4 flex-shrink-0" />
+                            <span className="text-sm">Sin contacto de emergencia registrado</span>
+                          </div>
+                          <button
+                            onClick={() => setIsEditing(true)}
+                            className="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                          >
+                            Agregar
+                          </button>
+                        </div>
+                      )}
+                    </div>
 
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-500 mb-1">

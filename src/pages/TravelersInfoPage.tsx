@@ -40,6 +40,7 @@ const TravelersInfoPage: React.FC = () => {
   const [showCompanionsSection, setShowCompanionsSection] = useState(true);
   const [mpBrick, setMpBrick] = useState<{ preferenceId: string; publicKey: string; amount: number } | null>(null);
   const [copyEmergencyToAll, setCopyEmergencyToAll] = useState(false);
+  const [showSaveEmergencyContactModal, setShowSaveEmergencyContactModal] = useState(false);
   const [userProfile, setUserProfile] = useState<{
     curp?: string;
     passport_number?: string;
@@ -393,14 +394,20 @@ const TravelersInfoPage: React.FC = () => {
     return true;
   };
 
-  const handleSave = async () => {
-    if (!validateForm()) {
-      return;
-    }
-
+  const doSave = async (saveContactToProfile: boolean) => {
     try {
       setIsSaving(true);
       setError('');
+
+      if (saveContactToProfile && travelers.length > 0 && user) {
+        const first = travelers[0];
+        if (first.emergency_contact_name || first.emergency_contact_phone) {
+          await supabase.from('users').update({
+            emergency_contact_name: first.emergency_contact_name || null,
+            emergency_contact_phone: first.emergency_contact_phone || null,
+          }).eq('id', user.id);
+        }
+      }
 
       await supabase
         .from('booking_travelers')
@@ -512,13 +519,32 @@ const TravelersInfoPage: React.FC = () => {
           proceedToPayment();
         }
       }
-
     } catch (err: any) {
       console.error('Error saving travelers:', err);
       setError(err.message || 'Error al guardar los datos');
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSave = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
+    const first = travelers[0];
+    const profileName = userProfile?.emergency_contact_name || '';
+    const profilePhone = userProfile?.emergency_contact_phone || '';
+    const formName = first?.emergency_contact_name || '';
+    const formPhone = first?.emergency_contact_phone || '';
+    const contactChanged = (formName || formPhone) && (formName !== profileName || formPhone !== profilePhone);
+
+    if (contactChanged) {
+      setShowSaveEmergencyContactModal(true);
+      return;
+    }
+
+    await doSave(false);
   };
 
   const proceedToPayment = async () => {
@@ -972,6 +998,7 @@ const TravelersInfoPage: React.FC = () => {
   }
 
   return (
+    <>
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
         <button
@@ -1286,17 +1313,30 @@ const TravelersInfoPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Contacto de emergencia — solo cuando la reserva incluye seguro y el viajero no es mascota */}
-                {booking?.travel_insurance_included && traveler.categoria_viajero !== 'mascota' && (
-                  <div className="mt-4 border border-emerald-200 rounded-lg bg-emerald-50 p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Shield className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span className="text-sm font-semibold text-emerald-800">Datos para el Seguro de Viajero</span>
+                {/* Contacto de emergencia — visible siempre para viajeros no-mascota */}
+                {traveler.categoria_viajero !== 'mascota' && (
+                  <div className="mt-4 border border-gray-200 rounded-lg bg-gray-50 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                        <span className="text-sm font-semibold text-gray-700">Contacto de Emergencia (opcional)</span>
+                      </div>
+                      {index === 0 && (userProfile?.emergency_contact_name || userProfile?.emergency_contact_phone) && (
+                        <span className="text-xs text-blue-600 font-medium bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5">
+                          Cargado desde tu perfil
+                        </span>
+                      )}
                     </div>
+                    {booking?.travel_insurance_included && !traveler.emergency_contact_name && !traveler.emergency_contact_phone && (
+                      <div className="mb-3 flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                        <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                        <span>Esta reserva incluye seguro de viajero. Se recomienda agregar un contacto de emergencia.</span>
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Nombre del contacto de emergencia *
+                          Nombre del contacto
                         </label>
                         <input
                           type="text"
@@ -1308,7 +1348,7 @@ const TravelersInfoPage: React.FC = () => {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Teléfono del contacto de emergencia *
+                          Teléfono del contacto
                         </label>
                         <input
                           type="tel"
@@ -1319,18 +1359,17 @@ const TravelersInfoPage: React.FC = () => {
                         />
                       </div>
                     </div>
-                    {/* Opción "mismo contacto para todos" — solo visible en el primer viajero y si hay más de uno */}
                     {index === 0 && travelers.filter(t => t.categoria_viajero !== 'mascota').length > 1 && (
-                      <div className="mt-3 pt-3 border-t border-emerald-200">
+                      <div className="mt-3 pt-3 border-t border-gray-200">
                         <label className="flex items-center gap-2 cursor-pointer text-sm">
                           <input
                             type="checkbox"
                             checked={copyEmergencyToAll}
                             onChange={(e) => handleCopyEmergencyToAll(e.target.checked)}
-                            className="h-4 w-4 text-emerald-600 border-gray-300 rounded"
+                            className="h-4 w-4 text-gray-500 border-gray-300 rounded"
                           />
-                          <Copy className="w-3.5 h-3.5 text-emerald-600" />
-                          <span className="text-emerald-800 font-medium">Usar el mismo contacto de emergencia para los acompañantes sin contacto registrado</span>
+                          <Copy className="w-3.5 h-3.5 text-gray-500" />
+                          <span className="text-gray-700 font-medium">Usar el mismo contacto de emergencia para los acompañantes sin contacto registrado</span>
                         </label>
                       </div>
                     )}
@@ -1400,6 +1439,45 @@ const TravelersInfoPage: React.FC = () => {
         </div>
       </div>
     </div>
+
+    {/* Modal: guardar contacto de emergencia en perfil */}
+
+    {showSaveEmergencyContactModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+        <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="bg-blue-50 rounded-full p-2">
+              <Shield className="w-5 h-5 text-blue-600" />
+            </div>
+            <h3 className="text-base font-semibold text-gray-900">Guardar contacto de emergencia</h3>
+          </div>
+          <p className="text-sm text-gray-600 mb-5">
+            ¿Quieres guardar este contacto de emergencia en tu perfil para que se cargue automáticamente en futuras reservas?
+          </p>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => {
+                setShowSaveEmergencyContactModal(false);
+                doSave(true);
+              }}
+              className="btn-primary w-full"
+            >
+              Si, guardar en mi perfil
+            </button>
+            <button
+              onClick={() => {
+                setShowSaveEmergencyContactModal(false);
+                doSave(false);
+              }}
+              className="btn-secondary w-full"
+            >
+              No, solo para esta reserva
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 
