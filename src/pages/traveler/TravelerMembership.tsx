@@ -16,6 +16,7 @@ interface Membership {
   cancelled_at: string | null;
   service_fee_exemption_used: number;
   exemption_period_start: string;
+  service_fee_exemption_reset_date: string;
 }
 
 interface BookingWithBenefit {
@@ -67,7 +68,7 @@ export default function TravelerMembership() {
       setMembership(data);
 
       if (data) {
-        await fetchBookingsWithBenefit(data.exemption_period_start);
+        await fetchBookingsWithBenefit(data.service_fee_exemption_reset_date);
       }
     } catch (err) {
       console.error('Error fetching membership:', err);
@@ -76,11 +77,17 @@ export default function TravelerMembership() {
     }
   };
 
-  const fetchBookingsWithBenefit = async (exemptionPeriodStart: string) => {
+  const fetchBookingsWithBenefit = async (resetDate: string) => {
     if (!user) return;
 
     try {
-      const periodStart = new Date(exemptionPeriodStart);
+      // Derive the start of the current exemption period: 1st of current month
+      // resetDate is set to the 1st of NEXT month, so subtract 1 month
+      const reset = new Date(resetDate);
+      const periodStart = new Date(reset);
+      periodStart.setMonth(periodStart.getMonth() - 1);
+      periodStart.setDate(1);
+      periodStart.setHours(0, 0, 0, 0);
 
       const { data, error } = await supabase
         .from('bookings')
@@ -245,11 +252,7 @@ export default function TravelerMembership() {
                   De $500 MXN totales ({((remainingExemption / 500) * 100).toFixed(0)}% disponible)
                 </p>
                 <p className="text-yellow-100 text-xs mt-1">
-                  Se resetea el: {new Date(new Date(membership.exemption_period_start).setMonth(new Date(membership.exemption_period_start).getMonth() + 1)).toLocaleDateString('es-MX', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
+                  Se resetea el: {formatDate(membership.service_fee_exemption_reset_date)}
                 </p>
               </div>
             </div>
