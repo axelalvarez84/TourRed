@@ -177,8 +177,11 @@ Deno.serve(async (req: Request) => {
     const depositRefund = originalDepositAmount * refundPct;
     // BUG FIX 1: sum insurance refund into total
     const refundAmountToTraveler = depositRefund + optionalServicesRefundable + insuranceRefund;
-    const amountToAgency = penaltyAmount * (1 - commissionRate);
-    const amountToPlatform = penaltyAmount * commissionRate;
+    // Penalty split: 60% to agency, 40% to platform (only applies when penaltyAmount > 0)
+    const PENALTY_AGENCY_SHARE = 0.60;
+    const PENALTY_PLATFORM_SHARE = 0.40;
+    const amountToAgency = penaltyAmount * PENALTY_AGENCY_SHARE;
+    const amountToPlatform = penaltyAmount * PENALTY_PLATFORM_SHARE;
 
     // Cancel optional services
     await supabase.rpc("cancel_booking_optional_services", {
@@ -282,6 +285,21 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Error actualizando reserva: ${updateBookingError.message}`);
     }
 
+    // Explicit audit log — DB trigger uses auth.uid() which is null under service role
+    supabase.rpc("insert_audit_log", {
+      p_tenant_type: "traveler",
+      p_actor_id: user.id,
+      p_actor_email: user.email ?? null,
+      p_actor_role: "traveler",
+      p_target_id: booking_id,
+      p_target_table: "bookings",
+      p_action: "cancel",
+      p_severity: "medium",
+      p_old_values: { status: booking.status },
+      p_new_values: { status: "cancelled", cancellation_type: policyType },
+      p_metadata: { cancellation_id: cancellationRecord.id, policy_type: policyType },
+    }).catch((e: unknown) => console.error("Error insertando audit log:", e));
+
     // Create penalty record if applicable
     if (penaltyAmount > 0 && (policyType === "50_percent" || policyType === "no_refund")) {
       const { error: penaltyError } = await supabase
@@ -304,14 +322,17 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Generate accounting entry (fire-and-forget, only for non-full-refund)
+    // Generate accounting entry (awaited — fire-and-forget may not execute before response is sent)
     if (policyType === "50_percent" || policyType === "no_refund") {
-      supabase.rpc("create_accounting_entry_for_cancellation", {
-        p_cancellation_id: cancellationRecord.id,
-        p_cancellation_type: "full",
-      }).then(({ error: accErr }: { error: any }) => {
+      try {
+        const { error: accErr } = await supabase.rpc("create_accounting_entry_for_cancellation", {
+          p_cancellation_id: cancellationRecord.id,
+          p_cancellation_type: "full",
+        });
         if (accErr) console.error("Error generando póliza de cancelación:", accErr.message);
-      });
+      } catch (e: unknown) {
+        console.error("Excepción generando póliza de cancelación:", e);
+      }
     }
 
     // Send notifications (fire-and-forget)
