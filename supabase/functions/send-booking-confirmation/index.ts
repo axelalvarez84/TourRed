@@ -487,11 +487,29 @@ Deno.serve(async (req: Request) => {
       ${qrSection}
 
       <div class="section">
-        <div class="section-title">🏢 Información de Contacto de la Agencia</div>
+        <div class="section-title">🏢 Prestador del Servicio Turístico</div>
         <div class="info-row">
           <span class="info-label">Agencia:</span>
           <span class="info-value">${booking.agency.name}</span>
         </div>
+        ${booking.agency.razon_social ? `
+        <div class="info-row">
+          <span class="info-label">Razón social:</span>
+          <span class="info-value">${booking.agency.razon_social}</span>
+        </div>
+        ` : ''}
+        ${booking.agency.rfc ? `
+        <div class="info-row">
+          <span class="info-label">RFC:</span>
+          <span class="info-value">${booking.agency.rfc}</span>
+        </div>
+        ` : ''}
+        ${booking.agency.domicilio_fiscal ? `
+        <div class="info-row">
+          <span class="info-label">Domicilio fiscal:</span>
+          <span class="info-value">${booking.agency.domicilio_fiscal}</span>
+        </div>
+        ` : ''}
         <div class="info-row">
           <span class="info-label">Email:</span>
           <span class="info-value">${booking.agency.contact_email}</span>
@@ -502,7 +520,27 @@ Deno.serve(async (req: Request) => {
           <span class="info-value">${booking.agency.contact_phone}</span>
         </div>
         ` : ''}
+        <p style="color: #6b7280; font-size: 12px; margin-top: 10px; margin-bottom: 0;">
+          ToursRed actúa exclusivamente como intermediario digital y comisionista
+          mercantil para la publicación, promoción y procesamiento de pago de este
+          servicio turístico. La agencia arriba identificada es la única responsable
+          de la operación, ejecución y prestación efectiva del servicio.
+        </p>
       </div>
+
+      ${(() => {
+        const cancellationText = booking.tour.cancellation_not_allowed
+          ? 'Este tour es de tipo "No Cancelable". No aplica reembolso una vez confirmada la reserva, salvo causas imputables a la agencia o a ToursRed, o por disposición legal aplicable.'
+          : 'Cancelaciones con 15 días naturales o más de anticipación: reembolso del 100% mediante ToursRed Cash. Entre 7 y 14 días: reembolso del 50%. Con menos de 7 días: no hay derecho a reembolso. Si la reserva se realizó con más de 10 días hábiles de anticipación al tour, aplica además el derecho de revocación de 5 días hábiles conforme al Artículo 56 de la LFPC.';
+        return `
+      <div class="section">
+        <div class="section-title">📌 Política de Cancelación</div>
+        <p style="color: #374151; font-size: 14px; margin: 0;">${cancellationText}</p>
+        <p style="color: #6b7280; font-size: 12px; margin-top: 8px; margin-bottom: 0;">
+          Consulta los Términos y Condiciones completos en toursred.com/terminos
+        </p>
+      </div>`;
+      })()}
 
       <div class="highlight">
         <strong>Importante:</strong> El saldo restante de ${formatCurrency(remainingAmount)} debe ser pagado directamente a la agencia según las condiciones acordadas. Por favor, contacta a la agencia para coordinar los detalles del pago y el viaje.
