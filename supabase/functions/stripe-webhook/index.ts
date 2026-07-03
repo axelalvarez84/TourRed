@@ -519,6 +519,17 @@ Deno.serve(async (req) => {
           } else {
             console.log(`Successfully updated booking ${bookingId} to paid status`);
 
+            // Audit log: booking confirmed by Stripe webhook
+            supabase.rpc('insert_audit_log', {
+              p_tenant_type: 'traveler',
+              p_actor_id: booking.user_id,
+              p_actor_role: 'stripe_webhook',
+              p_target_id: bookingId,
+              p_target_table: 'bookings',
+              p_action: 'BOOKING_CONFIRMED',
+              p_metadata: { payment_method: paymentMethod, payment_intent_id: paymentIntentId },
+            }).catch((e: unknown) => console.error('Audit log failed (non-blocking):', e));
+
             // Activate membership if purchased alongside booking (mixed-cart)
             const membershipPurchased = session.metadata?.membership_purchased === 'true';
             const membershipPlan = session.metadata?.membership_plan || 'monthly';
@@ -526,7 +537,12 @@ Deno.serve(async (req) => {
               try {
                 console.log(`Mixed-cart membership detected. Activating for subscription ${session.subscription}`);
                 const subscriptionId = session.subscription as string;
-                const subscriptionData = await stripe.subscriptions.retrieve(subscriptionId);
+                const subscriptionData = await Promise.race([
+                  stripe.subscriptions.retrieve(subscriptionId),
+                  new Promise<never>((_, reject) =>
+                    setTimeout(() => reject(new Error('stripe.subscriptions.retrieve timeout after 4s')), 4000)
+                  ),
+                ]);
                 const membershipUserId = subscriptionData.metadata?.user_id || booking.user_id;
 
                 const { data: existingMembership } = await supabase

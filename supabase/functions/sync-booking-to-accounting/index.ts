@@ -36,6 +36,36 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // Internal ERP: call DB function directly — no external adapter needed
+    if (settings.accounting_provider === "internal") {
+      // Idempotency: check if entry already exists for this booking
+      const { data: existingEntry } = await supabase
+        .from("accounting_entries")
+        .select("id")
+        .eq("booking_id", booking_id)
+        .maybeSingle();
+
+      if (existingEntry?.id) {
+        return new Response(JSON.stringify({ success: true, skipped: true, entry_id: existingEntry.id }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: entryId, error: rpcError } = await supabase
+        .rpc("create_accounting_entry_for_booking", { p_booking_id: booking_id });
+
+      if (rpcError) {
+        console.error("Internal accounting RPC failed:", rpcError);
+        return new Response(JSON.stringify({ error: `Internal accounting RPC failed: ${rpcError.message}` }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true, entry_id: entryId, provider: "internal" }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Query separada para evitar ambiguedad de multiples FK a users
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")
