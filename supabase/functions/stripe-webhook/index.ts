@@ -1457,6 +1457,111 @@ Deno.serve(async (req) => {
         const isSubscriptionCreate = invoice.billing_reason === 'subscription_create';
         console.log(`invoice.payment_succeeded: ${isSubscriptionCreate ? 'alta nueva' : 'renovación'} suscripción ${subscriptionId}, amount_paid: ${invoice.amount_paid}`);
 
+        // --- Resolve membership (always, regardless of CFDI) ---
+        let membership: { id: string } | null = null;
+        {
+          const { data: found } = await supabase
+            .from('memberships')
+            .select('id')
+            .eq('stripe_subscription_id', subscriptionId)
+            .maybeSingle();
+          membership = found;
+        }
+
+        if (!membership?.id && isSubscriptionCreate) {
+          console.log(`Membresía no encontrada aún para subscription ${subscriptionId}, obteniendo datos de Stripe...`);
+          try {
+            const subscriptionData = await stripe.subscriptions.retrieve(subscriptionId);
+            const userId = subscriptionData.metadata?.user_id;
+            if (userId) {
+              const statusMapLocal: Record<string, string> = {
+                'incomplete': 'trialing', 'incomplete_expired': 'expired', 'trialing': 'trialing',
+                'active': 'active', 'past_due': 'past_due', 'canceled': 'cancelled',
+                'unpaid': 'expired', 'paused': 'past_due'
+              };
+              const { data: upserted } = await supabase
+                .from('memberships')
+                .upsert({
+                  user_id: userId,
+                  stripe_customer_id: subscriptionData.customer as string,
+                  stripe_subscription_id: subscriptionData.id,
+                  plan_type: subscriptionData.metadata?.plan_type || 'monthly',
+                  status: statusMapLocal[subscriptionData.status] || 'active',
+                  start_date: new Date((subscriptionData.start_date as number) * 1000).toISOString(),
+                  current_period_start: new Date((subscriptionData as any).current_period_start * 1000).toISOString(),
+                  current_period_end: new Date((subscriptionData as any).current_period_end * 1000).toISOString(),
+                  cancel_at_period_end: subscriptionData.cancel_at_period_end || false,
+                  cancelled_at: subscriptionData.canceled_at ? new Date(subscriptionData.canceled_at * 1000).toISOString() : null,
+                }, { onConflict: 'stripe_subscription_id' })
+                .select('id')
+                .single();
+              membership = upserted;
+              console.log(`Membresía creada desde invoice.payment_succeeded: ${membership?.id}`);
+            }
+          } catch (subErr) {
+            console.error('Error obteniendo suscripción de Stripe:', subErr);
+          }
+        }
+
+        if (!membership?.id) {
+          console.error(`No se encontró membresía para subscription ${subscriptionId}`);
+          break;
+        }
+
+        // --- Activate + welcome email (always, not gated on CFDI) ---
+        if (isSubscriptionCreate) {
+          try {
+            const { data: currentMembership } = await supabase
+              .from('memberships')
+              .select('id, status, user_id, plan_type')
+              .eq('id', membership.id)
+              .maybeSingle();
+
+            if (currentMembership && currentMembership.status !== 'active') {
+              console.log(`Activando membresía ${membership.id} (era ${currentMembership.status})`);
+              await supabase
+                .from('memberships')
+                .update({ status: 'active' })
+                .eq('id', membership.id);
+
+              const { data: userData } = await supabase
+                .from('users')
+                .select('email, first_name')
+                .eq('id', currentMembership.user_id)
+                .maybeSingle();
+
+              if (userData) {
+                const subscriptionData = await stripe.subscriptions.retrieve(subscriptionId);
+                console.log('📧 Enviando correo de bienvenida ToursRed Plus...');
+                const welcomeRes = await fetch(
+                  `${supabaseUrl}/functions/v1/send-membership-welcome`,
+                  {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      email: userData.email,
+                      firstName: userData.first_name || 'Viajero',
+                      planType: currentMembership.plan_type || 'monthly',
+                      startDate: new Date((subscriptionData as any).current_period_start * 1000).toISOString(),
+                      endDate: new Date((subscriptionData as any).current_period_end * 1000).toISOString(),
+                    }),
+                  }
+                );
+                if (welcomeRes.ok) {
+                  console.log('✅ Correo de bienvenida enviado exitosamente');
+                } else {
+                  console.error('Error enviando correo de bienvenida:', await welcomeRes.text());
+                }
+              }
+            } else {
+              console.log(`Membresía ${membership.id} ya está activa, omitiendo activación`);
+            }
+          } catch (activationErr) {
+            console.error('Error activando membresía:', activationErr);
+          }
+        }
+
+        // --- CFDI (fire-and-forget, no bloquea la activación) ---
         EdgeRuntime.waitUntil(
           (async () => {
             try {
@@ -1467,117 +1572,11 @@ Deno.serve(async (req) => {
 
               if (!cfdiSettings?.pac_provider || cfdiSettings.pac_provider === 'none') return;
 
-              let { data: membership } = await supabase
-                .from('memberships')
-                .select('id')
-                .eq('stripe_subscription_id', subscriptionId)
-                .maybeSingle();
-
-              if (!membership?.id && isSubscriptionCreate) {
-                console.log(`Membresía no encontrada aún para subscription ${subscriptionId}, obteniendo datos de Stripe para crear upsert...`);
-                try {
-                  const subscriptionData = await stripe.subscriptions.retrieve(subscriptionId);
-                  const userId = subscriptionData.metadata?.user_id;
-                  if (userId) {
-                    const statusMap: Record<string, string> = {
-                      'incomplete': 'trialing', 'incomplete_expired': 'expired', 'trialing': 'trialing',
-                      'active': 'active', 'past_due': 'past_due', 'canceled': 'cancelled',
-                      'unpaid': 'expired', 'paused': 'past_due'
-                    };
-                    const { data: upsertedMembership } = await supabase
-                      .from('memberships')
-                      .upsert({
-                        user_id: userId,
-                        stripe_customer_id: subscriptionData.customer as string,
-                        stripe_subscription_id: subscriptionData.id,
-                        plan_type: subscriptionData.metadata?.plan_type || 'monthly',
-                        status: statusMap[subscriptionData.status] || 'active',
-                        start_date: new Date((subscriptionData.start_date as number) * 1000).toISOString(),
-                        current_period_start: new Date((subscriptionData as any).current_period_start * 1000).toISOString(),
-                        current_period_end: new Date((subscriptionData as any).current_period_end * 1000).toISOString(),
-                        cancel_at_period_end: subscriptionData.cancel_at_period_end || false,
-                        cancelled_at: subscriptionData.canceled_at ? new Date(subscriptionData.canceled_at * 1000).toISOString() : null,
-                      }, { onConflict: 'stripe_subscription_id' })
-                      .select('id')
-                      .single();
-                    membership = upsertedMembership;
-                    console.log(`Membresía creada desde invoice.payment_succeeded: ${membership?.id}`);
-                  }
-                } catch (subErr) {
-                  console.error('Error obteniendo suscripción de Stripe:', subErr);
-                }
-              }
-
-              if (!membership?.id) {
-                console.error(`No se encontró membresía para subscription ${subscriptionId}`);
-                return;
-              }
-
               if (isSubscriptionCreate) {
-                // Activar membresía si no está activa aún (flujo mixed-cart: subscription llega
-                // como 'incomplete' y solo se activa al confirmar el pago vía invoice)
-                const { data: currentMembership } = await supabase
-                  .from('memberships')
-                  .select('id, status, user_id, plan_type')
-                  .eq('id', membership.id)
-                  .maybeSingle();
-
-                if (currentMembership && currentMembership.status !== 'active') {
-                  console.log(`Activando membresía ${membership.id} desde invoice.payment_succeeded (era ${currentMembership.status})`);
-                  await supabase
-                    .from('memberships')
-                    .update({ status: 'active' })
-                    .eq('id', membership.id);
-
-                  // Enviar correo de bienvenida
-                  try {
-                    const { data: userData } = await supabase
-                      .from('users')
-                      .select('email, first_name')
-                      .eq('id', currentMembership.user_id)
-                      .maybeSingle();
-
-                    if (userData) {
-                      const subscriptionData = await stripe.subscriptions.retrieve(subscriptionId);
-                      console.log('📧 Enviando correo de bienvenida ToursRed Plus (activación vía invoice)...');
-                      const welcomeRes = await fetch(
-                        `${supabaseUrl}/functions/v1/send-membership-welcome`,
-                        {
-                          method: 'POST',
-                          headers: {
-                            'Authorization': `Bearer ${supabaseServiceKey}`,
-                            'Content-Type': 'application/json',
-                          },
-                          body: JSON.stringify({
-                            email: userData.email,
-                            firstName: userData.first_name || 'Viajero',
-                            planType: currentMembership.plan_type || 'monthly',
-                            startDate: new Date((subscriptionData as any).current_period_start * 1000).toISOString(),
-                            endDate: new Date((subscriptionData as any).current_period_end * 1000).toISOString(),
-                          }),
-                        }
-                      );
-                      if (welcomeRes.ok) {
-                        console.log('✅ Correo de bienvenida enviado exitosamente');
-                      } else {
-                        console.error('Error enviando correo de bienvenida:', await welcomeRes.text());
-                      }
-                    }
-                  } catch (welcomeErr) {
-                    console.error('Error en envío de correo de bienvenida:', welcomeErr);
-                  }
-                } else {
-                  console.log(`Membresía ${membership.id} ya está activa, omitiendo activación`);
-                }
-              }
-
-              if (isSubscriptionCreate) {
-                // Alta nueva: cancelar el CFDI disparado desde subscription.created (sin monto)
-                // y generar uno nuevo con el monto real pagado (puede incluir descuento de cupón)
                 await supabase
                   .from('cfdi_invoices')
                   .delete()
-                  .eq('membership_id', membership.id)
+                  .eq('membership_id', membership!.id)
                   .is('stripe_invoice_id', null)
                   .eq('status', 'pending');
 
@@ -1585,20 +1584,19 @@ Deno.serve(async (req) => {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
                   body: JSON.stringify({
-                    membership_id: membership.id,
+                    membership_id: membership!.id,
                     stripe_invoice_id: invoice.id,
                     stripe_amount_paid: invoice.amount_paid,
                   }),
                 });
-                console.log(`CFDI de alta nueva (con monto real) solicitado para membresía ${membership.id}, invoice ${invoice.id}, amount_paid ${invoice.amount_paid}`);
+                console.log(`CFDI alta nueva solicitado: membresía ${membership!.id}, invoice ${invoice.id}`);
               } else {
-                // Renovación: sin descuento, precio regular
                 await fetch(`${supabaseUrl}/functions/v1/generate-membership-cfdi`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
-                  body: JSON.stringify({ membership_id: membership.id, stripe_invoice_id: invoice.id }),
+                  body: JSON.stringify({ membership_id: membership!.id, stripe_invoice_id: invoice.id }),
                 });
-                console.log(`CFDI de renovación solicitado para membresía ${membership.id}, invoice ${invoice.id}`);
+                console.log(`CFDI renovación solicitado: membresía ${membership!.id}, invoice ${invoice.id}`);
               }
             } catch (cfdiErr) {
               console.error('Error triggering membership CFDI:', cfdiErr);
