@@ -43,13 +43,14 @@ Deno.serve(async (req: Request) => {
     const { booking_id, cancellation_reason } = await req.json();
     if (!booking_id) return err("booking_id es requerido");
 
-    // Load booking + tour fields needed for policy calculation
+    // Load booking + tour fields + insurance fields needed for policy calculation
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")
       .select(`
         id, status, payment_status, deposit_amount, service_charge,
         user_id, tour_id, agency_id, booking_code, cancelled_at,
         is_no_show, approval_status, selected_date, selected_time,
+        travel_insurance_included, travel_insurance_cost,
         tours!bookings_tour_id_fkey(
           id, name, tour_type, start_date,
           cancellation_not_allowed,
@@ -67,28 +68,40 @@ Deno.serve(async (req: Request) => {
 
     // Eligibility checks
     if (booking.cancelled_at || booking.status === "cancelled") return err("Esta reserva ya fue cancelada");
-    if (booking.is_no_show) return err("Esta reserva está marcada como No Show y no puede cancelarse");
-    if (booking.approval_status === "rejected") return err("Esta reserva fue rechazada y no puede cancelarse");
+    if ((booking as any).is_no_show) return err("Esta reserva está marcada como No Show y no puede cancelarse");
+    if ((booking as any).approval_status === "rejected") return err("Esta reserva fue rechazada y no puede cancelarse");
     if (!["pending", "confirmed"].includes(booking.status)) return err("Solo se pueden cancelar reservas pendientes o confirmadas");
 
     const tour = (booking as any).tours as any;
     if (!tour) return err("Información del tour no encontrada");
 
-    const isPending = booking.approval_status === "pending";
+    const isPending = (booking as any).approval_status === "pending";
     const isReceptivo = tour.tour_type === "receptivo";
 
     // Determine departure datetime for policy calculation
     let departureDateTime: Date;
+    let tourStartDateForRecord: string | null = null;
+
     if (isReceptivo) {
-      const selectedDate = (booking as any).selected_date;
-      const selectedTime = (booking as any).selected_time || "00:00:00";
+      const selectedDate = (booking as any).selected_date as string | null;
+      const selectedTime = ((booking as any).selected_time as string | null) || "00:00:00";
       if (selectedDate) {
         departureDateTime = new Date(`${selectedDate}T${selectedTime}`);
+        tourStartDateForRecord = selectedDate;
+      } else if (tour.start_date) {
+        departureDateTime = new Date(tour.start_date);
+        tourStartDateForRecord = tour.start_date;
       } else {
-        departureDateTime = tour.start_date ? new Date(tour.start_date) : new Date();
+        // No date available: use tomorrow as a safe fallback so the cancellation proceeds
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        departureDateTime = tomorrow;
+        tourStartDateForRecord = tomorrow.toISOString().split("T")[0];
       }
     } else {
-      departureDateTime = tour.start_date ? new Date(tour.start_date) : new Date();
+      if (!tour.start_date) return err("El tour no tiene fecha de inicio configurada");
+      departureDateTime = new Date(tour.start_date);
+      tourStartDateForRecord = tour.start_date;
     }
 
     const now = new Date();
@@ -106,8 +119,13 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
     const commissionRate = ((platformSettings as any)?.agency_commission_percentage || 15) / 100;
 
-    const originalDepositAmount = Number(booking.deposit_amount || 0);
-    const originalServiceCharge = Number(booking.service_charge || 0);
+    const originalDepositAmount = Number((booking as any).deposit_amount || 0);
+    const originalServiceCharge = Number((booking as any).service_charge || 0);
+
+    // BUG FIX 1: include travel insurance in refund calculation
+    const insuranceRefund = (booking as any).travel_insurance_included
+      ? Number((booking as any).travel_insurance_cost || 0)
+      : 0;
 
     // Fetch optional services
     const { data: optionalServicesData } = await supabase
@@ -157,7 +175,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const depositRefund = originalDepositAmount * refundPct;
-    const refundAmountToTraveler = depositRefund + optionalServicesRefundable;
+    // BUG FIX 1: sum insurance refund into total
+    const refundAmountToTraveler = depositRefund + optionalServicesRefundable + insuranceRefund;
     const amountToAgency = penaltyAmount * (1 - commissionRate);
     const amountToPlatform = penaltyAmount * commissionRate;
 
@@ -188,6 +207,12 @@ Deno.serve(async (req: Request) => {
 
       const newBalance = Number(wallet.balance) + refundAmountToTraveler;
 
+      // Build description with all refund components
+      const descParts: string[] = [];
+      if (optionalServicesRefundable > 0) descParts.push(`servicios opcionales $${optionalServicesRefundable.toFixed(2)}`);
+      if (insuranceRefund > 0) descParts.push(`seguro de viaje $${insuranceRefund.toFixed(2)}`);
+      const descSuffix = descParts.length > 0 ? ` (incluye ${descParts.join(", ")})` : "";
+
       const { data: transaction, error: txError } = await supabase
         .from("toursred_cash_transactions")
         .insert({
@@ -196,7 +221,7 @@ Deno.serve(async (req: Request) => {
           amount: refundAmountToTraveler,
           balance_after: newBalance,
           type: "refund",
-          description: `Reembolso por cancelación - ${tour.name}${optionalServicesRefundable > 0 ? ` (incluye $${optionalServicesRefundable.toFixed(2)} de servicios adicionales)` : ""}`,
+          description: `Reembolso por cancelación - ${tour.name}${descSuffix}`,
           reference_id: booking_id,
           reference_type: "booking_cancellation",
         })
@@ -213,16 +238,15 @@ Deno.serve(async (req: Request) => {
       if (walletUpdateError) throw new Error("Error actualizando balance del wallet");
     }
 
-    // Insert booking_cancellation record using service role (bypasses RLS)
+    // BUG FIX 2: tour_start_date is NOT NULL — always provide a valid date
+    // tourStartDateForRecord is guaranteed non-null from the logic above
     const { data: cancellationRecord, error: cancellationError } = await supabase
       .from("booking_cancellations")
       .insert({
         booking_id: booking_id,
         cancelled_by_user_id: user.id,
         cancelled_at: now.toISOString(),
-        tour_start_date: isReceptivo
-          ? ((booking as any).selected_date || tour.start_date || null)
-          : (tour.start_date || null),
+        tour_start_date: tourStartDateForRecord,
         days_before_tour: daysBeforeTour,
         cancellation_policy_type: policyType,
         original_deposit_amount: originalDepositAmount,
@@ -237,9 +261,12 @@ Deno.serve(async (req: Request) => {
       .select()
       .single();
 
-    if (cancellationError) throw new Error(`Error registrando cancelación: ${cancellationError.message}`);
+    if (cancellationError) {
+      console.error("Error registrando booking_cancellations:", JSON.stringify(cancellationError));
+      throw new Error(`Error registrando cancelación: ${cancellationError.message}`);
+    }
 
-    // Update booking status
+    // BUG FIX 2: update booking status — log error explicitly if it fails
     const { error: updateBookingError } = await supabase
       .from("bookings")
       .update({
@@ -250,7 +277,10 @@ Deno.serve(async (req: Request) => {
       })
       .eq("id", booking_id);
 
-    if (updateBookingError) throw new Error(`Error actualizando reserva: ${updateBookingError.message}`);
+    if (updateBookingError) {
+      console.error("Error actualizando bookings a cancelled:", JSON.stringify(updateBookingError));
+      throw new Error(`Error actualizando reserva: ${updateBookingError.message}`);
+    }
 
     // Create penalty record if applicable
     if (penaltyAmount > 0 && (policyType === "50_percent" || policyType === "no_refund")) {
@@ -258,8 +288,8 @@ Deno.serve(async (req: Request) => {
         .from("cancellation_penalty_records")
         .insert({
           booking_id: booking_id,
-          agency_id: booking.agency_id,
-          tour_id: booking.tour_id,
+          agency_id: (booking as any).agency_id,
+          tour_id: (booking as any).tour_id,
           cancellation_type: "full",
           cancellation_id: cancellationRecord.id,
           cancellation_policy_type: policyType,
