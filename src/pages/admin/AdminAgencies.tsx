@@ -293,11 +293,7 @@ const AdminAgencies: React.FC = () => {
       setIsUpdating(selectedAgency.id);
       setError('');
 
-      console.log('🔄 Actualizando agencia:', {
-        id: selectedAgency.id,
-        commission_rate: editForm.commission_rate,
-        commission_percentage: (editForm.commission_rate * 100).toFixed(1)
-      });
+      const commissionChanged = editForm.commission_rate !== selectedAgency.commission_rate;
 
       // Actualizar datos de la agencia
       const { data: updateData, error: agencyError } = await supabase
@@ -325,8 +321,6 @@ const AdminAgencies: React.FC = () => {
         throw new Error(`Error actualizando agencia: ${agencyError.message}`);
       }
 
-      console.log('✅ Agencia actualizada en BD:', updateData);
-
       // Actualizar datos del usuario propietario
       const { error: userError } = await supabase
         .from('users')
@@ -341,7 +335,28 @@ const AdminAgencies: React.FC = () => {
         console.warn('⚠️ Error actualizando datos del usuario:', userError);
       }
 
-      console.log('✅ Agencia actualizada correctamente');
+      // Audit log explícito cuando cambia la comisión (captura email del admin)
+      if (commissionChanged) {
+        const { data: { user: adminUser } } = await supabase.auth.getUser();
+        await supabase.rpc('insert_audit_log', {
+          p_tenant_type: 'admin',
+          p_actor_id: adminUser?.id ?? null,
+          p_actor_email: adminUser?.email ?? null,
+          p_actor_role: 'admin',
+          p_target_table: 'agencies',
+          p_target_id: selectedAgency.id,
+          p_action: 'UPDATE_COMMISSION',
+          p_old_values: { commission_rate: selectedAgency.commission_rate },
+          p_new_values: { commission_rate: editForm.commission_rate },
+          p_metadata: {
+            changed_field: 'commission_rate',
+            agency_name: selectedAgency.name,
+            old_percentage: (selectedAgency.commission_rate ?? 0) * 100,
+            new_percentage: editForm.commission_rate * 100
+          }
+        });
+      }
+
       await fetchAgencies();
       setIsEditingAgency(false);
       setSelectedAgency(null);
