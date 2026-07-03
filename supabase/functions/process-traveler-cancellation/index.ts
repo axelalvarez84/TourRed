@@ -1,0 +1,312 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+};
+
+function ok(data: unknown) {
+  return new Response(JSON.stringify(data), {
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function err(message: string) {
+  return new Response(JSON.stringify({ success: false, error: message }), {
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 200, headers: corsHeaders });
+  }
+
+  try {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // Validate auth and identify the calling traveler
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) return err("No authorization header");
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !user) return err("Token inválido");
+
+    const { booking_id, cancellation_reason } = await req.json();
+    if (!booking_id) return err("booking_id es requerido");
+
+    // Load booking + tour fields needed for policy calculation
+    const { data: booking, error: bookingError } = await supabase
+      .from("bookings")
+      .select(`
+        id, status, payment_status, deposit_amount, service_charge,
+        user_id, tour_id, agency_id, booking_code, cancelled_at,
+        is_no_show, approval_status, selected_date, selected_time,
+        tours!bookings_tour_id_fkey(
+          id, name, tour_type, start_date,
+          cancellation_not_allowed,
+          flexible_hours, flexible_refund_percentage,
+          moderate_hours, moderate_refund_percentage
+        )
+      `)
+      .eq("id", booking_id)
+      .maybeSingle();
+
+    if (bookingError || !booking) return err("Reserva no encontrada");
+
+    // Security: only the booking owner can cancel
+    if (booking.user_id !== user.id) return err("No tienes permiso para cancelar esta reserva");
+
+    // Eligibility checks
+    if (booking.cancelled_at || booking.status === "cancelled") return err("Esta reserva ya fue cancelada");
+    if (booking.is_no_show) return err("Esta reserva está marcada como No Show y no puede cancelarse");
+    if (booking.approval_status === "rejected") return err("Esta reserva fue rechazada y no puede cancelarse");
+    if (!["pending", "confirmed"].includes(booking.status)) return err("Solo se pueden cancelar reservas pendientes o confirmadas");
+
+    const tour = (booking as any).tours as any;
+    if (!tour) return err("Información del tour no encontrada");
+
+    const isPending = booking.approval_status === "pending";
+    const isReceptivo = tour.tour_type === "receptivo";
+
+    // Determine departure datetime for policy calculation
+    let departureDateTime: Date;
+    if (isReceptivo) {
+      const selectedDate = (booking as any).selected_date;
+      const selectedTime = (booking as any).selected_time || "00:00:00";
+      if (selectedDate) {
+        departureDateTime = new Date(`${selectedDate}T${selectedTime}`);
+      } else {
+        departureDateTime = tour.start_date ? new Date(tour.start_date) : new Date();
+      }
+    } else {
+      departureDateTime = tour.start_date ? new Date(tour.start_date) : new Date();
+    }
+
+    const now = new Date();
+    const millisecondsPerHour = 1000 * 60 * 60;
+    const hoursBeforeTour = (departureDateTime.getTime() - now.getTime()) / millisecondsPerHour;
+    const daysBeforeTour = Math.ceil(hoursBeforeTour / 24);
+
+    // Validate tour hasn't started
+    if (hoursBeforeTour <= 0) return err("No se puede cancelar una reserva de un tour que ya inició o ha pasado");
+
+    // Fetch platform commission rate
+    const { data: platformSettings } = await supabase
+      .from("platform_settings")
+      .select("agency_commission_percentage")
+      .maybeSingle();
+    const commissionRate = ((platformSettings as any)?.agency_commission_percentage || 15) / 100;
+
+    const originalDepositAmount = Number(booking.deposit_amount || 0);
+    const originalServiceCharge = Number(booking.service_charge || 0);
+
+    // Fetch optional services
+    const { data: optionalServicesData } = await supabase
+      .from("booking_optional_services")
+      .select("subtotal, tour_optional_service_id, tour_optional_services(is_refundable)")
+      .eq("booking_id", booking_id)
+      .eq("is_cancelled", false);
+
+    let optionalServicesRefundable = 0;
+    for (const bos of (optionalServicesData || [])) {
+      const isRefundable = (bos as any).tour_optional_services?.is_refundable !== false;
+      if (isRefundable) optionalServicesRefundable += Number((bos as any).subtotal || 0);
+    }
+
+    // Calculate cancellation policy
+    let policyType: string;
+    let refundPct: number;
+    let penaltyAmount: number;
+
+    if (isPending) {
+      policyType = "pending_approval";
+      refundPct = 1;
+      penaltyAmount = 0;
+    } else if (tour.cancellation_not_allowed) {
+      policyType = "no_refund";
+      refundPct = 0;
+      penaltyAmount = originalDepositAmount;
+    } else {
+      const flexibleHours = Number(tour.flexible_hours ?? 48);
+      const flexibleRefundPct = Number(tour.flexible_refund_percentage ?? 100) / 100;
+      const moderateHours = Number(tour.moderate_hours ?? 24);
+      const moderateRefundPct = Number(tour.moderate_refund_percentage ?? 50) / 100;
+
+      if (hoursBeforeTour >= flexibleHours) {
+        refundPct = flexibleRefundPct;
+        penaltyAmount = originalDepositAmount * (1 - flexibleRefundPct);
+        policyType = flexibleRefundPct >= 1 ? "100_percent" : "50_percent";
+      } else if (hoursBeforeTour >= moderateHours) {
+        refundPct = moderateRefundPct;
+        penaltyAmount = originalDepositAmount * (1 - moderateRefundPct);
+        policyType = moderateRefundPct > 0 ? "50_percent" : "no_refund";
+      } else {
+        refundPct = 0;
+        penaltyAmount = originalDepositAmount;
+        policyType = "no_refund";
+      }
+    }
+
+    const depositRefund = originalDepositAmount * refundPct;
+    const refundAmountToTraveler = depositRefund + optionalServicesRefundable;
+    const amountToAgency = penaltyAmount * (1 - commissionRate);
+    const amountToPlatform = penaltyAmount * commissionRate;
+
+    // Cancel optional services
+    await supabase.rpc("cancel_booking_optional_services", {
+      p_booking_id: booking_id,
+      p_cancelled_by_agency: false,
+    });
+
+    // Process refund to ToursRed Cash wallet if there's a refund
+    let transactionId: string | null = null;
+    if (refundAmountToTraveler > 0) {
+      let { data: wallet } = await supabase
+        .from("toursred_cash_wallets")
+        .select("*")
+        .eq("user_id", booking.user_id)
+        .maybeSingle();
+
+      if (!wallet) {
+        const { data: newWallet, error: walletCreateError } = await supabase
+          .from("toursred_cash_wallets")
+          .insert({ user_id: booking.user_id, balance: 0, currency: "MXN" })
+          .select()
+          .single();
+        if (walletCreateError || !newWallet) throw new Error("Error creando wallet del viajero");
+        wallet = newWallet;
+      }
+
+      const newBalance = Number(wallet.balance) + refundAmountToTraveler;
+
+      const { data: transaction, error: txError } = await supabase
+        .from("toursred_cash_transactions")
+        .insert({
+          wallet_id: wallet.id,
+          user_id: booking.user_id,
+          amount: refundAmountToTraveler,
+          balance_after: newBalance,
+          type: "refund",
+          description: `Reembolso por cancelación - ${tour.name}${optionalServicesRefundable > 0 ? ` (incluye $${optionalServicesRefundable.toFixed(2)} de servicios adicionales)` : ""}`,
+          reference_id: booking_id,
+          reference_type: "booking_cancellation",
+        })
+        .select()
+        .single();
+
+      if (txError || !transaction) throw new Error("Error creando transacción de reembolso");
+      transactionId = transaction.id;
+
+      const { error: walletUpdateError } = await supabase
+        .from("toursred_cash_wallets")
+        .update({ balance: newBalance })
+        .eq("id", wallet.id);
+      if (walletUpdateError) throw new Error("Error actualizando balance del wallet");
+    }
+
+    // Insert booking_cancellation record using service role (bypasses RLS)
+    const { data: cancellationRecord, error: cancellationError } = await supabase
+      .from("booking_cancellations")
+      .insert({
+        booking_id: booking_id,
+        cancelled_by_user_id: user.id,
+        cancelled_at: now.toISOString(),
+        tour_start_date: isReceptivo
+          ? ((booking as any).selected_date || tour.start_date || null)
+          : (tour.start_date || null),
+        days_before_tour: daysBeforeTour,
+        cancellation_policy_type: policyType,
+        original_deposit_amount: originalDepositAmount,
+        original_service_charge: originalServiceCharge,
+        refund_amount_to_traveler: refundAmountToTraveler,
+        amount_to_agency: amountToAgency,
+        amount_to_platform: amountToPlatform,
+        toursred_cash_transaction_id: transactionId,
+        refund_processed: refundAmountToTraveler > 0,
+        cancellation_reason: cancellation_reason || null,
+      })
+      .select()
+      .single();
+
+    if (cancellationError) throw new Error(`Error registrando cancelación: ${cancellationError.message}`);
+
+    // Update booking status
+    const { error: updateBookingError } = await supabase
+      .from("bookings")
+      .update({
+        status: "cancelled",
+        cancelled_at: now.toISOString(),
+        cancellation_type: policyType,
+        cancellation_refund_amount: refundAmountToTraveler,
+      })
+      .eq("id", booking_id);
+
+    if (updateBookingError) throw new Error(`Error actualizando reserva: ${updateBookingError.message}`);
+
+    // Create penalty record if applicable
+    if (penaltyAmount > 0 && (policyType === "50_percent" || policyType === "no_refund")) {
+      const { error: penaltyError } = await supabase
+        .from("cancellation_penalty_records")
+        .insert({
+          booking_id: booking_id,
+          agency_id: booking.agency_id,
+          tour_id: booking.tour_id,
+          cancellation_type: "full",
+          cancellation_id: cancellationRecord.id,
+          cancellation_policy_type: policyType,
+          original_booking_amount: originalDepositAmount,
+          gross_penalty: penaltyAmount,
+          agency_net_amount: amountToAgency,
+          platform_amount: amountToPlatform,
+          status: "pending",
+        });
+      if (penaltyError) {
+        console.error("Error creando cancellation_penalty_record:", penaltyError.message);
+      }
+    }
+
+    // Generate accounting entry (fire-and-forget, only for non-full-refund)
+    if (policyType === "50_percent" || policyType === "no_refund") {
+      supabase.rpc("create_accounting_entry_for_cancellation", {
+        p_cancellation_id: cancellationRecord.id,
+        p_cancellation_type: "full",
+      }).then(({ error: accErr }: { error: any }) => {
+        if (accErr) console.error("Error generando póliza de cancelación:", accErr.message);
+      });
+    }
+
+    // Send notifications (fire-and-forget)
+    const notificationBody = {
+      booking_id: booking_id,
+      cancellation_id: cancellationRecord.id,
+    };
+    supabase.functions.invoke("send-cancellation-notification-traveler", { body: notificationBody })
+      .catch((e: unknown) => console.error("Error enviando email viajero:", e));
+    supabase.functions.invoke("send-cancellation-notification-agency", { body: notificationBody })
+      .catch((e: unknown) => console.error("Error enviando email agencia:", e));
+    supabase.functions.invoke("send-cancellation-notification-admin", { body: notificationBody })
+      .catch((e: unknown) => console.error("Error enviando email admin:", e));
+
+    return ok({
+      success: true,
+      cancellation_id: cancellationRecord.id,
+      refund_amount: refundAmountToTraveler,
+      refund_percentage: Math.round(refundPct * 100),
+      policy_type: policyType,
+      days_before_tour: daysBeforeTour,
+    });
+
+  } catch (error: any) {
+    console.error("process-traveler-cancellation error:", error);
+    return err(error.message || "Error al procesar la cancelación");
+  }
+});

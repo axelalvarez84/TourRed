@@ -3,7 +3,7 @@ import { Calendar, MapPin, Users, DollarSign, Clock, Eye, AlertCircle, Star, X, 
 import SeatReselectionModal from '../../components/SeatReselectionModal';
 import PaymentPlanCalendar from '../../components/PaymentPlanCalendar';
 import { useAuth } from '../../context/AuthContext';
-import { getUserBookings, getUserPastBookings, getUserCancelledBookings, parseDateFromDB, supabase, calculateCancellationPolicy, processCancellation, calculatePartialCancellationPolicy, processPartialCancellation, PartialCancellationTraveler } from '../../lib/supabase';
+import { getUserBookings, getUserPastBookings, getUserCancelledBookings, parseDateFromDB, supabase, calculateCancellationPolicy, calculatePartialCancellationPolicy, processPartialCancellation, PartialCancellationTraveler } from '../../lib/supabase';
 import { Booking, PendingReschedule } from '../../types';
 import { format } from 'date-fns';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -845,15 +845,18 @@ const TravelerBookings: React.FC = () => {
     }));
 
     try {
-      const result = await processCancellation(
-        cancellationModal.booking.id,
-        user.id,
-        cancellationModal.cancellationReason || undefined
+      const { data: result, error: fnError } = await supabase.functions.invoke(
+        'process-traveler-cancellation',
+        {
+          body: {
+            booking_id: cancellationModal.booking.id,
+            cancellation_reason: cancellationModal.cancellationReason || undefined,
+          },
+        }
       );
 
-      if (result.error) {
-        throw new Error(result.error);
-      }
+      if (fnError) throw new Error(fnError.message);
+      if (result?.error) throw new Error(result.error);
 
       cancellationFormPersistence.clearStorage();
 
@@ -3050,7 +3053,7 @@ const TravelerBookings: React.FC = () => {
                             </span>
                           </div>
                           <div className="text-sm text-gray-600">
-                            Fecha del tour: {formatFullDate((cancellationModal.booking.tours as any).start_date)}
+                            Fecha del tour: {formatFullDate((cancellationModal.booking as any).selected_date ?? (cancellationModal.booking.tours as any).start_date)}
                           </div>
                         </div>
 
