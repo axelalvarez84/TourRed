@@ -567,7 +567,7 @@ Deno.serve(async (req: Request) => {
     if (precioMembresiaBruto > 0) {
       const planLabel = (booking as any).membership_plan === "annual" ? "anual" : "mensual";
       conceptos.push({
-        clave_prod_serv: "92111500",
+        clave_prod_serv: "80141628",
         cantidad: 1,
         clave_unidad: "E48",
         descripcion: `Membresia ToursRed Plus (${planLabel}) - Reserva ${bookingRef}`,

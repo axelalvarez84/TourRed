@@ -1514,6 +1514,64 @@ Deno.serve(async (req) => {
               }
 
               if (isSubscriptionCreate) {
+                // Activar membresía si no está activa aún (flujo mixed-cart: subscription llega
+                // como 'incomplete' y solo se activa al confirmar el pago vía invoice)
+                const { data: currentMembership } = await supabase
+                  .from('memberships')
+                  .select('id, status, user_id, plan_type')
+                  .eq('id', membership.id)
+                  .maybeSingle();
+
+                if (currentMembership && currentMembership.status !== 'active') {
+                  console.log(`Activando membresía ${membership.id} desde invoice.payment_succeeded (era ${currentMembership.status})`);
+                  await supabase
+                    .from('memberships')
+                    .update({ status: 'active' })
+                    .eq('id', membership.id);
+
+                  // Enviar correo de bienvenida
+                  try {
+                    const { data: userData } = await supabase
+                      .from('users')
+                      .select('email, first_name')
+                      .eq('id', currentMembership.user_id)
+                      .maybeSingle();
+
+                    if (userData) {
+                      const subscriptionData = await stripe.subscriptions.retrieve(subscriptionId);
+                      console.log('📧 Enviando correo de bienvenida ToursRed Plus (activación vía invoice)...');
+                      const welcomeRes = await fetch(
+                        `${supabaseUrl}/functions/v1/send-membership-welcome`,
+                        {
+                          method: 'POST',
+                          headers: {
+                            'Authorization': `Bearer ${supabaseServiceKey}`,
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({
+                            email: userData.email,
+                            firstName: userData.first_name || 'Viajero',
+                            planType: currentMembership.plan_type || 'monthly',
+                            startDate: new Date((subscriptionData as any).current_period_start * 1000).toISOString(),
+                            endDate: new Date((subscriptionData as any).current_period_end * 1000).toISOString(),
+                          }),
+                        }
+                      );
+                      if (welcomeRes.ok) {
+                        console.log('✅ Correo de bienvenida enviado exitosamente');
+                      } else {
+                        console.error('Error enviando correo de bienvenida:', await welcomeRes.text());
+                      }
+                    }
+                  } catch (welcomeErr) {
+                    console.error('Error en envío de correo de bienvenida:', welcomeErr);
+                  }
+                } else {
+                  console.log(`Membresía ${membership.id} ya está activa, omitiendo activación`);
+                }
+              }
+
+              if (isSubscriptionCreate) {
                 // Alta nueva: cancelar el CFDI disparado desde subscription.created (sin monto)
                 // y generar uno nuevo con el monto real pagado (puede incluir descuento de cupón)
                 await supabase

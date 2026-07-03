@@ -151,7 +151,7 @@ Deno.serve(async (req: Request) => {
     const depositPercentage = booking.tour.deposit_percentage;
     const serviceChargePercentage = platformSettings.service_charge_percentage;
     const agencyCommission = Number(booking.commission_amount) || 0;
-    const agencyCommissionPercentage = totalPrice > 0 ? Math.round((agencyCommission / totalPrice) * 1000) / 10 : 0;
+    const agencyCommissionPercentage = platformSettings?.platform_commission_percentage ?? (totalPrice > 0 ? Math.round((agencyCommission / totalPrice) * 1000) / 10 : 0);
     const serviceCharge = booking.service_charge || 0;
     const serviceChargeDiscount = Number(booking.service_charge_discount) || 0;
     const discountAmount = Number(booking.discount_amount) || 0;
@@ -171,6 +171,8 @@ Deno.serve(async (req: Request) => {
     const membershipPurchased = booking.membership_purchased || false;
     const membershipPlan = booking.membership_plan || null;
     const membershipCost = Number(booking.membership_cost) || 0;
+    // Monto real cobrado al viajero hoy: depósito + seguro + membresía (calculado, no el campo stale de BD)
+    const adminTotalCobrado = depositAmount + travelInsuranceCost + membershipCost;
 
     const formatDate = (dateString: string | null | undefined) => {
       if (!dateString) return 'No disponible';
@@ -836,7 +838,7 @@ Deno.serve(async (req: Request) => {
         ${insuranceDiscountAmount > 0 ? `<div class="info-row"><span class="info-label" style="color:#059669;">Descuento en seguro (plataforma absorbe):</span><span class="info-value" style="color:#059669;">-${formatCurrency(insuranceDiscountAmount)}</span></div>` : ''}
         <div class="info-row" style="background-color: #f0fdf4; padding: 8px 5px; margin: 5px -5px;">
           <span class="info-label" style="font-weight: 700;">Total cobrado al viajero hoy:</span>
-          <span class="info-value" style="font-weight: 700;">${formatCurrency(userPayment)}</span>
+          <span class="info-value" style="font-weight: 700;">${formatCurrency(adminTotalCobrado)}</span>
         </div>
         ` : ''}
         ${serviceChargeDiscount > 0 ? `
@@ -908,6 +910,12 @@ Deno.serve(async (req: Request) => {
           </span>
         </div>
         ` : ''}
+        ${membershipPurchased && membershipCost > 0 ? `
+        <div class="info-row" style="background-color: #eff6ff; padding: 8px 5px; margin: 5px -5px;">
+          <span class="info-label" style="font-weight: 600;">💎 Membresía ToursRed Plus (${membershipPlan === 'annual' ? 'anual' : 'mensual'}):</span>
+          <span class="info-value" style="color: #1e40af;">${formatCurrency(membershipCost)}</span>
+        </div>
+        ` : ''}
         <div class="info-row">
           <span class="info-label">Comisión de agencia (${agencyCommissionPercentage}%):</span>
           <span class="info-value" style="color: #16a34a;">${formatCurrency(agencyCommission)}</span>
@@ -915,10 +923,10 @@ Deno.serve(async (req: Request) => {
         <div class="highlight">
           <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold;">
             <span>Ingresos netos de la plataforma:</span>
-            <span style="color: #059669;">${formatCurrency(agencyCommission + serviceCharge)}</span>
+            <span style="color: #059669;">${formatCurrency(agencyCommission + serviceCharge + membershipCost)}</span>
           </div>
           <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">
-            (Comisión ${formatCurrency(agencyCommission)} + Cargo ${formatCurrency(serviceCharge)})
+            Comisión ${formatCurrency(agencyCommission)} + Cargo ${formatCurrency(serviceCharge)}${membershipCost > 0 ? ` + Membresía ${formatCurrency(membershipCost)}` : ''}
           </div>
         </div>
         <div class="info-row">
