@@ -529,15 +529,26 @@ Deno.serve(async (req: Request) => {
       </div>
 
       ${(() => {
-        const cancellationText = booking.tour.cancellation_not_allowed
-          ? 'Este tour es de tipo "No Cancelable". No aplica reembolso una vez confirmada la reserva, salvo causas imputables a la agencia o a ToursRed, o por disposición legal aplicable.'
-          : 'Cancelaciones con 15 días naturales o más de anticipación: reembolso del 100% mediante ToursRed Cash. Entre 7 y 14 días: reembolso del 50%. Con menos de 7 días: no hay derecho a reembolso. Si la reserva se realizó con más de 10 días hábiles de anticipación al tour, aplica además el derecho de revocación de 5 días hábiles conforme al Artículo 56 de la LFPC.';
+        const termsUrl = `${platformSettings.platform_url}/terminos-servicio`;
+        const lfpcClause = 'Si la reserva se realizó con más de 10 días hábiles de anticipación, aplica el derecho de revocación de 5 días hábiles conforme al Artículo 56 de la LFPC y la NOM-010-TUR.';
+        let cancellationText: string;
+        if (booking.tour.cancellation_not_allowed) {
+          cancellationText = `Este tour es de tipo No Cancelable. No aplica reembolso una vez confirmada la reserva, salvo causas imputables a la agencia o a ToursRed, o por disposición legal aplicable. ${lfpcClause}`;
+        } else if (booking.tour.tour_type === 'receptivo') {
+          const fh = booking.tour.flexible_hours ?? 48;
+          const fp = booking.tour.flexible_refund_percentage ?? 100;
+          const mh = booking.tour.moderate_hours ?? 24;
+          const mp = booking.tour.moderate_refund_percentage ?? 50;
+          cancellationText = `Cancelación con más de ${fh}h de anticipación: reembolso del ${fp}%. Entre ${mh}h y ${fh}h: reembolso del ${mp}%. Con menos de ${mh}h: sin derecho a reembolso. ${lfpcClause}`;
+        } else {
+          cancellationText = `Cancelaciones con 15 días naturales o más de anticipación: reembolso del 100% en ToursRed Cash. Entre 7 y 14 días: reembolso del 50%. Con menos de 7 días: sin derecho a reembolso. ${lfpcClause}`;
+        }
         return `
       <div class="section">
         <div class="section-title">📌 Política de Cancelación</div>
         <p style="color: #374151; font-size: 14px; margin: 0;">${cancellationText}</p>
         <p style="color: #6b7280; font-size: 12px; margin-top: 8px; margin-bottom: 0;">
-          Consulta los Términos y Condiciones completos en toursred.com/terminos
+          Consulta los Términos y Condiciones completos en <a href="${termsUrl}" style="color: #6b7280;">${termsUrl}</a>
         </p>
       </div>`;
       })()}
