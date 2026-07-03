@@ -1351,6 +1351,11 @@ Deno.serve(async (req) => {
         const wasNotActive = !existingMembership || existingMembership.status !== 'active';
         const isNowActive = mappedStatus === 'active';
 
+        const nextMonthStart = new Date();
+        nextMonthStart.setDate(1);
+        nextMonthStart.setMonth(nextMonthStart.getMonth() + 1);
+        nextMonthStart.setHours(0, 0, 0, 0);
+
         const membershipData = {
           user_id: userId,
           stripe_customer_id: subscription.customer,
@@ -1362,6 +1367,7 @@ Deno.serve(async (req) => {
           current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
           cancel_at_period_end: subscription.cancel_at_period_end || false,
           cancelled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
+          service_fee_exemption_reset_date: nextMonthStart.toISOString(),
         };
 
         console.log('Upserting membership:', membershipData);
@@ -1479,6 +1485,11 @@ Deno.serve(async (req) => {
                 'active': 'active', 'past_due': 'past_due', 'canceled': 'cancelled',
                 'unpaid': 'expired', 'paused': 'past_due'
               };
+              const nms = new Date();
+              nms.setDate(1);
+              nms.setMonth(nms.getMonth() + 1);
+              nms.setHours(0, 0, 0, 0);
+
               const { data: upserted } = await supabase
                 .from('memberships')
                 .upsert({
@@ -1492,6 +1503,7 @@ Deno.serve(async (req) => {
                   current_period_end: new Date((subscriptionData as any).current_period_end * 1000).toISOString(),
                   cancel_at_period_end: subscriptionData.cancel_at_period_end || false,
                   cancelled_at: subscriptionData.canceled_at ? new Date(subscriptionData.canceled_at * 1000).toISOString() : null,
+                  service_fee_exemption_reset_date: nms.toISOString(),
                 }, { onConflict: 'stripe_subscription_id' })
                 .select('id')
                 .single();
