@@ -519,6 +519,94 @@ Deno.serve(async (req) => {
           } else {
             console.log(`Successfully updated booking ${bookingId} to paid status`);
 
+            // Activate membership if purchased alongside booking (mixed-cart)
+            const membershipPurchased = session.metadata?.membership_purchased === 'true';
+            const membershipPlan = session.metadata?.membership_plan || 'monthly';
+            if (membershipPurchased && session.subscription) {
+              try {
+                console.log(`Mixed-cart membership detected. Activating for subscription ${session.subscription}`);
+                const subscriptionId = session.subscription as string;
+                const subscriptionData = await stripe.subscriptions.retrieve(subscriptionId);
+                const membershipUserId = subscriptionData.metadata?.user_id || booking.user_id;
+
+                const { data: existingMembership } = await supabase
+                  .from('memberships')
+                  .select('id, status')
+                  .eq('stripe_subscription_id', subscriptionId)
+                  .maybeSingle();
+
+                const wasAlreadyActive = existingMembership?.status === 'active';
+
+                const nms = new Date();
+                nms.setDate(1);
+                nms.setMonth(nms.getMonth() + 1);
+                nms.setHours(0, 0, 0, 0);
+
+                const statusMapMixed: Record<string, string> = {
+                  'incomplete': 'trialing', 'incomplete_expired': 'expired', 'trialing': 'trialing',
+                  'active': 'active', 'past_due': 'past_due', 'canceled': 'active',
+                  'unpaid': 'expired', 'paused': 'past_due'
+                };
+
+                const { data: upsertedMembership, error: membershipUpsertErr } = await supabase
+                  .from('memberships')
+                  .upsert({
+                    user_id: membershipUserId,
+                    stripe_customer_id: subscriptionData.customer as string,
+                    stripe_subscription_id: subscriptionId,
+                    plan_type: subscriptionData.metadata?.plan_type || membershipPlan,
+                    status: statusMapMixed[subscriptionData.status] || 'active',
+                    start_date: new Date((subscriptionData.start_date as number) * 1000).toISOString(),
+                    current_period_start: new Date((subscriptionData as any).current_period_start * 1000).toISOString(),
+                    current_period_end: new Date((subscriptionData as any).current_period_end * 1000).toISOString(),
+                    cancel_at_period_end: subscriptionData.cancel_at_period_end || false,
+                    cancelled_at: subscriptionData.canceled_at ? new Date(subscriptionData.canceled_at * 1000).toISOString() : null,
+                    service_fee_exemption_reset_date: nms.toISOString(),
+                  }, { onConflict: 'stripe_subscription_id' })
+                  .select('id, status')
+                  .single();
+
+                if (membershipUpsertErr) {
+                  console.error(`Error upserting mixed-cart membership: ${membershipUpsertErr.message}`);
+                } else {
+                  console.log(`✅ Mixed-cart membership activated: ${upsertedMembership?.id}`);
+
+                  if (!wasAlreadyActive) {
+                    const { data: userData } = await supabase
+                      .from('users')
+                      .select('email, first_name')
+                      .eq('id', membershipUserId)
+                      .maybeSingle();
+
+                    if (userData) {
+                      console.log('📧 Sending mixed-cart membership welcome email...');
+                      const welcomeRes = await fetch(
+                        `${supabaseUrl}/functions/v1/send-membership-welcome`,
+                        {
+                          method: 'POST',
+                          headers: { 'Authorization': `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            email: userData.email,
+                            firstName: userData.first_name || 'Viajero',
+                            planType: subscriptionData.metadata?.plan_type || membershipPlan,
+                            startDate: new Date((subscriptionData as any).current_period_start * 1000).toISOString(),
+                            endDate: new Date((subscriptionData as any).current_period_end * 1000).toISOString(),
+                          }),
+                        }
+                      );
+                      if (welcomeRes.ok) {
+                        console.log('✅ Mixed-cart membership welcome email sent');
+                      } else {
+                        console.error('Error sending mixed-cart membership welcome email:', await welcomeRes.text());
+                      }
+                    }
+                  }
+                }
+              } catch (mixedMembershipErr) {
+                console.error('Error activating mixed-cart membership:', mixedMembershipErr);
+              }
+            }
+
             // Apply preventa commission discount (10% on first 10 preventa bookings)
             try {
               const { data: bookingForPreventa } = await supabase

@@ -218,7 +218,7 @@ Deno.serve(async (req) => {
       cancel_url: cancel_url || `${req.headers.get("origin")}/booking-cancel?booking_id=${bookingId}`,
       metadata: {
         booking_id: bookingId,
-        add_membership: addMembership ? 'true' : 'false',
+        membership_purchased: addMembership ? 'true' : 'false',
         membership_plan: membershipPlan,
         toursred_cash_used: toursRedCashUsed.toString(),
         points_used: pointsUsed.toString(),
