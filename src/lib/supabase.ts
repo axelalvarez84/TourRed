@@ -1626,6 +1626,7 @@ export const deleteTourCategory = async (id: string) => {
 
 interface CancellationPolicy {
   policyType: '100_percent' | '50_percent' | 'no_refund' | 'no_show' | 'pending_approval';
+  refundPercentage: number;
   daysBeforeTour: number;
   originalDepositAmount: number;
   originalServiceCharge: number;
@@ -1756,6 +1757,7 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
   if (isPending) {
     return {
       policyType: 'pending_approval',
+      refundPercentage: 100,
       daysBeforeTour: 0,
       originalDepositAmount: 0,
       originalServiceCharge: 0,
@@ -1796,6 +1798,7 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
       const totalRefund = refundAmount + optionalServicesRefundable;
       return {
         policyType: flexibleRefundPct >= 1 ? '100_percent' : '50_percent',
+        refundPercentage: Math.round(flexibleRefundPct * 100),
         daysBeforeTour: Math.ceil(hoursBeforeTour / 24),
         originalDepositAmount,
         originalServiceCharge,
@@ -1815,6 +1818,7 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
       const totalRefund = refundAmount + optionalServicesRefundable;
       return {
         policyType: moderateRefundPct > 0 ? '50_percent' : 'no_refund',
+        refundPercentage: Math.round(moderateRefundPct * 100),
         daysBeforeTour: Math.ceil(hoursBeforeTour / 24),
         originalDepositAmount,
         originalServiceCharge,
@@ -1833,6 +1837,7 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
       const platformCommission = originalDepositAmount * commissionRate;
       return {
         policyType: 'no_refund',
+        refundPercentage: 0,
         daysBeforeTour: Math.ceil(hoursBeforeTour / 24),
         originalDepositAmount,
         originalServiceCharge,
@@ -1848,6 +1853,7 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
 
     return {
       policyType: 'no_show',
+      refundPercentage: 0,
       daysBeforeTour: 0,
       originalDepositAmount,
       originalServiceCharge,
@@ -1874,6 +1880,7 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
     const totalRefund = originalDepositAmount + optionalServicesRefundable;
     return {
       policyType: '100_percent',
+      refundPercentage: 100,
       daysBeforeTour,
       originalDepositAmount,
       originalServiceCharge,
@@ -1896,6 +1903,7 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
 
     return {
       policyType: '50_percent',
+      refundPercentage: 50,
       daysBeforeTour,
       originalDepositAmount,
       originalServiceCharge,
@@ -1915,6 +1923,7 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
 
     return {
       policyType: 'no_refund',
+      refundPercentage: 0,
       daysBeforeTour,
       originalDepositAmount,
       originalServiceCharge,
@@ -1933,6 +1942,7 @@ export const calculateCancellationPolicy = async (booking: any): Promise<Cancell
 
   return {
     policyType: 'no_show',
+    refundPercentage: 0,
     daysBeforeTour,
     originalDepositAmount,
     originalServiceCharge,

@@ -3014,7 +3014,7 @@ const TravelerBookings: React.FC = () => {
                     <div>
                       <h2 className="text-2xl font-bold mb-2 text-red-600">
                         {cancellationModal.policy?.policyType === '100_percent' && 'Cancelación con Reembolso del 100%'}
-                        {cancellationModal.policy?.policyType === '50_percent' && 'Cancelación con Reembolso del 50%'}
+                        {cancellationModal.policy?.policyType === '50_percent' && `Cancelación con Reembolso del ${cancellationModal.policy.refundPercentage ?? 50}%`}
                         {cancellationModal.policy?.policyType === 'no_refund' && 'Cancelación sin Reembolso'}
                         {cancellationModal.policy?.policyType === 'no_show' && 'Advertencia: Se Marcará como No Show'}
                         {cancellationModal.policy?.policyType === 'pending_approval' && 'Cancelar Reserva Pendiente'}
