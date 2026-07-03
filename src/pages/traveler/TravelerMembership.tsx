@@ -22,6 +22,7 @@ interface BookingWithBenefit {
   id: string;
   booking_code: string;
   created_at: string;
+  paid_at: string | null;
   membership_service_fee_saved: number;
   used_membership_benefit: boolean;
   tour: {
@@ -80,7 +81,6 @@ export default function TravelerMembership() {
 
     try {
       const periodStart = new Date(exemptionPeriodStart);
-      const now = new Date();
 
       const { data, error } = await supabase
         .from('bookings')
@@ -88,15 +88,15 @@ export default function TravelerMembership() {
           id,
           booking_code,
           created_at,
+          paid_at,
           membership_service_fee_saved,
           used_membership_benefit,
           tour:tours(name, destination)
         `)
         .eq('user_id', user.id)
         .eq('used_membership_benefit', true)
-        .gte('created_at', periodStart.toISOString())
-        .lte('created_at', now.toISOString())
-        .order('created_at', { ascending: false });
+        .gte('paid_at', periodStart.toISOString())
+        .order('paid_at', { ascending: false });
 
       if (error) throw error;
       setBookingsWithBenefit(data || []);
@@ -305,7 +305,7 @@ export default function TravelerMembership() {
                                 {booking.booking_code}
                               </span>
                               <span className="text-xs text-gray-500">
-                                {new Date(booking.created_at).toLocaleDateString('es-MX', {
+                                {new Date(booking.paid_at || booking.created_at).toLocaleDateString('es-MX', {
                                   year: 'numeric',
                                   month: 'short',
                                   day: 'numeric',
