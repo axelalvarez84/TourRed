@@ -1791,7 +1791,6 @@ Deno.serve(async (req) => {
           if (booking.points_used && booking.points_used > 0) {
             await supabase.rpc('refund_points_for_cancelled_booking', {
               p_booking_id: bookingId,
-              p_user_id: booking.user_id,
               p_points_to_refund: booking.points_used
             });
             console.log(`Refunded ${booking.points_used} points for expired booking`);
@@ -1865,7 +1864,6 @@ Deno.serve(async (req) => {
           if (booking.points_used && booking.points_used > 0) {
             await supabase.rpc('refund_points_for_cancelled_booking', {
               p_booking_id: bookingId,
-              p_user_id: booking.user_id,
               p_points_to_refund: booking.points_used
             });
             console.log(`Refunded ${booking.points_used} points for failed booking`);
