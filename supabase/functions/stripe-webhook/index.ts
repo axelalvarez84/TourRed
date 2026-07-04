@@ -719,7 +719,6 @@ Deno.serve(async (req) => {
                 if (booking) {
                   const { error: pointsError } = await supabase.rpc('deduct_points_for_booking', {
                     p_booking_id: bookingId,
-                    p_user_id: booking.user_id,
                     p_points_to_deduct: pointsUsed
                   });
 
@@ -1257,7 +1256,6 @@ Deno.serve(async (req) => {
                 if (bookingForPoints) {
                   const { error: pointsError } = await supabase.rpc('deduct_points_for_booking', {
                     p_booking_id: bookingId,
-                    p_user_id: bookingForPoints.user_id,
                     p_points_to_deduct: pointsUsedFromIntent
                   });
 
