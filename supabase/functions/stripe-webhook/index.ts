@@ -1057,9 +1057,12 @@ Deno.serve(async (req) => {
           console.error(`Error creating transaction record: ${transactionError.message}`);
         }
 
+        // FIX 2026-07-06: se reemplazó .insert().on_conflict().merge() (sintaxis inválida en
+        // supabase-js v2 — causaba TypeError no capturado → 500 → Stripe reintentaba el webhook
+        // indefinidamente) por .upsert() con onConflict, que es la API correcta en v2.
         const { error: orderError } = await supabase
           .from('stripe_orders')
-          .insert({
+          .upsert({
             checkout_session_id: session.id,
             payment_intent_id: paymentIntentId,
             customer_id: session.customer,
@@ -1068,9 +1071,7 @@ Deno.serve(async (req) => {
             currency: session.currency,
             payment_status: 'succeeded',
             status: 'completed'
-          })
-          .on_conflict(['checkout_session_id'])
-          .merge();
+          }, { onConflict: 'checkout_session_id' });
 
         if (orderError) {
           console.error(`Error creating order record: ${orderError.message}`);
