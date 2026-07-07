@@ -40,11 +40,22 @@ hacian inoperante en la practica:
 - Se revocaron permisos EXECUTE de PUBLIC / anon / authenticated, igualando las demas
   funciones de auditoria del proyecto.
 
+**Ajuste posterior — redaccion con hash corto** (migracion `fix_audit_platform_settings_hash_redaction_v2`)
+
+Se detecto que usar siempre el mismo literal `'[REDACTED]'` hacia imposible distinguir en el diff
+de `audit_logs` si un secreto habia cambiado o no (old y new mostraban el mismo string aunque
+el valor rotara). Se sustituyo por un fingerprint de 8 hex: `[REDACTED:XXXXXXXX]` donde
+`XXXXXXXX` es el prefijo del SHA-256 del valor original calculado via `extensions.digest()`
+(pgcrypto). El mismo valor produce el mismo fingerprint (el diff queda limpio); valores distintos
+producen fingerprints distintos (el diff si detecta la rotacion). Valores NULL producen
+`[REDACTED:empty]`. El valor original nunca se escribe en `audit_logs`.
+
 **Nota de seguridad**
 
 Las columnas `paypal_client_secret`, `mercadopago_access_token`, `pac_api_key_encrypted`,
-`zoho_client_secret`, `odoo_api_key_encrypted` y `geo_api_key` siempre se escribiran como
-`[REDACTED]` en `audit_logs`, independientemente de si su valor cambio o no.
+`zoho_client_secret`, `odoo_api_key_encrypted` y `geo_api_key` se escriben como
+`[REDACTED:XXXXXXXX]` en `audit_logs`. El fingerprint permite detectar rotaciones sin exponer
+el secreto.
 
 ---
 
