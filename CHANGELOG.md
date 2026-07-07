@@ -2,6 +2,52 @@
 
 ## 2026-07-07
 
+### Correccion critica — Trigger de auditoria de `platform_settings` no registraba actor ni redactaba secretos
+
+**Descripcion del problema**
+
+La funcion `audit_platform_settings_change()` (creada en la migracion
+`20260617231235_20260617_corr2_smart_business_event_triggers.sql`) tenia tres defectos que la
+hacian inoperante en la practica:
+
+1. **Error de columna inexistente**: el codigo comparaba `OLD.commission_rate IS DISTINCT FROM
+   NEW.commission_rate`, pero `commission_rate` no es una columna de `platform_settings` (las
+   columnas reales son `service_charge_percentage` y `agency_commission_percentage`). Esto causaba
+   un error en tiempo de ejecucion que el bloque `EXCEPTION WHEN OTHERS` silenciaba — el trigger
+   nunca llegaba a llamar a `insert_audit_log`.
+
+2. **Actor no resuelto**: usaba `p_tenant_type => 'system'` fijo y nunca capturaba quien hizo el
+   cambio (`auth.uid()`), por lo que los registros de auditoria no hubieran permitido saber que
+   administrador modifico un precio, porcentaje o proveedor de CFDI.
+
+3. **Secretos en texto plano**: escribia `to_jsonb(OLD)` / `to_jsonb(NEW)` directamente, lo que
+   habria expuesto columnas como `paypal_client_secret`, `mercadopago_access_token`,
+   `pac_api_key_encrypted`, `zoho_client_secret`, `odoo_api_key_encrypted` y `geo_api_key` en
+   la tabla `audit_logs`.
+
+**Correccion aplicada** (migracion `fix_audit_platform_settings_resolve_actor_and_redact_secrets`)
+
+- Se reescribio `audit_platform_settings_change()` con:
+  - Resolucion de actor: `auth.uid()` → fallback a `NEW.updated_by` → fallback a NULL con
+    `actor_role = 'system'` para escrituras via service role.
+  - Lookup de email y rol del actor en la tabla `public.users`.
+  - Skip completo del log si `to_jsonb(OLD) = to_jsonb(NEW)` (sin cambios reales).
+  - Redaccion de las 6 columnas sensibles en ambos snapshots (old_values y new_values),
+    reemplazando el valor por el string `'[REDACTED]'`.
+  - `p_tenant_type 'admin'` y `p_severity 'warning'` (tabla de configuracion sensible).
+  - `EXCEPTION WHEN OTHERS → RAISE WARNING` para nunca bloquear el UPDATE original.
+- Se recreo el trigger `trg_audit_platform_settings` de forma idempotente.
+- Se revocaron permisos EXECUTE de PUBLIC / anon / authenticated, igualando las demas
+  funciones de auditoria del proyecto.
+
+**Nota de seguridad**
+
+Las columnas `paypal_client_secret`, `mercadopago_access_token`, `pac_api_key_encrypted`,
+`zoho_client_secret`, `odoo_api_key_encrypted` y `geo_api_key` siempre se escribiran como
+`[REDACTED]` en `audit_logs`, independientemente de si su valor cambio o no.
+
+---
+
 ### Migracion — Stripe SDK a v22.3.0 y API version 2026-06-24.dahlia
 
 **Alcance**
