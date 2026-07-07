@@ -70,9 +70,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [isLoadingExemption, setIsLoadingExemption] = useState(true);
 
   // Travel insurance
-  const isInsuranceApplicable = !['experience', 'transport', 'ticket'].includes((tour as any).activity_type as string);
+  const [isForeignTraveler, setIsForeignTraveler] = useState(false);
+  const isInsuranceApplicable = !['experience', 'transport', 'ticket'].includes((tour as any).activity_type as string) && !isForeignTraveler;
   const [insurancePricePerDayPerTraveler, setInsurancePricePerDayPerTraveler] = useState(79);
-  const [includeInsurance, setIncludeInsurance] = useState(isInsuranceApplicable);
+  const [includeInsurance, setIncludeInsurance] = useState(false);
   const [showInsuranceWarning, setShowInsuranceWarning] = useState(false);
   const [showInsuranceCoverage, setShowInsuranceCoverage] = useState(false);
   const [optionalServices, setOptionalServices] = useState<TourOptionalService[]>([]);
@@ -336,7 +337,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
       try {
         const { data, error } = await supabase
           .from('users')
-          .select('no_show_count')
+          .select('no_show_count, is_foreign_traveler')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -346,8 +347,13 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           setIsHighRisk(false);
         } else {
           const count = data?.no_show_count || 0;
+          const isForeign = data?.is_foreign_traveler ?? false;
+          setIsForeignTraveler(isForeign);
           setNoShowCount(count);
           setIsHighRisk(count > 3);
+          const activityType = (tour as any).activity_type as string;
+          const insuranceOk = !['experience', 'transport', 'ticket'].includes(activityType) && !isForeign;
+          setIncludeInsurance(insuranceOk);
           if (count > 3) {
             console.log('⚠️ VIAJERO DE ALTO RIESGO: Tiene', count, 'no shows. Se cobrará el 100% del tour.');
           }

@@ -281,6 +281,7 @@ const TravelerBookings: React.FC = () => {
   const [cancelledLoaded, setCancelledLoaded] = useState(false);
   const [pastOptionalServices, setPastOptionalServices] = useState<Record<string, any[]>>({});
   const [pastSupplements, setPastSupplements] = useState<Record<string, any[]>>({});
+  const [isForeignTraveler, setIsForeignTraveler] = useState(false);
 
   const cancellationFormPersistence = useFormPersistence(
     { cancellationReason: cancellationModal.cancellationReason },
@@ -292,6 +293,14 @@ const TravelerBookings: React.FC = () => {
   useEffect(() => {
     if (user?.id) {
       fetchBookings();
+      supabase
+        .from('users')
+        .select('is_foreign_traveler')
+        .eq('id', user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) setIsForeignTraveler(data.is_foreign_traveler ?? false);
+        });
     }
   }, [user?.id]);
 
@@ -4513,12 +4522,14 @@ const TravelerBookings: React.FC = () => {
               >
                 Servicios Opcionales
               </button>
-              <button
-                onClick={() => setExtrasModal(prev => ({ ...prev, activeTab: 'seguro' }))}
-                className={`flex-1 py-3 text-sm font-medium transition-colors ${extrasModal.activeTab === 'seguro' ? 'border-b-2 border-teal-600 text-teal-700' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                Seguro de Viaje
-              </button>
+              {!isForeignTraveler && (
+                <button
+                  onClick={() => setExtrasModal(prev => ({ ...prev, activeTab: 'seguro' }))}
+                  className={`flex-1 py-3 text-sm font-medium transition-colors ${extrasModal.activeTab === 'seguro' ? 'border-b-2 border-teal-600 text-teal-700' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Seguro de Viaje
+                </button>
+              )}
             </div>
 
             {/* Body */}
