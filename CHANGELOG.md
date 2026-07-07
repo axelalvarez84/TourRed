@@ -2,6 +2,46 @@
 
 ## 2026-07-07
 
+### Correccion critica — `stripe-webhook` retornaba HTTP 500 en `checkout.session.completed` por anti-patron `.rpc().catch()`
+
+**Descripcion del problema**
+
+En `supabase/functions/stripe-webhook/index.ts`, el handler de `checkout.session.completed` llamaba
+al log de auditoria con el siguiente patron:
+
+```typescript
+supabase.rpc('insert_audit_log', { ... }).catch((e) => console.error(...));
+```
+
+`supabase.rpc()` retorna un `PostgrestBuilder`, que es un "thenable" pero NO una `Promise` nativa.
+Llamar `.catch()` directamente sobre el builder sin `await` no intercepta errores de forma confiable:
+si la llamada RPC falla (p.ej. timeout, error de BD), la excepcion no queda capturada y asciende
+al `catch` general del handler, que retorna HTTP 500 a Stripe.
+
+**Impacto**
+
+- La reserva YA estaba confirmada en la BD antes de la linea fallida — el cobro no se perdio.
+- Sin embargo, Stripe recibia 500 y reintentaba el evento `checkout.session.completed`
+  indefinidamente, acumulando reintento tras reintento para webhooks cuyo negocio ya estaba
+  completo.
+
+**Correccion aplicada**
+
+Se reemplazo el patron roto por un bloque `try/await/catch` correcto:
+
+```typescript
+try {
+  await supabase.rpc('insert_audit_log', { ... });
+} catch (e) {
+  console.error('Audit log failed (non-blocking):', e);
+}
+```
+
+Se auditaron todas las demas llamadas `.rpc()` del archivo — todas las restantes ya usaban `await`
+correctamente. Este era el unico caso afectado. Se redesplego la edge function.
+
+---
+
 ### Correccion critica — Trigger de auditoria de `platform_settings` no registraba actor ni redactaba secretos
 
 **Descripcion del problema**
