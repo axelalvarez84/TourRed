@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.6';
-import Stripe from 'npm:stripe@14.10.0';
+import Stripe from 'npm:stripe@22.3.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -54,7 +54,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const stripe = new Stripe(stripeSecretKey, {
-      apiVersion: '2023-10-16',
+      apiVersion: '2026-06-24.dahlia',
     });
 
     if (action === 'cancel') {
@@ -173,14 +173,14 @@ Deno.serve(async (req: Request) => {
         .update({
           plan_type: 'annual',
           cancel_at_period_end: false,
-          current_period_end: new Date(updatedSubscription.current_period_end * 1000).toISOString(),
+          current_period_end: new Date(updatedSubscription.items.data[0].current_period_end * 1000).toISOString(),
         })
         .eq('id', membership.id);
 
       return new Response(
         JSON.stringify({
           message: 'Subscription upgraded to annual plan successfully',
-          current_period_end: new Date(updatedSubscription.current_period_end * 1000).toISOString()
+          current_period_end: new Date(updatedSubscription.items.data[0].current_period_end * 1000).toISOString()
         }),
         {
           status: 200,

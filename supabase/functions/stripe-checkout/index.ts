@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.6";
-import Stripe from "npm:stripe@12.18.0";
+import Stripe from "npm:stripe@22.3.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -60,7 +60,7 @@ serve(async (req) => {
 
     // Initialize Stripe
     const stripe = new Stripe(stripeSecretKey, {
-      apiVersion: "2023-10-16",
+      apiVersion: "2026-06-24.dahlia",
     });
 
     // Get the user from the authorization header

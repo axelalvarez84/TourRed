@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.6";
-import Stripe from "npm:stripe@12.18.0";
+import Stripe from "npm:stripe@22.3.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
     }
 
     const stripe = new Stripe(stripeSecretKey, {
-      apiVersion: "2023-10-16",
+      apiVersion: "2026-06-24.dahlia",
     });
 
     const authHeader = req.headers.get("Authorization");

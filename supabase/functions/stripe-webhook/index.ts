@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.6";
-import Stripe from "npm:stripe@12.18.0";
+import Stripe from "npm:stripe@22.3.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     }
 
     const stripe = new Stripe(stripeSecretKey, {
-      apiVersion: "2023-10-16",
+      apiVersion: "2026-06-24.dahlia",
     });
 
     const body = await req.text();
@@ -573,8 +573,8 @@ Deno.serve(async (req) => {
                     plan_type: subscriptionData.metadata?.plan_type || membershipPlan,
                     status: statusMapMixed[subscriptionData.status] || 'active',
                     start_date: new Date((subscriptionData.start_date as number) * 1000).toISOString(),
-                    current_period_start: new Date((subscriptionData as any).current_period_start * 1000).toISOString(),
-                    current_period_end: new Date((subscriptionData as any).current_period_end * 1000).toISOString(),
+                    current_period_start: new Date((subscriptionData as any).items.data[0].current_period_start * 1000).toISOString(),
+                    current_period_end: new Date((subscriptionData as any).items.data[0].current_period_end * 1000).toISOString(),
                     cancel_at_period_end: subscriptionData.cancel_at_period_end || false,
                     cancelled_at: subscriptionData.canceled_at ? new Date(subscriptionData.canceled_at * 1000).toISOString() : null,
                     service_fee_exemption_reset_date: nms.toISOString(),
@@ -605,8 +605,8 @@ Deno.serve(async (req) => {
                             email: userData.email,
                             firstName: userData.first_name || 'Viajero',
                             planType: subscriptionData.metadata?.plan_type || membershipPlan,
-                            startDate: new Date((subscriptionData as any).current_period_start * 1000).toISOString(),
-                            endDate: new Date((subscriptionData as any).current_period_end * 1000).toISOString(),
+                            startDate: new Date((subscriptionData as any).items.data[0].current_period_start * 1000).toISOString(),
+                            endDate: new Date((subscriptionData as any).items.data[0].current_period_end * 1000).toISOString(),
                           }),
                         }
                       );
@@ -1466,8 +1466,8 @@ Deno.serve(async (req) => {
           plan_type: subscription.metadata?.plan_type || 'monthly',
           status: mappedStatus,
           start_date: new Date(subscription.start_date * 1000).toISOString(),
-          current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+          current_period_start: new Date(subscription.items.data[0].current_period_start * 1000).toISOString(),
+          current_period_end: new Date(subscription.items.data[0].current_period_end * 1000).toISOString(),
           cancel_at_period_end: subscription.cancel_at_period_end || false,
           cancelled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
           service_fee_exemption_reset_date: nextMonthStart.toISOString(),
@@ -1529,8 +1529,8 @@ Deno.serve(async (req) => {
                       email: userData.email,
                       firstName: userData.first_name || 'Viajero',
                       planType: subscription.metadata?.plan_type || 'monthly',
-                      startDate: new Date(subscription.current_period_start * 1000).toISOString(),
-                      endDate: new Date(subscription.current_period_end * 1000).toISOString(),
+                      startDate: new Date(subscription.items.data[0].current_period_start * 1000).toISOString(),
+                      endDate: new Date(subscription.items.data[0].current_period_end * 1000).toISOString(),
                     }),
                   }
                 );
@@ -1602,8 +1602,8 @@ Deno.serve(async (req) => {
                   plan_type: subscriptionData.metadata?.plan_type || 'monthly',
                   status: statusMapLocal[subscriptionData.status] || 'active',
                   start_date: new Date((subscriptionData.start_date as number) * 1000).toISOString(),
-                  current_period_start: new Date((subscriptionData as any).current_period_start * 1000).toISOString(),
-                  current_period_end: new Date((subscriptionData as any).current_period_end * 1000).toISOString(),
+                  current_period_start: new Date((subscriptionData as any).items.data[0].current_period_start * 1000).toISOString(),
+                  current_period_end: new Date((subscriptionData as any).items.data[0].current_period_end * 1000).toISOString(),
                   cancel_at_period_end: subscriptionData.cancel_at_period_end || false,
                   cancelled_at: subscriptionData.canceled_at ? new Date(subscriptionData.canceled_at * 1000).toISOString() : null,
                   service_fee_exemption_reset_date: nms.toISOString(),
@@ -1657,8 +1657,8 @@ Deno.serve(async (req) => {
                       email: userData.email,
                       firstName: userData.first_name || 'Viajero',
                       planType: currentMembership.plan_type || 'monthly',
-                      startDate: new Date((subscriptionData as any).current_period_start * 1000).toISOString(),
-                      endDate: new Date((subscriptionData as any).current_period_end * 1000).toISOString(),
+                      startDate: new Date((subscriptionData as any).items.data[0].current_period_start * 1000).toISOString(),
+                      endDate: new Date((subscriptionData as any).items.data[0].current_period_end * 1000).toISOString(),
                     }),
                   }
                 );

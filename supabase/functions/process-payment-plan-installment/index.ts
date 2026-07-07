@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import Stripe from "npm:stripe@12.18.0";
+import Stripe from "npm:stripe@22.3.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -398,7 +398,7 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
+      const stripe = new Stripe(stripeKey, { apiVersion: "2026-06-24.dahlia" });
       const origin = req.headers.get("origin") || req.headers.get("referer")?.split("/").slice(0, 3).join("/") || "https://toursred.com";
 
       const session = await stripe.checkout.sessions.create({
