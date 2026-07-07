@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard, Crown, Gift, Award, Users, Globe, FileText, Shield, BookOpen, Link, Unlink, RefreshCw, ExternalLink, Tag, Image, Upload, RotateCcw, X, Wrench, Megaphone, Power, PowerOff } from 'lucide-react';
+import { Mail, Server, Save, Loader, CheckCircle, AlertCircle, DollarSign, Percent, CreditCard, Crown, Gift, Award, Users, Globe, FileText, Shield, BookOpen, Link, Unlink, RefreshCw, ExternalLink, Tag, Image, Upload, RotateCcw, X, Wrench, Megaphone, Power, PowerOff, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../utils/formatCurrency';
 
@@ -161,6 +161,8 @@ const AdminSettings: React.FC = () => {
     type: 'success' | 'error' | null;
     text: string;
   }>({ type: null, text: '' });
+  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
+  const toggleSecret = (key: string) => setShowSecrets(prev => ({ ...prev, [key]: !prev[key] }));
 
   useEffect(() => {
     fetchSettings();
@@ -1014,14 +1016,19 @@ const AdminSettings: React.FC = () => {
                     <p className="text-xs text-gray-500 mb-2">
                       Token privado de acceso de tu cuenta MercadoPago (empieza con APP_USR- o TEST-)
                     </p>
-                    <input
-                      type="password"
-                      name="mercadopago_access_token"
-                      value={platformSettings.mercadopago_access_token}
-                      onChange={handlePlatformChange}
-                      placeholder="APP_USR-xxxxxxxxxxxxxxxxxxxx"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showSecrets['mercadopago_access_token'] ? 'text' : 'password'}
+                        name="mercadopago_access_token"
+                        value={platformSettings.mercadopago_access_token}
+                        onChange={handlePlatformChange}
+                        placeholder="APP_USR-xxxxxxxxxxxxxxxxxxxx"
+                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                      />
+                      <button type="button" onClick={() => toggleSecret('mercadopago_access_token')} className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600">
+                        {showSecrets['mercadopago_access_token'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1075,14 +1082,19 @@ const AdminSettings: React.FC = () => {
                     <p className="text-xs text-gray-500 mb-2">
                       Secret de tu app en PayPal Developer
                     </p>
-                    <input
-                      type="password"
-                      name="paypal_client_secret"
-                      value={platformSettings.paypal_client_secret}
-                      onChange={handlePlatformChange}
-                      placeholder="EGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showSecrets['paypal_client_secret'] ? 'text' : 'password'}
+                        name="paypal_client_secret"
+                        value={platformSettings.paypal_client_secret}
+                        onChange={handlePlatformChange}
+                        placeholder="EGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                      />
+                      <button type="button" onClick={() => toggleSecret('paypal_client_secret')} className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600">
+                        {showSecrets['paypal_client_secret'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1173,14 +1185,19 @@ const AdminSettings: React.FC = () => {
               <label htmlFor="smtp_password" className="block text-sm font-medium text-gray-700 mb-1">
                 Contraseña SMTP
               </label>
-              <input
-                type="password"
-                id="smtp_password"
-                name="smtp_password"
-                value={settings.smtp_password}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
-              />
+              <div className="relative">
+                <input
+                  type={showSecrets['smtp_password'] ? 'text' : 'password'}
+                  id="smtp_password"
+                  name="smtp_password"
+                  value={settings.smtp_password}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                />
+                <button type="button" onClick={() => toggleSecret('smtp_password')} className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600">
+                  {showSecrets['smtp_password'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div>
@@ -1190,14 +1207,19 @@ const AdminSettings: React.FC = () => {
               <p className="text-xs text-gray-500 mb-2">
                 El API key se usa para enviar emails a través de SMTP2GO
               </p>
-              <input
-                type="text"
-                id="smtp_api_key"
-                name="smtp_api_key"
-                value={settings.smtp_api_key}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
-              />
+              <div className="relative">
+                <input
+                  type={showSecrets['smtp_api_key'] ? 'text' : 'password'}
+                  id="smtp_api_key"
+                  name="smtp_api_key"
+                  value={settings.smtp_api_key}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                />
+                <button type="button" onClick={() => toggleSecret('smtp_api_key')} className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600">
+                  {showSecrets['smtp_api_key'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1253,14 +1275,19 @@ const AdminSettings: React.FC = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">API Key del PAC</label>
-              <input
-                type="password"
-                value={platformSettings.pac_api_key_encrypted}
-                onChange={(e) => setPlatformSettings(prev => ({ ...prev, pac_api_key_encrypted: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
-                placeholder="sk_live_xxxxxxxxxxxx o equivalente"
-                autoComplete="off"
-              />
+              <div className="relative">
+                <input
+                  type={showSecrets['pac_api_key_encrypted'] ? 'text' : 'password'}
+                  value={platformSettings.pac_api_key_encrypted}
+                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, pac_api_key_encrypted: e.target.value }))}
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                  placeholder="sk_live_xxxxxxxxxxxx o equivalente"
+                  autoComplete="off"
+                />
+                <button type="button" onClick={() => toggleSecret('pac_api_key_encrypted')} className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600">
+                  {showSecrets['pac_api_key_encrypted'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
               <p className="text-xs text-gray-400 mt-1">En FacturAPI: Configuración → API Keys → Live Key.</p>
             </div>
 
@@ -1483,14 +1510,19 @@ const AdminSettings: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Client Secret</label>
-                    <input
-                      type="password"
-                      value={platformSettings.zoho_client_secret}
-                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, zoho_client_secret: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
-                      placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                      autoComplete="off"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showSecrets['zoho_client_secret'] ? 'text' : 'password'}
+                        value={platformSettings.zoho_client_secret}
+                        onChange={(e) => setPlatformSettings(prev => ({ ...prev, zoho_client_secret: e.target.value }))}
+                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                        placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                        autoComplete="off"
+                      />
+                      <button type="button" onClick={() => toggleSecret('zoho_client_secret')} className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600">
+                        {showSecrets['zoho_client_secret'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                     <p className="text-xs text-gray-400 mt-1">Zoho Developer Console → Tu App → Client Secret</p>
                   </div>
                   <div>
@@ -1668,14 +1700,19 @@ const AdminSettings: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
-                    <input
-                      type="password"
-                      value={platformSettings.odoo_api_key_encrypted}
-                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, odoo_api_key_encrypted: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
-                      placeholder="Bearer token generado en Preferencias → Seguridad"
-                      autoComplete="off"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showSecrets['odoo_api_key_encrypted'] ? 'text' : 'password'}
+                        value={platformSettings.odoo_api_key_encrypted}
+                        onChange={(e) => setPlatformSettings(prev => ({ ...prev, odoo_api_key_encrypted: e.target.value }))}
+                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                        placeholder="Bearer token generado en Preferencias → Seguridad"
+                        autoComplete="off"
+                      />
+                      <button type="button" onClick={() => toggleSecret('odoo_api_key_encrypted')} className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600">
+                        {showSecrets['odoo_api_key_encrypted'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                     <p className="text-xs text-gray-400 mt-1">Preferencias de usuario → Seguridad de la cuenta → Nueva clave API</p>
                   </div>
                   <div>
