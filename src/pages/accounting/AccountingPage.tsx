@@ -5,13 +5,16 @@ import {
   Plus, AlertCircle, CheckCircle, Clock, Search, Calendar,
   BookMarked, ArrowUpRight, ArrowDownLeft, Users, Building2,
   X, ChevronDown, ChevronUp, Settings, PenLine, Trash2, Send,
-  Pencil, ToggleLeft, ToggleRight, Filter, CreditCard, Gift, RotateCcw, Ban
+  Pencil, ToggleLeft, ToggleRight, Filter, CreditCard, Gift, RotateCcw, Ban,
+  ShieldCheck
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import ManualEntryModal from '../../components/accounting/ManualEntryModal';
 import AccountCatalogModal from '../../components/accounting/AccountCatalogModal';
 import AperturaModal from '../../components/accounting/AperturaModal';
+import InsuranceSettlementModal from '../../components/accounting/InsuranceSettlementModal';
+import InsuranceCommissionModal from '../../components/accounting/InsuranceCommissionModal';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -96,6 +99,33 @@ interface EntryLine {
   cfdi_uuid: string | null;
 }
 
+interface InsuranceSettlement {
+  id: string;
+  provider_name: string;
+  period_start: string;
+  period_end: string;
+  amount: number;
+  payment_date: string | null;
+  reference: string | null;
+  notes: string | null;
+  status: 'pending' | 'completed';
+  created_at: string;
+}
+
+interface InsuranceCommissionReceipt {
+  id: string;
+  provider_name: string;
+  period_start: string;
+  period_end: string;
+  amount: number;
+  receipt_date: string | null;
+  invoice_reference: string | null;
+  cfdi_uuid: string | null;
+  notes: string | null;
+  status: 'pending' | 'completed';
+  created_at: string;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -133,22 +163,24 @@ function typeColor(t: string): string {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-const TABS = [
+const ALL_TABS = [
   { id: 'overview', label: 'Resumen', icon: BarChart2 },
   { id: 'entries', label: 'Polizas', icon: List },
   { id: 'libro_diario', label: 'Libro Diario', icon: BookMarked },
   { id: 'libro_mayor', label: 'Libro Mayor', icon: BookOpen },
   { id: 'manual', label: 'Movimientos', icon: PenLine },
+  { id: 'seguros', label: 'Seguros de Viaje', icon: ShieldCheck },
   { id: 'balance_sheet', label: 'Balance General', icon: Layers },
   { id: 'income', label: 'Estado de Resultados', icon: TrendingUp },
   { id: 'catalog', label: 'Catalogo', icon: BookOpen },
 ] as const;
 
-type Tab = typeof TABS[number]['id'];
+type Tab = typeof ALL_TABS[number]['id'];
 
 const AccountingPage: React.FC = () => {
   const { isAdmin, isAccountant, isSuperAdmin } = useAuth();
   const canExport = isAdmin || isSuperAdmin || isAccountant;
+  const canManage = isAdmin || isSuperAdmin;
 
   const now = new Date();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -217,6 +249,21 @@ const AccountingPage: React.FC = () => {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
+  // Insurance tab
+  const [insuranceSettlements, setInsuranceSettlements] = useState<InsuranceSettlement[]>([]);
+  const [insuranceCommissions, setInsuranceCommissions] = useState<InsuranceCommissionReceipt[]>([]);
+  const [loadingInsurance, setLoadingInsurance] = useState(false);
+  const [insuranceLiability, setInsuranceLiability] = useState(0);
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
+  const [showCommissionModal, setShowCommissionModal] = useState(false);
+  const [confirmMarkPaid, setConfirmMarkPaid] = useState<string | null>(null);
+  const [confirmMarkReceived, setConfirmMarkReceived] = useState<string | null>(null);
+  const [markingId, setMarkingId] = useState<string | null>(null);
+
+  // Accountant granular permissions (fetched when user is accountant)
+  const [accountantPerms, setAccountantPerms] = useState<Record<string, boolean> | null>(null);
+  const canViewSeguros = canManage || (isAccountant && accountantPerms?.can_view_seguros === true);
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -316,6 +363,31 @@ const AccountingPage: React.FC = () => {
     setLoadingGcSummary(false);
   }, []);
 
+  // ── Load insurance data
+  const loadInsuranceData = useCallback(async () => {
+    setLoadingInsurance(true);
+    const [settlementsRes, commissionsRes, liabilityRes] = await Promise.all([
+      supabase
+        .from('insurance_settlements')
+        .select('*')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('insurance_commission_receipts')
+        .select('*')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('accounting_entry_lines')
+        .select('debit, credit')
+        .eq('account_code', '201.01'),
+    ]);
+    setInsuranceSettlements(settlementsRes.data ?? []);
+    setInsuranceCommissions(commissionsRes.data ?? []);
+    const lines = liabilityRes.data ?? [];
+    const balance = lines.reduce((s, l) => s + (l.credit ?? 0) - (l.debit ?? 0), 0);
+    setInsuranceLiability(balance);
+    setLoadingInsurance(false);
+  }, []);
+
   // ── Load ledger lines for a specific account
   const loadLedgerLines = useCallback(async (accountCode: string) => {
     setLoadingLedger(true);
@@ -358,6 +430,30 @@ const AccountingPage: React.FC = () => {
     setDeletingId(null);
   };
 
+  const handleMarkSettlementPaid = async (id: string) => {
+    setMarkingId(id);
+    const { error } = await supabase
+      .from('insurance_settlements')
+      .update({ status: 'completed' })
+      .eq('id', id);
+    setMarkingId(null);
+    setConfirmMarkPaid(null);
+    if (error) showToast('Error al actualizar la liquidación', false);
+    else { showToast('Liquidación marcada como pagada'); loadInsuranceData(); }
+  };
+
+  const handleMarkCommissionReceived = async (id: string) => {
+    setMarkingId(id);
+    const { error } = await supabase
+      .from('insurance_commission_receipts')
+      .update({ status: 'completed' })
+      .eq('id', id);
+    setMarkingId(null);
+    setConfirmMarkReceived(null);
+    if (error) showToast('Error al actualizar la comisión', false);
+    else { showToast('Comisión marcada como recibida'); loadInsuranceData(); }
+  };
+
   useEffect(() => {
     loadAccounts();
   }, [loadAccounts]);
@@ -392,6 +488,26 @@ const AccountingPage: React.FC = () => {
       loadReports();
     }
   }, [activeTab, loadAccountBalances, loadReports]);
+
+  useEffect(() => {
+    if (activeTab === 'seguros') loadInsuranceData();
+  }, [activeTab, loadInsuranceData]);
+
+  // Load accountant granular permissions on mount
+  useEffect(() => {
+    if (!isAccountant) return;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('accounting_access_invitations')
+        .select('permissions')
+        .eq('email', user.email)
+        .eq('status', 'accepted')
+        .maybeSingle();
+      if (data?.permissions) setAccountantPerms(data.permissions as Record<string, boolean>);
+    })();
+  }, [isAccountant]);
 
   // ── Toggle entry detail
   const toggleEntry = async (entryId: string) => {
@@ -535,11 +651,14 @@ const AccountingPage: React.FC = () => {
 
           {/* Tabs */}
           <div className="flex gap-1 mt-6 overflow-x-auto">
-            {TABS.map(tab => {
+            {ALL_TABS.filter(tab => {
+              if (tab.id === 'seguros') return canViewSeguros;
+              return true;
+            }).map(tab => {
               const Icon = tab.icon;
               const active = activeTab === tab.id;
               return (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                <button key={tab.id} onClick={() => setActiveTab(tab.id as Tab)}
                   className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg whitespace-nowrap transition-colors ${
                     active ? 'bg-sky-50 text-sky-700 border border-sky-200' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
                   }`}>
@@ -569,6 +688,23 @@ const AccountingPage: React.FC = () => {
           month={month}
           onClose={() => setShowAperturaModal(false)}
           onSaved={() => { loadEntries(); loadManualEntries(); loadReports(); showToast('Poliza de apertura registrada correctamente'); }}
+        />
+      )}
+
+      {/* Insurance settlement modal */}
+      {showSettlementModal && (
+        <InsuranceSettlementModal
+          suggestedAmount={insuranceLiability > 0 ? insuranceLiability : undefined}
+          onClose={() => setShowSettlementModal(false)}
+          onSaved={() => { loadInsuranceData(); showToast('Liquidación registrada correctamente'); }}
+        />
+      )}
+
+      {/* Insurance commission modal */}
+      {showCommissionModal && (
+        <InsuranceCommissionModal
+          onClose={() => setShowCommissionModal(false)}
+          onSaved={() => { loadInsuranceData(); showToast('Comisión registrada correctamente'); }}
         />
       )}
 
@@ -1471,6 +1607,227 @@ const AccountingPage: React.FC = () => {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        )}
+
+        {/* ── SEGUROS DE VIAJE ── */}
+        {activeTab === 'seguros' && (
+          <div className="space-y-6">
+            {/* Summary cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm text-gray-500 font-medium">Pasivo con Aseguradora</span>
+                  <ShieldCheck className="w-5 h-5 text-amber-600" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900">{fmt(insuranceLiability)}</p>
+                <p className="text-xs text-gray-400 mt-1">Saldo acumulado cta. 201.01</p>
+              </div>
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm text-gray-500 font-medium">Spread Acumulado</span>
+                  <TrendingUp className="w-5 h-5 text-emerald-600" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900">
+                  {fmt(insuranceCommissions.reduce((s, c) => s + Number(c.amount), 0))}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">Comisiones recibidas (Flujo C)</p>
+              </div>
+              <div className="rounded-xl border border-sky-100 bg-sky-50/40 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm text-gray-500 font-medium">Liquidaciones Pendientes</span>
+                  <Clock className="w-5 h-5 text-sky-600" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900">
+                  {insuranceSettlements.filter(s => s.status === 'pending').length}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">Pagos pendientes a Universal Assistance</p>
+              </div>
+            </div>
+
+            {loadingInsurance ? <LoadingSpinner /> : (
+              <>
+                {/* Flujo B — Liquidaciones a la aseguradora */}
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Liquidaciones a la Aseguradora</h3>
+                      <p className="text-xs text-gray-400 mt-0.5">Flujo B — Pagos de ToursRed a Universal Assistance</p>
+                    </div>
+                    {canManage && (
+                      <button
+                        onClick={() => setShowSettlementModal(true)}
+                        className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Registrar liquidación
+                      </button>
+                    )}
+                  </div>
+                  {insuranceSettlements.length === 0 ? (
+                    <p className="text-center text-gray-400 text-sm py-10">Sin liquidaciones registradas.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-50 text-xs text-gray-500 uppercase">
+                            <th className="text-left px-5 py-3">Aseguradora</th>
+                            <th className="text-left px-4 py-3">Periodo</th>
+                            <th className="text-right px-4 py-3">Monto</th>
+                            <th className="text-left px-4 py-3">Fecha pago</th>
+                            <th className="text-left px-4 py-3">Referencia</th>
+                            <th className="text-left px-4 py-3">Estado</th>
+                            {canManage && <th className="text-right px-5 py-3">Accion</th>}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {insuranceSettlements.map(s => (
+                            <tr key={s.id} className="hover:bg-gray-50/50 transition-colors">
+                              <td className="px-5 py-3 font-medium text-gray-800">{s.provider_name}</td>
+                              <td className="px-4 py-3 text-gray-500 text-xs">{s.period_start} — {s.period_end}</td>
+                              <td className="px-4 py-3 text-right font-semibold text-gray-900">{fmt(s.amount)}</td>
+                              <td className="px-4 py-3 text-gray-500 text-xs">{s.payment_date ?? '—'}</td>
+                              <td className="px-4 py-3 text-gray-400 text-xs font-mono">{s.reference ?? '—'}</td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  s.status === 'completed'
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                }`}>
+                                  {s.status === 'completed' ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                                  {s.status === 'completed' ? 'Pagado' : 'Pendiente'}
+                                </span>
+                              </td>
+                              {canManage && (
+                                <td className="px-5 py-3 text-right">
+                                  {s.status === 'pending' && (
+                                    confirmMarkPaid === s.id ? (
+                                      <div className="flex items-center justify-end gap-2">
+                                        <span className="text-xs text-gray-500">Confirmar?</span>
+                                        <button
+                                          onClick={() => handleMarkSettlementPaid(s.id)}
+                                          disabled={markingId === s.id}
+                                          className="px-2 py-1 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                                        >
+                                          {markingId === s.id ? '...' : 'Si'}
+                                        </button>
+                                        <button
+                                          onClick={() => setConfirmMarkPaid(null)}
+                                          className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg hover:bg-gray-200 transition-colors"
+                                        >
+                                          No
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={() => setConfirmMarkPaid(s.id)}
+                                        className="px-3 py-1.5 text-xs font-medium text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors"
+                                      >
+                                        Marcar pagado
+                                      </button>
+                                    )
+                                  )}
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Flujo C — Comisiones recibidas */}
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Comisiones Recibidas de la Aseguradora</h3>
+                      <p className="text-xs text-gray-400 mt-0.5">Flujo C — Ingresos recibidos de Universal Assistance</p>
+                    </div>
+                    {canManage && (
+                      <button
+                        onClick={() => setShowCommissionModal(true)}
+                        className="flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Registrar comisión
+                      </button>
+                    )}
+                  </div>
+                  {insuranceCommissions.length === 0 ? (
+                    <p className="text-center text-gray-400 text-sm py-10">Sin comisiones registradas.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-50 text-xs text-gray-500 uppercase">
+                            <th className="text-left px-5 py-3">Aseguradora</th>
+                            <th className="text-left px-4 py-3">Periodo</th>
+                            <th className="text-right px-4 py-3">Monto</th>
+                            <th className="text-left px-4 py-3">Fecha recepcion</th>
+                            <th className="text-left px-4 py-3">Factura</th>
+                            <th className="text-left px-4 py-3">Estado</th>
+                            {canManage && <th className="text-right px-5 py-3">Accion</th>}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {insuranceCommissions.map(c => (
+                            <tr key={c.id} className="hover:bg-gray-50/50 transition-colors">
+                              <td className="px-5 py-3 font-medium text-gray-800">{c.provider_name}</td>
+                              <td className="px-4 py-3 text-gray-500 text-xs">{c.period_start} — {c.period_end}</td>
+                              <td className="px-4 py-3 text-right font-semibold text-emerald-700">{fmt(c.amount)}</td>
+                              <td className="px-4 py-3 text-gray-500 text-xs">{c.receipt_date ?? '—'}</td>
+                              <td className="px-4 py-3 text-gray-400 text-xs">{c.invoice_reference ?? '—'}</td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  c.status === 'completed'
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                }`}>
+                                  {c.status === 'completed' ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                                  {c.status === 'completed' ? 'Recibido' : 'Pendiente'}
+                                </span>
+                              </td>
+                              {canManage && (
+                                <td className="px-5 py-3 text-right">
+                                  {c.status === 'pending' && (
+                                    confirmMarkReceived === c.id ? (
+                                      <div className="flex items-center justify-end gap-2">
+                                        <span className="text-xs text-gray-500">Confirmar?</span>
+                                        <button
+                                          onClick={() => handleMarkCommissionReceived(c.id)}
+                                          disabled={markingId === c.id}
+                                          className="px-2 py-1 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                                        >
+                                          {markingId === c.id ? '...' : 'Si'}
+                                        </button>
+                                        <button
+                                          onClick={() => setConfirmMarkReceived(null)}
+                                          className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg hover:bg-gray-200 transition-colors"
+                                        >
+                                          No
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={() => setConfirmMarkReceived(c.id)}
+                                        className="px-3 py-1.5 text-xs font-medium text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors"
+                                      >
+                                        Marcar recibido
+                                      </button>
+                                    )
+                                  )}
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
         )}
