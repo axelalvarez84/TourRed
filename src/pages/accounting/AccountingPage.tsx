@@ -255,6 +255,8 @@ const AccountingPage: React.FC = () => {
   const [insuranceCommissions, setInsuranceCommissions] = useState<InsuranceCommissionReceipt[]>([]);
   const [loadingInsurance, setLoadingInsurance] = useState(false);
   const [insuranceLiability, setInsuranceLiability] = useState(0);
+  const [insuranceSpread, setInsuranceSpread] = useState(0);
+  const [insuranceCommissionsTotal, setInsuranceCommissionsTotal] = useState(0);
   const [showSettlementModal, setShowSettlementModal] = useState(false);
   const [showCommissionModal, setShowCommissionModal] = useState(false);
   const [confirmMarkPaid, setConfirmMarkPaid] = useState<string | null>(null);
@@ -366,7 +368,7 @@ const AccountingPage: React.FC = () => {
   // ── Load insurance data
   const loadInsuranceData = useCallback(async () => {
     setLoadingInsurance(true);
-    const [settlementsRes, commissionsRes, liabilityRes] = await Promise.all([
+    const [settlementsRes, commissionsRes, liabilityRes, spreadRes] = await Promise.all([
       supabase
         .from('insurance_settlements')
         .select('*')
@@ -375,18 +377,39 @@ const AccountingPage: React.FC = () => {
         .from('insurance_commission_receipts')
         .select('*')
         .order('created_at', { ascending: false }),
+      // Pasivo acumulado total en 201.01 (sin filtro de periodo — es saldo corriente)
       supabase
         .from('accounting_entry_lines')
         .select('debit, credit')
         .eq('account_code', '201.01'),
+      // Spread del periodo seleccionado en 401.02
+      supabase
+        .from('accounting_entry_lines')
+        .select('debit, credit, accounting_entries!inner(period_year, period_month)')
+        .eq('account_code', '401.02')
+        .eq('accounting_entries.period_year', year)
+        .eq('accounting_entries.period_month', month),
     ]);
     setInsuranceSettlements(settlementsRes.data ?? []);
     setInsuranceCommissions(commissionsRes.data ?? []);
-    const lines = liabilityRes.data ?? [];
-    const balance = lines.reduce((s, l) => s + (l.credit ?? 0) - (l.debit ?? 0), 0);
-    setInsuranceLiability(balance);
+
+    const liabilityLines = liabilityRes.data ?? [];
+    setInsuranceLiability(liabilityLines.reduce((s, l) => s + (l.credit ?? 0) - (l.debit ?? 0), 0));
+
+    const spreadLines = spreadRes.data ?? [];
+    setInsuranceSpread(spreadLines.reduce((s, l) => s + (l.credit ?? 0) - (l.debit ?? 0), 0));
+
+    // Comisiones cobradas en el periodo seleccionado
+    const allCommissions = commissionsRes.data ?? [];
+    const periodCommissions = allCommissions.filter(c => {
+      if (c.status !== 'completed' || !c.receipt_date) return false;
+      const d = new Date(c.receipt_date);
+      return d.getFullYear() === year && (d.getMonth() + 1) === month;
+    });
+    setInsuranceCommissionsTotal(periodCommissions.reduce((s, c) => s + Number(c.amount), 0));
+
     setLoadingInsurance(false);
-  }, []);
+  }, [year, month]);
 
   // ── Load ledger lines for a specific account
   const loadLedgerLines = useCallback(async (accountCode: string) => {
@@ -1615,7 +1638,7 @@ const AccountingPage: React.FC = () => {
         {activeTab === 'seguros' && (
           <div className="space-y-6">
             {/* Summary cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-5">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm text-gray-500 font-medium">Pasivo con Aseguradora</span>
@@ -1626,18 +1649,24 @@ const AccountingPage: React.FC = () => {
               </div>
               <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-gray-500 font-medium">Spread Acumulado</span>
+                  <span className="text-sm text-gray-500 font-medium">Spread del Periodo</span>
                   <TrendingUp className="w-5 h-5 text-emerald-600" />
                 </div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {fmt(insuranceCommissions.reduce((s, c) => s + Number(c.amount), 0))}
-                </p>
-                <p className="text-xs text-gray-400 mt-1">Comisiones recibidas (Flujo C)</p>
+                <p className="text-2xl font-bold text-gray-900">{fmt(insuranceSpread)}</p>
+                <p className="text-xs text-gray-400 mt-1">Ingreso cta. 401.02 — {MONTHS[month - 1]} {year}</p>
               </div>
               <div className="rounded-xl border border-sky-100 bg-sky-50/40 p-5">
                 <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm text-gray-500 font-medium">Comisiones Recibidas</span>
+                  <DollarSign className="w-5 h-5 text-sky-600" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900">{fmt(insuranceCommissionsTotal)}</p>
+                <p className="text-xs text-gray-400 mt-1">Cobradas en {MONTHS[month - 1]} {year}</p>
+              </div>
+              <div className="rounded-xl border border-rose-100 bg-rose-50/40 p-5">
+                <div className="flex items-center justify-between mb-3">
                   <span className="text-sm text-gray-500 font-medium">Liquidaciones Pendientes</span>
-                  <Clock className="w-5 h-5 text-sky-600" />
+                  <Clock className="w-5 h-5 text-rose-600" />
                 </div>
                 <p className="text-2xl font-bold text-gray-900">
                   {insuranceSettlements.filter(s => s.status === 'pending').length}
