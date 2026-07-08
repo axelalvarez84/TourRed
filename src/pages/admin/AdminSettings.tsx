@@ -50,6 +50,8 @@ interface PlatformSettings {
   odoo_api_key_encrypted: string;
   odoo_database: string;
   travel_insurance_price_per_day_per_traveler: number;
+  travel_insurance_cost_per_day_per_traveler: number;
+  travel_insurance_commission_pct: number;
   supplement_commission_percentage: number;
   hero_background_url: string | null;
   maintenance_mode: boolean;
@@ -118,6 +120,8 @@ const AdminSettings: React.FC = () => {
     odoo_api_key_encrypted: '',
     odoo_database: '',
     travel_insurance_price_per_day_per_traveler: 79,
+    travel_insurance_cost_per_day_per_traveler: 59,
+    travel_insurance_commission_pct: 20,
     supplement_commission_percentage: 10,
     hero_background_url: null,
     maintenance_mode: false,
@@ -383,6 +387,8 @@ const AdminSettings: React.FC = () => {
             odoo_api_key_encrypted: platformSettings.odoo_api_key_encrypted,
             odoo_database: platformSettings.odoo_database,
             travel_insurance_price_per_day_per_traveler: platformSettings.travel_insurance_price_per_day_per_traveler,
+            travel_insurance_cost_per_day_per_traveler: platformSettings.travel_insurance_cost_per_day_per_traveler ?? 59,
+            travel_insurance_commission_pct: platformSettings.travel_insurance_commission_pct ?? 20,
             supplement_commission_percentage: platformSettings.supplement_commission_percentage,
             maintenance_mode: platformSettings.maintenance_mode,
             maintenance_message: platformSettings.maintenance_message,
@@ -632,10 +638,10 @@ const AdminSettings: React.FC = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <div>
               <label htmlFor="insurance_price" className="block text-sm font-medium text-gray-700 mb-1">
-                Precio por día por viajero (MXN)
+                Precio al viajero por día (MXN)
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">$</span>
@@ -652,30 +658,108 @@ const AdminSettings: React.FC = () => {
                   className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
                 />
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Precio base configurable. Ajustar cuando varíe el tipo de cambio.
-              </p>
+              <p className="text-xs text-gray-500 mt-1">Lo que se le cobra al viajero. Ajustar cuando varíe el tipo de cambio.</p>
             </div>
+            <div>
+              <label htmlFor="insurance_cost" className="block text-sm font-medium text-gray-700 mb-1">
+                Costo por día por viajero (MXN)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">$</span>
+                <input
+                  id="insurance_cost"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={platformSettings.travel_insurance_cost_per_day_per_traveler}
+                  onChange={(e) => setPlatformSettings(prev => ({
+                    ...prev,
+                    travel_insurance_cost_per_day_per_traveler: parseFloat(e.target.value) || 0,
+                  }))}
+                  className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Costo real con la aseguradora. Ajustar cuando varíe el tipo de cambio.</p>
+            </div>
+            <div>
+              <label htmlFor="insurance_commission_pct" className="block text-sm font-medium text-gray-700 mb-1">
+                % Comisión de la aseguradora
+              </label>
+              <div className="relative">
+                <input
+                  id="insurance_commission_pct"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={platformSettings.travel_insurance_commission_pct}
+                  onChange={(e) => setPlatformSettings(prev => ({
+                    ...prev,
+                    travel_insurance_commission_pct: parseFloat(e.target.value) || 0,
+                  }))}
+                  className="w-full pr-8 pl-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">%</span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Porcentaje que paga Universal Assistance sobre el costo.</p>
+            </div>
+          </div>
 
-            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Ejemplos de costo total</p>
-              <div className="space-y-1 text-sm text-gray-700">
-                <div className="flex justify-between">
-                  <span>1 día × 1 viajero:</span>
-                  <span className="font-medium">{formatCurrency(platformSettings.travel_insurance_price_per_day_per_traveler)}</span>
+          {/* Spread breakdown */}
+          <div className="bg-gray-50 rounded-lg p-4 mb-6 space-y-2">
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Desglose del spread — por día / viajero</p>
+            {(() => {
+              const precio = platformSettings.travel_insurance_price_per_day_per_traveler;
+              const costo = platformSettings.travel_insurance_cost_per_day_per_traveler;
+              const pct = platformSettings.travel_insurance_commission_pct;
+              const spread = precio - costo;
+              const comision = costo * (pct / 100);
+              const total = spread + comision;
+              return (
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex justify-between text-gray-700">
+                    <span>Precio al viajero</span>
+                    <span className="font-medium">{formatCurrency(precio)}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-700">
+                    <span>Costo a pagar a la aseguradora</span>
+                    <span className="font-medium text-red-600">− {formatCurrency(costo)}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-700 border-t border-gray-200 pt-1.5">
+                    <span>Spread de ToursRed (ingreso inmediato)</span>
+                    <span className="font-semibold text-emerald-600">{formatCurrency(spread)}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-700">
+                    <span>Comisión de la aseguradora ({pct}% sobre el costo, se cobra después)</span>
+                    <span className="font-semibold text-emerald-600">{formatCurrency(comision)}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-gray-300 pt-1.5 mt-1">
+                    <span className="font-bold text-gray-800">Ganancia total estimada</span>
+                    <span className="font-bold text-emerald-700">{formatCurrency(total)}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span>3 días × 2 viajeros:</span>
-                  <span className="font-medium">{formatCurrency(platformSettings.travel_insurance_price_per_day_per_traveler * 3 * 2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>5 días × 4 viajeros:</span>
-                  <span className="font-medium">{formatCurrency(platformSettings.travel_insurance_price_per_day_per_traveler * 5 * 4)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>7 días × 2 viajeros:</span>
-                  <span className="font-medium">{formatCurrency(platformSettings.travel_insurance_price_per_day_per_traveler * 7 * 2)}</span>
-                </div>
+              );
+            })()}
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Ejemplos de costo total al viajero</p>
+            <div className="space-y-1 text-sm text-gray-700">
+              <div className="flex justify-between">
+                <span>1 día × 1 viajero:</span>
+                <span className="font-medium">{formatCurrency(platformSettings.travel_insurance_price_per_day_per_traveler)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>3 días × 2 viajeros:</span>
+                <span className="font-medium">{formatCurrency(platformSettings.travel_insurance_price_per_day_per_traveler * 3 * 2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>5 días × 4 viajeros:</span>
+                <span className="font-medium">{formatCurrency(platformSettings.travel_insurance_price_per_day_per_traveler * 5 * 4)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>7 días × 2 viajeros:</span>
+                <span className="font-medium">{formatCurrency(platformSettings.travel_insurance_price_per_day_per_traveler * 7 * 2)}</span>
               </div>
             </div>
           </div>
