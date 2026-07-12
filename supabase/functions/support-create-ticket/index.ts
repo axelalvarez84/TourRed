@@ -31,7 +31,7 @@ Deno.serve(async (req: Request) => {
       ticketData = await req.json();
     }
 
-    const { tipo, subcategory_id, solicitante_nombre, solicitante_email, descripcion, user_id } = ticketData;
+    const { tipo, subcategory_id, solicitante_nombre, solicitante_email, descripcion, user_id, extra_data } = ticketData;
 
     if (!tipo || !subcategory_id || !solicitante_nombre || !solicitante_email || !descripcion) {
       return new Response(
@@ -76,6 +76,7 @@ Deno.serve(async (req: Request) => {
         solicitante_nombre,
         solicitante_email,
         descripcion,
+        extra_data: extra_data ?? null,
       })
       .select()
       .single();

@@ -606,14 +606,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setNeedsTermsAcceptance(false);
           }
 
-          // Verificar si la agencia está aprobada
+          // Verificar si la agencia está aprobada / en qué etapa de onboarding está
           try {
             const { data: agencyData } = await supabase
               .from('agencies')
-              .select('is_approved')
+              .select('is_approved, onboarding_status')
               .eq('user_id', authUser.id)
               .maybeSingle();
-            setIsAgencyApproved(agencyData?.is_approved === true);
+            const onboardingStatus = agencyData?.onboarding_status ?? 'pending_documents';
+            setIsAgencyApproved(onboardingStatus === 'active' && agencyData?.is_approved === true);
           } catch {
             setIsAgencyApproved(false);
           }

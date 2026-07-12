@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Building, Users, Eye, EyeOff, Mail, Phone, Globe, Calendar, Search, Filter, MoreVertical, CheckCircle, XCircle, CreditCard as Edit, Save, X, Percent, DollarSign, AlertTriangle, User, MapPin, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Building, Users, Eye, EyeOff, Mail, Phone, Globe, Calendar, Search, Filter, MoreVertical, CheckCircle, XCircle, CreditCard as Edit, Save, X, Percent, DollarSign, AlertTriangle, User, MapPin, ArrowUpDown, ArrowUp, ArrowDown, FileText } from 'lucide-react';
 import { getAllAgencies, updateAgencyStatus, supabase } from '../../lib/supabase';
 import { formatCurrency, formatCurrencyMXN } from '../../utils/formatCurrency';
+import AgencyContractSection from '../../components/AgencyContractSection';
 
 interface Agency {
   id: string;
@@ -15,6 +16,12 @@ interface Agency {
   rating?: number;
   is_active: boolean;
   is_approved?: boolean;
+  onboarding_status?: string;
+  signed_contract_url?: string | null;
+  persona_type?: string;
+  representante_legal_nombre?: string | null;
+  rejection_category?: string | null;
+  rejection_reason?: string | null;
   created_at: string;
   updated_at: string;
   commission_rate?: number;
@@ -95,6 +102,12 @@ const AdminAgencies: React.FC = () => {
           razon_social,
           user_id,
           account_executive_id,
+          onboarding_status,
+          signed_contract_url,
+          persona_type,
+          representante_legal_nombre,
+          rejection_category,
+          rejection_reason,
           users(first_name, last_name, email, is_approved)
         `)
         .order('created_at', { ascending: false })
@@ -1265,6 +1278,21 @@ const AdminAgencies: React.FC = () => {
                       </div>
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Contrato y documentos de onboarding */}
+              <div className="space-y-6">
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Contrato y Documentos
+                  </h4>
+                  <AgencyContractSection
+                    agencyId={selectedAgency.id}
+                    legacySignedContractUrl={selectedAgency.signed_contract_url}
+                    onboardingStatus={selectedAgency.onboarding_status}
+                  />
                 </div>
               </div>
 

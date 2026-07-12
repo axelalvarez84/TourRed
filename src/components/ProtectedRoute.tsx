@@ -86,10 +86,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles,
       }
     }
 
-    // Block unapproved agencies from all pages except pending-approval and profile
-    const approvalExemptPaths = ['/agency/pending-approval', '/agency/profile'];
-    if (userRole === UserRole.AGENCY && !isAgencyApproved && !approvalExemptPaths.includes(location.pathname)) {
-      return <Navigate to="/agency/pending-approval" replace />;
+    // Block unapproved agencies — redirect to new onboarding flow
+    const onboardingExemptPaths = ['/agency/onboarding', '/agency/pending-approval', '/agency/profile'];
+    if (userRole === UserRole.AGENCY && !isAgencyApproved && !onboardingExemptPaths.includes(location.pathname)) {
+      return <Navigate to="/agency/onboarding" replace />;
     }
 
     // Show T&C gate for traveler/agency routes if terms need acceptance

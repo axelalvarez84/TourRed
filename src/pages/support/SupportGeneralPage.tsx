@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Headphones as HeadphonesIcon, CheckCircle, ArrowLeft, Loader } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Headphones as HeadphonesIcon, CheckCircle, ArrowLeft, Loader, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { SupportCategory, SupportSubcategory } from '../../types';
 import SupportFileUpload, { UploadedFile } from '../../components/support/SupportFileUpload';
@@ -21,8 +21,14 @@ const INITIAL_FORM: FormData = {
   descripcion: '',
 };
 
+const APEL_CATEGORY_NAME_FRAGMENT = 'pelac'; // matches 'apelacón'
+
 const SupportGeneralPage: React.FC = () => {
-  const [form, setForm] = useState<FormData>(INITIAL_FORM);
+  const [searchParams] = useSearchParams();
+  const isApelacion = searchParams.get('tipo') === 'apelacion';
+  const preselectedCategoryId = searchParams.get('categoria') ?? '';
+
+  const [form, setForm] = useState<FormData>({ ...INITIAL_FORM, category_id: preselectedCategoryId });
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [categories, setCategories] = useState<SupportCategory[]>([]);
   const [subcategories, setSubcategories] = useState<SupportSubcategory[]>([]);
@@ -37,10 +43,23 @@ const SupportGeneralPage: React.FC = () => {
       const { data: cats } = await supabase.from('support_categories').select('*').eq('activa', true).order('nombre');
       const { data: subs } = await supabase.from('support_subcategories').select('*').eq('activa', true).order('nombre');
       setCategories(cats ?? []);
-      const generalSubs = (subs ?? []).filter(s => s.aplica_a?.includes('general'));
-      setSubcategories(generalSubs);
+      // Include 'agency' categories in addition to 'general' for the general page
+      // so that APEL-type appeals (aplica_a = ['agency']) show here when redirected
+      const generalAndAgencySubs = (subs ?? []).filter(s =>
+        s.aplica_a?.includes('general') || s.aplica_a?.includes('agency')
+      );
+      setSubcategories(generalAndAgencySubs);
+
+      // Auto-detect APEL category by name fragment if no preselection
+      if (!preselectedCategoryId && isApelacion) {
+        const apelCat = (cats ?? []).find((c: SupportCategory) =>
+          c.nombre?.toLowerCase().includes(APEL_CATEGORY_NAME_FRAGMENT)
+        );
+        if (apelCat) setForm(prev => ({ ...prev, category_id: apelCat.id }));
+      }
     };
     load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -91,6 +110,7 @@ const SupportGeneralPage: React.FC = () => {
         solicitante_nombre: form.nombre,
         solicitante_email: form.email,
         descripcion: form.descripcion,
+        extra_data: isApelacion ? { ticket_type: 'apelacion_rechazo' } : undefined,
       }));
       files.forEach(f => formData.append('files', f.file));
 
@@ -163,6 +183,18 @@ const SupportGeneralPage: React.FC = () => {
       </div>
 
       <div className="container-custom py-8 max-w-2xl">
+        {/* Apelación banner */}
+        {isApelacion && (
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-amber-900">Estás enviando una apelación de rechazo de registro</p>
+              <p className="text-sm text-amber-800 mt-0.5">
+                Explica en detalle por qué consideras que el rechazo fue incorrecto y adjunta cualquier documento o evidencia relevante. Nuestro equipo revisará tu caso.
+              </p>
+            </div>
+          </div>
+        )}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
