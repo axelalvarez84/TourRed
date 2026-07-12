@@ -377,46 +377,46 @@ const AgencyProfile: React.FC = () => {
             ) : (
               <div className="w-full h-full bg-gradient-to-r from-primary-600 to-primary-700" />
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
 
-            {/* Botón Editar superpuesto */}
+            {/* Logo superpuesto en el borde inferior izquierdo */}
+            <div className="absolute bottom-0 left-6 translate-y-1/2">
+              <div className="h-24 w-24 rounded-xl border-4 border-white shadow-xl bg-white overflow-hidden">
+                {(isEditing ? editForm.logo : agency.logo) ? (
+                  <img
+                    src={isEditing ? editForm.logo : agency.logo}
+                    alt={agency.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : agency.users?.profile_picture_url ? (
+                  <img
+                    src={agency.users.profile_picture_url}
+                    alt={agency.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="h-full w-full bg-primary-50 flex items-center justify-center">
+                    <Building className="h-10 w-10 text-primary-400" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Botón Editar con fondo azul sólido */}
             {!isEditing && (
               <button
                 onClick={() => setIsEditing(true)}
-                className="absolute top-4 right-4 btn bg-white/20 text-white border-white/30 hover:bg-white/30 backdrop-blur-sm"
+                className="absolute top-4 right-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium shadow-md transition-colors"
               >
-                <Edit className="h-4 w-4 mr-2" />
+                <Edit className="h-4 w-4" />
                 Editar Perfil
               </button>
             )}
           </div>
 
-          {/* Logo + info */}
-          <div className="px-6 pb-5">
-            <div className="flex flex-col sm:flex-row sm:items-end -mt-12 mb-4 gap-4">
-              {/* Logo superpuesto sobre portada */}
-              <div className="flex-shrink-0">
-                <div className="h-24 w-24 rounded-xl border-4 border-white shadow-lg bg-white overflow-hidden">
-                  {(isEditing ? editForm.logo : agency.logo) ? (
-                    <img
-                      src={isEditing ? editForm.logo : agency.logo}
-                      alt={agency.name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : agency.users?.profile_picture_url ? (
-                    <img
-                      src={agency.users.profile_picture_url}
-                      alt={agency.name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="h-full w-full bg-primary-50 flex items-center justify-center">
-                      <Building className="h-10 w-10 text-primary-400" />
-                    </div>
-                  )}
-                </div>
-              </div>
-
+          {/* Nombre + badges (con espacio para el logo) */}
+          <div className="px-6 pb-5 pt-16">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <div className="flex-1 min-w-0">
                 <h1 className="text-2xl font-bold text-gray-900 truncate">
                   {isEditing ? editForm.name : agency.name}
