@@ -366,57 +366,78 @@ const AgencyProfile: React.FC = () => {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-          <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-8">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="h-20 w-20 rounded-full bg-white/20 flex items-center justify-center overflow-hidden">
+          {/* Cover / portada */}
+          <div className="relative h-44 md:h-56">
+            {(isEditing ? editForm.cover_image_url : agency.cover_image_url) ? (
+              <img
+                src={isEditing ? editForm.cover_image_url : agency.cover_image_url}
+                alt="Portada"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-r from-primary-600 to-primary-700" />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+
+            {/* Botón Editar superpuesto */}
+            {!isEditing && (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="absolute top-4 right-4 btn bg-white/20 text-white border-white/30 hover:bg-white/30 backdrop-blur-sm"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Editar Perfil
+              </button>
+            )}
+          </div>
+
+          {/* Logo + info */}
+          <div className="px-6 pb-5">
+            <div className="flex flex-col sm:flex-row sm:items-end -mt-12 mb-4 gap-4">
+              {/* Logo superpuesto sobre portada */}
+              <div className="flex-shrink-0">
+                <div className="h-24 w-24 rounded-xl border-4 border-white shadow-lg bg-white overflow-hidden">
                   {(isEditing ? editForm.logo : agency.logo) ? (
                     <img
                       src={isEditing ? editForm.logo : agency.logo}
                       alt={agency.name}
-                      className="h-20 w-20 rounded-full object-cover"
+                      className="h-full w-full object-cover"
                     />
                   ) : agency.users?.profile_picture_url ? (
                     <img
                       src={agency.users.profile_picture_url}
                       alt={agency.name}
-                      className="h-20 w-20 rounded-full object-cover"
+                      className="h-full w-full object-cover"
                     />
                   ) : (
-                    <Building className="h-10 w-10 text-white" />
+                    <div className="h-full w-full bg-primary-50 flex items-center justify-center">
+                      <Building className="h-10 w-10 text-primary-400" />
+                    </div>
                   )}
                 </div>
-                <div className="ml-6">
-                  <h1 className="text-2xl font-bold text-white">
-                    {isEditing ? editForm.name : agency.name}
-                  </h1>
-                  <p className="text-primary-100">Agencia de Viajes</p>
-                  <div className="flex items-center mt-2">
-                    {agency.rating && (
-                      <div className="flex items-center text-white">
-                        <Star className="h-4 w-4 fill-current mr-1" />
-                        <span className="text-sm">{agency.rating.toFixed(1)}</span>
-                      </div>
-                    )}
-                    <span className={`ml-3 px-2 py-1 rounded-full text-xs font-medium ${
-                      agency.is_active 
-                        ? 'bg-success-100 text-success-800' 
-                        : 'bg-error-100 text-error-800'
-                    }`}>
-                      {agency.is_active ? 'Activa' : 'Inactiva'}
-                    </span>
-                  </div>
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <h1 className="text-2xl font-bold text-gray-900 truncate">
+                  {isEditing ? editForm.name : agency.name}
+                </h1>
+                <div className="flex flex-wrap items-center gap-3 mt-1">
+                  <span className="text-sm text-gray-500">Agencia de Viajes</span>
+                  {agency.rating ? (
+                    <div className="flex items-center text-yellow-500">
+                      <Star className="h-4 w-4 fill-current mr-1" />
+                      <span className="text-sm font-medium text-gray-700">{agency.rating.toFixed(1)}</span>
+                    </div>
+                  ) : null}
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                    agency.is_active
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {agency.is_active ? 'Activa' : 'Inactiva'}
+                  </span>
                 </div>
               </div>
-              {!isEditing && (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="btn bg-white/20 text-white border-white/30 hover:bg-white/30"
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Editar Perfil
-                </button>
-              )}
             </div>
           </div>
 

@@ -125,7 +125,7 @@ const AgencyPublicProfile: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-8">
-          {/* Header / Cover */}
+          {/* Header / Cover con logo superpuesto */}
           <div className="relative h-48 md:h-64">
             {agency.cover_image_url ? (
               <img
@@ -136,26 +136,30 @@ const AgencyPublicProfile: React.FC = () => {
             ) : (
               <div className="w-full h-full bg-gradient-to-r from-blue-600 to-blue-800" />
             )}
-            {/* Overlay for readability */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+            {/* Overlay degradado inferior para contraste */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
+
+            {/* Logo superpuesto en la esquina inferior izquierda */}
+            <div className="absolute bottom-0 left-6 md:left-8 translate-y-1/2">
+              {agency.logo ? (
+                <img
+                  src={agency.logo}
+                  alt={agency.name}
+                  className="w-28 h-28 md:w-32 md:h-32 rounded-xl border-4 border-white shadow-xl object-cover bg-white"
+                />
+              ) : (
+                <div className="w-28 h-28 md:w-32 md:h-32 rounded-xl border-4 border-white shadow-xl bg-gray-100 flex items-center justify-center">
+                  <Building className="h-12 w-12 md:h-14 md:h-14 text-gray-400" />
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="px-6 md:px-8 pb-8">
-            <div className="flex flex-col md:flex-row md:items-end -mt-16 mb-6">
-              {/* Logo */}
-              <div className="flex-shrink-0 mb-4 md:mb-0">
-                {agency.logo ? (
-                  <img
-                    src={agency.logo}
-                    alt={agency.name}
-                    className="w-32 h-32 rounded-xl border-4 border-white shadow-xl object-cover bg-white"
-                  />
-                ) : (
-                  <div className="w-32 h-32 rounded-xl border-4 border-white shadow-xl bg-gray-100 flex items-center justify-center">
-                    <Building className="h-14 w-14 text-gray-400" />
-                  </div>
-                )}
-              </div>
+            {/* Espacio para el logo superpuesto + nombre */}
+            <div className="flex flex-col md:flex-row md:items-end pt-16 md:pt-18 mb-6">
+              {/* Espacio reservado para el logo (ya posicionado en absolute) */}
+              <div className="hidden md:block w-32 flex-shrink-0" />
 
               <div className="md:ml-6 flex-1">
                 <div className="flex items-start justify-between">
