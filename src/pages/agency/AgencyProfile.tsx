@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Building, Mail, Phone, Globe, Star, CreditCard as Edit, Save, X, Upload, User, Calendar, MapPin, FileText, Landmark, Hash, Shield, Link2, Building2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Building, Mail, Phone, Globe, Star, CreditCard as Edit, Save, X, Upload, User, Calendar, MapPin, FileText, Landmark, Hash, Shield, Link2, Building2, Image, ExternalLink, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { useAgencyId } from '../../hooks/useAgencyId';
@@ -13,6 +13,8 @@ interface AgencyProfile {
   name: string;
   description?: string;
   logo?: string;
+  cover_image_url?: string;
+  custom_slug?: string;
   contact_email: string;
   contact_phone?: string;
   website?: string;
@@ -69,12 +71,16 @@ const AgencyProfile: React.FC = () => {
     titular_cuenta: '',
     rnt: '',
     logo: '',
+    cover_image_url: '',
+    custom_slug: '',
     contact_email: '',
     contact_phone: '',
     website: '',
     first_name: '',
     last_name: ''
   });
+
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
 
   useEffect(() => {
     if (resolvedAgencyId) {
@@ -146,6 +152,8 @@ const AgencyProfile: React.FC = () => {
         cuenta_clabe: agencyData.cuenta_clabe || '',
         titular_cuenta: agencyData.titular_cuenta || '',
         logo: agencyData.logo || '',
+        cover_image_url: agencyData.cover_image_url || '',
+        custom_slug: agencyData.custom_slug || '',
         contact_email: agencyData.contact_email || '',
         contact_phone: agencyData.contact_phone || '',
         website: agencyData.website || '',
@@ -178,6 +186,8 @@ const AgencyProfile: React.FC = () => {
           name: editForm.name,
           description: editForm.description,
           logo: editForm.logo,
+          cover_image_url: editForm.cover_image_url || null,
+          custom_slug: editForm.custom_slug ? editForm.custom_slug.trim().toLowerCase() : null,
           rnt: editForm.rnt,
           rfc: editForm.rfc,
           razon_social: editForm.razon_social,
@@ -242,6 +252,8 @@ const AgencyProfile: React.FC = () => {
       name: agency.name || '',
       description: agency.description || '',
       logo: agency.logo || '',
+      cover_image_url: agency.cover_image_url || '',
+      custom_slug: agency.custom_slug || '',
       rnt: agency.rnt || '',
       contact_email: agency.contact_email || '',
       contact_phone: agency.contact_phone || '',
@@ -256,6 +268,42 @@ const AgencyProfile: React.FC = () => {
 
   const handleLogoSelect = (base64: string, type: string, size: number) => {
     setEditForm({ ...editForm, logo: base64 });
+  };
+
+  const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+  let slugDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const handleSlugChange = (raw: string) => {
+    const value = raw.toLowerCase().replace(/\s/g, '-');
+    setEditForm((prev) => ({ ...prev, custom_slug: value }));
+
+    if (!value) {
+      setSlugStatus('idle');
+      return;
+    }
+
+    if (!SLUG_REGEX.test(value)) {
+      setSlugStatus('invalid');
+      return;
+    }
+
+    setSlugStatus('checking');
+
+    if (slugDebounceTimer) clearTimeout(slugDebounceTimer);
+    slugDebounceTimer = setTimeout(async () => {
+      try {
+        const { data } = await supabase
+          .from('agencies')
+          .select('id')
+          .ilike('custom_slug', value)
+          .neq('id', agency!.id)
+          .maybeSingle();
+
+        setSlugStatus(data ? 'taken' : 'available');
+      } catch {
+        setSlugStatus('idle');
+      }
+    }, 500);
   };
 
   // Helper function to format CLABE with spaces for readability
@@ -762,6 +810,88 @@ const AgencyProfile: React.FC = () => {
                       placeholder="Subir logo de la agencia"
                     />
                   </div>
+
+                  {/* Cover image */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Imagen de Portada del Perfil Público
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Se muestra como fondo en la parte superior de tu página pública. Recomendado: 1200×400 px.
+                    </p>
+                    <ImageUploader
+                      onImageSelect={(url) => setEditForm({ ...editForm, cover_image_url: url })}
+                      currentImage={editForm.cover_image_url}
+                      maxSizeMB={5}
+                      placeholder="Subir imagen de portada"
+                    />
+                  </div>
+
+                  {/* Custom slug */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      URL Personalizada de tu Perfil
+                    </label>
+                    <div className="flex rounded-lg overflow-hidden border border-gray-300 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
+                      <span className="inline-flex items-center px-3 bg-gray-50 text-gray-500 text-sm border-r border-gray-300 whitespace-nowrap">
+                        /agencies/
+                      </span>
+                      <input
+                        type="text"
+                        value={editForm.custom_slug}
+                        onChange={(e) => handleSlugChange(e.target.value)}
+                        placeholder="mi-agencia"
+                        className="flex-1 px-3 py-2 text-sm outline-none bg-white"
+                        maxLength={60}
+                      />
+                      {slugStatus === 'checking' && (
+                        <span className="inline-flex items-center px-3 text-gray-400">
+                          <div className="h-4 w-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+                        </span>
+                      )}
+                      {slugStatus === 'available' && (
+                        <span className="inline-flex items-center px-3 text-green-600">
+                          <CheckCircle className="h-4 w-4" />
+                        </span>
+                      )}
+                      {slugStatus === 'taken' && (
+                        <span className="inline-flex items-center px-3 text-red-500">
+                          <AlertCircle className="h-4 w-4" />
+                        </span>
+                      )}
+                      {slugStatus === 'invalid' && (
+                        <span className="inline-flex items-center px-3 text-orange-500">
+                          <AlertCircle className="h-4 w-4" />
+                        </span>
+                      )}
+                    </div>
+                    {slugStatus === 'available' && editForm.custom_slug && (
+                      <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" /> URL disponible
+                      </p>
+                    )}
+                    {slugStatus === 'taken' && (
+                      <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" /> Esta URL ya está en uso por otra agencia
+                      </p>
+                    )}
+                    {slugStatus === 'invalid' && (
+                      <p className="text-xs text-orange-500 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" /> Solo letras minúsculas, números y guiones (-)
+                      </p>
+                    )}
+                    {editForm.custom_slug && slugStatus === 'idle' && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Tu perfil público estará en: <strong>/agencies/{editForm.custom_slug}</strong>
+                      </p>
+                    )}
+                    {!editForm.custom_slug && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Deja vacío para seguir usando la URL con ID único
+                      </p>
+                    )}
+                  </div>
+
                   <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
                     <button onClick={handleCancel} className="btn btn-outline" disabled={isSaving}>
                       <X className="h-4 w-4 mr-2" />Cancelar
