@@ -71,6 +71,9 @@ interface PlatformSettings {
   oauth_azure_link_enabled: boolean;
   oauth_twitter_link_enabled: boolean;
   oauth_facebook_link_enabled: boolean;
+  stripe_bookings_enabled: boolean;
+  stripe_gift_cards_enabled: boolean;
+  stripe_memberships_enabled: boolean;
 }
 
 const AdminSettings: React.FC = () => {
@@ -141,6 +144,9 @@ const AdminSettings: React.FC = () => {
     oauth_azure_link_enabled: true,
     oauth_twitter_link_enabled: false,
     oauth_facebook_link_enabled: false,
+    stripe_bookings_enabled: true,
+    stripe_gift_cards_enabled: true,
+    stripe_memberships_enabled: true,
   });
   const [zohoStatus, setZohoStatus] = useState<{
     connected: boolean;
@@ -411,6 +417,9 @@ const AdminSettings: React.FC = () => {
             oauth_azure_link_enabled: platformSettings.oauth_azure_link_enabled,
             oauth_twitter_link_enabled: platformSettings.oauth_twitter_link_enabled,
             oauth_facebook_link_enabled: platformSettings.oauth_facebook_link_enabled,
+            stripe_bookings_enabled: platformSettings.stripe_bookings_enabled,
+            stripe_gift_cards_enabled: platformSettings.stripe_gift_cards_enabled,
+            stripe_memberships_enabled: platformSettings.stripe_memberships_enabled,
             updated_at: new Date().toISOString(),
             updated_by: user?.id
           })
@@ -450,7 +459,7 @@ const AdminSettings: React.FC = () => {
   const handlePlatformChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     const numericFields = ['service_charge_percentage', 'agency_commission_percentage', 'supplement_commission_percentage', 'membership_monthly_price', 'membership_annual_price', 'default_max_referrals_per_user', 'referral_bonus_points'];
-    const booleanFields = ['referral_program_enabled', 'mercadopago_enabled', 'paypal_enabled', 'oauth_google_login_enabled', 'oauth_azure_login_enabled', 'oauth_twitter_login_enabled', 'oauth_facebook_login_enabled', 'oauth_google_link_enabled', 'oauth_azure_link_enabled', 'oauth_twitter_link_enabled', 'oauth_facebook_link_enabled'];
+    const booleanFields = ['referral_program_enabled', 'mercadopago_enabled', 'paypal_enabled', 'oauth_google_login_enabled', 'oauth_azure_login_enabled', 'oauth_twitter_login_enabled', 'oauth_facebook_login_enabled', 'oauth_google_link_enabled', 'oauth_azure_link_enabled', 'oauth_twitter_link_enabled', 'oauth_facebook_link_enabled', 'stripe_bookings_enabled', 'stripe_gift_cards_enabled', 'stripe_memberships_enabled'];
     setPlatformSettings(prev => ({
       ...prev,
       [name]: booleanFields.includes(name) ? checked : (numericFields.includes(name) ? (parseFloat(value) || 0) : value),
@@ -1042,7 +1051,8 @@ const AdminSettings: React.FC = () => {
               <div className="text-sm text-blue-800">
                 <p className="font-medium mb-1">Informacion importante:</p>
                 <ul className="space-y-1 text-xs">
-                  <li>• Stripe siempre esta disponible y es el unico proveedor para membresias (requiere cobro recurrente)</li>
+                  <li>• Stripe es el proveedor principal y el unico disponible para membresias (requiere cobro recurrente)</li>
+                  <li>• Puedes desactivar Stripe por contexto: reservas, tarjetas de regalo o membresias de forma independiente</li>
                   <li>• MercadoPago y PayPal aplican solo para reservas sin membresia y tarjetas de regalo</li>
                   <li>• Las claves secretas se configuran como secrets de Supabase Edge Functions</li>
                   <li>• Aqui solo se guardan las claves publicas (no sensibles) necesarias para el frontend</li>
@@ -1182,6 +1192,95 @@ const AdminSettings: React.FC = () => {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* ---- Stripe — Control por contexto ---- */}
+            <div className="border border-violet-200 rounded-lg p-4 bg-violet-50/30">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 bg-violet-100 rounded-lg flex items-center justify-center">
+                  <CreditCard className="w-4 h-4 text-violet-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Stripe — Control por contexto</h3>
+                  <p className="text-xs text-gray-500">Activa o desactiva Stripe segun el tipo de transaccion</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {/* Stripe para reservas */}
+                <div className="flex items-start justify-between gap-4 bg-white border border-gray-200 rounded-lg p-3">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">Stripe para reservas de tours</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Permite pagar reservas con tarjeta via Stripe</p>
+                    {!platformSettings.stripe_bookings_enabled && (
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-2">
+                        Desactivado — los viajeros no podran pagar con Stripe al reservar tours
+                      </p>
+                    )}
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer flex-shrink-0 mt-0.5">
+                    <input
+                      type="checkbox"
+                      name="stripe_bookings_enabled"
+                      checked={platformSettings.stripe_bookings_enabled}
+                      onChange={handlePlatformChange}
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Habilitado</span>
+                  </label>
+                </div>
+
+                {/* Stripe para tarjetas de regalo */}
+                <div className="flex items-start justify-between gap-4 bg-white border border-gray-200 rounded-lg p-3">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">Stripe para tarjetas de regalo</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Permite comprar tarjetas de regalo con tarjeta via Stripe</p>
+                    {!platformSettings.stripe_gift_cards_enabled && (
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-2">
+                        Desactivado — la opcion de Stripe no aparecera al comprar tarjetas de regalo
+                      </p>
+                    )}
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer flex-shrink-0 mt-0.5">
+                    <input
+                      type="checkbox"
+                      name="stripe_gift_cards_enabled"
+                      checked={platformSettings.stripe_gift_cards_enabled}
+                      onChange={handlePlatformChange}
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Habilitado</span>
+                  </label>
+                </div>
+
+                {/* Stripe para membresias */}
+                <div className="flex items-start justify-between gap-4 bg-white border border-gray-200 rounded-lg p-3">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">Stripe para nuevas membresias</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Permite contratar nuevas suscripciones de membresia</p>
+                    {!platformSettings.stripe_memberships_enabled && (
+                      <div className="mt-2 space-y-1.5">
+                        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                          Desactivado — la pagina de compra mostrara un aviso de mantenimiento temporal
+                        </p>
+                        <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-1">
+                          Las suscripciones activas y sus renovaciones automaticas en Stripe no se ven afectadas
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer flex-shrink-0 mt-0.5">
+                    <input
+                      type="checkbox"
+                      name="stripe_memberships_enabled"
+                      checked={platformSettings.stripe_memberships_enabled}
+                      onChange={handlePlatformChange}
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Habilitado</span>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         </div>

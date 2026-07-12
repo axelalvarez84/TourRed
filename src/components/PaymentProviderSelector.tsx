@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CreditCard, Lock, Info } from 'lucide-react';
+import { CreditCard, Lock, Info, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export type PaymentProvider = 'stripe' | 'mercadopago' | 'paypal';
@@ -15,6 +15,9 @@ interface ProviderConfig {
   paypal_enabled: boolean;
   mercadopago_public_key: string;
   paypal_client_id: string;
+  stripe_bookings_enabled: boolean;
+  stripe_gift_cards_enabled: boolean;
+  stripe_memberships_enabled: boolean;
 }
 
 interface PaymentProviderSelectorProps {
@@ -36,6 +39,19 @@ const PROVIDER_DESCRIPTIONS: Record<PaymentProvider, string> = {
   paypal: 'Cuenta PayPal o tarjeta de crédito/débito',
 };
 
+function isStripeAvailableForContext(context: PaymentContext, config: ProviderConfig): boolean {
+  if (context === 'booking' || context === 'booking_with_membership') {
+    return config.stripe_bookings_enabled;
+  }
+  if (context === 'gift_card') {
+    return config.stripe_gift_cards_enabled;
+  }
+  if (context === 'membership') {
+    return config.stripe_memberships_enabled;
+  }
+  return true;
+}
+
 export default function PaymentProviderSelector({
   context,
   value,
@@ -47,7 +63,9 @@ export default function PaymentProviderSelector({
   useEffect(() => {
     supabase
       .from('platform_settings')
-      .select('mercadopago_enabled, paypal_enabled, mercadopago_public_key, paypal_client_id')
+      .select(
+        'mercadopago_enabled, paypal_enabled, mercadopago_public_key, paypal_client_id, stripe_bookings_enabled, stripe_gift_cards_enabled, stripe_memberships_enabled'
+      )
       .maybeSingle()
       .then(({ data }) => {
         if (data) setConfig(data as ProviderConfig);
@@ -57,21 +75,48 @@ export default function PaymentProviderSelector({
   const isMembershipContext =
     context === 'booking_with_membership' || context === 'membership';
 
-  const availableProviders: PaymentProvider[] = ['stripe'];
+  const stripeAvailable = config ? isStripeAvailableForContext(context, config) : true;
 
-  if (!isMembershipContext && config?.mercadopago_enabled && config.mercadopago_public_key) {
-    availableProviders.push('mercadopago');
-  }
-  if (!isMembershipContext && config?.paypal_enabled && config.paypal_client_id) {
-    availableProviders.push('paypal');
+  const availableProviders: PaymentProvider[] = [];
+
+  if (stripeAvailable) {
+    availableProviders.push('stripe');
   }
 
+  if (!isMembershipContext) {
+    if (config?.mercadopago_enabled && config.mercadopago_public_key) {
+      availableProviders.push('mercadopago');
+    }
+    if (config?.paypal_enabled && config.paypal_client_id) {
+      availableProviders.push('paypal');
+    }
+  }
+
+  // If current selection is no longer available, switch to first available
   useEffect(() => {
+    if (!config) return;
     if (isMembershipContext && value !== 'stripe') {
       onChange('stripe');
+      return;
     }
-  }, [isMembershipContext, value, onChange]);
+    if (availableProviders.length > 0 && !availableProviders.includes(value)) {
+      onChange(availableProviders[0]);
+    }
+  }, [config, isMembershipContext, value]);
 
+  // No providers available at all
+  if (config && availableProviders.length === 0) {
+    return (
+      <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+        <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-amber-800">
+          No hay métodos de pago disponibles en este momento. Por favor intenta más tarde.
+        </p>
+      </div>
+    );
+  }
+
+  // Only one provider and it's not membership context — hide selector (no choice to make)
   if (availableProviders.length === 1 && !isMembershipContext) {
     return null;
   }

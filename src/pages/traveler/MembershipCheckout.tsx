@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Crown, Check, ArrowLeft, Tag, X, Shield, CreditCard, Calendar, Zap, Sparkles, Loader2 } from 'lucide-react';
+import { Crown, Check, ArrowLeft, Tag, X, Shield, CreditCard, Calendar, Zap, Sparkles, Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { useMembershipPrices } from '../../hooks/useMembershipPrices';
@@ -29,9 +29,11 @@ export default function MembershipCheckout() {
   const [error, setError] = useState<string | null>(null);
   const [hasMembership, setHasMembership] = useState(false);
   const [checkingMembership, setCheckingMembership] = useState(true);
+  const [stripeMembershipsEnabled, setStripeMembershipsEnabled] = useState<boolean | null>(null);
 
   useEffect(() => {
     checkExistingMembership();
+    checkStripeEnabled();
   }, [user?.id]);
 
   const checkExistingMembership = async () => {
@@ -51,15 +53,49 @@ export default function MembershipCheckout() {
     }
   };
 
+  const checkStripeEnabled = async () => {
+    const { data } = await supabase
+      .from('platform_settings')
+      .select('stripe_memberships_enabled')
+      .maybeSingle();
+    setStripeMembershipsEnabled(data?.stripe_memberships_enabled ?? true);
+  };
+
   if (!planType || !['monthly', 'annual'].includes(planType)) {
     navigate('/traveler/membership', { replace: true });
     return null;
   }
 
-  if (checkingMembership || pricesLoading || !prices) {
+  if (checkingMembership || pricesLoading || !prices || stripeMembershipsEnabled === null) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!stripeMembershipsEnabled) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
+          <div className="h-16 w-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="h-8 w-8 text-amber-600" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">
+            Membresías no disponibles temporalmente
+          </h2>
+          <p className="text-gray-600 text-sm mb-6">
+            El proceso de pago para nuevas membresías está temporalmente deshabilitado por mantenimiento.
+            Las suscripciones activas no se ven afectadas. Por favor intenta de nuevo más tarde.
+          </p>
+          <button
+            onClick={() => navigate('/traveler/membership')}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Volver a Membresías
+          </button>
+        </div>
       </div>
     );
   }
