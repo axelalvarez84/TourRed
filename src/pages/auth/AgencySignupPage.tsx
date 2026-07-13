@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, CheckCircle, XCircle, Loader } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { signUp, supabase } from '../../lib/supabase';
 import { UserRole } from '../../lib/supabase';
 import { useFieldAvailability } from '../../hooks/useFieldAvailability';
+import AgencySignupFormBody, {
+  AgencyFormData,
+  defaultAgencyFormData,
+} from './AgencySignupFormBody';
 
 const isLeakedPasswordError = (message: string) =>
   /leaked|pwned|compromised|common password/i.test(message);
@@ -17,41 +20,10 @@ const AgencySignupPage: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [activeTermsVersion, setActiveTermsVersion] = useState<{ version_number: number; published_at: string } | null>(null);
+  const [formData, setFormData] = useState<AgencyFormData>(defaultAgencyFormData);
 
   const searchParams = new URLSearchParams(location.search);
   const redirectUrl = searchParams.get('redirect');
-
-  const [formData, setFormData] = useState({
-    firstName: '',
-    apellidoPaterno: '',
-    apellidoMaterno: '',
-    dateOfBirth: '',
-    sexo: '' as '' | 'masculino' | 'femenino' | 'no_binario',
-    curp: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    agencyName: '',
-    phoneNumber: '',
-    website: '',
-    personaType: '' as '' | 'persona_fisica' | 'persona_moral',
-    representanteLegalNombre: '',
-    rfc: '',
-    razonSocial: '',
-    rnt: '',
-    regimenFiscal: '',
-    banco: '',
-    cuentaClabe: '',
-    titularCuenta: '',
-    street: '',
-    exteriorNumber: '',
-    interiorNumber: '',
-    colony: '',
-    city: '',
-    state: '',
-    postalCode: '',
-    country: 'México'
-  });
 
   useEffect(() => {
     supabase.rpc('get_active_terms', { p_type: 'agency' }).then(({ data }) => {
@@ -59,1045 +31,170 @@ const AgencySignupPage: React.FC = () => {
     });
   }, []);
 
+  const curpAvailability = useFieldAvailability(formData.curp, 'check_curp_available', 18, 18, 'agency');
+  const emailAvailability = useFieldAvailability(formData.email, 'check_email_available', 5);
+
+  const handleChange = (field: keyof AgencyFormData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
-    const { firstName, apellidoPaterno, apellidoMaterno, dateOfBirth, sexo, curp, email, password, confirmPassword, agencyName, phoneNumber, website, rfc, razonSocial, rnt, regimenFiscal, banco, cuentaClabe, titularCuenta, street, exteriorNumber, interiorNumber, colony, city, state, postalCode, country } = formData;
+    const {
+      firstName, apellidoPaterno, sexo, email, password, confirmPassword,
+      agencyName, website, rfc, razonSocial, personaType, representanteLegalNombre,
+    } = formData;
 
-    if (password.trim() !== confirmPassword.trim()) {
-      setError('Las contraseñas no coinciden');
-      setIsLoading(false);
-      return;
-    }
-
-    // Validaciones adicionales
-    if (!firstName.trim()) {
-      setError('El nombre es obligatorio');
-      setIsLoading(false);
-      return;
-    }
-
-    if (!apellidoPaterno.trim()) {
-      setError('El apellido paterno es obligatorio');
-      setIsLoading(false);
-      return;
-    }
-
-    if (!sexo) {
-      setError('El sexo es obligatorio');
-      setIsLoading(false);
-      return;
-    }
-
-    if (!agencyName.trim()) {
-      setError('El nombre de la agencia es obligatorio');
-      setIsLoading(false);
-      return;
-    }
-
-    if (!website.trim()) {
-      setError('El sitio web o página de Facebook es obligatorio');
-      setIsLoading(false);
-      return;
-    }
-
-    if (!rfc.trim()) {
-      setError('El RFC es obligatorio');
-      setIsLoading(false);
-      return;
-    }
-
-    if (!razonSocial.trim()) {
-      setError('La razón social es obligatoria');
-      setIsLoading(false);
-      return;
-    }
-
-    if (!formData.personaType) {
-      setError('El tipo de persona es obligatorio');
-      setIsLoading(false);
-      return;
-    }
-
-    if (!formData.representanteLegalNombre.trim()) {
-      setError('El nombre de quien firma el contrato es obligatorio');
-      setIsLoading(false);
-      return;
-    }
+    if (password.trim() !== confirmPassword.trim()) { setError('Las contraseñas no coinciden'); setIsLoading(false); return; }
+    if (!firstName.trim()) { setError('El nombre es obligatorio'); setIsLoading(false); return; }
+    if (!apellidoPaterno.trim()) { setError('El apellido paterno es obligatorio'); setIsLoading(false); return; }
+    if (!sexo) { setError('El sexo es obligatorio'); setIsLoading(false); return; }
+    if (!agencyName.trim()) { setError('El nombre de la agencia es obligatorio'); setIsLoading(false); return; }
+    if (!website.trim()) { setError('El sitio web o página de Facebook es obligatorio'); setIsLoading(false); return; }
+    if (!rfc.trim()) { setError('El RFC es obligatorio'); setIsLoading(false); return; }
+    if (!razonSocial.trim()) { setError('La razón social es obligatoria'); setIsLoading(false); return; }
+    if (!personaType) { setError('El tipo de persona es obligatorio'); setIsLoading(false); return; }
+    if (!representanteLegalNombre.trim()) { setError('El nombre de quien firma el contrato es obligatorio'); setIsLoading(false); return; }
 
     try {
-      console.log('🚀 Iniciando registro de agencia...');
-      
-      // 1. Create user account
-      const { data, error, profileData, isExistingUser } = await signUp(email, password, UserRole.AGENCY);
-      
-      if (error) {
-        if (isLeakedPasswordError(error.message)) {
+      const { data, error: signUpError, profileData, isExistingUser } = await signUp(email, password, UserRole.AGENCY);
+
+      if (signUpError) {
+        if (isLeakedPasswordError(signUpError.message)) {
           throw new Error('Esta contraseña ha sido expuesta en brechas de datos conocidas y no puede usarse. Por favor elige una contraseña diferente y más segura.');
         }
-        throw error;
+        throw signUpError;
       }
 
-      if (!data.user) {
-        throw new Error('No se pudo crear el usuario');
-      }
+      if (!data.user) throw new Error('No se pudo crear el usuario');
 
-      console.log('✅ Usuario creado:', { user: data.user, profile: profileData, isExistingUser });
-
-      // Registrar aceptación de T&C de agencia con IP real capturada en el servidor
+      // Registrar aceptación de T&C
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/record-terms-acceptance`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`,
-            },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
             body: JSON.stringify({ terms_type: 'agency' }),
           });
         }
-      } catch (termsErr) {
-        console.error('Error registrando aceptación de T&C de agencia:', termsErr);
-      }
+      } catch { /* best-effort */ }
 
-      // 2. Update user profile with name
-      console.log('👤 Actualizando nombre del usuario...');
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({
-          first_name: firstName.trim(),
-          last_name: apellidoPaterno.trim(),
-          apellido_paterno: apellidoPaterno.trim(),
-          apellido_materno: apellidoMaterno.trim() || null,
-          date_of_birth: dateOfBirth || null,
-          sexo: sexo || null,
-          curp: curp.trim() || null,
-        })
-        .eq('id', data.user.id);
+      // Actualizar perfil de usuario
+      await supabase.from('users').update({
+        first_name: formData.firstName.trim(),
+        last_name: formData.apellidoPaterno.trim(),
+        apellido_paterno: formData.apellidoPaterno.trim(),
+        apellido_materno: formData.apellidoMaterno.trim() || null,
+        date_of_birth: formData.dateOfBirth || null,
+        sexo: formData.sexo || null,
+        curp: formData.curp.trim() || null,
+      }).eq('id', data.user.id);
 
-      if (updateError) {
-        console.error('❌ Error actualizando nombre del usuario:', updateError);
-      }
+      // Crear perfil de agencia
+      const { error: agencyError } = await supabase.from('agencies').insert({
+        user_id: data.user.id,
+        name: formData.agencyName.trim(),
+        contact_email: email,
+        contact_phone: formData.phoneNumber || null,
+        website: formData.website || null,
+        rfc: formData.rfc || null,
+        razon_social: formData.razonSocial.trim(),
+        persona_type: formData.personaType || null,
+        representante_legal_nombre: formData.representanteLegalNombre.trim() || null,
+        rnt: formData.rnt || null,
+        regimen_fiscal: formData.regimenFiscal || null,
+        banco: formData.banco || null,
+        cuenta_clabe: formData.cuentaClabe || null,
+        titular_cuenta: formData.titularCuenta || null,
+        street: formData.street || null,
+        exterior_number: formData.exteriorNumber || null,
+        interior_number: formData.interiorNumber || null,
+        colony: formData.colony || null,
+        city: formData.city || null,
+        state: formData.state || null,
+        postal_code: formData.postalCode || null,
+        country: formData.country || 'México',
+        is_active: true,
+      });
 
-      // 3. Create agency profile
-      console.log('🏢 Creando perfil de agencia...');
-      const { data: agencyData, error: agencyError } = await supabase
-        .from('agencies')
-        .insert({
-          user_id: data.user.id,
-          name: agencyName.trim(),
-          contact_email: email,
-          contact_phone: phoneNumber || null,
-          website: website || null,
-          rfc: rfc || null,
-          razon_social: razonSocial.trim(),
-          persona_type: formData.personaType || null,
-          representante_legal_nombre: formData.representanteLegalNombre.trim() || null,
-          rnt: rnt || null,
-          regimen_fiscal: regimenFiscal || null,
-          banco: banco || null,
-          cuenta_clabe: cuentaClabe || null,
-          titular_cuenta: titularCuenta || null,
-          street: street || null,
-          exterior_number: exteriorNumber || null,
-          interior_number: interiorNumber || null,
-          colony: colony || null,
-          city: city || null,
-          state: state || null,
-          postal_code: postalCode || null,
-          country: country || 'México',
-          is_active: true
-        })
-        .select()
-        .single();
-      
-      if (agencyError) {
-        console.error('❌ Error creando perfil de agencia:', agencyError);
-        throw new Error('Error creating agency profile: ' + agencyError.message);
-      }
+      if (agencyError) throw new Error('Error creating agency profile: ' + agencyError.message);
 
-      console.log('✅ Agencia creada:', agencyData);
-
-      // 4. Send notification emails
+      // Enviar emails
       try {
         const { data: { session } } = await supabase.auth.getSession();
-
         if (session) {
-          // Send email to admin
-          console.log('📧 Enviando notificación al administrador...');
-          await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-agency-registration-admin`,
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                agencyName: agencyName.trim(),
-                email: email,
-                firstName: firstName,
-                lastName: apellidoPaterno,
-                phone: phoneNumber || null,
-              }),
-            }
-          );
-
-          // Send welcome email to agency
-          console.log('📧 Enviando email de bienvenida a la agencia...');
-          await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-agency-welcome`,
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                email: email,
-                firstName: firstName,
-                agencyName: agencyName.trim(),
-              }),
-            }
-          );
+          await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-agency-registration-admin`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agencyName: formData.agencyName.trim(), email, firstName: formData.firstName, lastName: formData.apellidoPaterno, phone: formData.phoneNumber || null }),
+          });
+          await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-agency-welcome`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, firstName: formData.firstName, agencyName: formData.agencyName.trim() }),
+          });
         }
-      } catch (emailError) {
-        console.error('Error enviando emails de notificación:', emailError);
-        // No detenemos el registro si falla el envío de emails
-      }
+      } catch { /* best-effort */ }
 
       if (isExistingUser) {
         setError('Usuario ya registrado. Se ha iniciado sesión automáticamente y se creó el perfil de agencia.');
         setTimeout(() => navigate('/dashboard'), 2000);
       } else {
+        // Enviar código de verificación
         const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 24);
 
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({
-            verification_code: verificationCode,
-            verification_code_expires_at: expiresAt.toISOString(),
-            verification_code_attempts: 0,
-          })
-          .eq('id', data.user.id);
-
-        if (updateError) {
-          console.error('Error actualizando código de verificación:', updateError);
-        }
+        await supabase.from('users').update({
+          verification_code: verificationCode,
+          verification_code_expires_at: expiresAt.toISOString(),
+          verification_code_attempts: 0,
+        }).eq('id', data.user.id);
 
         try {
           const { data: { session } } = await supabase.auth.getSession();
-
           if (session) {
-            await fetch(
-              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-verification-email`,
-              {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${session.access_token}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  userId: data.user.id,
-                  verificationCode: verificationCode,
-                  userName: formData.agencyName,
-                }),
-              }
-            );
+            await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-verification-email`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: data.user.id, verificationCode, userName: formData.agencyName }),
+            });
           }
-        } catch (emailError) {
-          console.error('Error enviando correo de verificación:', emailError);
-        }
+        } catch { /* best-effort */ }
 
-        if (redirectUrl) {
-          navigate(`/verify-email?redirect=${encodeURIComponent(redirectUrl)}`);
-        } else {
-          navigate('/verify-email');
-        }
+        navigate(redirectUrl ? `/verify-email?redirect=${encodeURIComponent(redirectUrl)}` : '/verify-email');
       }
     } catch (err: any) {
-      console.error('❌ Error en registro de agencia:', err);
       setError(err.message || 'Ocurrió un error durante el registro');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const curpAvailability = useFieldAvailability(formData.curp, 'check_curp_available', 18, 18, 'agency');
-  const emailAvailability = useFieldAvailability(formData.email, 'check_email_available', 5);
-
-  const identifierUnavailable =
-    curpAvailability.isAvailable === false || emailAvailability.isAvailable === false;
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Registra tu agencia de viajes
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          O{' '}
-          <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500">
-            inicia sesión en tu cuenta existente
-          </Link>
-        </p>
-      </div>
-
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-2xl">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          {error && (
-            <div className={`mb-4 border rounded-md p-3 ${
-              error.includes('ya registrado') 
-                ? 'bg-yellow-50 border-yellow-200 text-yellow-700' 
-                : 'bg-red-50 border-red-200 text-red-600'
-            }`}>
-              {error}
-            </div>
-          )}
-
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            {/* Información Personal */}
-            <div className="border-b border-gray-200 pb-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Información Personal</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                <div className="md:col-span-2">
-                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
-                    Nombre(s) *
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="firstName"
-                      name="firstName"
-                      type="text"
-                      value={formData.firstName}
-                      onChange={(e) => handleInputChange('firstName', e.target.value)}
-                      required
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      placeholder="Ej: Juan"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="apellidoPaterno" className="block text-sm font-medium text-gray-700">
-                    Apellido Paterno *
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="apellidoPaterno"
-                      name="apellidoPaterno"
-                      type="text"
-                      value={formData.apellidoPaterno}
-                      onChange={(e) => handleInputChange('apellidoPaterno', e.target.value)}
-                      required
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      placeholder="Ej: Pérez"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="apellidoMaterno" className="block text-sm font-medium text-gray-700">
-                    Apellido Materno <span className="text-gray-400 font-normal">(opcional)</span>
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="apellidoMaterno"
-                      name="apellidoMaterno"
-                      type="text"
-                      value={formData.apellidoMaterno}
-                      onChange={(e) => handleInputChange('apellidoMaterno', e.target.value)}
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      placeholder="Ej: García"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700">
-                    Fecha de Nacimiento <span className="text-gray-400 font-normal">(opcional)</span>
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="dateOfBirth"
-                      name="dateOfBirth"
-                      type="date"
-                      value={formData.dateOfBirth}
-                      onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="curp" className="block text-sm font-medium text-gray-700">
-                    CURP <span className="text-gray-400 font-normal">(opcional)</span>
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="curp"
-                      name="curp"
-                      type="text"
-                      value={formData.curp}
-                      onChange={(e) => handleInputChange('curp', e.target.value.toUpperCase())}
-                      maxLength={18}
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm uppercase"
-                      placeholder="ABCD123456HDFRRL09"
-                    />
-                    {curpAvailability.isChecking && (
-                      <p className="mt-1 text-xs text-gray-500 flex items-center gap-1">
-                        <Loader className="h-3 w-3 animate-spin" /> Verificando CURP...
-                      </p>
-                    )}
-                    {!curpAvailability.isChecking && curpAvailability.isAvailable === true && (
-                      <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
-                        <CheckCircle className="h-3 w-3" /> CURP disponible
-                      </p>
-                    )}
-                    {!curpAvailability.isChecking && curpAvailability.isAvailable === false && (
-                      <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
-                        <XCircle className="h-3 w-3" /> Esta CURP ya tiene una cuenta. <a href="/login" className="underline">Inicia sesión</a>
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Sexo *</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(['masculino', 'femenino', 'no_binario'] as const).map((opcion) => (
-                      <label key={opcion} className={`flex items-center justify-center px-3 py-2 border rounded-md cursor-pointer text-sm font-medium transition-colors ${
-                        formData.sexo === opcion
-                          ? 'border-primary-500 bg-primary-50 text-primary-700'
-                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                      }`}>
-                        <input
-                          type="radio"
-                          name="sexo"
-                          value={opcion}
-                          checked={formData.sexo === opcion}
-                          onChange={() => handleInputChange('sexo', opcion)}
-                          className="sr-only"
-                        />
-                        {opcion === 'masculino' ? 'Masculino' : opcion === 'femenino' ? 'Femenino' : 'No Binario'}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Información de la Agencia */}
-            <div className="border-b border-gray-200 pb-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Información de la Agencia</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="agencyName" className="block text-sm font-medium text-gray-700">
-                    Nombre Comercial de la Agencia *
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="agencyName"
-                      name="agencyName"
-                      type="text"
-                      value={formData.agencyName}
-                      onChange={(e) => handleInputChange('agencyName', e.target.value)}
-                      required
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      placeholder="Ej: Viajes Aventura México"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                    Correo electrónico *
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      autoComplete="email"
-                      value={formData.email}
-                      onChange={(e) => handleInputChange('email', e.target.value)}
-                      required
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                    />
-                    {emailAvailability.isChecking && (
-                      <p className="mt-1 text-xs text-gray-500 flex items-center gap-1">
-                        <Loader className="h-3 w-3 animate-spin" /> Verificando correo...
-                      </p>
-                    )}
-                    {!emailAvailability.isChecking && emailAvailability.isAvailable === true && (
-                      <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
-                        <CheckCircle className="h-3 w-3" /> Correo disponible
-                      </p>
-                    )}
-                    {!emailAvailability.isChecking && emailAvailability.isAvailable === false && (
-                      <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
-                        <XCircle className="h-3 w-3" /> Este correo ya tiene una cuenta. <a href="/login" className="underline">Inicia sesión</a>
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
-                    Teléfono *
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="phoneNumber"
-                      name="phoneNumber"
-                      type="tel"
-                      value={formData.phoneNumber}
-                      onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                      required
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      placeholder="+52 (55) 1234-5678"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="website" className="block text-sm font-medium text-gray-700">
-                    Sitio Web o Facebook *
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="website"
-                      name="website"
-                      type="url"
-                      value={formData.website}
-                      onChange={(e) => handleInputChange('website', e.target.value)}
-                      required
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      placeholder="https://www.tuagencia.com o https://facebook.com/tuagencia"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Información Fiscal */}
-            <div className="border-b border-gray-200 pb-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Información Fiscal</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Tipo de persona */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de persona *</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {([
-                      { value: 'persona_fisica', label: 'Persona Física', desc: 'RFC de 13 caracteres' },
-                      { value: 'persona_moral', label: 'Persona Moral', desc: 'RFC de 12 caracteres' },
-                    ] as const).map(({ value, label, desc }) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => handleInputChange('personaType', value)}
-                        className={`p-3 rounded-lg border-2 text-left transition-colors ${
-                          formData.personaType === value
-                            ? 'border-primary-500 bg-primary-50'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <div className="font-medium text-sm text-gray-900">{label}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{desc}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Representante legal / firmante */}
-                <div className="md:col-span-2">
-                  <label htmlFor="representanteLegalNombre" className="block text-sm font-medium text-gray-700">
-                    Nombre de quien firma este contrato *
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="representanteLegalNombre"
-                      name="representanteLegalNombre"
-                      type="text"
-                      value={formData.representanteLegalNombre}
-                      onChange={(e) => handleInputChange('representanteLegalNombre', e.target.value)}
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      placeholder="Ej: Juan Pérez García"
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Para persona física, normalmente eres tú mismo. Para persona moral, quien cuente con facultades legales (representante legal o apoderado).
-                  </p>
-                </div>
-
-                <div>
-                  <label htmlFor="rfc" className="block text-sm font-medium text-gray-700">
-                    RFC *
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="rfc"
-                      name="rfc"
-                      type="text"
-                      value={formData.rfc}
-                      onChange={(e) => handleInputChange('rfc', e.target.value.toUpperCase())}
-                      required
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      placeholder="XAXX010101000"
-                      maxLength={13}
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Registro Federal de Contribuyentes
-                  </p>
-                </div>
-
-                <div>
-                  <label htmlFor="rnt" className="block text-sm font-medium text-gray-700">
-                    RNT (Opcional)
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="rnt"
-                      name="rnt"
-                      type="text"
-                      value={formData.rnt}
-                      onChange={(e) => handleInputChange('rnt', e.target.value)}
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      placeholder="Ej: 12345678"
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Registro Nacional de Turismo (opcional)
-                  </p>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label htmlFor="razonSocial" className="block text-sm font-medium text-gray-700">
-                    Razón Social *
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="razonSocial"
-                      name="razonSocial"
-                      type="text"
-                      value={formData.razonSocial}
-                      onChange={(e) => handleInputChange('razonSocial', e.target.value)}
-                      required
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      placeholder="Ej: Viajes Aventura S.A. de C.V."
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Nombre legal o razón social tal como aparece en tu RFC
-                  </p>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label htmlFor="regimenFiscal" className="block text-sm font-medium text-gray-700">
-                    Régimen Fiscal <span className="text-gray-400 font-normal">(opcional)</span>
-                  </label>
-                  <div className="mt-1">
-                    <select
-                      id="regimenFiscal"
-                      name="regimenFiscal"
-                      value={formData.regimenFiscal}
-                      onChange={(e) => handleInputChange('regimenFiscal', e.target.value)}
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm bg-white"
-                    >
-                      <option value="">Selecciona tu régimen fiscal</option>
-                      <option value="601">601 — General de Ley Personas Morales</option>
-                      <option value="612">612 — Personas Físicas con Actividades Empresariales y Profesionales</option>
-                      <option value="621">621 — Incorporación Fiscal (RIF)</option>
-                      <option value="625">625 — Régimen de las Actividades Empresariales con ingresos a través de Plataformas Tecnológicas</option>
-                      <option value="626">626 — Régimen Simplificado de Confianza (RESICO)</option>
-                      <option value="608">608 — Demás Ingresos</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Información Bancaria */}
-            <div className="border-b border-gray-200 pb-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-1">Información Bancaria</h3>
-              <p className="text-sm text-gray-500 mb-4">Opcional, pero recomendable completarla desde el inicio para agilizar pagos.</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="banco" className="block text-sm font-medium text-gray-700">
-                    Banco <span className="text-gray-400 font-normal">(opcional)</span>
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="banco"
-                      name="banco"
-                      type="text"
-                      value={formData.banco}
-                      onChange={(e) => handleInputChange('banco', e.target.value)}
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      placeholder="Ej: BBVA, Banorte, Santander..."
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="titularCuenta" className="block text-sm font-medium text-gray-700">
-                    Titular de la Cuenta <span className="text-gray-400 font-normal">(opcional)</span>
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="titularCuenta"
-                      name="titularCuenta"
-                      type="text"
-                      value={formData.titularCuenta}
-                      onChange={(e) => handleInputChange('titularCuenta', e.target.value)}
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      placeholder="Nombre del titular tal como aparece en el banco"
-                    />
-                  </div>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label htmlFor="cuentaClabe" className="block text-sm font-medium text-gray-700">
-                    CLABE Interbancaria <span className="text-gray-400 font-normal">(opcional)</span>
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="cuentaClabe"
-                      name="cuentaClabe"
-                      type="text"
-                      value={formData.cuentaClabe}
-                      onChange={(e) => handleInputChange('cuentaClabe', e.target.value)}
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      placeholder="18 dígitos"
-                      maxLength={18}
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500">18 dígitos — necesaria para recibir transferencias</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Domicilio de la Agencia */}
-            <div className="border-b border-gray-200 pb-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Domicilio de la Agencia</h3>
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="street" className="block text-sm font-medium text-gray-700">
-                    Calle *
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="street"
-                      name="street"
-                      type="text"
-                      value={formData.street}
-                      onChange={(e) => handleInputChange('street', e.target.value)}
-                      required
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      placeholder="Ej: Av. Insurgentes Sur"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="exteriorNumber" className="block text-sm font-medium text-gray-700">
-                      Número Exterior *
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        id="exteriorNumber"
-                        name="exteriorNumber"
-                        type="text"
-                        value={formData.exteriorNumber}
-                        onChange={(e) => handleInputChange('exteriorNumber', e.target.value)}
-                        required
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                        placeholder="Ej: 123"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="interiorNumber" className="block text-sm font-medium text-gray-700">
-                      Número Interior
-                      <span className="text-gray-400 font-normal ml-1">(opcional)</span>
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        id="interiorNumber"
-                        name="interiorNumber"
-                        type="text"
-                        value={formData.interiorNumber}
-                        onChange={(e) => handleInputChange('interiorNumber', e.target.value)}
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                        placeholder="Ej: 4B"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="colony" className="block text-sm font-medium text-gray-700">
-                    Colonia *
-                  </label>
-                  <div className="mt-1">
-                    <input
-                      id="colony"
-                      name="colony"
-                      type="text"
-                      value={formData.colony}
-                      onChange={(e) => handleInputChange('colony', e.target.value)}
-                      required
-                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      placeholder="Ej: Roma Norte"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="city" className="block text-sm font-medium text-gray-700">
-                      Ciudad *
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        id="city"
-                        name="city"
-                        type="text"
-                        value={formData.city}
-                        onChange={(e) => handleInputChange('city', e.target.value)}
-                        required
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                        placeholder="Ej: Ciudad de México"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="state" className="block text-sm font-medium text-gray-700">
-                      Estado *
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        id="state"
-                        name="state"
-                        type="text"
-                        value={formData.state}
-                        onChange={(e) => handleInputChange('state', e.target.value)}
-                        required
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                        placeholder="Ej: CDMX"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="postalCode" className="block text-sm font-medium text-gray-700">
-                      Código Postal *
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        id="postalCode"
-                        name="postalCode"
-                        type="text"
-                        value={formData.postalCode}
-                        onChange={(e) => handleInputChange('postalCode', e.target.value)}
-                        required
-                        maxLength={5}
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                        placeholder="Ej: 06700"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="country" className="block text-sm font-medium text-gray-700">
-                      País *
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        id="country"
-                        name="country"
-                        type="text"
-                        value={formData.country}
-                        onChange={(e) => handleInputChange('country', e.target.value)}
-                        required
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                        placeholder="México"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Información de Cuenta */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Información de Cuenta</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                    Contraseña *
-                  </label>
-                  <div className="mt-1 relative">
-                    <input
-                      id="password"
-                      name="password"
-                      type={showPassword ? 'text' : 'password'}
-                      autoComplete="new-password"
-                      value={formData.password}
-                      onChange={(e) => handleInputChange('password', e.target.value)}
-                      required
-                      className="appearance-none block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      minLength={6}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-5 w-5" />
-                      ) : (
-                        <Eye className="h-5 w-5" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                    Confirmar Contraseña *
-                  </label>
-                  <div className="mt-1 relative">
-                    <input
-                      id="confirmPassword"
-                      name="confirmPassword"
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      autoComplete="new-password"
-                      value={formData.confirmPassword}
-                      onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                      required
-                      className="appearance-none block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      minLength={6}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                    >
-                      {showConfirmPassword ? (
-                        <EyeOff className="h-5 w-5" />
-                      ) : (
-                        <Eye className="h-5 w-5" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-blue-800">
-                    Información importante
-                  </h3>
-                  <div className="mt-2 text-sm text-blue-700">
-                    <ul className="list-disc list-inside space-y-1">
-                      <li><strong>Nombre Comercial:</strong> Es como se conoce tu agencia (ej: "Viajes Aventura")</li>
-                      <li><strong>Razón Social:</strong> Es el nombre legal para facturación fiscal</li>
-                      <li><strong>RFC:</strong> Necesario para emitir facturas y recibir pagos</li>
-                      <li><strong>RNT:</strong> Registro Nacional de Turismo (opcional, pero recomendado)</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Aceptación explícita de T&C para agencias */}
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={termsAccepted}
-                  onChange={e => setTermsAccepted(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 flex-shrink-0"
-                />
-                <span className="text-sm text-gray-700 leading-relaxed">
-                  He leído y acepto los{' '}
-                  <Link to="/terminos-servicio" target="_blank" className="font-medium text-primary-600 hover:text-primary-500 underline">
-                    Términos y Condiciones para Agencias
-                  </Link>{' '}
-                  y el{' '}
-                  <Link to="/aviso-privacidad" target="_blank" className="font-medium text-primary-600 hover:text-primary-500 underline">
-                    Aviso de Privacidad
-                  </Link>{' '}
-                  de ToursRed
-                  {activeTermsVersion && (
-                    <span className="block text-xs text-gray-400 mt-1">
-                      Versión {activeTermsVersion.version_number} · vigente desde{' '}
-                      {new Date(activeTermsVersion.published_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })}
-                    </span>
-                  )}
-                </span>
-              </label>
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={isLoading || !termsAccepted || identifierUnavailable}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? 'Creando cuenta...' : 'Registrar Agencia'}
-              </button>
-            </div>
-          </form>
-
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">¿Eres un viajero?</span>
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <Link
-                to="/signup"
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              >
-                Registrarse como viajero
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <AgencySignupFormBody
+      formData={formData}
+      onChange={handleChange}
+      onSubmit={handleSubmit}
+      isLoading={isLoading}
+      error={error}
+      termsAccepted={termsAccepted}
+      setTermsAccepted={setTermsAccepted}
+      activeTermsVersion={activeTermsVersion}
+      showPassword={showPassword}
+      setShowPassword={setShowPassword}
+      showConfirmPassword={showConfirmPassword}
+      setShowConfirmPassword={setShowConfirmPassword}
+      curpAvailability={curpAvailability}
+      emailAvailability={emailAvailability}
+      emailReadOnly={false}
+      oauthProviderLabel={null}
+      submitLabel="Registrar Agencia"
+    />
   );
 };
 
