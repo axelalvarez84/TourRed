@@ -268,8 +268,7 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "Faltan document_ids" }), { status: 400, headers: corsHeaders });
     }
 
-    // Fix: valid status values are 'pending_review', 'rejected', 'superseded' — never 'approved'
-    const newDocStatus = action === "approve" ? "pending_review" : "rejected";
+    const newDocStatus = action === "approve" ? "approved" : "rejected";
 
     const { error: updateErr } = await supabase
       .from("agency_documents")
@@ -443,7 +442,12 @@ Deno.serve(async (req: Request) => {
         .eq("id", agency_id)
         .in("onboarding_status", ["pending_review", "pending_documents"]);
 
-      const { data: agencyRow } = await supabase.from("agencies").select("user_id").eq("id", agency_id).maybeSingle();
+      const { data: agencyRow } = await supabase
+        .from("agencies")
+        .select("user_id, name, contact_email")
+        .eq("id", agency_id)
+        .maybeSingle();
+
       if (agencyRow?.user_id) {
         await supabase.from("notifications").insert({
           user_id: agencyRow.user_id,
@@ -451,6 +455,88 @@ Deno.serve(async (req: Request) => {
           title:   "Documentos requieren corrección",
           message: `Algunos de tus documentos fueron rechazados: ${rejectionReason}. Por favor súbelos nuevamente.`,
         }).select();
+
+        // Send rejection email via smtp2go
+        if (agencyRow.contact_email) {
+          try {
+            const { data: emailSettings } = await supabase
+              .from("email_settings")
+              .select("smtp_api_key, contact_email")
+              .maybeSingle();
+
+            const { data: platformSettings } = await supabase
+              .from("platform_settings")
+              .select("platform_url")
+              .maybeSingle();
+
+            if (emailSettings?.smtp_api_key) {
+              const fromEmail    = emailSettings.contact_email || "contacto@toursred.com";
+              const appUrl       = platformSettings?.platform_url || "https://toursredmx.netlify.app";
+              const logoUrl      = `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/images/email-logo.png`;
+              const agencyName   = agencyRow.name ?? "tu agencia";
+              const toEmail      = agencyRow.contact_email as string;
+
+              const htmlContent = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f3f4f6;">
+  <table role="presentation" style="width:100%;border-collapse:collapse;">
+    <tr><td align="center" style="padding:40px 20px;">
+      <table role="presentation" style="width:100%;max-width:600px;border-collapse:collapse;background-color:#ffffff;border-radius:12px;box-shadow:0 4px 6px rgba(0,0,0,0.07);">
+        <tr>
+          <td style="padding:36px 40px 28px 40px;text-align:center;background:linear-gradient(135deg,#dc2626 0%,#b91c1c 100%);border-radius:12px 12px 0 0;">
+            <img src="${logoUrl}" alt="ToursRed" style="max-width:160px;height:auto;margin-bottom:16px;background:white;padding:8px 16px;border-radius:8px;" />
+            <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Documentos requieren corrección</h1>
+            <p style="margin:8px 0 0 0;color:rgba(255,255,255,0.85);font-size:15px;">${agencyName}</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 40px 40px 40px;">
+            <p style="margin:0 0 20px 0;color:#374151;font-size:16px;line-height:28px;">
+              Hola,<br><br>
+              Hemos revisado los documentos de tu agencia <strong>${agencyName}</strong> y uno o más requieren ser corregidos o resubidos.
+            </p>
+            <div style="background-color:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:20px 24px;margin:0 0 28px 0;">
+              <p style="margin:0 0 8px 0;color:#991b1b;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Motivo del rechazo</p>
+              <p style="margin:0;color:#7f1d1d;font-size:15px;line-height:24px;">${rejectionReason || "El documento no cumple con los requisitos solicitados."}</p>
+            </div>
+            <div style="text-align:center;margin-bottom:32px;">
+              <a href="${appUrl}/agencia/onboarding"
+                 style="display:inline-block;padding:15px 48px;background-color:#dc2626;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">
+                Corregir mis documentos
+              </a>
+            </div>
+            <p style="margin:0;color:#6b7280;font-size:14px;line-height:22px;">
+              Si tienes dudas, contáctanos en <a href="mailto:${fromEmail}" style="color:#dc2626;text-decoration:none;">${fromEmail}</a>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 40px;background-color:#f9fafb;border-radius:0 0 12px 12px;text-align:center;border-top:1px solid #e5e7eb;">
+            <p style="margin:0;color:#d1d5db;font-size:12px;">&copy; ${new Date().getFullYear()} ToursRed. Todos los derechos reservados.</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+              await fetch("https://api.smtp2go.com/v3/email/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "X-Smtp2go-Api-Key": emailSettings.smtp_api_key },
+                body: JSON.stringify({
+                  sender:    fromEmail,
+                  to:        [toEmail],
+                  subject:   `Documentos de "${agencyName}" requieren corrección`,
+                  html_body: htmlContent,
+                }),
+              });
+            }
+          } catch (emailErr) {
+            console.error("Error sending rejection email:", emailErr);
+          }
+        }
       }
     }
 
