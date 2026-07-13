@@ -3,33 +3,35 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import PdfPrinter from "npm:pdfmake@0.2.20";
 import { Buffer } from "node:buffer";
 import { buildContractDocDefinition, type ContractData } from "../_shared/contractDocDefinition.ts";
-import {
-  ROBOTO_NORMAL_B64,
-  ROBOTO_BOLD_B64,
-  ROBOTO_ITALICS_B64,
-  ROBOTO_BOLDITALICS_B64,
-} from "../_shared/robotoFonts.ts";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const fonts = {
-  Roboto: {
-    normal:      Buffer.from(ROBOTO_NORMAL_B64,      "base64"),
-    bold:        Buffer.from(ROBOTO_BOLD_B64,        "base64"),
-    italics:     Buffer.from(ROBOTO_ITALICS_B64,     "base64"),
-    bolditalics: Buffer.from(ROBOTO_BOLDITALICS_B64, "base64"),
-  },
-  Courier: {
-    normal:      Buffer.from(ROBOTO_NORMAL_B64,  "base64"),
-    bold:        Buffer.from(ROBOTO_BOLD_B64,    "base64"),
-    italics:     Buffer.from(ROBOTO_ITALICS_B64, "base64"),
-    bolditalics: Buffer.from(ROBOTO_BOLDITALICS_B64, "base64"),
-  },
-};
+// Lazy-loaded so fonts are only decoded when PDF generation is actually needed.
+// deno-lint-ignore no-explicit-any
+let _fonts: any = null;
+async function getFonts() {
+  if (_fonts) return _fonts;
+  const { ROBOTO_NORMAL_B64, ROBOTO_BOLD_B64, ROBOTO_ITALICS_B64, ROBOTO_BOLDITALICS_B64 } =
+    await import("../_shared/robotoFonts.ts");
+  _fonts = {
+    Roboto: {
+      normal:      Buffer.from(ROBOTO_NORMAL_B64,      "base64"),
+      bold:        Buffer.from(ROBOTO_BOLD_B64,        "base64"),
+      italics:     Buffer.from(ROBOTO_ITALICS_B64,     "base64"),
+      bolditalics: Buffer.from(ROBOTO_BOLDITALICS_B64, "base64"),
+    },
+    Courier: {
+      normal:      Buffer.from(ROBOTO_NORMAL_B64,  "base64"),
+      bold:        Buffer.from(ROBOTO_BOLD_B64,    "base64"),
+      italics:     Buffer.from(ROBOTO_ITALICS_B64, "base64"),
+      bolditalics: Buffer.from(ROBOTO_BOLDITALICS_B64, "base64"),
+    },
+  };
+  return _fonts;
+}
 
 function generateFolio(agencyId: string): string {
   const hex = Array.from(crypto.getRandomValues(new Uint8Array(2)))
@@ -177,7 +179,7 @@ Deno.serve(async (req: Request) => {
 
       // Generate amendment PDF
       // deno-lint-ignore no-explicit-any
-      const printer  = new (PdfPrinter as any)(fonts);
+      const printer  = new (PdfPrinter as any)(await getFonts());
       const docDef   = buildContractDocDefinition(contractData);
       const pdfDoc   = printer.createPdfKitDocument(docDef);
       const pdfBytes = await pdfDocToBytes(pdfDoc);
@@ -377,7 +379,7 @@ Deno.serve(async (req: Request) => {
         };
 
         // deno-lint-ignore no-explicit-any
-        const printer  = new (PdfPrinter as any)(fonts);
+        const printer  = new (PdfPrinter as any)(await getFonts());
         const docDef   = buildContractDocDefinition(contractData);
         const pdfDoc   = printer.createPdfKitDocument(docDef);
         const pdfBytes = await pdfDocToBytes(pdfDoc);
