@@ -149,7 +149,7 @@ const XAgencySignupPage: React.FC = () => {
       } catch { /* best-effort */ }
 
       await completeOnboarding();
-      navigate('/agency/pending-approval');
+      navigate('/agency/onboarding');
     } catch (err: any) {
       setError(err.message || 'Ocurrió un error al completar el registro');
     } finally {

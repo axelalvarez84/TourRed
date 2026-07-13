@@ -160,7 +160,8 @@ const AgencySignupPage: React.FC = () => {
           }
         } catch { /* best-effort */ }
 
-        navigate(redirectUrl ? `/verify-email?redirect=${encodeURIComponent(redirectUrl)}` : '/verify-email');
+        const postVerifyRedirect = redirectUrl ?? '/agency/onboarding';
+        navigate(`/verify-email?redirect=${encodeURIComponent(postVerifyRedirect)}`);
       }
     } catch (err: any) {
       setError(err.message || 'Ocurrió un error durante el registro');
