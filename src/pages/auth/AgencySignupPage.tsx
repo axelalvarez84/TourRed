@@ -83,45 +83,39 @@ const AgencySignupPage: React.FC = () => {
         }
       } catch { /* best-effort */ }
 
-      // Actualizar perfil de usuario
-      await supabase.from('users').update({
-        first_name: formData.firstName.trim(),
-        last_name: formData.apellidoPaterno.trim(),
-        apellido_paterno: formData.apellidoPaterno.trim(),
-        apellido_materno: formData.apellidoMaterno.trim() || null,
-        date_of_birth: formData.dateOfBirth || null,
-        sexo: formData.sexo || null,
-        curp: formData.curp.trim() || null,
-      }).eq('id', data.user.id);
-
-      // Crear perfil de agencia
-      const { error: agencyError } = await supabase.from('agencies').insert({
-        user_id: data.user.id,
-        name: formData.agencyName.trim(),
-        contact_email: email,
-        contact_phone: formData.phoneNumber || null,
-        website: formData.website || null,
-        rfc: formData.rfc || null,
-        razon_social: formData.razonSocial.trim(),
-        persona_type: formData.personaType || null,
-        representante_legal_nombre: formData.representanteLegalNombre.trim() || null,
-        rnt: formData.rnt || null,
-        regimen_fiscal: formData.regimenFiscal || null,
-        banco: formData.banco || null,
-        cuenta_clabe: formData.cuentaClabe || null,
-        titular_cuenta: formData.titularCuenta || null,
-        street: formData.street || null,
-        exterior_number: formData.exteriorNumber || null,
-        interior_number: formData.interiorNumber || null,
-        colony: formData.colony || null,
-        city: formData.city || null,
-        state: formData.state || null,
-        postal_code: formData.postalCode || null,
-        country: formData.country || 'México',
-        is_active: true,
+      // Crear perfil de usuario y agencia en una sola transacción Postgres.
+      const { error: onboardingError } = await supabase.rpc('complete_agency_onboarding', {
+        p_first_name:                  formData.firstName.trim(),
+        p_apellido_paterno:            formData.apellidoPaterno.trim(),
+        p_apellido_materno:            formData.apellidoMaterno.trim() || null,
+        p_date_of_birth:               formData.dateOfBirth || null,
+        p_sexo:                        formData.sexo || null,
+        p_curp:                        formData.curp.trim() || null,
+        p_phone_number:                formData.phoneNumber.trim() || null,
+        p_email:                       email,
+        p_agency_name:                 formData.agencyName.trim(),
+        p_rfc:                         formData.rfc.trim(),
+        p_razon_social:                formData.razonSocial.trim(),
+        p_persona_type:                formData.personaType,
+        p_representante_legal_nombre:  formData.representanteLegalNombre.trim(),
+        p_website:                     formData.website.trim(),
+        p_contact_phone:               formData.phoneNumber || null,
+        p_rnt:                         formData.rnt || null,
+        p_regimen_fiscal:              formData.regimenFiscal || null,
+        p_banco:                       formData.banco || null,
+        p_cuenta_clabe:                formData.cuentaClabe || null,
+        p_titular_cuenta:              formData.titularCuenta || null,
+        p_street:                      formData.street || null,
+        p_exterior_number:             formData.exteriorNumber || null,
+        p_interior_number:             formData.interiorNumber || null,
+        p_colony:                      formData.colony || null,
+        p_city:                        formData.city || null,
+        p_state:                       formData.state || null,
+        p_postal_code:                 formData.postalCode || null,
+        p_country:                     formData.country || 'México',
       });
 
-      if (agencyError) throw new Error('Error creating agency profile: ' + agencyError.message);
+      if (onboardingError) throw new Error(onboardingError.message);
 
       // Enviar emails
       try {

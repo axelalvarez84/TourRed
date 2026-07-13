@@ -75,56 +75,46 @@ const FacebookAgencySignupPage: React.FC = () => {
     try {
       if (!user) throw new Error('Sesión no encontrada');
 
-      const { error: insertError } = await supabase.from('users').insert({
-        id: user.id,
-        email: formData.email,
-        role: UserRole.AGENCY,
-        first_name: firstName.trim(),
-        last_name: apellidoPaterno.trim(),
-        apellido_paterno: apellidoPaterno.trim(),
-        apellido_materno: formData.apellidoMaterno.trim() || null,
-        date_of_birth: formData.dateOfBirth || null,
-        sexo: sexo || null,
-        curp: formData.curp.trim() || null,
-        phone_number: formData.phoneNumber.trim(),
-        email_verified: true,
-        onboarding_completed: true,
-        profile_picture_url: avatarUrl || null,
-      });
-      if (insertError) throw insertError;
-
+      // Primero la contraseña: si es débil o filtrada falla antes de escribir en BD.
       const { error: pwError } = await supabase.auth.updateUser({ password });
       if (pwError) {
         if (isLeakedPasswordError(pwError.message)) throw new Error('Esta contraseña ha sido expuesta en brechas de datos. Por favor elige una más segura.');
         throw pwError;
       }
 
-      const { error: agencyError } = await supabase.from('agencies').insert({
-        user_id: user.id,
-        name: agencyName.trim(),
-        contact_email: formData.email,
-        contact_phone: formData.phoneNumber || null,
-        website: formData.website || null,
-        rfc: formData.rfc || null,
-        razon_social: formData.razonSocial.trim(),
-        persona_type: personaType || null,
-        representante_legal_nombre: representanteLegalNombre.trim() || null,
-        rnt: formData.rnt || null,
-        regimen_fiscal: formData.regimenFiscal || null,
-        banco: formData.banco || null,
-        cuenta_clabe: formData.cuentaClabe || null,
-        titular_cuenta: formData.titularCuenta || null,
-        street: formData.street || null,
-        exterior_number: formData.exteriorNumber || null,
-        interior_number: formData.interiorNumber || null,
-        colony: formData.colony || null,
-        city: formData.city || null,
-        state: formData.state || null,
-        postal_code: formData.postalCode || null,
-        country: formData.country || 'México',
-        is_active: true,
+      // Crear perfil de usuario y agencia en una sola transacción Postgres.
+      const { error: onboardingError } = await supabase.rpc('complete_agency_onboarding', {
+        p_first_name:                  firstName.trim(),
+        p_apellido_paterno:            apellidoPaterno.trim(),
+        p_apellido_materno:            formData.apellidoMaterno.trim() || null,
+        p_date_of_birth:               formData.dateOfBirth || null,
+        p_sexo:                        sexo || null,
+        p_curp:                        formData.curp.trim() || null,
+        p_phone_number:                formData.phoneNumber.trim() || null,
+        p_email:                       formData.email,
+        p_profile_picture_url:         avatarUrl || null,
+        p_agency_name:                 agencyName.trim(),
+        p_rfc:                         rfc.trim(),
+        p_razon_social:                razonSocial.trim(),
+        p_persona_type:                personaType,
+        p_representante_legal_nombre:  representanteLegalNombre.trim(),
+        p_website:                     website.trim(),
+        p_contact_phone:               formData.phoneNumber || null,
+        p_rnt:                         formData.rnt || null,
+        p_regimen_fiscal:              formData.regimenFiscal || null,
+        p_banco:                       formData.banco || null,
+        p_cuenta_clabe:                formData.cuentaClabe || null,
+        p_titular_cuenta:              formData.titularCuenta || null,
+        p_street:                      formData.street || null,
+        p_exterior_number:             formData.exteriorNumber || null,
+        p_interior_number:             formData.interiorNumber || null,
+        p_colony:                      formData.colony || null,
+        p_city:                        formData.city || null,
+        p_state:                       formData.state || null,
+        p_postal_code:                 formData.postalCode || null,
+        p_country:                     formData.country || 'México',
       });
-      if (agencyError) throw new Error('Error al crear el perfil de agencia: ' + agencyError.message);
+      if (onboardingError) throw new Error(onboardingError.message);
 
       await supabase.from('user_auth_providers').upsert(
         { user_id: user.id, provider: 'facebook', provider_user_id: user.id },
