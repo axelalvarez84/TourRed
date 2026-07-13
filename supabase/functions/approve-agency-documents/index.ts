@@ -448,12 +448,34 @@ Deno.serve(async (req: Request) => {
         .eq("id", agency_id)
         .maybeSingle();
 
+      // Fetch the rejected documents' type keys
+      const { data: rejectedDocs } = await supabase
+        .from("agency_documents")
+        .select("document_type_key")
+        .in("id", document_ids)
+        .eq("agency_id", agency_id);
+
+      // Fetch labels for those document types
+      const rejectedKeys = (rejectedDocs ?? []).map((d: any) => d.document_type_key);
+      let docLabels: string[] = rejectedKeys;
+      if (rejectedKeys.length > 0) {
+        const { data: docTypes } = await supabase
+          .from("document_types")
+          .select("key, label")
+          .in("key", rejectedKeys);
+        const labelMap: Record<string, string> = {};
+        for (const dt of docTypes ?? []) labelMap[dt.key] = dt.label;
+        docLabels = rejectedKeys.map((k: string) => labelMap[k] || k);
+      }
+
+      const docList = docLabels.length > 0 ? docLabels.join(", ") : "Documento(s)";
+
       if (agencyRow?.user_id) {
         await supabase.from("notifications").insert({
           user_id: agencyRow.user_id,
           type:    "agency_documents_rejected",
           title:   "Documentos requieren corrección",
-          message: `Algunos de tus documentos fueron rechazados: ${rejectionReason}. Por favor súbelos nuevamente.`,
+          message: `Los siguientes documentos fueron rechazados: ${docList}. Motivo: ${rejectionReason}. Por favor súbelos nuevamente.`,
         }).select();
 
         // Send rejection email via smtp2go
@@ -476,6 +498,11 @@ Deno.serve(async (req: Request) => {
               const agencyName   = agencyRow.name ?? "tu agencia";
               const toEmail      = agencyRow.contact_email as string;
 
+              // Build list items HTML for rejected documents
+              const docListHtml = docLabels
+                .map((label: string) => `<li style="color:#7f1d1d;font-size:15px;line-height:24px;padding:4px 0;">${label}</li>`)
+                .join("");
+
               const htmlContent = `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -494,11 +521,15 @@ Deno.serve(async (req: Request) => {
           <td style="padding:32px 40px 40px 40px;">
             <p style="margin:0 0 20px 0;color:#374151;font-size:16px;line-height:28px;">
               Hola,<br><br>
-              Hemos revisado los documentos de tu agencia <strong>${agencyName}</strong> y uno o más requieren ser corregidos o resubidos.
+              Hemos revisado los documentos de tu agencia <strong>${agencyName}</strong> y el siguiente documento(s) requiere(n) ser corregido(s) o resubido(s):
             </p>
             <div style="background-color:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:20px 24px;margin:0 0 28px 0;">
-              <p style="margin:0 0 8px 0;color:#991b1b;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Motivo del rechazo</p>
-              <p style="margin:0;color:#7f1d1d;font-size:15px;line-height:24px;">${rejectionReason || "El documento no cumple con los requisitos solicitados."}</p>
+              <p style="margin:0 0 10px 0;color:#991b1b;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Documento(s) rechazado(s)</p>
+              <ul style="margin:0;padding:0 0 0 20px;">${docListHtml}</ul>
+            </div>
+            <div style="background-color:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:20px 24px;margin:0 0 28px 0;">
+              <p style="margin:0 0 8px 0;color:#92400e;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Motivo del rechazo</p>
+              <p style="margin:0;color:#78350f;font-size:15px;line-height:24px;">${rejectionReason || "El documento no cumple con los requisitos solicitados."}</p>
             </div>
             <div style="text-align:center;margin-bottom:32px;">
               <a href="${appUrl}/agencia/onboarding"
@@ -528,7 +559,7 @@ Deno.serve(async (req: Request) => {
                 body: JSON.stringify({
                   sender:    fromEmail,
                   to:        [toEmail],
-                  subject:   `Documentos de "${agencyName}" requieren corrección`,
+                  subject:   `Documento(s) rechazado(s) en "${agencyName}" — ToursRed`,
                   html_body: htmlContent,
                 }),
               });
