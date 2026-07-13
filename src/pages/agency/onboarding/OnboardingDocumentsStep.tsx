@@ -55,7 +55,20 @@ const OnboardingDocumentsStep: React.FC<Props> = ({ agencyId, personaType, docum
     setMyDocs(docs ?? []);
   }, [agencyId, personaType]);
 
-  useEffect(() => { fetchDocs(); }, [fetchDocs]);
+  useEffect(() => {
+    fetchDocs();
+
+    const channel = supabase
+      .channel('agency-documents-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'agency_documents', filter: `agency_id=eq.${agencyId}` },
+        () => fetchDocs()
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchDocs, agencyId]);
 
   const getDocForType = (key: string) => myDocs.find(d => d.document_type_key === key);
 

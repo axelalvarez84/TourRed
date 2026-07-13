@@ -10,7 +10,7 @@ interface AgencyDocument {
   document_type_key: string;
   file_name: string;
   storage_path: string;
-  status: 'pending_review' | 'rejected' | 'superseded';
+  status: 'pending_review' | 'approved' | 'rejected' | 'superseded';
   rejection_reason: string | null;
   reviewed_at: string | null;
   reviewed_by: string | null;
@@ -45,7 +45,7 @@ const DOC_TYPE_LABELS: Record<string, string> = {
 };
 
 const isApproved = (doc: AgencyDocument) =>
-  doc.status === 'pending_review' && doc.reviewed_at !== null;
+  doc.status === 'approved' || (doc.status === 'pending_review' && doc.reviewed_at !== null);
 
 const isPending = (doc: AgencyDocument) =>
   doc.status === 'pending_review' && doc.reviewed_at === null;
