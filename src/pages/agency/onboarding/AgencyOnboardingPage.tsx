@@ -13,6 +13,7 @@ interface AgencyInfo {
   persona_type: 'persona_fisica' | 'persona_moral';
   terms_accepted_at: string | null;
   contact_email: string;
+  documents_submitted_at: string | null;
 }
 
 const STEPS = [
@@ -42,7 +43,7 @@ const AgencyOnboardingPage: React.FC = () => {
     const [{ data: ag }, { data: cats }] = await Promise.all([
       supabase
         .from('agencies')
-        .select('id, onboarding_status, persona_type, terms_accepted_at, contact_email')
+        .select('id, onboarding_status, persona_type, terms_accepted_at, contact_email, documents_submitted_at')
         .eq('user_id', user.id)
         .maybeSingle(),
       supabase
@@ -122,7 +123,8 @@ const AgencyOnboardingPage: React.FC = () => {
         <OnboardingDocumentsStep
           agencyId={agency.id}
           personaType={agency.persona_type}
-          onCompleted={fetchAgency}
+          documentsSubmittedAt={agency.documents_submitted_at}
+          onSubmitted={fetchAgency}
         />
       )}
 
