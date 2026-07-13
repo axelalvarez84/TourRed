@@ -128,7 +128,7 @@ const AdminAgencies: React.FC = () => {
           representante_legal_nombre,
           rejection_category,
           rejection_reason,
-          users(first_name, last_name, email, is_approved)
+          users!agencies_user_id_fkey(first_name, last_name, email, is_approved)
         `)
         .order('created_at', { ascending: false })
         .limit(100);
