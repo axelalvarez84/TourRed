@@ -20,6 +20,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+const MAX_OTP_ATTEMPTS = 5;
+
 const fonts = {
   Roboto: {
     normal:      Buffer.from(ROBOTO_NORMAL_B64,      "base64"),
@@ -79,7 +81,6 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "Código OTP inválido" }), { status: 400, headers: corsHeaders });
     }
 
-    // Load agency + user data in one round-trip
     const { data: agency } = await supabase
       .from("agencies")
       .select("id, onboarding_status, contact_email, razon_social, rfc, domicilio_fiscal, representante_legal_nombre, name")
@@ -94,7 +95,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: acceptance } = await supabase
       .from("contract_acceptances")
-      .select("id, otp_code_hash, otp_expires_at, contract_version, folio_contrato")
+      .select("id, otp_code_hash, otp_expires_at, otp_attempts, contract_version, folio_contrato")
       .eq("agency_id", agency.id)
       .eq("status", "pending")
       .maybeSingle();
@@ -107,12 +108,38 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "El código ha expirado. Solicita uno nuevo." }), { status: 410, headers: corsHeaders });
     }
 
+    // ── Verificar intento fallido ────────────────────────────────────────────
     const inputHash = await hashOtp(otp);
     if (inputHash !== acceptance.otp_code_hash) {
-      return new Response(JSON.stringify({ error: "Código incorrecto." }), { status: 422, headers: corsHeaders });
+      const newAttempts = (acceptance.otp_attempts ?? 0) + 1;
+
+      if (newAttempts >= MAX_OTP_ATTEMPTS) {
+        // Bloquear: marcar como fallido — obliga a solicitar un nuevo OTP
+        await supabase.from("contract_acceptances").update({
+          otp_attempts:  newAttempts,
+          status:        "failed",
+          otp_code_hash: null,
+          otp_expires_at: null,
+        }).eq("id", acceptance.id);
+
+        return new Response(
+          JSON.stringify({ error: "Demasiados intentos fallidos. Solicita un código nuevo." }),
+          { status: 429, headers: corsHeaders },
+        );
+      }
+
+      await supabase.from("contract_acceptances").update({
+        otp_attempts: newAttempts,
+      }).eq("id", acceptance.id);
+
+      const remaining = MAX_OTP_ATTEMPTS - newAttempts;
+      return new Response(
+        JSON.stringify({ error: `Código incorrecto. Te quedan ${remaining} intento${remaining === 1 ? "" : "s"}.` }),
+        { status: 422, headers: corsHeaders },
+      );
     }
 
-    // ── OTP válido — generar PDF firmado con Anexo B ──────────────────────────
+    // ── OTP válido — generar PDF firmado con Anexo B ─────────────────────────
 
     const now    = new Date();
     const nowIso = now.toISOString();
@@ -132,6 +159,8 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "Error de estado: folio de contrato ausente. Contacta a soporte." }), { status: 500, headers: corsHeaders });
     }
 
+    const signerEmail = agency.contact_email ?? user.email ?? "";
+
     const contractData: ContractData = {
       razonSocial:        agency.razon_social ?? agency.name ?? "Sin nombre",
       rfcAgencia:         agency.rfc ?? "PENDIENTE",
@@ -143,7 +172,7 @@ Deno.serve(async (req: Request) => {
         }
         return agency.representante_legal_nombre;
       })(),
-      emailContacto:      agency.contact_email ?? user.email ?? "",
+      emailContacto:      signerEmail,
       folioContrato:      folio,
       fechaDia,
       fechaMes,
@@ -151,7 +180,6 @@ Deno.serve(async (req: Request) => {
       versionContrato:    contractVersion,
     };
 
-    // Format acceptance timestamp in Mexico City time
     const fechaHoraFormatted = now.toLocaleString("es-MX", {
       timeZone:   "America/Mexico_City",
       dateStyle:  "long",
@@ -163,28 +191,24 @@ Deno.serve(async (req: Request) => {
       contractVersion,
       razonSocial:          contractData.razonSocial,
       rfcAgencia:           contractData.rfcAgencia,
-      emailAceptacion:      contractData.emailContacto,
+      emailAceptacion:      signerEmail,
       fechaHoraAceptacion:  fechaHoraFormatted,
       ipAceptacion:         ip,
       userAgentAceptacion:  ua.length > 120 ? ua.slice(0, 120) + "…" : ua,
       otpEstatus:           "Verificado — código de 6 dígitos validado correctamente",
-      // hashDocumento omitted: contractDocDefinition renders a static text instead
     };
 
-    // Single pass: generate signed PDF
     // deno-lint-ignore no-explicit-any
     const printer   = new (PdfPrinter as any)(fonts);
     const docDef    = buildSignedContractDocDefinition(contractData, anexoData);
     const pdfDoc    = printer.createPdfKitDocument(docDef);
     const pdfBytes  = await pdfDocToBytes(pdfDoc);
 
-    // Compute SHA-256 of the PDF bytes (stored in contract_acceptances.document_hash)
     const hashBuffer   = await crypto.subtle.digest("SHA-256", pdfBytes);
     const documentHash = Array.from(new Uint8Array(hashBuffer))
       .map(b => b.toString(16).padStart(2, "0"))
       .join("");
 
-    // Upload signed PDF to agency-documents bucket
     const pdfPath = `${agency.id}/contrato_agencia/contrato_firmado_${Date.now()}.pdf`;
     const { error: uploadErr } = await supabase.storage
       .from("agency-documents")
@@ -192,7 +216,7 @@ Deno.serve(async (req: Request) => {
 
     if (uploadErr) throw new Error(`PDF upload failed: ${uploadErr.message}`);
 
-    // Mark contract_acceptances as signed + store hash + clear OTP
+    // Marcar contrato como firmado + guardar email del firmante + limpiar OTP
     await supabase.from("contract_acceptances").update({
       status:         "signed",
       signed_at:      nowIso,
@@ -203,9 +227,10 @@ Deno.serve(async (req: Request) => {
       otp_expires_at: null,
       document_hash:  documentHash,
       folio_contrato: folio,
+      accepted_email: signerEmail,
     }).eq("id", acceptance.id);
 
-    // Supersede any prior contrato_agencia document and insert the signed one
+    // Superseder documento previo e insertar el firmado
     await supabase.from("agency_documents")
       .update({ is_current: false, status: "superseded" })
       .eq("agency_id", agency.id)
@@ -219,17 +244,15 @@ Deno.serve(async (req: Request) => {
       file_name:         `Contrato_firmado_${folio}_${nowIso.slice(0, 10)}.pdf`,
       mime_type:         "application/pdf",
       is_current:        true,
-      status:            "approved",
-      reviewed_by:       user.id,
-      reviewed_at:       nowIso,
+      status:            "pending_review",
       uploaded_by:       user.id,
     });
 
-    // Update agency to active
+    // Avanzar agencia a activa
     await supabase.from("agencies").update({
-      onboarding_status:  "active",
-      is_approved:        true,
-      approved_at:        nowIso,
+      onboarding_status:   "active",
+      is_approved:         true,
+      approved_at:         nowIso,
       signed_contract_url: pdfPath,
     }).eq("id", agency.id);
 
