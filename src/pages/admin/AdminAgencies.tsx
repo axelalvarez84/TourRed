@@ -1506,6 +1506,7 @@ const AdminAgencies: React.FC = () => {
                     agencyId={selectedAgency.id}
                     legacySignedContractUrl={selectedAgency.signed_contract_url}
                     onboardingStatus={selectedAgency.onboarding_status}
+                    onRefresh={fetchAgencies}
                   />
                 </div>
               </div>
