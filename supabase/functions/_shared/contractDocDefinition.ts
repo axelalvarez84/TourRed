@@ -33,6 +33,10 @@ export interface ContractData {
   fechaMes: string;
   fechaAnio: string;
   versionContrato: string;
+  /** Porcentaje de comisión efectivo para esta agencia (default de plataforma si no hay acuerdo especial). */
+  commissionPercentage: number;
+  /** Solo presente cuando la agencia tiene comisión negociada distinta al default. Se inserta después de la Cláusula Quinta. */
+  specialCommissionClause?: string;
 }
 
 export interface AnexoBData {
@@ -89,6 +93,8 @@ function coverPage(data: ContractData) {
           { text: data.emailContacto, style: "coverValue" },
           { text: "FOLIO DE CONTRATO", style: "coverLabel" },
           { text: data.folioContrato, style: "coverValue" },
+          { text: "COMISIÓN PLATAFORMA", style: "coverLabel" },
+          { text: `${data.commissionPercentage}%${data.specialCommissionClause ? " (comisión especial negociada)" : " (tarifa estándar)"}`, style: "coverValue" },
         ],
       ],
       columnGap: 24,
@@ -544,6 +550,9 @@ export function buildContractDocDefinition(data: ContractData) {
   { text: "e) comerciales;", style: "listLetter", margin: [28, 0, 0, 6] },
   { text: "f) de seguridad;", style: "listLetter", margin: [28, 0, 0, 6] },
   { text: "g) o derivadas de cambios en PASARELAS DE PAGO o legislación aplicable.", style: "listLetter", margin: [28, 0, 0, 6] },
+  ...(data.specialCommissionClause
+    ? [{ text: data.specialCommissionClause, style: "body", margin: [0, 6, 0, 0], italics: true }]
+    : []),
   { text: "SEXTA. FACTURACIÓN A CUENTA DE TERCEROS Y OBLIGACIONES FISCALES", style: "clauseTitle" },
   { text: "1. Naturaleza fiscal de la intermediación.", style: "listNum", margin: [20, 0, 0, 6] },
   { text: "LAS PARTES reconocen y aceptan que TOURSRED actúa exclusivamente como intermediario digital y comisionista mercantil en la comercialización de los tours y servicios turísticos publicados por LA AGENCIA dentro de la plataforma.", style: "body" },

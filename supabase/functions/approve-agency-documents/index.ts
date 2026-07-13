@@ -71,33 +71,208 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: authErr } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
     if (authErr || !user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401, headers: corsHeaders });
 
-    // Must be admin
-    const { data: adminUser } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
-    if (adminUser?.role !== "admin") return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: corsHeaders });
+    // Must be admin or account_executive
+    const { data: actorUser } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
+    const actorRole = actorUser?.role;
+    if (!["admin", "super_admin", "account_executive"].includes(actorRole)) {
+      return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: corsHeaders });
+    }
 
     const body = await req.json();
-    const { agency_id, document_ids, action } = body; // action: 'approve' | 'reject'
+    // action: 'approve' | 'reject' | 'resign'
+    const { agency_id, action } = body;
+    const document_ids: string[] | undefined = body.document_ids;
     const rejectionReason: string | undefined = body.rejection_reason;
+    const newCommissionPct: number | undefined = body.new_commission_percentage;
 
-    if (!agency_id || !document_ids?.length || !action) {
+    if (!agency_id || !action) {
       return new Response(JSON.stringify({ error: "Faltan campos requeridos" }), { status: 400, headers: corsHeaders });
     }
 
-    if (!["approve", "reject"].includes(action)) {
+    if (!["approve", "reject", "resign"].includes(action)) {
       return new Response(JSON.stringify({ error: "Acción inválida" }), { status: 400, headers: corsHeaders });
+    }
+
+    // approve/reject require document_ids
+    if (action !== "resign" && !document_ids?.length) {
+      return new Response(JSON.stringify({ error: "Faltan campos requeridos: document_ids" }), { status: 400, headers: corsHeaders });
     }
 
     if (action === "reject" && !rejectionReason) {
       return new Response(JSON.stringify({ error: "Se requiere motivo de rechazo" }), { status: 422, headers: corsHeaders });
     }
 
-    const newStatus = action === "approve" ? "approved" : "rejected";
+    if (action === "resign" && (newCommissionPct === undefined || newCommissionPct === null)) {
+      return new Response(JSON.stringify({ error: "Se requiere new_commission_percentage para resign" }), { status: 400, headers: corsHeaders });
+    }
 
-    // Update individual documents
+    // ── RESIGN: initiate commission amendment for an active agency ───────────
+    if (action === "resign") {
+      const { data: agency } = await supabase
+        .from("agencies")
+        .select("id, user_id, razon_social, rfc, domicilio_fiscal, representante_legal_nombre, name, contact_email, commission_percentage, onboarding_status")
+        .eq("id", agency_id)
+        .maybeSingle();
+
+      if (!agency) return new Response(JSON.stringify({ error: "Agencia no encontrada" }), { status: 404, headers: corsHeaders });
+
+      if (agency.onboarding_status !== "active") {
+        return new Response(
+          JSON.stringify({ error: "Solo se puede iniciar una enmienda para agencias activas" }),
+          { status: 409, headers: corsHeaders }
+        );
+      }
+
+      // Validate required contract fields
+      const missingFields: string[] = [];
+      if (!agency.razon_social?.trim())               missingFields.push("razon_social");
+      if (!agency.rfc?.trim())                        missingFields.push("rfc");
+      if (!agency.domicilio_fiscal?.trim())           missingFields.push("domicilio_fiscal");
+      if (!agency.representante_legal_nombre?.trim()) missingFields.push("representante_legal_nombre");
+
+      if (missingFields.length > 0) {
+        return new Response(
+          JSON.stringify({ error: `Campos faltantes en perfil: ${missingFields.join(", ")}`, missing_fields: missingFields }),
+          { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Load platform default commission
+      const { data: platformSettings } = await supabase
+        .from("platform_settings")
+        .select("agency_commission_percentage")
+        .limit(1)
+        .maybeSingle();
+
+      const platformDefault = platformSettings?.agency_commission_percentage ?? 15;
+
+      // Supersede any existing pending amendment before creating a new one
+      await supabase.from("contract_acceptances")
+        .update({ status: "superseded" })
+        .eq("agency_id", agency_id)
+        .eq("status", "pending");
+
+      const folio = generateFolio(agency_id);
+      const nowDate = new Date();
+      const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+
+      const specialClause = newCommissionPct !== platformDefault
+        ? `No obstante lo dispuesto en la Cláusula Quinta, las partes acuerdan que la comisión aplicable a "${agency.razon_social ?? agency.name}" será del ${newCommissionPct}% conforme a negociación particular formalizada en la aprobación de su expediente.`
+        : undefined;
+
+      const contractData: ContractData = {
+        razonSocial:           agency.razon_social ?? agency.name ?? "Sin nombre",
+        rfcAgencia:            agency.rfc!,
+        domicilioFiscal:       agency.domicilio_fiscal!,
+        representanteLegal:    agency.representante_legal_nombre!,
+        emailContacto:         agency.contact_email ?? "",
+        folioContrato:         folio,
+        fechaDia:              String(nowDate.getDate()).padStart(2, "0"),
+        fechaMes:              MESES[nowDate.getMonth()],
+        fechaAnio:             String(nowDate.getFullYear()),
+        versionContrato:       "2.0",
+        commissionPercentage:  newCommissionPct,
+        specialCommissionClause: specialClause,
+      };
+
+      // Generate amendment PDF
+      // deno-lint-ignore no-explicit-any
+      const printer  = new (PdfPrinter as any)(fonts);
+      const docDef   = buildContractDocDefinition(contractData);
+      const pdfDoc   = printer.createPdfKitDocument(docDef);
+      const pdfBytes = await pdfDocToBytes(pdfDoc);
+
+      const pdfPath = `${agency_id}/contrato_agencia/enmienda_comision_${Date.now()}.pdf`;
+      const { error: uploadErr } = await supabase.storage
+        .from("agency-documents")
+        .upload(pdfPath, pdfBytes, { contentType: "application/pdf", upsert: true });
+
+      if (uploadErr) {
+        console.error("Amendment PDF upload error:", uploadErr.message);
+        return new Response(JSON.stringify({ error: "Error al generar el PDF de enmienda" }), { status: 500, headers: corsHeaders });
+      }
+
+      // Supersede prior contrato_agencia documents
+      await supabase.from("agency_documents")
+        .update({ is_current: false, status: "superseded" })
+        .eq("agency_id", agency_id)
+        .eq("document_type_key", "contrato_agencia")
+        .eq("is_current", true);
+
+      // Insert new contrato_agencia document (the amendment PDF)
+      await supabase.from("agency_documents").insert({
+        agency_id:         agency_id,
+        document_type_key: "contrato_agencia",
+        storage_path:      pdfPath,
+        file_name:         `Enmienda_Comision_${folio}.pdf`,
+        mime_type:         "application/pdf",
+        is_current:        true,
+        status:            "pending_review",
+        uploaded_by:       user.id,
+      });
+
+      // Create the amendment contract_acceptances record
+      const { data: newAcceptance, error: insertErr } = await supabase
+        .from("contract_acceptances")
+        .insert({
+          agency_id:                    agency_id,
+          contract_version:             "2.0",
+          folio_contrato:               folio,
+          status:                       "pending",
+          amendment_type:               "commission_change",
+          commission_percentage_proposed: newCommissionPct,
+        })
+        .select("id")
+        .single();
+
+      if (insertErr || !newAcceptance) {
+        console.error("Insert contract_acceptances error:", insertErr?.message);
+        return new Response(JSON.stringify({ error: "Error al crear el registro de enmienda" }), { status: 500, headers: corsHeaders });
+      }
+
+      // Point agencies.pending_amendment_id to the new record — do NOT touch onboarding_status
+      await supabase.from("agencies")
+        .update({ pending_amendment_id: newAcceptance.id })
+        .eq("id", agency_id);
+
+      // Audit log
+      await supabase.from("audit_logs").insert({
+        actor_id:   user.id,
+        event_type: "commission_amendment_initiated",
+        severity:   "info",
+        old_values: { commission_percentage: agency.commission_percentage },
+        new_values: { commission_percentage: newCommissionPct },
+        metadata:   { agency_id, folio, amendment_id: newAcceptance.id },
+      }).select();
+
+      // Notify agency user
+      if (agency.user_id) {
+        await supabase.from("notifications").insert({
+          user_id: agency.user_id,
+          type:    "agency_documents_approved",
+          title:   "Enmienda de comisión — Firma requerida",
+          message: `Se ha generado una enmienda a tu contrato con una nueva comisión del ${newCommissionPct}%. Revísala y firma para que entre en vigor.`,
+        }).select();
+      }
+
+      return new Response(
+        JSON.stringify({ ok: true, folio, amendment_id: newAcceptance.id }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ── APPROVE / REJECT individual documents ───────────────────────────────
+    if (!document_ids?.length) {
+      return new Response(JSON.stringify({ error: "Faltan document_ids" }), { status: 400, headers: corsHeaders });
+    }
+
+    // Fix: valid status values are 'pending_review', 'rejected', 'superseded' — never 'approved'
+    const newDocStatus = action === "approve" ? "pending_review" : "rejected";
+
     const { error: updateErr } = await supabase
       .from("agency_documents")
       .update({
-        status:           newStatus,
+        status:           newDocStatus,
         rejection_reason: action === "reject" ? rejectionReason : null,
         reviewed_by:      user.id,
         reviewed_at:      new Date().toISOString(),
@@ -110,7 +285,6 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "Error al actualizar documentos" }), { status: 500, headers: corsHeaders });
     }
 
-    // If all required current docs are approved → generate pre-signature contract PDF and advance to pending_signature
     if (action === "approve") {
       const { data: reqTypes } = await supabase
         .from("document_types")
@@ -120,47 +294,41 @@ Deno.serve(async (req: Request) => {
 
       const requiredKeys = (reqTypes ?? []).map((r: any) => r.key);
 
-      const { data: approvedDocs } = await supabase
+      // All required current docs that are NOT rejected
+      const { data: currentDocs } = await supabase
         .from("agency_documents")
         .select("document_type_key")
         .eq("agency_id", agency_id)
         .eq("is_current", true)
-        .eq("status", "approved")
+        .neq("status", "rejected")
         .neq("document_type_key", "contrato_agencia");
 
-      const approvedKeys = (approvedDocs ?? []).map((d: any) => d.document_type_key);
-      const allApproved = requiredKeys.every((k: string) => approvedKeys.includes(k));
+      const presentKeys = (currentDocs ?? []).map((d: any) => d.document_type_key);
+      const allPresent = requiredKeys.every((k: string) => presentKeys.includes(k));
 
-      if (allApproved) {
-        // Load agency data
+      if (allPresent) {
         const { data: agency } = await supabase
           .from("agencies")
-          .select("id, user_id, razon_social, rfc, domicilio_fiscal, representante_legal_nombre, name, contact_email")
+          .select("id, user_id, razon_social, rfc, domicilio_fiscal, representante_legal_nombre, name, contact_email, commission_percentage")
           .eq("id", agency_id)
           .maybeSingle();
 
-        if (!agency) {
-          return new Response(JSON.stringify({ error: "Agencia no encontrada" }), { status: 404, headers: corsHeaders });
-        }
+        if (!agency) return new Response(JSON.stringify({ error: "Agencia no encontrada" }), { status: 404, headers: corsHeaders });
 
-        // Validate required contract fields — 422 if any missing
         const missingFields: string[] = [];
-        if (!agency.razon_social?.trim())                 missingFields.push("razon_social");
-        if (!agency.rfc?.trim())                          missingFields.push("rfc");
-        if (!agency.domicilio_fiscal?.trim())             missingFields.push("domicilio_fiscal");
-        if (!agency.representante_legal_nombre?.trim())   missingFields.push("representante_legal_nombre");
+        if (!agency.razon_social?.trim())               missingFields.push("razon_social");
+        if (!agency.rfc?.trim())                        missingFields.push("rfc");
+        if (!agency.domicilio_fiscal?.trim())           missingFields.push("domicilio_fiscal");
+        if (!agency.representante_legal_nombre?.trim()) missingFields.push("representante_legal_nombre");
 
         if (missingFields.length > 0) {
           return new Response(
-            JSON.stringify({
-              error: `No se puede generar el contrato. Campos faltantes en el perfil de la agencia: ${missingFields.join(", ")}. Completa estos datos antes de aprobar los documentos.`,
-              missing_fields: missingFields,
-            }),
+            JSON.stringify({ error: `No se puede generar el contrato. Campos faltantes: ${missingFields.join(", ")}`, missing_fields: missingFields }),
             { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
-        // Idempotency: if a pending contract_acceptances already exists, return success without re-generating
+        // Idempotency: if a pending contract_acceptances already exists, skip re-generation
         const { data: existingAcceptance } = await supabase
           .from("contract_acceptances")
           .select("id, folio_contrato")
@@ -169,40 +337,51 @@ Deno.serve(async (req: Request) => {
           .maybeSingle();
 
         if (existingAcceptance) {
-          // Already generated — this is a retry. Respond with success.
           return new Response(JSON.stringify({ ok: true }), {
             status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
 
-        // Generate folio
-        const folio = generateFolio(agency_id);
+        // Load platform default commission
+        const { data: platformSettings } = await supabase
+          .from("platform_settings")
+          .select("agency_commission_percentage")
+          .limit(1)
+          .maybeSingle();
 
-        // Build contract data
-        const nowDate   = new Date();
-        const MESES     = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+        const platformDefault = platformSettings?.agency_commission_percentage ?? 15;
+        const effectiveCommission = agency.commission_percentage ?? platformDefault;
+
+        const folio = generateFolio(agency_id);
+        const nowDate = new Date();
+        const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+
+        const specialClause = agency.commission_percentage !== null && agency.commission_percentage !== undefined
+          ? `No obstante lo dispuesto en la Cláusula Quinta, las partes acuerdan que la comisión aplicable a "${agency.razon_social ?? agency.name}" será del ${agency.commission_percentage}% conforme a negociación particular formalizada en la aprobación de su expediente.`
+          : undefined;
+
         const contractData: ContractData = {
-          razonSocial:        agency.razon_social!,
-          rfcAgencia:         agency.rfc!,
-          domicilioFiscal:    agency.domicilio_fiscal!,
-          representanteLegal: agency.representante_legal_nombre!,
-          emailContacto:      agency.contact_email ?? "",
-          folioContrato:      folio,
-          fechaDia:           String(nowDate.getDate()).padStart(2, "0"),
-          fechaMes:           MESES[nowDate.getMonth()],
-          fechaAnio:          String(nowDate.getFullYear()),
-          versionContrato:    "1.0",
+          razonSocial:           agency.razon_social!,
+          rfcAgencia:            agency.rfc!,
+          domicilioFiscal:       agency.domicilio_fiscal!,
+          representanteLegal:    agency.representante_legal_nombre!,
+          emailContacto:         agency.contact_email ?? "",
+          folioContrato:         folio,
+          fechaDia:              String(nowDate.getDate()).padStart(2, "0"),
+          fechaMes:              MESES[nowDate.getMonth()],
+          fechaAnio:             String(nowDate.getFullYear()),
+          versionContrato:       "1.0",
+          commissionPercentage:  effectiveCommission,
+          specialCommissionClause: specialClause,
         };
 
-        // Generate pre-signature PDF
         // deno-lint-ignore no-explicit-any
         const printer  = new (PdfPrinter as any)(fonts);
         const docDef   = buildContractDocDefinition(contractData);
         const pdfDoc   = printer.createPdfKitDocument(docDef);
         const pdfBytes = await pdfDocToBytes(pdfDoc);
 
-        // Upload pre-signature PDF to storage
         const pdfPath = `${agency_id}/contrato_agencia/contrato_previo_${Date.now()}.pdf`;
         const { error: uploadErr } = await supabase.storage
           .from("agency-documents")
@@ -220,7 +399,6 @@ Deno.serve(async (req: Request) => {
           .eq("document_type_key", "contrato_agencia")
           .eq("is_current", true);
 
-        // Insert new contrato_agencia document record
         await supabase.from("agency_documents").insert({
           agency_id:         agency_id,
           document_type_key: "contrato_agencia",
@@ -232,22 +410,20 @@ Deno.serve(async (req: Request) => {
           uploaded_by:       user.id,
         });
 
-        // Insert contract_acceptances record
         await supabase.from("contract_acceptances").insert({
           agency_id:        agency_id,
           contract_version: "1.0",
           folio_contrato:   folio,
           status:           "pending",
+          amendment_type:   "initial",
         });
 
-        // Advance onboarding_status to pending_signature (no documents_completed_at touch)
         await supabase
           .from("agencies")
           .update({ onboarding_status: "pending_signature" })
           .eq("id", agency_id)
           .eq("onboarding_status", "pending_documents");
 
-        // Notify agency
         if (agency.user_id) {
           await supabase.from("notifications").insert({
             user_id: agency.user_id,
@@ -258,7 +434,7 @@ Deno.serve(async (req: Request) => {
         }
       }
     } else {
-      // Reject: notify agency & set status back to pending_documents
+      // Reject
       await supabase
         .from("agencies")
         .update({ onboarding_status: "pending_documents" })

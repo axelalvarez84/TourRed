@@ -83,19 +83,22 @@ Deno.serve(async (req: Request) => {
 
     const { data: agency } = await supabase
       .from("agencies")
-      .select("id, onboarding_status, contact_email, razon_social, rfc, domicilio_fiscal, representante_legal_nombre, name")
+      .select("id, onboarding_status, contact_email, razon_social, rfc, domicilio_fiscal, representante_legal_nombre, name, commission_percentage, pending_amendment_id")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (!agency) return new Response(JSON.stringify({ error: "Agencia no encontrada" }), { status: 404, headers: corsHeaders });
 
-    if (agency.onboarding_status !== "pending_signature") {
-      return new Response(JSON.stringify({ error: "La agencia no está en etapa de firma" }), { status: 409, headers: corsHeaders });
+    const isInitialFlow   = agency.onboarding_status === "pending_signature";
+    const isAmendmentFlow = agency.pending_amendment_id != null;
+
+    if (!isInitialFlow && !isAmendmentFlow) {
+      return new Response(JSON.stringify({ error: "La agencia no tiene una firma pendiente" }), { status: 409, headers: corsHeaders });
     }
 
     const { data: acceptance } = await supabase
       .from("contract_acceptances")
-      .select("id, otp_code_hash, otp_expires_at, otp_attempts, contract_version, folio_contrato")
+      .select("id, otp_code_hash, otp_expires_at, otp_attempts, contract_version, folio_contrato, amendment_type, commission_percentage_proposed")
       .eq("agency_id", agency.id)
       .eq("status", "pending")
       .maybeSingle();
@@ -108,17 +111,16 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "El código ha expirado. Solicita uno nuevo." }), { status: 410, headers: corsHeaders });
     }
 
-    // ── Verificar intento fallido ────────────────────────────────────────────
+    // ── Verify OTP ──────────────────────────────────────────────────────────
     const inputHash = await hashOtp(otp);
     if (inputHash !== acceptance.otp_code_hash) {
       const newAttempts = (acceptance.otp_attempts ?? 0) + 1;
 
       if (newAttempts >= MAX_OTP_ATTEMPTS) {
-        // Bloquear: marcar como fallido — obliga a solicitar un nuevo OTP
         await supabase.from("contract_acceptances").update({
-          otp_attempts:  newAttempts,
-          status:        "failed",
-          otp_code_hash: null,
+          otp_attempts:   newAttempts,
+          status:         "failed",
+          otp_code_hash:  null,
           otp_expires_at: null,
         }).eq("id", acceptance.id);
 
@@ -128,9 +130,7 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      await supabase.from("contract_acceptances").update({
-        otp_attempts: newAttempts,
-      }).eq("id", acceptance.id);
+      await supabase.from("contract_acceptances").update({ otp_attempts: newAttempts }).eq("id", acceptance.id);
 
       const remaining = MAX_OTP_ATTEMPTS - newAttempts;
       return new Response(
@@ -139,8 +139,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // ── OTP válido — generar PDF firmado con Anexo B ─────────────────────────
-
+    // ── OTP válido — build contract data ─────────────────────────────────────
     const now    = new Date();
     const nowIso = now.toISOString();
     const ip     = req.headers.get("x-forwarded-for") ?? req.headers.get("cf-connecting-ip") ?? "No disponible";
@@ -151,7 +150,7 @@ Deno.serve(async (req: Request) => {
     const fechaMes  = MESES[now.getMonth()];
     const fechaAnio = String(now.getFullYear());
 
-    const folio          = acceptance.folio_contrato as string | null;
+    const folio           = acceptance.folio_contrato as string | null;
     const contractVersion = (acceptance.contract_version as string | null) ?? "1.0";
 
     if (!folio) {
@@ -161,29 +160,51 @@ Deno.serve(async (req: Request) => {
 
     const signerEmail = agency.contact_email ?? user.email ?? "";
 
+    // Resolve effective commission: for amendments use the proposed value; for initial use agency or platform default
+    const { data: platformSettings } = await supabase
+      .from("platform_settings")
+      .select("agency_commission_percentage")
+      .limit(1)
+      .maybeSingle();
+
+    const platformDefault = platformSettings?.agency_commission_percentage ?? 15;
+
+    const isAmendment         = acceptance.amendment_type === "commission_change";
+    const proposedCommission  = acceptance.commission_percentage_proposed as number | null;
+    const effectiveCommission = isAmendment
+      ? (proposedCommission ?? platformDefault)
+      : (agency.commission_percentage ?? platformDefault);
+
+    const specialClause = isAmendment && proposedCommission !== null && proposedCommission !== platformDefault
+      ? `No obstante lo dispuesto en la Cláusula Quinta, las partes acuerdan que la comisión aplicable a "${agency.razon_social ?? agency.name}" será del ${proposedCommission}% conforme a negociación particular formalizada en la aprobación de su expediente.`
+      : !isAmendment && agency.commission_percentage !== null && agency.commission_percentage !== undefined
+        ? `No obstante lo dispuesto en la Cláusula Quinta, las partes acuerdan que la comisión aplicable a "${agency.razon_social ?? agency.name}" será del ${agency.commission_percentage}% conforme a negociación particular formalizada en la aprobación de su expediente.`
+        : undefined;
+
+    if (!agency.representante_legal_nombre) {
+      console.error(`Inconsistent state: agency ${agency.id} has no representante_legal_nombre`);
+      return new Response(JSON.stringify({ error: "Error de estado: nombre del firmante ausente. Contacta a soporte." }), { status: 500, headers: corsHeaders });
+    }
+
     const contractData: ContractData = {
-      razonSocial:        agency.razon_social ?? agency.name ?? "Sin nombre",
-      rfcAgencia:         agency.rfc ?? "PENDIENTE",
-      domicilioFiscal:    agency.domicilio_fiscal ?? "A confirmar",
-      representanteLegal: (() => {
-        if (!agency.representante_legal_nombre) {
-          console.error(`Inconsistent state: agency ${agency.id} has no representante_legal_nombre`);
-          throw new Error("Error de estado: nombre del firmante ausente. Contacta a soporte.");
-        }
-        return agency.representante_legal_nombre;
-      })(),
-      emailContacto:      signerEmail,
-      folioContrato:      folio,
+      razonSocial:         agency.razon_social ?? agency.name ?? "Sin nombre",
+      rfcAgencia:          agency.rfc ?? "PENDIENTE",
+      domicilioFiscal:     agency.domicilio_fiscal ?? "A confirmar",
+      representanteLegal:  agency.representante_legal_nombre,
+      emailContacto:       signerEmail,
+      folioContrato:       folio,
       fechaDia,
       fechaMes,
       fechaAnio,
-      versionContrato:    contractVersion,
+      versionContrato:     contractVersion,
+      commissionPercentage: effectiveCommission,
+      specialCommissionClause: specialClause,
     };
 
     const fechaHoraFormatted = now.toLocaleString("es-MX", {
-      timeZone:   "America/Mexico_City",
-      dateStyle:  "long",
-      timeStyle:  "medium",
+      timeZone:  "America/Mexico_City",
+      dateStyle: "long",
+      timeStyle: "medium",
     }) + " (hora Ciudad de México)";
 
     const anexoData: AnexoBData = {
@@ -209,28 +230,32 @@ Deno.serve(async (req: Request) => {
       .map(b => b.toString(16).padStart(2, "0"))
       .join("");
 
-    const pdfPath = `${agency.id}/contrato_agencia/contrato_firmado_${Date.now()}.pdf`;
+    const pdfName = isAmendment
+      ? `enmienda_firmada_${Date.now()}.pdf`
+      : `contrato_firmado_${Date.now()}.pdf`;
+    const pdfPath = `${agency.id}/contrato_agencia/${pdfName}`;
     const { error: uploadErr } = await supabase.storage
       .from("agency-documents")
       .upload(pdfPath, pdfBytes, { contentType: "application/pdf", upsert: false });
 
     if (uploadErr) throw new Error(`PDF upload failed: ${uploadErr.message}`);
 
-    // Marcar contrato como firmado + guardar email del firmante + limpiar OTP
+    // Mark acceptance as signed + record commission at signing (always)
     await supabase.from("contract_acceptances").update({
-      status:         "signed",
-      signed_at:      nowIso,
-      signer_user_id: user.id,
-      ip_address:     ip,
-      user_agent:     ua,
-      otp_code_hash:  null,
-      otp_expires_at: null,
-      document_hash:  documentHash,
-      folio_contrato: folio,
-      accepted_email: signerEmail,
+      status:                       "signed",
+      signed_at:                    nowIso,
+      signer_user_id:               user.id,
+      ip_address:                   ip,
+      user_agent:                   ua,
+      otp_code_hash:                null,
+      otp_expires_at:               null,
+      document_hash:                documentHash,
+      folio_contrato:               folio,
+      accepted_email:               signerEmail,
+      commission_percentage_at_signing: effectiveCommission,
     }).eq("id", acceptance.id);
 
-    // Superseder documento previo e insertar el firmado
+    // Supersede previous contrato_agencia doc + insert signed one
     await supabase.from("agency_documents")
       .update({ is_current: false, status: "superseded" })
       .eq("agency_id", agency.id)
@@ -241,25 +266,48 @@ Deno.serve(async (req: Request) => {
       agency_id:         agency.id,
       document_type_key: "contrato_agencia",
       storage_path:      pdfPath,
-      file_name:         `Contrato_firmado_${folio}_${nowIso.slice(0, 10)}.pdf`,
+      file_name:         isAmendment
+        ? `Enmienda_firmada_${folio}_${nowIso.slice(0, 10)}.pdf`
+        : `Contrato_firmado_${folio}_${nowIso.slice(0, 10)}.pdf`,
       mime_type:         "application/pdf",
       is_current:        true,
       status:            "pending_review",
       uploaded_by:       user.id,
     });
 
-    // Avanzar agencia a activa
-    await supabase.from("agencies").update({
-      onboarding_status:   "active",
-      is_approved:         true,
-      approved_at:         nowIso,
-      signed_contract_url: pdfPath,
-    }).eq("id", agency.id);
+    if (isAmendment) {
+      // Apply commission change + clear pending amendment — keep onboarding_status untouched
+      await supabase.from("agencies").update({
+        commission_percentage:  effectiveCommission,
+        pending_amendment_id:   null,
+        signed_contract_url:    pdfPath,
+      }).eq("id", agency.id);
+
+      // Audit log
+      await supabase.from("audit_logs").insert({
+        actor_id:   user.id,
+        event_type: "commission_amendment_signed",
+        severity:   "info",
+        old_values: { commission_percentage: agency.commission_percentage },
+        new_values: { commission_percentage: effectiveCommission },
+        metadata:   { agency_id: agency.id, folio, acceptance_id: acceptance.id },
+      }).select();
+    } else {
+      // Initial signing: advance agency to active
+      await supabase.from("agencies").update({
+        onboarding_status:   "active",
+        is_approved:         true,
+        approved_at:         nowIso,
+        signed_contract_url: pdfPath,
+        // Persist effective commission on first signing for reference
+        commission_percentage: agency.commission_percentage, // keep null if was null (uses platform default)
+      }).eq("id", agency.id);
+    }
 
     return new Response(
       JSON.stringify({
         ok:            true,
-        message:       "Contrato firmado exitosamente.",
+        message:       isAmendment ? "Enmienda firmada exitosamente." : "Contrato firmado exitosamente.",
         folio,
         document_hash: documentHash,
       }),

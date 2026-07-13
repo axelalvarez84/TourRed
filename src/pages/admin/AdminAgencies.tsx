@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building, Users, Eye, EyeOff, Mail, Phone, Globe, Calendar, Search, Filter, MoreVertical, CheckCircle, XCircle, CreditCard as Edit, Save, X, Percent, DollarSign, AlertTriangle, User, MapPin, ArrowUpDown, ArrowUp, ArrowDown, FileText } from 'lucide-react';
+import { Building, Users, Eye, EyeOff, Mail, Phone, Globe, Calendar, Search, Filter, MoreVertical, CheckCircle, XCircle, CreditCard as Edit, Save, X, Percent, DollarSign, AlertTriangle, User, MapPin, ArrowUpDown, ArrowUp, ArrowDown, FileText, RefreshCw } from 'lucide-react';
 import { getAllAgencies, updateAgencyStatus, supabase } from '../../lib/supabase';
 import { formatCurrency, formatCurrencyMXN } from '../../utils/formatCurrency';
 import AgencyContractSection from '../../components/AgencyContractSection';
@@ -25,6 +25,8 @@ interface Agency {
   created_at: string;
   updated_at: string;
   commission_rate?: number;
+  commission_percentage?: number | null;
+  pending_amendment_id?: string | null;
   rfc?: string;
   razon_social?: string;
   regimen_fiscal?: string;
@@ -74,9 +76,23 @@ const AdminAgencies: React.FC = () => {
     representante_legal_nombre: '',
   });
   const [commissionInput, setCommissionInput] = useState('10');
+  // commission_percentage override (null = use platform default)
+  const [commissionPctInput, setCommissionPctInput] = useState<string>('');
+  const [useSpecialCommission, setUseSpecialCommission] = useState(false);
+  const [resignModal, setResignModal] = useState<{
+    show: boolean;
+    agencyId: string;
+    agencyName: string;
+    newPct: number;
+    hasSignedContract: boolean;
+  } | null>(null);
+  const [isResigning, setIsResigning] = useState(false);
+  const [platformDefaultCommission, setPlatformDefaultCommission] = useState<number>(15);
 
   useEffect(() => {
     fetchAgencies();
+    supabase.from('platform_settings').select('agency_commission_percentage').limit(1).maybeSingle()
+      .then(({ data }) => { if (data?.agency_commission_percentage) setPlatformDefaultCommission(data.agency_commission_percentage); });
   }, []);
 
   const fetchAgencies = async () => {
@@ -99,6 +115,8 @@ const AdminAgencies: React.FC = () => {
           website,
           rating,
           commission_rate,
+          commission_percentage,
+          pending_amendment_id,
           description,
           rfc,
           razon_social,
@@ -352,7 +370,7 @@ const AdminAgencies: React.FC = () => {
         console.warn('⚠️ Error actualizando datos del usuario:', userError);
       }
 
-      // Audit log explícito cuando cambia la comisión (captura email del admin)
+      // Audit log explícito cuando cambia la comisión base (commission_rate)
       if (commissionChanged) {
         const { data: { user: adminUser } } = await supabase.auth.getUser();
         await supabase.rpc('insert_audit_log', {
@@ -371,6 +389,56 @@ const AdminAgencies: React.FC = () => {
             old_percentage: (selectedAgency.commission_rate ?? 0) * 100,
             new_percentage: editForm.commission_rate * 100
           }
+        });
+      }
+
+      // Handle negotiated commission_percentage change
+      const newCommissionPct = useSpecialCommission && commissionPctInput.trim() !== ''
+        ? parseFloat(commissionPctInput)
+        : null;
+      const oldCommissionPct = selectedAgency.commission_percentage ?? null;
+      const commissionPctChanged = newCommissionPct !== oldCommissionPct;
+
+      if (commissionPctChanged) {
+        // Check if agency already has a signed contract
+        const { data: signedContract } = await supabase
+          .from('contract_acceptances')
+          .select('id')
+          .eq('agency_id', selectedAgency.id)
+          .eq('status', 'signed')
+          .maybeSingle();
+
+        if (signedContract && newCommissionPct !== null) {
+          // Must go through resign flow — show modal, do NOT save silently
+          setResignModal({
+            show:            true,
+            agencyId:        selectedAgency.id,
+            agencyName:      selectedAgency.name,
+            newPct:          newCommissionPct,
+            hasSignedContract: true,
+          });
+          setIsUpdating(null);
+          return; // exit without refreshing so the modal is shown
+        }
+
+        // No signed contract — save directly
+        const { data: { user: adminUser } } = await supabase.auth.getUser();
+        await supabase.from('agencies')
+          .update({ commission_percentage: newCommissionPct })
+          .eq('id', selectedAgency.id);
+
+        await supabase.rpc('insert_audit_log', {
+          p_tenant_type: 'admin',
+          p_actor_id:    adminUser?.id ?? null,
+          p_actor_email: adminUser?.email ?? null,
+          p_actor_role:  'admin',
+          p_target_table: 'agencies',
+          p_target_id:   selectedAgency.id,
+          p_action:      'UPDATE_COMMISSION_PERCENTAGE',
+          p_old_values:  { commission_percentage: oldCommissionPct },
+          p_new_values:  { commission_percentage: newCommissionPct },
+          p_metadata:    { agency_name: selectedAgency.name },
+          p_severity:    'info',
         });
       }
 
@@ -408,6 +476,14 @@ const AdminAgencies: React.FC = () => {
     const rate = agency.commission_rate || 0.10;
     const pct = rate * 100;
     setCommissionInput(Number.isInteger(pct) ? String(pct) : pct.toFixed(1));
+    // Initialize negotiated commission fields
+    if (agency.commission_percentage != null) {
+      setUseSpecialCommission(true);
+      setCommissionPctInput(String(agency.commission_percentage));
+    } else {
+      setUseSpecialCommission(false);
+      setCommissionPctInput('');
+    }
     setSelectedAgency(agency);
     setIsEditingAgency(true);
   };
@@ -416,6 +492,40 @@ const AdminAgencies: React.FC = () => {
     setSelectedAgency(null);
     setIsEditingAgency(false);
     setError('');
+  };
+
+  const handleResign = async () => {
+    if (!resignModal) return;
+    setIsResigning(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/approve-agency-documents`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          agency_id: resignModal.agencyId,
+          action: 'resign',
+          new_commission_percentage: resignModal.newPct,
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        alert(`Error al iniciar enmienda: ${result.error || 'Error desconocido'}`);
+        return;
+      }
+      setResignModal(null);
+      setIsEditingAgency(false);
+      await fetchAgencies();
+      alert(`Enmienda iniciada exitosamente (folio: ${result.folio}). La agencia recibirá una notificación para firmar.`);
+    } catch (err) {
+      console.error('Resign error:', err);
+      alert('Error al iniciar la enmienda. Intenta de nuevo.');
+    } finally {
+      setIsResigning(false);
+    }
   };
 
   const handleSort = (column: string) => {
@@ -987,6 +1097,54 @@ const AdminAgencies: React.FC = () => {
                       </p>
                     </div>
 
+                    {/* Comisión negociada (commission_percentage) */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Comisión negociada <span className="text-gray-400 font-normal">(acuerdo especial)</span>
+                      </label>
+                      <div className="flex items-center gap-2 mb-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUseSpecialCommission(!useSpecialCommission);
+                            if (useSpecialCommission) setCommissionPctInput('');
+                          }}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${useSpecialCommission ? 'bg-blue-600' : 'bg-gray-200'}`}
+                        >
+                          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${useSpecialCommission ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                        </button>
+                        <span className="text-xs text-gray-600">{useSpecialCommission ? 'Comisión especial activa' : `Usando default de plataforma (${platformDefaultCommission}%)`}</span>
+                      </div>
+                      {useSpecialCommission && (
+                        <>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={0.5}
+                              value={commissionPctInput}
+                              onChange={(e) => setCommissionPctInput(e.target.value)}
+                              placeholder={`${platformDefaultCommission} (default plataforma)`}
+                              className="input pr-8"
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                              <Percent className="h-4 w-4 text-gray-400" />
+                            </div>
+                          </div>
+                          {selectedAgency?.pending_amendment_id && (
+                            <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                              <RefreshCw className="h-3 w-3" />
+                              Enmienda de comisión pendiente de firma por la agencia
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-1">
+                            Si la agencia ya tiene contrato firmado, se generará una enmienda y se solicitará nueva firma.
+                          </p>
+                        </>
+                      )}
+                    </div>
+
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Descripción
@@ -1431,6 +1589,49 @@ const AdminAgencies: React.FC = () => {
                     <Save className="h-4 w-4 mr-2" />
                     Guardar Cambios
                   </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de advertencia: resign / enmienda de comisión */}
+      {resignModal?.show && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-amber-100 rounded-full">
+                <AlertTriangle className="h-6 w-6 text-amber-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Contrato firmado — enmienda requerida</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-2">
+              La agencia <strong>{resignModal.agencyName}</strong> ya tiene un contrato firmado.
+              El cambio de comisión a <strong>{resignModal.newPct}%</strong> requiere generar
+              una enmienda contractual y solicitar nueva firma digital a la agencia.
+            </p>
+            <p className="text-sm text-gray-500 mb-6">
+              La agencia seguirá operando con normalidad mientras firma la enmienda. La nueva
+              comisión entrará en vigor solo cuando firme.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setResignModal(null)}
+                disabled={isResigning}
+                className="btn btn-outline"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleResign}
+                disabled={isResigning}
+                className="btn btn-primary flex items-center gap-2"
+              >
+                {isResigning ? (
+                  <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white" />Generando enmienda...</>
+                ) : (
+                  <><RefreshCw className="h-4 w-4" />Generar enmienda y solicitar firma</>
                 )}
               </button>
             </div>

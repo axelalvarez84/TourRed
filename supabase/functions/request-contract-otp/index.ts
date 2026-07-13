@@ -52,14 +52,17 @@ Deno.serve(async (req: Request) => {
 
     const { data: agency } = await supabase
       .from("agencies")
-      .select("id, onboarding_status, contact_email")
+      .select("id, onboarding_status, contact_email, pending_amendment_id")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (!agency) return new Response(JSON.stringify({ error: "Agencia no encontrada" }), { status: 404, headers: corsHeaders });
 
-    if (agency.onboarding_status !== "pending_signature") {
-      return new Response(JSON.stringify({ error: "La agencia no está en etapa de firma" }), { status: 409, headers: corsHeaders });
+    const isInitialFlow   = agency.onboarding_status === "pending_signature";
+    const isAmendmentFlow = agency.pending_amendment_id != null;
+
+    if (!isInitialFlow && !isAmendmentFlow) {
+      return new Response(JSON.stringify({ error: "La agencia no tiene una firma pendiente" }), { status: 409, headers: corsHeaders });
     }
 
     // Verify that a pending contract_acceptances record exists (created by approve-agency-documents)
@@ -71,7 +74,8 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (!existing) {
-      console.error(`Inconsistent state: agency ${agency.id} is pending_signature but has no pending contract_acceptances record`);
+      const mode = isAmendmentFlow ? "pending amendment" : "pending_signature";
+      console.error(`Inconsistent state: agency ${agency.id} is ${mode} but has no pending contract_acceptances record`);
       return new Response(
         JSON.stringify({ error: "Error de estado: no se encontró el registro del contrato. Contacta a soporte." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
