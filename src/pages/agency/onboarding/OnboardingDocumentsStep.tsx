@@ -7,6 +7,7 @@ interface DocType {
   label: string;
   description: string;
   required: boolean;
+  applies_to: 'ambas' | 'persona_fisica' | 'persona_moral';
 }
 
 interface AgencyDoc {
@@ -41,11 +42,11 @@ const OnboardingDocumentsStep: React.FC<Props> = ({ agencyId, personaType, onCom
       supabase.from('document_types').select('*').order('sort_order'),
       supabase.from('agency_documents').select('*').eq('agency_id', agencyId).eq('is_current', true),
     ]);
-    // Filter: acta_constitutiva only for persona_moral
     const filtered = (types ?? []).filter((t: DocType) => {
-      if (t.key === 'acta_constitutiva') return personaType === 'persona_moral';
       if (t.key === 'contrato_agencia') return false; // handled in signature step
-      return true;
+      if (t.applies_to === 'persona_moral') return personaType === 'persona_moral';
+      if (t.applies_to === 'persona_fisica') return personaType === 'persona_fisica';
+      return true; // 'ambas'
     });
     setDocTypes(filtered);
     setMyDocs(docs ?? []);
