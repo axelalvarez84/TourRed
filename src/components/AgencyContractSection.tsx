@@ -355,6 +355,3 @@ const AgencyContractSection: React.FC<Props> = ({
 };
 
 export default AgencyContractSection;
-
-
-export default AgencyContractSection
