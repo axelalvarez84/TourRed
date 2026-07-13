@@ -42,7 +42,7 @@ Deno.serve(async (req: Request) => {
     // Fetch agency info
     const { data: agency, error: agencyErr } = await adminClient
       .from("agencies")
-      .select("id, name, contact_name, contact_email, phone, persona_type, documents_submitted_at")
+      .select("id, name, contact_email, contact_phone, persona_type, documents_submitted_at, user_id")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -52,6 +52,14 @@ Deno.serve(async (req: Request) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Fetch contact name from users table
+    const { data: userRow } = await adminClient
+      .from("users")
+      .select("first_name, last_name")
+      .eq("id", user.id)
+      .maybeSingle();
+    const contactName = userRow ? `${userRow.first_name ?? ""} ${userRow.last_name ?? ""}`.trim() : null;
 
     // Idempotency guard: already submitted
     if (agency.documents_submitted_at) {
@@ -114,13 +122,13 @@ Deno.serve(async (req: Request) => {
       </div>
       <div class="field">
         <div class="label">Contacto</div>
-        <div class="value">${agency.contact_name ?? "—"}</div>
+        <div class="value">${contactName ?? "—"}</div>
       </div>
       <div class="field">
         <div class="label">Correo</div>
         <div class="value"><a href="mailto:${agency.contact_email}">${agency.contact_email}</a></div>
       </div>
-      ${agency.phone ? `<div class="field"><div class="label">Teléfono</div><div class="value">${agency.phone}</div></div>` : ""}
+      ${agency.contact_phone ? `<div class="field"><div class="label">Teléfono</div><div class="value">${agency.contact_phone}</div></div>` : ""}
       <div class="field">
         <div class="label">Tipo de persona</div>
         <div class="value">${personaLabel}</div>
@@ -140,7 +148,7 @@ Deno.serve(async (req: Request) => {
 </body>
 </html>`;
 
-    const textContent = `Documentos listos para revisión\n\nAgencia: ${agency.name}\nContacto: ${agency.contact_name ?? "—"}\nEmail: ${agency.contact_email}\n${agency.phone ? `Teléfono: ${agency.phone}\n` : ""}Tipo: ${personaLabel}\n\nRevisa los documentos en: ${platformUrl}/admin/agencias`;
+    const textContent = `Documentos listos para revisión\n\nAgencia: ${agency.name}\nContacto: ${contactName ?? "—"}\nEmail: ${agency.contact_email}\n${agency.contact_phone ? `Teléfono: ${agency.contact_phone}\n` : ""}Tipo: ${personaLabel}\n\nRevisa los documentos en: ${platformUrl}/admin/agencias`;
 
     const emailRes = await fetch("https://api.smtp2go.com/v3/email/send", {
       method: "POST",
