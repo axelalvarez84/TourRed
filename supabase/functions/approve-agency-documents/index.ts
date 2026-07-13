@@ -433,6 +433,89 @@ Deno.serve(async (req: Request) => {
             message: "Tus documentos han sido verificados. Ya puedes revisar y firmar tu contrato de colaboración con ToursRed.",
           }).select();
         }
+
+        // Send approval email via smtp2go
+        if (agency.contact_email) {
+          try {
+            const { data: emailSettings } = await supabase
+              .from("email_settings")
+              .select("smtp_api_key, contact_email")
+              .maybeSingle();
+
+            const { data: platformSettings } = await supabase
+              .from("platform_settings")
+              .select("platform_url")
+              .maybeSingle();
+
+            if (emailSettings?.smtp_api_key) {
+              const fromEmail = emailSettings.contact_email || "contacto@toursred.com";
+              const appUrl    = platformSettings?.platform_url || "https://toursredmx.netlify.app";
+              const logoUrl   = `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/images/email-logo.png`;
+              const agencyName = agency.name ?? agency.razon_social ?? "tu agencia";
+              const toEmail    = agency.contact_email as string;
+
+              const htmlContent = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f3f4f6;">
+  <table role="presentation" style="width:100%;border-collapse:collapse;">
+    <tr><td align="center" style="padding:40px 20px;">
+      <table role="presentation" style="width:100%;max-width:600px;border-collapse:collapse;background-color:#ffffff;border-radius:12px;box-shadow:0 4px 6px rgba(0,0,0,0.07);">
+        <tr>
+          <td style="padding:36px 40px 28px 40px;text-align:center;background:linear-gradient(135deg,#059669 0%,#047857 100%);border-radius:12px 12px 0 0;">
+            <img src="${logoUrl}" alt="ToursRed" style="max-width:160px;height:auto;margin-bottom:16px;background:white;padding:8px 16px;border-radius:8px;" />
+            <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Documentos aprobados</h1>
+            <p style="margin:8px 0 0 0;color:rgba(255,255,255,0.85);font-size:15px;">${agencyName}</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 40px 40px 40px;">
+            <p style="margin:0 0 20px 0;color:#374151;font-size:16px;line-height:28px;">
+              Hola,<br><br>
+              Hemos revisado y <strong>aprobado</strong> todos los documentos de tu agencia <strong>${agencyName}</strong>. Tu expediente esta completo y verificado.
+            </p>
+            <div style="background-color:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:20px 24px;margin:0 0 28px 0;">
+              <p style="margin:0;color:#065f46;font-size:15px;line-height:24px;">
+                El siguiente paso es <strong>revisar y firmar tu contrato de colaboracion</strong> con ToursRed. Ingresa a la plataforma para leer el borrador del contrato y proceder a la firma electronica.
+              </p>
+            </div>
+            <div style="text-align:center;margin-bottom:32px;">
+              <a href="${appUrl}/agencia/onboarding"
+                 style="display:inline-block;padding:15px 48px;background-color:#059669;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">
+                Revisar y firmar contrato
+              </a>
+            </div>
+            <p style="margin:0;color:#6b7280;font-size:14px;line-height:22px;">
+              Si tienes dudas, contactanos en <a href="mailto:${fromEmail}" style="color:#059669;text-decoration:none;">${fromEmail}</a>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 40px;background-color:#f9fafb;border-radius:0 0 12px 12px;text-align:center;border-top:1px solid #e5e7eb;">
+            <p style="margin:0;color:#d1d5db;font-size:12px;">&copy; ${new Date().getFullYear()} ToursRed. Todos los derechos reservados.</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+              await fetch("https://api.smtp2go.com/v3/email/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "X-Smtp2go-Api-Key": emailSettings.smtp_api_key },
+                body: JSON.stringify({
+                  sender:    fromEmail,
+                  to:        [toEmail],
+                  subject:   `Documentos aprobados — Firma tu contrato — ToursRed`,
+                  html_body: htmlContent,
+                }),
+              });
+            }
+          } catch (emailErr) {
+            console.error("Error sending approval email:", emailErr);
+          }
+        }
       }
     } else {
       // Reject

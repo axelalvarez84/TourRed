@@ -128,7 +128,7 @@ const AgencyOnboardingPage: React.FC = () => {
         />
       )}
 
-      {onboarding_status === 'pending_review' && <OnboardingReviewStep />}
+      {onboarding_status === 'pending_review' && <OnboardingReviewStep agencyId={agency.id} />}
 
       {onboarding_status === 'pending_signature' && (
         <OnboardingSignatureStep

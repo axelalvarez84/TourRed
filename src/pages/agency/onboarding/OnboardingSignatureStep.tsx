@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Ligature as FileSignature, Send, CheckCircle, RefreshCw, AlertCircle, FileText, ExternalLink } from 'lucide-react';
+import React, { useState } from 'react';
+import { Ligature as FileSignature, Send, CheckCircle, RefreshCw, AlertCircle } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
+import ContractDraftViewer from '../../../components/contracts/ContractDraftViewer';
 
 interface Props {
   agencyId: string;
@@ -18,39 +19,6 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
-
-  const [pdfUrl, setPdfUrl]         = useState<string | null>(null);
-  const [pdfLoading, setPdfLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setPdfLoading(true);
-      try {
-        const { data: docRow } = await supabase
-          .from('agency_documents')
-          .select('storage_path')
-          .eq('agency_id', agencyId)
-          .eq('document_type_key', 'contrato_agencia')
-          .eq('is_current', true)
-          .eq('status', 'pending_review')
-          .maybeSingle();
-
-        if (!cancelled && docRow?.storage_path) {
-          const { data: signedData } = await supabase.storage
-            .from('agency-documents')
-            .createSignedUrl(docRow.storage_path, 3600);
-          if (!cancelled) setPdfUrl(signedData?.signedUrl ?? null);
-        }
-      } catch {
-        // non-blocking: PDF preview is informational only
-      } finally {
-        if (!cancelled) setPdfLoading(false);
-      }
-    };
-    load();
-    return () => { cancelled = true; };
-  }, [agencyId]);
 
   const callFn = async (slug: string, body: object) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -137,27 +105,9 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
               </p>
             </div>
 
-            {/* PDF viewer */}
+            {/* Contract HTML preview — embedded */}
             <div className="mb-5">
-              {pdfLoading ? (
-                <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
-                  <div className="w-4 h-4 border-2 border-gray-200 border-t-gray-400 rounded-full animate-spin" />
-                  Cargando contrato…
-                </div>
-              ) : pdfUrl ? (
-                <a
-                  href={pdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200 rounded-xl px-4 py-3 transition-colors w-full justify-center"
-                >
-                  <FileText className="w-4 h-4 flex-shrink-0" />
-                  Ver contrato completo (PDF)
-                  <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 opacity-60" />
-                </a>
-              ) : (
-                <p className="text-xs text-gray-400 italic">No se pudo cargar la vista previa del contrato. Podrás consultarlo una vez firmado.</p>
-              )}
+              <ContractDraftViewer agencyId={agencyId} />
             </div>
 
             <div className="relative flex items-center mb-5">

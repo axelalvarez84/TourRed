@@ -271,7 +271,7 @@ Deno.serve(async (req: Request) => {
         : `Contrato_firmado_${folio}_${nowIso.slice(0, 10)}.pdf`,
       mime_type:         "application/pdf",
       is_current:        true,
-      status:            "pending_review",
+      status:            "approved",
       uploaded_by:       user.id,
     });
 
@@ -302,6 +302,111 @@ Deno.serve(async (req: Request) => {
         // Persist effective commission on first signing for reference
         commission_percentage: agency.commission_percentage, // keep null if was null (uses platform default)
       }).eq("id", agency.id);
+    }
+
+    // ── Send signed contract email with PDF attachment ──────────────────────
+    try {
+      const [{ data: emailSettings }, { data: platformSettings }] = await Promise.all([
+        supabase.from("email_settings").select("smtp_api_key, contact_email").maybeSingle(),
+        supabase.from("platform_settings").select("platform_url").maybeSingle(),
+      ]);
+
+      if (emailSettings?.smtp_api_key && agency.contact_email) {
+        const fromEmail = emailSettings.contact_email || "contacto@toursred.com";
+        const appUrl    = platformSettings?.platform_url || "https://toursredmx.netlify.app";
+        const logoUrl   = `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/images/email-logo.png`;
+        const toEmail    = agency.contact_email as string;
+        const agencyName = agency.razon_social ?? agency.name ?? "tu agencia";
+        const pdfBase64  = btoa(String.fromCharCode(...pdfBytes));
+        const fileName   = isAmendment
+          ? `Enmienda_firmada_${folio}_${nowIso.slice(0, 10)}.pdf`
+          : `Contrato_firmado_${folio}_${nowIso.slice(0, 10)}.pdf`;
+
+        const htmlContent = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f3f4f6;">
+  <table role="presentation" style="width:100%;border-collapse:collapse;">
+    <tr><td align="center" style="padding:40px 20px;">
+      <table role="presentation" style="width:100%;max-width:600px;border-collapse:collapse;background-color:#ffffff;border-radius:12px;box-shadow:0 4px 6px rgba(0,0,0,0.07);">
+        <tr>
+          <td style="padding:36px 40px 28px 40px;text-align:center;background:linear-gradient(135deg,#dc2626 0%,#b91c1c 100%);border-radius:12px 12px 0 0;">
+            <img src="${logoUrl}" alt="ToursRed" style="max-width:160px;height:auto;margin-bottom:16px;background:white;padding:8px 16px;border-radius:8px;" />
+            <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Contrato firmado exitosamente</h1>
+            <p style="margin:8px 0 0 0;color:rgba(255,255,255,0.85);font-size:15px;">${agencyName}</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 40px 40px 40px;">
+            <p style="margin:0 0 20px 0;color:#374151;font-size:16px;line-height:28px;">
+              Hola,<br><br>
+              Tu contrato de colaboracion con ToursRed ha sido firmado exitosamente. A continuacion encontrar los detalles de la firma:
+            </p>
+            <div style="background-color:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:20px 24px;margin:0 0 28px 0;">
+              <table style="width:100%;border-collapse:collapse;font-size:14px;color:#374151;">
+                <tr><td style="padding:4px 0;color:#6b7280;">Folio:</td><td style="padding:4px 0;font-weight:600;text-align:right;">${folio}</td></tr>
+                <tr><td style="padding:4px 0;color:#6b7280;">Fecha y hora:</td><td style="padding:4px 0;font-weight:600;text-align:right;">${fechaHoraFormatted}</td></tr>
+                <tr><td style="padding:4px 0;color:#6b7280;">Version:</td><td style="padding:4px 0;font-weight:600;text-align:right;">${contractVersion}</td></tr>
+                <tr><td style="padding:4px 0;color:#6b7280;">Hash SHA-256:</td><td style="padding:4px 0;font-weight:600;text-align:right;font-family:monospace;font-size:11px;word-break:break-all;">${documentHash}</td></tr>
+              </table>
+            </div>
+            <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:24px;">
+              Adjunto a este correo encontraras el PDF de tu contrato firmado, que incluye el <strong>Anexo B — Constancia de Aceptacion Electronica</strong> con todos los datos de la firma (IP, navegador, OTP verificado y hash del documento).
+            </p>
+            <div style="text-align:center;margin-bottom:32px;">
+              <a href="${appUrl}/agencia"
+                 style="display:inline-block;padding:15px 48px;background-color:#dc2626;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">
+                Ir a mi panel
+              </a>
+            </div>
+            <p style="margin:0;color:#6b7280;font-size:14px;line-height:22px;">
+              Si tienes dudas, contactanos en <a href="mailto:${fromEmail}" style="color:#dc2626;text-decoration:none;">${fromEmail}</a>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 40px;background-color:#f9fafb;border-radius:0 0 12px 12px;text-align:center;border-top:1px solid #e5e7eb;">
+            <p style="margin:0;color:#d1d5db;font-size:12px;">&copy; ${new Date().getFullYear()} ToursRed. Todos los derechos reservados.</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+        await fetch("https://api.smtp2go.com/v3/email/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Smtp2go-Api-Key": emailSettings.smtp_api_key },
+          body: JSON.stringify({
+            sender:      fromEmail,
+            to:          [toEmail],
+            subject:     `Contrato firmado — ${agencyName} — ToursRed`,
+            html_body:   htmlContent,
+            attachments: [{
+              filename:     fileName,
+              fileblob:     pdfBase64,
+              mimetype:     "application/pdf",
+            }],
+          }),
+        });
+      }
+    } catch (emailErr) {
+      console.error("Error sending signed contract email:", emailErr);
+    }
+
+    // ── Insert internal notification ────────────────────────────────────────
+    try {
+      await supabase.from("notifications").insert({
+        user_id:  user.id,
+        type:     "contract_signed",
+        title:    isAmendment ? "Enmienda firmada" : "Contrato firmado",
+        message:  isAmendment
+          ? `Enmienda firmada exitosamente. Folio: ${folio}`
+          : `Contrato firmado exitosamente. Folio: ${folio}`,
+      }).select();
+    } catch {
+      // non-blocking
     }
 
     return new Response(
