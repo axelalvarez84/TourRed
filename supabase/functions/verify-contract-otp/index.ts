@@ -124,14 +124,25 @@ Deno.serve(async (req: Request) => {
     const fechaMes  = MESES[now.getMonth()];
     const fechaAnio = String(now.getFullYear());
 
-    const folio          = (acceptance.folio_contrato as string | null) ?? `TRG-${fechaAnio}-${agency.id.replace(/-/g, "").slice(0,8).toUpperCase()}`;
+    const folio          = acceptance.folio_contrato as string | null;
     const contractVersion = (acceptance.contract_version as string | null) ?? "1.0";
+
+    if (!folio) {
+      console.error(`Inconsistent state: contract_acceptances ${acceptance.id} has null folio_contrato`);
+      return new Response(JSON.stringify({ error: "Error de estado: folio de contrato ausente. Contacta a soporte." }), { status: 500, headers: corsHeaders });
+    }
 
     const contractData: ContractData = {
       razonSocial:        agency.razon_social ?? agency.name ?? "Sin nombre",
       rfcAgencia:         agency.rfc ?? "PENDIENTE",
       domicilioFiscal:    agency.domicilio_fiscal ?? "A confirmar",
-      representanteLegal: agency.representante_legal_nombre ?? "Representante Legal",
+      representanteLegal: (() => {
+        if (!agency.representante_legal_nombre) {
+          console.error(`Inconsistent state: agency ${agency.id} has no representante_legal_nombre`);
+          throw new Error("Error de estado: nombre del firmante ausente. Contacta a soporte.");
+        }
+        return agency.representante_legal_nombre;
+      })(),
       emailContacto:      agency.contact_email ?? user.email ?? "",
       folioContrato:      folio,
       fechaDia,
@@ -157,27 +168,21 @@ Deno.serve(async (req: Request) => {
       ipAceptacion:         ip,
       userAgentAceptacion:  ua.length > 120 ? ua.slice(0, 120) + "…" : ua,
       otpEstatus:           "Verificado — código de 6 dígitos validado correctamente",
-      hashDocumento:        "Calculando…", // replaced after PDF generation
+      // hashDocumento omitted: contractDocDefinition renders a static text instead
     };
 
-    // First pass: generate PDF to compute its hash
+    // Single pass: generate signed PDF
     // deno-lint-ignore no-explicit-any
     const printer   = new (PdfPrinter as any)(fonts);
-    const docDef1   = buildSignedContractDocDefinition(contractData, anexoData);
-    const pdfDoc1   = printer.createPdfKitDocument(docDef1);
-    const pdfBytes1 = await pdfDocToBytes(pdfDoc1);
+    const docDef    = buildSignedContractDocDefinition(contractData, anexoData);
+    const pdfDoc    = printer.createPdfKitDocument(docDef);
+    const pdfBytes  = await pdfDocToBytes(pdfDoc);
 
-    // Compute SHA-256 of the first-pass PDF bytes
-    const hashBuffer   = await crypto.subtle.digest("SHA-256", pdfBytes1);
+    // Compute SHA-256 of the PDF bytes (stored in contract_acceptances.document_hash)
+    const hashBuffer   = await crypto.subtle.digest("SHA-256", pdfBytes);
     const documentHash = Array.from(new Uint8Array(hashBuffer))
       .map(b => b.toString(16).padStart(2, "0"))
       .join("");
-
-    // Second pass: embed the real hash in Anexo B
-    const anexoWithHash: AnexoBData = { ...anexoData, hashDocumento: documentHash };
-    const docDef2   = buildSignedContractDocDefinition(contractData, anexoWithHash);
-    const pdfDoc2   = printer.createPdfKitDocument(docDef2);
-    const pdfBytes  = await pdfDocToBytes(pdfDoc2);
 
     // Upload signed PDF to agency-documents bucket
     const pdfPath = `${agency.id}/contrato_agencia/contrato_firmado_${Date.now()}.pdf`;

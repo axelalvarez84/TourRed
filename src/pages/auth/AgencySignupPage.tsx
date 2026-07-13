@@ -34,6 +34,8 @@ const AgencySignupPage: React.FC = () => {
     agencyName: '',
     phoneNumber: '',
     website: '',
+    personaType: '' as '' | 'persona_fisica' | 'persona_moral',
+    representanteLegalNombre: '',
     rfc: '',
     razonSocial: '',
     rnt: '',
@@ -113,6 +115,18 @@ const AgencySignupPage: React.FC = () => {
       return;
     }
 
+    if (!formData.personaType) {
+      setError('El tipo de persona es obligatorio');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!formData.representanteLegalNombre.trim()) {
+      setError('El nombre de quien firma el contrato es obligatorio');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       console.log('🚀 Iniciando registro de agencia...');
       
@@ -180,6 +194,8 @@ const AgencySignupPage: React.FC = () => {
           website: website || null,
           rfc: rfc || null,
           razon_social: razonSocial.trim(),
+          persona_type: formData.personaType || null,
+          representante_legal_nombre: formData.representanteLegalNombre.trim() || null,
           rnt: rnt || null,
           regimen_fiscal: regimenFiscal || null,
           banco: banco || null,
@@ -580,6 +596,52 @@ const AgencySignupPage: React.FC = () => {
             <div className="border-b border-gray-200 pb-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Información Fiscal</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Tipo de persona */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de persona *</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {([
+                      { value: 'persona_fisica', label: 'Persona Física', desc: 'RFC de 13 caracteres' },
+                      { value: 'persona_moral', label: 'Persona Moral', desc: 'RFC de 12 caracteres' },
+                    ] as const).map(({ value, label, desc }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => handleInputChange('personaType', value)}
+                        className={`p-3 rounded-lg border-2 text-left transition-colors ${
+                          formData.personaType === value
+                            ? 'border-primary-500 bg-primary-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="font-medium text-sm text-gray-900">{label}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Representante legal / firmante */}
+                <div className="md:col-span-2">
+                  <label htmlFor="representanteLegalNombre" className="block text-sm font-medium text-gray-700">
+                    Nombre de quien firma este contrato *
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="representanteLegalNombre"
+                      name="representanteLegalNombre"
+                      type="text"
+                      value={formData.representanteLegalNombre}
+                      onChange={(e) => handleInputChange('representanteLegalNombre', e.target.value)}
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                      placeholder="Ej: Juan Pérez García"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Para persona física, normalmente eres tú mismo. Para persona moral, quien cuente con facultades legales (representante legal o apoderado).
+                  </p>
+                </div>
+
                 <div>
                   <label htmlFor="rfc" className="block text-sm font-medium text-gray-700">
                     RFC *
@@ -635,11 +697,11 @@ const AgencySignupPage: React.FC = () => {
                       onChange={(e) => handleInputChange('razonSocial', e.target.value)}
                       required
                       className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      placeholder="Ej: Juan Pérez García (persona física) o Viajes Aventura S.A. de C.V. (persona moral)"
+                      placeholder="Ej: Viajes Aventura S.A. de C.V."
                     />
                   </div>
                   <p className="mt-1 text-xs text-gray-500">
-                    Nombre legal completo del propietario (persona física) o razón social de la empresa (persona moral)
+                    Nombre legal o razón social tal como aparece en tu RFC
                   </p>
                 </div>
 

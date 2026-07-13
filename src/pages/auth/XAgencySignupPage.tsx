@@ -40,6 +40,8 @@ const XAgencySignupPage: React.FC = () => {
     phoneNumber: '',
     website: '',
     rfc: '',
+    personaType: '' as '' | 'persona_fisica' | 'persona_moral',
+    representanteLegalNombre: '',
     razonSocial: '',
     rnt: '',
     regimenFiscal: '',
@@ -99,6 +101,8 @@ const XAgencySignupPage: React.FC = () => {
     if (!website.trim()) { setError('El sitio web o página es obligatorio'); setIsLoading(false); return; }
     if (!rfc.trim()) { setError('El RFC es obligatorio'); setIsLoading(false); return; }
     if (!razonSocial.trim()) { setError('La razón social es obligatoria'); setIsLoading(false); return; }
+    if (!formData.personaType) { setError('El tipo de persona es obligatorio'); setIsLoading(false); return; }
+    if (!formData.representanteLegalNombre.trim()) { setError('El nombre de quien firma el contrato es obligatorio'); setIsLoading(false); return; }
     if (!phoneNumber.trim()) { setError('El teléfono es obligatorio'); setIsLoading(false); return; }
 
     try {
@@ -137,6 +141,8 @@ const XAgencySignupPage: React.FC = () => {
         website: website || null,
         rfc: rfc || null,
         razon_social: razonSocial.trim(),
+        persona_type: formData.personaType || null,
+        representante_legal_nombre: formData.representanteLegalNombre.trim() || null,
         rnt: rnt || null,
         regimen_fiscal: regimenFiscal || null,
         banco: banco || null,
@@ -303,6 +309,47 @@ const XAgencySignupPage: React.FC = () => {
 
             <div className="border-t pt-4 space-y-4">
               <h3 className="text-sm font-semibold text-gray-900">Información Fiscal</h3>
+
+              {/* Tipo de persona */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipo de persona *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { value: 'persona_fisica', label: 'Persona Física', desc: 'RFC de 13 caracteres' },
+                    { value: 'persona_moral',  label: 'Persona Moral',  desc: 'RFC de 12 caracteres' },
+                  ] as const).map(({ value, label, desc }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, personaType: value }))}
+                      className={`p-2.5 rounded-lg border-2 text-left transition-colors ${
+                        formData.personaType === value
+                          ? 'border-primary-500 bg-primary-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="font-medium text-xs text-gray-900">{label}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Firmante */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Nombre de quien firma este contrato *</label>
+                <input
+                  name="representanteLegalNombre"
+                  type="text"
+                  value={formData.representanteLegalNombre}
+                  onChange={handleInputChange}
+                  placeholder="Ej: Juan Pérez García"
+                  required
+                  className={`mt-1 ${inputClass}`}
+                />
+                <p className="mt-1 text-xs text-gray-500">Para persona física, normalmente eres tú mismo. Para persona moral, quien cuente con facultades legales.</p>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700">RFC</label>
                 <input name="rfc" type="text" value={formData.rfc} onChange={handleInputChange} placeholder="XAXX010101000" maxLength={13} required className={`mt-1 ${inputClass} uppercase`} />

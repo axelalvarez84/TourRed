@@ -69,7 +69,9 @@ const AdminAgencies: React.FC = () => {
     cuenta_clabe: '',
     titular_cuenta: '',
     first_name: '',
-    last_name: ''
+    last_name: '',
+    persona_type: '' as '' | 'persona_fisica' | 'persona_moral',
+    representante_legal_nombre: '',
   });
   const [commissionInput, setCommissionInput] = useState('10');
 
@@ -325,6 +327,8 @@ const AdminAgencies: React.FC = () => {
           banco: editForm.banco || null,
           cuenta_clabe: editForm.cuenta_clabe || null,
           titular_cuenta: editForm.titular_cuenta || null,
+          persona_type: editForm.persona_type || null,
+          representante_legal_nombre: editForm.representante_legal_nombre || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', selectedAgency.id)
@@ -397,7 +401,9 @@ const AdminAgencies: React.FC = () => {
       cuenta_clabe: agency.cuenta_clabe || '',
       titular_cuenta: agency.titular_cuenta || '',
       first_name: agency.users?.first_name || '',
-      last_name: agency.users?.last_name || ''
+      last_name: agency.users?.last_name || '',
+      persona_type: (agency.persona_type as '' | 'persona_fisica' | 'persona_moral') || '',
+      representante_legal_nombre: agency.representante_legal_nombre || '',
     });
     const rate = agency.commission_rate || 0.10;
     const pct = rate * 100;
@@ -1097,6 +1103,56 @@ const AdminAgencies: React.FC = () => {
                         rows={2}
                         placeholder="Dirección fiscal completa"
                       />
+                    </div>
+
+                    {/* Tipo de persona */}
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de persona</label>
+                      <div className="flex gap-3">
+                        {([
+                          { value: 'persona_fisica', label: 'Persona Física' },
+                          { value: 'persona_moral',  label: 'Persona Moral' },
+                        ] as const).map(({ value, label }) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => setEditForm({ ...editForm, persona_type: value })}
+                            className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-colors ${
+                              editForm.persona_type === value
+                                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                        {editForm.persona_type && (
+                          <button
+                            type="button"
+                            onClick={() => setEditForm({ ...editForm, persona_type: '' })}
+                            className="px-3 py-2 rounded-lg border border-gray-200 text-xs text-gray-400 hover:text-gray-600"
+                          >
+                            Limpiar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Representante legal / firmante */}
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Representante Legal / Firmante del contrato
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.representante_legal_nombre}
+                        onChange={(e) => setEditForm({ ...editForm, representante_legal_nombre: e.target.value })}
+                        className="input"
+                        placeholder="Nombre completo de quien firma el contrato"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Para persona física, normalmente el titular de la agencia. Para persona moral, quien cuente con facultades legales.
+                      </p>
                     </div>
                   </div>
                 </div>

@@ -45,7 +45,7 @@ export interface AnexoBData {
   ipAceptacion: string;
   userAgentAceptacion: string;
   otpEstatus: string;
-  hashDocumento: string;
+  hashDocumento?: string;
 }
 
 const styles = {
@@ -166,7 +166,7 @@ function anexoB(a: AnexoBData) {
           row("Dirección IP de origen", a.ipAceptacion),
           row("Navegador / dispositivo", a.userAgentAceptacion),
           row("Código OTP", a.otpEstatus),
-          row("Hash SHA-256 del documento aceptado", a.hashDocumento),
+          row("Hash SHA-256 del documento aceptado", a.hashDocumento ?? "El hash de integridad de este documento está disponible en el registro digital de la plataforma"),
         ],
       },
       layout: {
