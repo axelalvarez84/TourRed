@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   FileText, CheckCircle, Clock, XCircle, ExternalLink,
-  AlertTriangle, ThumbsUp, ThumbsDown, RefreshCw, Eye,
+  AlertTriangle, ThumbsUp, ThumbsDown, RotateCcw, Eye,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -21,16 +21,15 @@ interface Props {
   agencyId: string;
   legacySignedContractUrl?: string | null;
   onboardingStatus?: string | null;
-  /** Called after a document action changes the state, so the parent can re-fetch the agency */
   onRefresh?: () => void;
 }
 
-const ONBOARDING_STATUS: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  pending_documents: { label: 'Pendiente de documentos', color: 'text-gray-600 bg-gray-50 border-gray-200',   icon: <Clock className="w-4 h-4" /> },
-  pending_review:    { label: 'En revisión',              color: 'text-amber-700 bg-amber-50 border-amber-200', icon: <Clock className="w-4 h-4" /> },
-  pending_signature: { label: 'Pendiente de firma',       color: 'text-blue-700 bg-blue-50 border-blue-200',   icon: <FileText className="w-4 h-4" /> },
-  active:            { label: 'Activa',                   color: 'text-green-700 bg-green-50 border-green-200', icon: <CheckCircle className="w-4 h-4" /> },
-  rejected:          { label: 'Rechazada',                color: 'text-red-700 bg-red-50 border-red-200',       icon: <XCircle className="w-4 h-4" /> },
+const ONBOARDING_LABELS: Record<string, { label: string; color: string }> = {
+  pending_documents: { label: 'Pendiente de documentos', color: 'text-gray-600 bg-gray-100 border-gray-200' },
+  pending_review:    { label: 'En revisión',              color: 'text-amber-700 bg-amber-100 border-amber-200' },
+  pending_signature: { label: 'Pendiente de firma',       color: 'text-blue-700 bg-blue-100 border-blue-200' },
+  active:            { label: 'Activa',                   color: 'text-green-700 bg-green-100 border-green-200' },
+  rejected:          { label: 'Rechazada',                color: 'text-red-700 bg-red-100 border-red-200' },
 };
 
 const DOC_TYPE_LABELS: Record<string, string> = {
@@ -40,18 +39,16 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   comprobante_domicilio:       'Comprobante de domicilio',
   constancia_situacion_fiscal: 'Constancia de situación fiscal',
   contrato_agencia:            'Contrato de colaboración',
-  registro_sec_tur:            'Registro SECTUR / Licencia operación',
+  registro_sec_tur:            'Registro SECTUR / Licencia',
   aviso_funcionamiento:        'Aviso de funcionamiento',
   membresia_amav_clia:         'Membresía AMAV / CLIA',
 };
 
-function isApproved(doc: AgencyDocument) {
-  return doc.status === 'pending_review' && doc.reviewed_at !== null;
-}
+const isApproved = (doc: AgencyDocument) =>
+  doc.status === 'pending_review' && doc.reviewed_at !== null;
 
-function isPending(doc: AgencyDocument) {
-  return doc.status === 'pending_review' && doc.reviewed_at === null;
-}
+const isPending = (doc: AgencyDocument) =>
+  doc.status === 'pending_review' && doc.reviewed_at === null;
 
 const AgencyContractSection: React.FC<Props> = ({
   agencyId,
@@ -59,13 +56,13 @@ const AgencyContractSection: React.FC<Props> = ({
   onboardingStatus,
   onRefresh,
 }) => {
-  const [documents, setDocuments]         = useState<AgencyDocument[]>([]);
-  const [loading, setLoading]             = useState(true);
-  const [signedUrls, setSignedUrls]       = useState<Record<string, string>>({});
-  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
-  const [rejectingId, setRejectingId]     = useState<string | null>(null);
-  const [rejectReason, setRejectReason]   = useState('');
-  const [actionError, setActionError]     = useState('');
+  const [documents, setDocuments]   = useState<AgencyDocument[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [busy, setBusy]             = useState<Record<string, boolean>>({});
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -76,12 +73,12 @@ const AgencyContractSection: React.FC<Props> = ({
       .eq('is_current', true)
       .order('created_at', { ascending: true });
 
-    setDocuments(docs ?? []);
+    const list = docs ?? [];
+    setDocuments(list);
     setLoading(false);
 
-    // Pre-generate signed URLs for all docs
     const urls: Record<string, string> = {};
-    await Promise.all((docs ?? []).map(async (doc) => {
+    await Promise.all(list.map(async (doc) => {
       const { data } = await supabase.storage
         .from('agency-documents')
         .createSignedUrl(doc.storage_path, 3600);
@@ -92,280 +89,264 @@ const AgencyContractSection: React.FC<Props> = ({
 
   useEffect(() => { load(); }, [load]);
 
-  const callApproveEndpoint = async (payload: object) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/approve-agency-documents`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session?.access_token ?? ''}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      }
-    );
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error ?? 'Error al procesar la acción');
-    return json;
+  const invoke = async (payload: object) => {
+    const { data, error: fnErr } = await supabase.functions.invoke('approve-agency-documents', {
+      body: payload,
+    });
+    if (fnErr) throw new Error(fnErr.message);
+    if (data?.error) throw new Error(data.error);
+    return data;
   };
 
   const handleApprove = async (doc: AgencyDocument) => {
-    setActionLoading(prev => ({ ...prev, [doc.id]: true }));
-    setActionError('');
+    setBusy(p => ({ ...p, [doc.id]: true }));
+    setError('');
     try {
-      await callApproveEndpoint({
-        agency_id:    agencyId,
-        action:       'approve',
-        document_ids: [doc.id],
-      });
+      await invoke({ agency_id: agencyId, action: 'approve', document_ids: [doc.id] });
       await load();
       onRefresh?.();
-    } catch (err: any) {
-      setActionError(err.message);
+    } catch (e: any) {
+      setError(e.message);
     } finally {
-      setActionLoading(prev => ({ ...prev, [doc.id]: false }));
+      setBusy(p => ({ ...p, [doc.id]: false }));
     }
   };
 
-  const handleRejectSubmit = async (doc: AgencyDocument) => {
+  const handleReject = async (doc: AgencyDocument) => {
     if (!rejectReason.trim()) return;
-    setActionLoading(prev => ({ ...prev, [doc.id]: true }));
-    setActionError('');
+    setBusy(p => ({ ...p, [doc.id]: true }));
+    setError('');
     try {
-      await callApproveEndpoint({
-        agency_id:        agencyId,
-        action:           'reject',
-        document_ids:     [doc.id],
+      await invoke({
+        agency_id: agencyId,
+        action: 'reject',
+        document_ids: [doc.id],
         rejection_reason: rejectReason.trim(),
       });
       setRejectingId(null);
       setRejectReason('');
       await load();
       onRefresh?.();
-    } catch (err: any) {
-      setActionError(err.message);
+    } catch (e: any) {
+      setError(e.message);
     } finally {
-      setActionLoading(prev => ({ ...prev, [doc.id]: false }));
+      setBusy(p => ({ ...p, [doc.id]: false }));
     }
   };
 
   const contractDoc    = documents.find(d => d.document_type_key === 'contrato_agencia');
   const reviewableDocs = documents.filter(d => d.document_type_key !== 'contrato_agencia');
-  const statusCfg      = onboardingStatus ? ONBOARDING_STATUS[onboardingStatus] : null;
-
-  const contractUrl = signedUrls[contractDoc?.id ?? ''] ?? legacySignedContractUrl ?? null;
-  const isLegacyContract = !contractDoc && !!legacySignedContractUrl;
+  const contractUrl    = signedUrls[contractDoc?.id ?? ''] ?? legacySignedContractUrl ?? null;
+  const statusCfg      = onboardingStatus ? ONBOARDING_LABELS[onboardingStatus] : null;
 
   return (
     <div className="space-y-5">
-      {/* Onboarding status */}
+
+      {/* Onboarding status pill */}
       {statusCfg && (
-        <div className={`inline-flex items-center gap-2 text-sm border rounded-full px-3 py-1 font-medium ${statusCfg.color}`}>
-          {statusCfg.icon}
-          Estado de onboarding: {statusCfg.label}
+        <div className={`inline-flex items-center gap-1.5 text-xs font-semibold border rounded-full px-3 py-1 ${statusCfg.color}`}>
+          <Clock className="w-3.5 h-3.5" />
+          {statusCfg.label}
         </div>
       )}
 
-      {/* Error banner */}
-      {actionError && (
-        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-start gap-2 text-sm text-red-700">
+      {/* Error */}
+      {error && (
+        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-sm text-red-700">
           <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          {actionError}
+          {error}
         </div>
       )}
 
-      {/* --- Reviewable documents --- */}
-      {loading ? (
-        <div className="flex items-center gap-2 text-sm text-gray-400 py-4">
-          <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin" />
-          Cargando documentos…
-        </div>
-      ) : reviewableDocs.length === 0 ? (
-        <p className="text-sm text-gray-400 py-2">La agencia aún no ha subido documentos.</p>
-      ) : (
-        <div className="space-y-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            Documentos de verificación
-          </p>
-          {reviewableDocs.map(doc => {
-            const approved    = isApproved(doc);
-            const pending     = isPending(doc);
-            const rejected    = doc.status === 'rejected';
-            const busy        = actionLoading[doc.id];
-            const isRejecting = rejectingId === doc.id;
-            const url         = signedUrls[doc.id];
+      {/* ── Reviewable documents ── */}
+      <div>
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+          Documentos de verificación
+        </p>
 
-            return (
-              <div
-                key={doc.id}
-                className={`border rounded-xl p-4 transition-colors ${
-                  approved ? 'border-green-200 bg-green-50/40' :
-                  rejected ? 'border-red-200 bg-red-50/40' :
-                             'border-gray-200 bg-white'
-                }`}
-              >
-                {/* Header row */}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold text-gray-900">
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-gray-400 py-6 justify-center">
+            <div className="w-4 h-4 border-2 border-gray-200 border-t-gray-400 rounded-full animate-spin" />
+            Cargando…
+          </div>
+        ) : reviewableDocs.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-6">
+            La agencia aún no ha subido documentos.
+          </p>
+        ) : (
+          <div className="space-y-2.5">
+            {reviewableDocs.map(doc => {
+              const approved    = isApproved(doc);
+              const pending     = isPending(doc);
+              const rejected    = doc.status === 'rejected';
+              const isBusy      = busy[doc.id];
+              const isRejecting = rejectingId === doc.id;
+              const url         = signedUrls[doc.id];
+
+              return (
+                <div
+                  key={doc.id}
+                  className={`rounded-xl border overflow-hidden transition-colors ${
+                    approved ? 'border-green-200 bg-green-50/60' :
+                    rejected  ? 'border-red-200   bg-red-50/40'   :
+                                'border-gray-200  bg-white'
+                  }`}
+                >
+                  {/* Top section: info */}
+                  <div className="px-4 pt-3 pb-2">
+                    {/* Doc title row */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-gray-900 leading-snug">
                         {DOC_TYPE_LABELS[doc.document_type_key] ?? doc.document_type_key}
                       </span>
                       {/* Status badge */}
                       {approved && (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium bg-green-100 text-green-700 border border-green-200 rounded-full px-2 py-0.5">
+                        <span className="flex-shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold bg-green-100 text-green-700 border border-green-200 rounded-full px-2 py-0.5">
                           <CheckCircle className="w-3 h-3" /> Aprobado
                         </span>
                       )}
                       {rejected && (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium bg-red-100 text-red-700 border border-red-200 rounded-full px-2 py-0.5">
+                        <span className="flex-shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold bg-red-100 text-red-700 border border-red-200 rounded-full px-2 py-0.5">
                           <XCircle className="w-3 h-3" /> Rechazado
                         </span>
                       )}
                       {pending && (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5">
-                          <Clock className="w-3 h-3" /> Pendiente de revisión
+                        <span className="flex-shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold bg-amber-100 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5">
+                          <Clock className="w-3 h-3" /> En revisión
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5 truncate">{doc.file_name}</p>
+
+                    {/* File name */}
+                    <p className="text-[11px] text-gray-400 mt-0.5 truncate">{doc.file_name}</p>
+
+                    {/* Rejection reason */}
                     {doc.rejection_reason && (
-                      <p className="text-xs text-red-600 mt-1 bg-red-50 rounded px-2 py-1">
-                        Motivo: {doc.rejection_reason}
+                      <p className="mt-1.5 text-[11px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-2 py-1.5 leading-relaxed">
+                        <span className="font-medium">Motivo: </span>{doc.rejection_reason}
                       </p>
                     )}
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {url && (
-                      <a
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-300 px-2.5 py-1.5 rounded-lg transition-colors"
-                        title="Ver documento"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        Ver
-                      </a>
-                    )}
+                  {/* Bottom section: actions */}
+                  {!isRejecting ? (
+                    <div className="px-4 pb-3 flex items-center gap-2 flex-wrap">
+                      {/* View */}
+                      {url ? (
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-300 px-3 py-1.5 rounded-lg transition-colors shadow-sm"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          Ver archivo
+                        </a>
+                      ) : (
+                        <span className="text-xs text-gray-300 italic">Sin URL</span>
+                      )}
 
-                    {/* Approve */}
-                    {!approved && !isRejecting && (
-                      <button
-                        onClick={() => handleApprove(doc)}
-                        disabled={busy}
-                        title="Aprobar documento"
-                        className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        {busy ? <div className="w-3.5 h-3.5 border-2 border-green-400/30 border-t-green-600 rounded-full animate-spin" /> : <ThumbsUp className="w-3.5 h-3.5" />}
-                        Aprobar
-                      </button>
-                    )}
+                      {/* Approve */}
+                      {!approved && (
+                        <button
+                          onClick={() => handleApprove(doc)}
+                          disabled={isBusy}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 disabled:opacity-60 px-3 py-1.5 rounded-lg transition-colors shadow-sm"
+                        >
+                          {isBusy
+                            ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            : <ThumbsUp className="w-3.5 h-3.5" />}
+                          Aprobar
+                        </button>
+                      )}
 
-                    {/* Re-review approved */}
-                    {approved && !isRejecting && (
-                      <button
-                        onClick={() => { setRejectingId(doc.id); setRejectReason(''); }}
-                        title="Re-revisar / rechazar"
-                        className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-red-600 bg-white hover:bg-red-50 border border-gray-200 hover:border-red-200 px-2.5 py-1.5 rounded-lg transition-colors"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        Re-revisar
-                      </button>
-                    )}
-
-                    {/* Reject button (pending or re-review) */}
-                    {!isRejecting && (pending || rejected) && (
+                      {/* Reject / Re-review */}
                       <button
                         onClick={() => { setRejectingId(doc.id); setRejectReason(''); }}
-                        disabled={busy}
-                        title="Rechazar documento"
-                        className="inline-flex items-center gap-1 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                        disabled={isBusy}
+                        className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors shadow-sm disabled:opacity-60 ${
+                          approved
+                            ? 'text-gray-600 bg-white hover:bg-gray-50 border border-gray-200'
+                            : 'text-white bg-red-500 hover:bg-red-600'
+                        }`}
                       >
-                        <ThumbsDown className="w-3.5 h-3.5" />
-                        Rechazar
-                      </button>
-                    )}
-
-                    {/* Cancel reject */}
-                    {isRejecting && (
-                      <button
-                        onClick={() => { setRejectingId(null); setRejectReason(''); }}
-                        className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1.5"
-                      >
-                        Cancelar
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Inline reject form */}
-                {isRejecting && (
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Motivo de rechazo <span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                      className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-400 resize-none"
-                      rows={2}
-                      placeholder="Describe el problema con este documento…"
-                      value={rejectReason}
-                      onChange={e => setRejectReason(e.target.value)}
-                    />
-                    <div className="flex justify-end mt-2 gap-2">
-                      <button
-                        onClick={() => handleRejectSubmit(doc)}
-                        disabled={!rejectReason.trim() || busy}
-                        className="inline-flex items-center gap-1.5 text-xs font-medium bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        {busy
-                          ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          : <XCircle className="w-3.5 h-3.5" />}
-                        Confirmar rechazo
+                        {approved
+                          ? <><RotateCcw className="w-3.5 h-3.5" />Re-revisar</>
+                          : <><ThumbsDown className="w-3.5 h-3.5" />Rechazar</>}
                       </button>
                     </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+                  ) : (
+                    /* Inline reject form */
+                    <div className="px-4 pb-3 border-t border-dashed border-red-200 mt-1 pt-3 bg-red-50/40">
+                      <p className="text-xs font-semibold text-red-700 mb-1.5">
+                        Motivo de rechazo <span className="text-red-500">*</span>
+                      </p>
+                      <textarea
+                        autoFocus
+                        rows={2}
+                        className="w-full text-xs border border-red-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-300 resize-none bg-white"
+                        placeholder="Describe el problema con este documento…"
+                        value={rejectReason}
+                        onChange={e => setRejectReason(e.target.value)}
+                      />
+                      <div className="flex items-center gap-2 mt-2">
+                        <button
+                          onClick={() => handleReject(doc)}
+                          disabled={!rejectReason.trim() || busy[doc.id]}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          {busy[doc.id]
+                            ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            : <XCircle className="w-3.5 h-3.5" />}
+                          Confirmar rechazo
+                        </button>
+                        <button
+                          onClick={() => { setRejectingId(null); setRejectReason(''); }}
+                          className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-      {/* --- Contract document --- */}
+      {/* ── Contract ── */}
       <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
           Contrato de colaboración
         </p>
-        <div className="border border-gray-200 rounded-xl p-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 min-w-0">
-            <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-900">
-                {contractDoc?.file_name ?? 'Sin contrato generado'}
+        <div className="border border-gray-200 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+            <FileText className="w-4 h-4 text-blue-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900 truncate">
+              {contractDoc?.file_name ?? 'Sin contrato generado aún'}
+            </p>
+            {!contractDoc && legacySignedContractUrl && (
+              <p className="text-[11px] text-amber-600 flex items-center gap-1 mt-0.5">
+                <AlertTriangle className="w-3 h-3" /> Contrato legado
               </p>
-              {isLegacyContract && (
-                <p className="text-xs text-amber-600 mt-0.5 flex items-center gap-1">
-                  <AlertTriangle className="w-3 h-3" /> Contrato legado (fuera del flujo digital)
-                </p>
-              )}
-            </div>
+            )}
           </div>
           {contractUrl ? (
             <a
               href={contractUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200 px-3 py-1.5 rounded-lg transition-colors"
+              className="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition-colors"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               Ver contrato
             </a>
           ) : (
-            <span className="text-xs text-gray-400 flex-shrink-0">No generado aún</span>
+            <span className="flex-shrink-0 text-xs text-gray-300 italic">No generado</span>
           )}
         </div>
       </div>
@@ -374,3 +355,6 @@ const AgencyContractSection: React.FC<Props> = ({
 };
 
 export default AgencyContractSection;
+
+
+export default AgencyContractSection
