@@ -1096,7 +1096,7 @@ export function buildContractDocDefinition(data: ContractData) {
   { text: "Leído que fue el presente contrato y enteradas LAS PARTES de su contenido, alcance y efectos legales, lo aceptan de conformidad mediante firma autógrafa, firma electrónica o aceptación digital a través de los mecanismos implementados por TOURSRED.", style: "body" },
   { text: "El presente contrato surtirá efectos legales a partir de la fecha de aceptación electrónica realizada por LA AGENCIA dentro de la plataforma.", style: "body" },
   { text: ["Firmado en la Ciudad de México, el día ", { text: data.fechaDia, bold: true }, " de ", { text: data.fechaMes, bold: true }, " de ", { text: data.fechaAnio, bold: true }], style: "body", margin: [0, 16, 0, 0] },
-  { text: "> ![](media/image1.emf){width=\"3.125in\" > height=\"1.5in\"}![](media/image1.emf){width=\"3.125in\" height=\"1.625in\"}", style: "body" },
+
   { text: "ANEXO A.", style: "clauseTitle", pageBreak: "before" },
   { text: [{"text": "DEFINICIONES GENERALES", "bold": true}], style: "body" },
   { text: "Para efectos del presente contrato, los términos utilizados con mayúscula inicial tendrán el significado que se les atribuye a continuación:", style: "body" },
