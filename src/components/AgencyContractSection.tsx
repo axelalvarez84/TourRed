@@ -90,12 +90,19 @@ const AgencyContractSection: React.FC<Props> = ({
   useEffect(() => { load(); }, [load]);
 
   const invoke = async (payload: object) => {
-    const { data, error: fnErr } = await supabase.functions.invoke('approve-agency-documents', {
-      body: payload,
-    });
-    if (fnErr) throw new Error(fnErr.message);
-    if (data?.error) throw new Error(data.error);
-    return data;
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/approve-agency-documents`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token ?? ''}` },
+        body: JSON.stringify(payload),
+      }
+    );
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error ?? `Error ${res.status}`);
+    if (json.error) throw new Error(json.error);
+    return json;
   };
 
   const handleApprove = async (doc: AgencyDocument) => {

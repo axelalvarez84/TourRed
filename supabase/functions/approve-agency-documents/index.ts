@@ -460,7 +460,7 @@ Deno.serve(async (req: Request) => {
           .from("agencies")
           .update({ onboarding_status: "pending_signature" })
           .eq("id", agency_id)
-          .eq("onboarding_status", "pending_documents");
+          .in("onboarding_status", ["pending_documents", "pending_review"]);
 
         if (agency.user_id) {
           await supabase.from("notifications").insert({
