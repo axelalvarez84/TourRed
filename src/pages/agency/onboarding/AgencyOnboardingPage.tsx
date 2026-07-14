@@ -3,7 +3,6 @@ import { supabase } from '../../../lib/supabase';
 import AgencyOnboardingLayout from './AgencyOnboardingLayout';
 import OnboardingTermsStep from './OnboardingTermsStep';
 import OnboardingDocumentsStep from './OnboardingDocumentsStep';
-import OnboardingReviewStep from './OnboardingReviewStep';
 import OnboardingSignatureStep from './OnboardingSignatureStep';
 import OnboardingRejectedStep from './OnboardingRejectedStep';
 
@@ -19,15 +18,14 @@ interface AgencyInfo {
 const STEPS = [
   { number: 1, label: 'Términos'   },
   { number: 2, label: 'Documentos' },
-  { number: 3, label: 'Revisión'   },
-  { number: 4, label: 'Firma'      },
+  { number: 3, label: 'Firma'      },
 ];
 
 const STATUS_TO_STEP: Record<string, number> = {
   pending_documents: 2,
-  pending_review:    3,
-  pending_signature: 4,
-  active:            5,
+  pending_review:    2,
+  pending_signature: 3,
+  active:            4,
   rejected:          0,
 };
 
@@ -119,7 +117,7 @@ const AgencyOnboardingPage: React.FC = () => {
         />
       )}
 
-      {!showTerms && onboarding_status === 'pending_documents' && (
+      {!showTerms && (onboarding_status === 'pending_documents' || onboarding_status === 'pending_review') && (
         <OnboardingDocumentsStep
           agencyId={agency.id}
           personaType={agency.persona_type}
@@ -127,8 +125,6 @@ const AgencyOnboardingPage: React.FC = () => {
           onSubmitted={fetchAgency}
         />
       )}
-
-      {onboarding_status === 'pending_review' && <OnboardingReviewStep agencyId={agency.id} />}
 
       {onboarding_status === 'pending_signature' && (
         <OnboardingSignatureStep
