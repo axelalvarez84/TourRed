@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Ligature as FileSignature, Send, CheckCircle, RefreshCw, AlertCircle } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import ContractDraftViewer from '../../../components/contracts/ContractDraftViewer';
+import { generateAndUploadSignedContract } from '../../../utils/contractPdf';
 
 interface Props {
   agencyId: string;
@@ -57,8 +58,17 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
     setLoading(true);
     setError('');
     try {
-      await callFn('verify-contract-otp', { otp });
+      const result = await callFn('verify-contract-otp', { otp });
       setStage('signed');
+
+      if (result?.signing_data && agencyId) {
+        try {
+          await generateAndUploadSignedContract(agencyId, result.signing_data);
+        } catch (pdfErr) {
+          console.error('PDF generation failed (non-blocking):', pdfErr);
+        }
+      }
+
       setTimeout(onSigned, 1800);
     } catch (err: any) {
       setError(err.message ?? 'Código incorrecto o expirado.');
