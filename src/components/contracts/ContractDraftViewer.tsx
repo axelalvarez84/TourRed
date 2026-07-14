@@ -25,7 +25,7 @@ const ContractDraftViewer: React.FC<Props> = ({ agencyId }) => {
       try {
         const { data: agency, error: agencyErr } = await supabase
           .from('agencies')
-          .select('id, name, razon_social, rfc, domicilio_fiscal, representante_legal_nombre, contact_email, commission_percentage')
+          .select('id, name, razon_social, rfc, representante_legal_nombre, contact_email, commission_percentage, street, exterior_number, interior_number, colony, city, state, postal_code, country')
           .eq('id', agencyId)
           .maybeSingle();
 
@@ -48,7 +48,12 @@ const ContractDraftViewer: React.FC<Props> = ({ agencyId }) => {
           rfc_agencia:            agency.rfc ?? '—',
           representante_legal:    agency.representante_legal_nombre ?? '—',
           email_contacto:         agency.contact_email ?? '—',
-          domicilio_fiscal:       agency.domicilio_fiscal ?? '—',
+          domicilio_fiscal:       [agency.street, agency.exterior_number && `#${agency.exterior_number}`, agency.interior_number && `Int. ${agency.interior_number}`].filter(Boolean).join(' ') +
+                                 (agency.colony ? `, ${agency.colony}` : '') +
+                                 (agency.city ? `, ${agency.city}` : '') +
+                                 (agency.state ? `, ${agency.state}` : '') +
+                                 (agency.postal_code ? ` ${agency.postal_code}` : '') +
+                                 (agency.country ? `, ${agency.country}` : '') || '—',
           fecha_dia:              String(now.getDate()).padStart(2, '0'),
           fecha_mes:              MESES[now.getMonth()],
           fecha_anio:             String(now.getFullYear()),

@@ -31,6 +31,14 @@ interface Agency {
   razon_social?: string;
   regimen_fiscal?: string;
   domicilio_fiscal?: string;
+  street?: string;
+  exterior_number?: string;
+  interior_number?: string;
+  colony?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
   banco?: string;
   cuenta_clabe?: string;
   titular_cuenta?: string;
@@ -67,6 +75,14 @@ const AdminAgencies: React.FC = () => {
     razon_social: '',
     regimen_fiscal: '',
     domicilio_fiscal: '',
+    street: '',
+    exterior_number: '',
+    interior_number: '',
+    colony: '',
+    city: '',
+    state: '',
+    postal_code: '',
+    country: '',
     banco: '',
     cuenta_clabe: '',
     titular_cuenta: '',
@@ -120,6 +136,16 @@ const AdminAgencies: React.FC = () => {
           description,
           rfc,
           razon_social,
+          regimen_fiscal,
+          domicilio_fiscal,
+          street,
+          exterior_number,
+          interior_number,
+          colony,
+          city,
+          state,
+          postal_code,
+          country,
           user_id,
           account_executive_id,
           onboarding_status,
@@ -342,6 +368,14 @@ const AdminAgencies: React.FC = () => {
           razon_social: editForm.razon_social || null,
           regimen_fiscal: editForm.regimen_fiscal || null,
           domicilio_fiscal: editForm.domicilio_fiscal || null,
+          street: editForm.street || null,
+          exterior_number: editForm.exterior_number || null,
+          interior_number: editForm.interior_number || null,
+          colony: editForm.colony || null,
+          city: editForm.city || null,
+          state: editForm.state || null,
+          postal_code: editForm.postal_code || null,
+          country: editForm.country || null,
           banco: editForm.banco || null,
           cuenta_clabe: editForm.cuenta_clabe || null,
           titular_cuenta: editForm.titular_cuenta || null,
@@ -465,6 +499,14 @@ const AdminAgencies: React.FC = () => {
       razon_social: agency.razon_social || '',
       regimen_fiscal: agency.regimen_fiscal || '',
       domicilio_fiscal: agency.domicilio_fiscal || '',
+      street: agency.street || '',
+      exterior_number: agency.exterior_number || '',
+      interior_number: agency.interior_number || '',
+      colony: agency.colony || '',
+      city: agency.city || '',
+      state: agency.state || '',
+      postal_code: agency.postal_code || '',
+      country: agency.country || '',
       banco: agency.banco || '',
       cuenta_clabe: agency.cuenta_clabe || '',
       titular_cuenta: agency.titular_cuenta || '',
@@ -1252,15 +1294,108 @@ const AdminAgencies: React.FC = () => {
 
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Domicilio Fiscal
+                        CP Fiscal (para facturación SAT)
                       </label>
-                      <textarea
+                      <input
+                        type="text"
                         value={editForm.domicilio_fiscal}
                         onChange={(e) => setEditForm({...editForm, domicilio_fiscal: e.target.value})}
                         className="input"
-                        rows={2}
-                        placeholder="Dirección fiscal completa"
+                        placeholder="Código postal para facturación"
                       />
+                    </div>
+
+                    {/* Domicilio de la Agencia */}
+                    <div className="md:col-span-2 pt-2">
+                      <label className="block text-sm font-semibold text-gray-800 mb-3">Domicilio de la Agencia</label>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Calle</label>
+                          <input
+                            type="text"
+                            value={editForm.street || ''}
+                            onChange={(e) => setEditForm({...editForm, street: e.target.value})}
+                            className="input"
+                            placeholder="Ej: Av. Insurgentes Sur"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">No. Exterior</label>
+                            <input
+                              type="text"
+                              value={editForm.exterior_number || ''}
+                              onChange={(e) => setEditForm({...editForm, exterior_number: e.target.value})}
+                              className="input"
+                              placeholder="123"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">No. Interior</label>
+                            <input
+                              type="text"
+                              value={editForm.interior_number || ''}
+                              onChange={(e) => setEditForm({...editForm, interior_number: e.target.value})}
+                              className="input"
+                              placeholder="B-2"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Colonia</label>
+                          <input
+                            type="text"
+                            value={editForm.colony || ''}
+                            onChange={(e) => setEditForm({...editForm, colony: e.target.value})}
+                            className="input"
+                            placeholder="Ej: Centro"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Ciudad</label>
+                            <input
+                              type="text"
+                              value={editForm.city || ''}
+                              onChange={(e) => setEditForm({...editForm, city: e.target.value})}
+                              className="input"
+                              placeholder="Ej: CDMX"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                            <input
+                              type="text"
+                              value={editForm.state || ''}
+                              onChange={(e) => setEditForm({...editForm, state: e.target.value})}
+                              className="input"
+                              placeholder="Ej: Ciudad de México"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Código Postal</label>
+                            <input
+                              type="text"
+                              value={editForm.postal_code || ''}
+                              onChange={(e) => setEditForm({...editForm, postal_code: e.target.value})}
+                              className="input"
+                              placeholder="00000"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">País</label>
+                            <input
+                              type="text"
+                              value={editForm.country || ''}
+                              onChange={(e) => setEditForm({...editForm, country: e.target.value})}
+                              className="input"
+                              placeholder="México"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Tipo de persona */}

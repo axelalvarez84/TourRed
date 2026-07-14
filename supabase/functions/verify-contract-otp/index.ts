@@ -83,7 +83,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: agency } = await supabase
       .from("agencies")
-      .select("id, onboarding_status, contact_email, razon_social, rfc, domicilio_fiscal, representante_legal_nombre, name, commission_percentage, pending_amendment_id")
+      .select("id, onboarding_status, contact_email, razon_social, rfc, representante_legal_nombre, name, commission_percentage, pending_amendment_id, street, exterior_number, interior_number, colony, city, state, postal_code, country")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -189,7 +189,12 @@ Deno.serve(async (req: Request) => {
     const contractData: ContractData = {
       razonSocial:         agency.razon_social ?? agency.name ?? "Sin nombre",
       rfcAgencia:          agency.rfc ?? "PENDIENTE",
-      domicilioFiscal:     agency.domicilio_fiscal ?? "A confirmar",
+      domicilioFiscal:     [agency.street, agency.exterior_number && `#${agency.exterior_number}`, agency.interior_number && `Int. ${agency.interior_number}`].filter(Boolean).join(" ") +
+                           (agency.colony ? `, ${agency.colony}` : "") +
+                           (agency.city ? `, ${agency.city}` : "") +
+                           (agency.state ? `, ${agency.state}` : "") +
+                           (agency.postal_code ? ` ${agency.postal_code}` : "") +
+                           (agency.country ? `, ${agency.country}` : "") || "A confirmar",
       representanteLegal:  agency.representante_legal_nombre,
       emailContacto:       signerEmail,
       folioContrato:       folio,
