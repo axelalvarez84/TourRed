@@ -266,7 +266,11 @@ Deno.serve(async (req: Request) => {
       // El OTP ya se validó, así que no se pierde — el usuario puede
       // reintentar sin pedir código nuevo.
       return new Response(
-        JSON.stringify({ error: "No se pudo generar el documento del contrato. Intenta de nuevo en unos momentos." }),
+        JSON.stringify({
+          error: "No se pudo generar el documento del contrato. Intenta de nuevo en unos momentos.",
+          debug_detail: String(pdfError instanceof Error ? pdfError.message : pdfError),
+          debug_stack: pdfError instanceof Error ? (pdfError.stack ?? null) : null,
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
