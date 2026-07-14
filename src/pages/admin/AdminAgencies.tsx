@@ -152,6 +152,9 @@ const AdminAgencies: React.FC = () => {
           signed_contract_url,
           persona_type,
           representante_legal_nombre,
+          banco,
+          cuenta_clabe,
+          titular_cuenta,
           rejection_category,
           rejection_reason,
           users!agencies_user_id_fkey(first_name, last_name, email, is_approved)
