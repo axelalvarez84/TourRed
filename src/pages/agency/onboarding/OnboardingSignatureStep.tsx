@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Ligature as FileSignature, Send, CheckCircle, RefreshCw, AlertCircle, Download, ArrowRight } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import ContractDraftViewer from '../../../components/contracts/ContractDraftViewer';
-import { generateAndUploadSignedContract } from '../../../utils/contractPdf';
 
 interface Props {
   agencyId: string;
@@ -20,9 +19,8 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
-  const [pdfReady, setPdfReady]     = useState(false);
-  const [pdfError, setPdfError]     = useState('');
-  const [signingData, setSigningData] = useState<any>(null);
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [folio, setFolio]       = useState<string | null>(null);
 
   const callFn = async (slug: string, body: object) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -63,18 +61,8 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
     try {
       const result = await callFn('verify-contract-otp', { otp });
       setStage('signed');
-      setSigningData(result?.signing_data ?? null);
-
-      if (result?.signing_data && agencyId) {
-        try {
-          setPdfError('');
-          await generateAndUploadSignedContract(agencyId, result.signing_data);
-          setPdfReady(true);
-        } catch (pdfErr: any) {
-          console.error('PDF generation failed:', pdfErr);
-          setPdfError(pdfErr?.message ?? 'No se pudo generar el PDF del contrato.');
-        }
-      }
+      setFolio(result?.folio ?? null);
+      setSignedUrl(result?.signed_url ?? null);
     } catch (err: any) {
       setError(err.message ?? 'Código incorrecto o expirado.');
     } finally {
@@ -82,20 +70,15 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
     }
   };
 
-  const handleDownloadPdf = async () => {
-    if (!pdfReady || !signingData) return;
-    try {
-      const { signedUrl } = await generateAndUploadSignedContract(agencyId, signingData);
-      const a = document.createElement('a');
-      a.href = signedUrl;
-      a.download = `contrato-firmado.pdf`;
-      a.target = '_blank';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } catch (err: any) {
-      setPdfError(err?.message ?? 'No se pudo descargar el PDF del contrato.');
-    }
+  const handleDownloadPdf = () => {
+    if (!signedUrl) return;
+    const a = document.createElement('a');
+    a.href = signedUrl;
+    a.download = `contrato-${folio ?? 'firmado'}.pdf`;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   if (stage === 'signed') {
@@ -107,17 +90,20 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
             <CheckCircle className="w-10 h-10 text-green-500" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">¡Contrato firmado!</h2>
-          <p className="text-gray-500 text-sm mb-6">Tu cuenta ha sido activada. Descarga tu contrato firmado y continúa a tu panel.</p>
+          <p className="text-gray-500 text-sm mb-2">Tu cuenta ha sido activada exitosamente.</p>
+          {folio && (
+            <p className="text-gray-400 text-xs mb-6">Folio: <span className="font-mono font-semibold text-gray-600">{folio}</span></p>
+          )}
           <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-sm mx-auto">
             <button
               onClick={handleDownloadPdf}
-              disabled={!pdfReady}
+              disabled={!signedUrl}
               className={`flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-semibold text-sm transition-all ${
-                pdfReady ? 'bg-primary-600 text-white hover:bg-primary-700 shadow-sm' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                signedUrl ? 'bg-primary-600 text-white hover:bg-primary-700 shadow-sm' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
               }`}
             >
               <Download className="w-4 h-4" />
-              {pdfReady ? 'Descargar PDF' : 'Generando PDF...'}
+              Descargar PDF
             </button>
             <button
               onClick={onSigned}
@@ -127,32 +113,8 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
-          {!pdfReady && !pdfError && (
-            <p className="text-xs text-gray-400 mt-3">Generando tu contrato en PDF...</p>
-          )}
-          {pdfError && (
-            <div className="mt-4 max-w-sm mx-auto">
-              <div className="flex items-start gap-2 bg-amber-50 text-amber-800 rounded-xl p-3 text-sm mb-3">
-                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>{pdfError}</span>
-              </div>
-              <button
-                onClick={async () => {
-                  if (!signingData) return;
-                  setPdfError('');
-                  try {
-                    await generateAndUploadSignedContract(agencyId, signingData);
-                    setPdfReady(true);
-                  } catch (err: any) {
-                    setPdfError(err?.message ?? 'No se pudo generar el PDF del contrato.');
-                  }
-                }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm bg-amber-100 text-amber-800 hover:bg-amber-200 transition-all"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Reintentar descarga
-              </button>
-            </div>
+          {!signedUrl && (
+            <p className="text-xs text-gray-400 mt-3">Preparando tu contrato en PDF...</p>
           )}
         </div>
       </div>

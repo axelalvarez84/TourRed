@@ -17,6 +17,8 @@ const AgencyAmendmentSignaturePage: React.FC = () => {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [proposedPct, setProposedPct] = useState<number | null>(null);
   const [agencyName, setAgencyName] = useState('');
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [folio, setFolio]         = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,6 +114,8 @@ const AgencyAmendmentSignaturePage: React.FC = () => {
       const result = await res.json();
       if (!res.ok) { setError(result.error ?? 'Código incorrecto.'); return; }
       setStage('signed');
+      setFolio(result?.folio ?? null);
+      setSignedUrl(result?.signed_url ?? null);
     } finally {
       setLoading(false);
     }
@@ -149,10 +153,34 @@ const AgencyAmendmentSignaturePage: React.FC = () => {
           <p className="text-gray-500 text-sm mb-2">
             La nueva comisión{proposedPct != null ? ` de ${proposedPct}%` : ''} entra en vigor a partir de ahora.
           </p>
-          <p className="text-gray-400 text-xs mb-6">Recibirás el PDF firmado por correo electrónico.</p>
-          <button onClick={() => navigate('/agency/dashboard')} className="btn btn-primary">
-            Ir al dashboard
-          </button>
+          {folio && (
+            <p className="text-gray-400 text-xs mb-2">Folio: <span className="font-mono font-semibold text-gray-600">{folio}</span></p>
+          )}
+          <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-xs mx-auto mb-6">
+            <button
+              onClick={() => {
+                if (signedUrl) {
+                  const a = document.createElement('a');
+                  a.href = signedUrl;
+                  a.download = `enmienda-${folio ?? 'firmada'}.pdf`;
+                  a.target = '_blank';
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                }
+              }}
+              disabled={!signedUrl}
+              className={`flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-semibold text-sm transition-all ${
+                signedUrl ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Descargar PDF
+            </button>
+            <button onClick={() => navigate('/agency/dashboard')} className="btn btn-primary">
+              Ir al dashboard
+            </button>
+          </div>
         </div>
       </div>
     );

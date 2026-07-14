@@ -1,5 +1,18 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import PdfPrinter from "npm:pdfmake@0.2.20";
+import { Buffer } from "node:buffer";
+import {
+  ROBOTO_NORMAL_B64,
+  ROBOTO_BOLD_B64,
+  ROBOTO_ITALICS_B64,
+  ROBOTO_BOLDITALICS_B64,
+} from "../_shared/robotoFonts.ts";
+import {
+  buildSignedContractDocDefinition,
+  type ContractData,
+  type AnexoBData,
+} from "../_shared/contractDocDefinition.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,9 +22,35 @@ const corsHeaders = {
 
 const MAX_OTP_ATTEMPTS = 5;
 
+const fonts = {
+  Roboto: {
+    normal:      Buffer.from(ROBOTO_NORMAL_B64,      "base64"),
+    bold:        Buffer.from(ROBOTO_BOLD_B64,        "base64"),
+    italics:     Buffer.from(ROBOTO_ITALICS_B64,     "base64"),
+    bolditalics: Buffer.from(ROBOTO_BOLDITALICS_B64, "base64"),
+  },
+};
+
 async function hashOtp(otp: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(otp));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// deno-lint-ignore no-explicit-any
+async function pdfDocToBytes(pdfDoc: any): Promise<Uint8Array> {
+  const chunks: Uint8Array[] = [];
+  return new Promise((resolve, reject) => {
+    pdfDoc.on("data",  (chunk: Uint8Array) => chunks.push(chunk));
+    pdfDoc.on("error", reject);
+    pdfDoc.on("end", () => {
+      const totalLen = chunks.reduce((acc, c) => acc + c.length, 0);
+      const merged   = new Uint8Array(totalLen);
+      let offset     = 0;
+      for (const c of chunks) { merged.set(c, offset); offset += c.length; }
+      resolve(merged);
+    });
+    pdfDoc.end();
+  });
 }
 
 Deno.serve(async (req: Request) => {
@@ -94,7 +133,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // ── OTP válido — record signing data ─────────────────────────────────────
+    // ── OTP válido — preparar datos del contrato ─────────────────────────────
     const now    = new Date();
     const nowIso = now.toISOString();
     const ip     = req.headers.get("x-forwarded-for") ?? req.headers.get("cf-connecting-ip") ?? "No disponible";
@@ -141,7 +180,95 @@ Deno.serve(async (req: Request) => {
       timeStyle: "medium",
     }) + " (hora Ciudad de México)";
 
-    // Mark acceptance as signed
+    // Construir domicilio fiscal desde columnas separadas (domicilio_fiscal está NULL)
+    const domicilioFiscal = [
+      agency.street,
+      agency.exterior_number && `#${agency.exterior_number}`,
+      agency.interior_number && `Int. ${agency.interior_number}`,
+    ].filter(Boolean).join(" ") +
+      (agency.colony ? `, ${agency.colony}` : "") +
+      (agency.city ? `, ${agency.city}` : "") +
+      (agency.state ? `, ${agency.state}` : "") +
+      (agency.postal_code ? ` ${agency.postal_code}` : "") +
+      (agency.country ? `, ${agency.country}` : "") || "A confirmar";
+
+    // ── Construir datos del contrato (server-side, nunca del cliente) ────────
+    const contractData: ContractData = {
+      razonSocial:          agency.razon_social ?? agency.name ?? "Sin nombre",
+      rfcAgencia:           agency.rfc ?? "PENDIENTE",
+      domicilioFiscal:      domicilioFiscal,
+      representanteLegal:   agency.representante_legal_nombre,
+      emailContacto:        signerEmail,
+      folioContrato:        folio,
+      fechaDia,
+      fechaMes,
+      fechaAnio,
+      versionContrato:      contractVersion,
+      commissionPercentage: effectiveCommission,
+    };
+
+    const anexoB: AnexoBData = {
+      contractFolio:       folio,
+      contractVersion:    contractVersion,
+      razonSocial:         agency.razon_social ?? agency.name ?? "Sin nombre",
+      rfcAgencia:          agency.rfc ?? "PENDIENTE",
+      emailAceptacion:     signerEmail,
+      fechaHoraAceptacion: fechaHoraFormatted,
+      ipAceptacion:        ip,
+      userAgentAceptacion: ua.length > 120 ? ua.slice(0, 120) + "…" : ua,
+      otpEstatus:          "Verificado — código de 6 dígitos validado correctamente",
+      // hashDocumento se deja undefined — el Anexo B impreso mostrará el texto
+      // estático "El hash de integridad de este documento está disponible en el
+      // registro digital de la plataforma". El hash se calcula sobre los bytes
+      // del PDF y se guarda solo en contract_acceptances.document_hash.
+    };
+
+    // ── Generación de PDF, hash y subida a Storage ───────────────────────────
+    // TODO en un solo try/catch. Si algo falla aquí, NO se actualiza
+    // contract_acceptances.status ni agencies.onboarding_status.
+    let pdfBytes: Uint8Array;
+    let documentHash: string;
+    let storagePath: string;
+
+    try {
+      const docDefinition = buildSignedContractDocDefinition(contractData, anexoB);
+      // deno-lint-ignore no-explicit-any
+      const printer = new (PdfPrinter as any)(fonts);
+      const pdfDoc = printer.createPdfKitDocument(docDefinition);
+
+      pdfBytes = await pdfDocToBytes(pdfDoc);
+
+      if (!pdfBytes || pdfBytes.length < 1000) {
+        throw new Error(`PDF generado con tamaño sospechoso: ${pdfBytes?.length ?? 0} bytes`);
+      }
+
+      // SHA-256 sobre los bytes de la única generación
+      const hashBuffer = await crypto.subtle.digest("SHA-256", pdfBytes);
+      documentHash = Array.from(new Uint8Array(hashBuffer))
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join("");
+
+      storagePath = `${agency.id}/contratos/${folio}.pdf`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("agency-documents")
+        .upload(storagePath, pdfBytes, { contentType: "application/pdf", upsert: true });
+
+      if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`);
+    } catch (pdfError) {
+      console.error("Fallo en generación de contrato firmado:", pdfError);
+      // NO tocar contract_acceptances.status, NO tocar agencies.onboarding_status.
+      // El OTP ya se validó, así que no se pierde — el usuario puede
+      // reintentar sin pedir código nuevo.
+      return new Response(
+        JSON.stringify({ error: "No se pudo generar el documento del contrato. Intenta de nuevo en unos momentos." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // ── Solo si llegamos aquí: PDF real confirmado, hash real, archivo subido ──
+
+    // 1. Marcar acceptance como signed con document_hash
     await supabase.from("contract_acceptances").update({
       status:                       "signed",
       signed_at:                    nowIso,
@@ -153,15 +280,30 @@ Deno.serve(async (req: Request) => {
       folio_contrato:               folio,
       accepted_email:               signerEmail,
       commission_percentage_at_signing: effectiveCommission,
+      document_hash:                documentHash,
     }).eq("id", acceptance.id);
 
-    // Supersede previous contrato_agencia doc
+    // 2. Marcar contrato_agencia previo como superseded
     await supabase.from("agency_documents")
       .update({ is_current: false, status: "superseded" })
       .eq("agency_id", agency.id)
       .eq("document_type_key", "contrato_agencia")
       .eq("is_current", true);
 
+    // 3. Insertar nuevo agency_documents con status=approved
+    await supabase.from("agency_documents").insert({
+      agency_id:         agency.id,
+      document_type_key: "contrato_agencia",
+      storage_path:      storagePath,
+      file_name:         `${folio}.pdf`,
+      mime_type:         "application/pdf",
+      file_size_bytes:   pdfBytes.length,
+      is_current:        true,
+      status:            "approved",
+      uploaded_by:       user.id,
+    });
+
+    // 4. Actualizar agencia
     if (isAmendment) {
       await supabase.from("agencies").update({
         commission_percentage:  effectiveCommission,
@@ -178,14 +320,19 @@ Deno.serve(async (req: Request) => {
       }).select();
     } else {
       await supabase.from("agencies").update({
-        onboarding_status:   "active",
-        is_approved:         true,
-        approved_at:         nowIso,
+        onboarding_status:     "active",
+        is_approved:           true,
+        approved_at:           nowIso,
         commission_percentage: agency.commission_percentage,
       }).eq("id", agency.id);
     }
 
-    // ── Insert internal notification ────────────────────────────────────────
+    // 5. Generar signed URL para descarga
+    const { data: urlData } = await supabase.storage
+      .from("agency-documents")
+      .createSignedUrl(storagePath, 31536000);
+
+    // 6. Notificación interna
     try {
       await supabase.from("notifications").insert({
         user_id:  user.id,
@@ -199,7 +346,6 @@ Deno.serve(async (req: Request) => {
       // non-blocking
     }
 
-    // ── Return signing data so client can generate PDF ──────────────────────
     return new Response(
       JSON.stringify({
         ok:            true,
@@ -207,31 +353,10 @@ Deno.serve(async (req: Request) => {
         folio,
         contract_version: contractVersion,
         is_amendment:  isAmendment,
-        signing_data: {
-          razonSocial:         agency.razon_social ?? agency.name ?? "Sin nombre",
-          rfcAgencia:          agency.rfc ?? "PENDIENTE",
-          domicilioFiscal:     [agency.street, agency.exterior_number && `#${agency.exterior_number}`, agency.interior_number && `Int. ${agency.interior_number}`].filter(Boolean).join(" ") +
-                               (agency.colony ? `, ${agency.colony}` : "") +
-                               (agency.city ? `, ${agency.city}` : "") +
-                               (agency.state ? `, ${agency.state}` : "") +
-                               (agency.postal_code ? ` ${agency.postal_code}` : "") +
-                               (agency.country ? `, ${agency.country}` : "") || "A confirmar",
-          representanteLegal:  agency.representante_legal_nombre,
-          emailContacto:       signerEmail,
-          folioContrato:       folio,
-          fechaDia,
-          fechaMes,
-          fechaAnio,
-          versionContrato:     contractVersion,
-          commissionPercentage: effectiveCommission,
-          emailAceptacion:     signerEmail,
-          fechaHoraAceptacion: fechaHoraFormatted,
-          ipAceptacion:        ip,
-          userAgentAceptacion: ua.length > 120 ? ua.slice(0, 120) + "…" : ua,
-          otpEstatus:          "Verificado — código de 6 dígitos validado correctamente",
-        },
+        document_hash: documentHash,
+        signed_url:    urlData?.signedUrl ?? null,
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
     console.error("Unexpected error in verify-contract-otp:", err);
