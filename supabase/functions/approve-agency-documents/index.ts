@@ -331,13 +331,13 @@ Deno.serve(async (req: Request) => {
         .filter((r: any) => r.applies_to === "ambas" || r.applies_to === personaType)
         .map((r: any) => r.key);
 
-      // All required current docs that are NOT rejected
+      // All required current docs that are APPROVED (not just "not rejected")
       const { data: currentDocs } = await supabase
         .from("agency_documents")
         .select("document_type_key")
         .eq("agency_id", agency_id)
         .eq("is_current", true)
-        .neq("status", "rejected")
+        .eq("status", "approved")
         .neq("document_type_key", "contrato_agencia");
 
       const presentKeys = (currentDocs ?? []).map((d: any) => d.document_type_key);
