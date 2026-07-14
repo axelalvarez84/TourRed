@@ -1,18 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import PdfPrinter from "npm:pdfmake@0.2.20";
-import { Buffer } from "node:buffer";
-import {
-  buildSignedContractDocDefinition,
-  type ContractData,
-  type AnexoBData,
-} from "../_shared/contractDocDefinition.ts";
-import {
-  ROBOTO_NORMAL_B64,
-  ROBOTO_BOLD_B64,
-  ROBOTO_ITALICS_B64,
-  ROBOTO_BOLDITALICS_B64,
-} from "../_shared/robotoFonts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,21 +8,6 @@ const corsHeaders = {
 };
 
 const MAX_OTP_ATTEMPTS = 5;
-
-const fonts = {
-  Roboto: {
-    normal:      Buffer.from(ROBOTO_NORMAL_B64,      "base64"),
-    bold:        Buffer.from(ROBOTO_BOLD_B64,        "base64"),
-    italics:     Buffer.from(ROBOTO_ITALICS_B64,     "base64"),
-    bolditalics: Buffer.from(ROBOTO_BOLDITALICS_B64, "base64"),
-  },
-  Courier: {
-    normal:      Buffer.from(ROBOTO_NORMAL_B64,      "base64"),
-    bold:        Buffer.from(ROBOTO_BOLD_B64,        "base64"),
-    italics:     Buffer.from(ROBOTO_ITALICS_B64,     "base64"),
-    bolditalics: Buffer.from(ROBOTO_BOLDITALICS_B64, "base64"),
-  },
-};
 
 async function hashOtp(otp: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(otp));
@@ -222,6 +194,32 @@ Deno.serve(async (req: Request) => {
       ipAceptacion:         ip,
       userAgentAceptacion:  ua.length > 120 ? ua.slice(0, 120) + "…" : ua,
       otpEstatus:           "Verificado — código de 6 dígitos validado correctamente",
+    };
+
+    // ── Lazy-load heavy PDF deps only after OTP is verified ─────────────────
+    const { Buffer } = await import("node:buffer");
+    const PdfPrinter = (await import("npm:pdfmake@0.2.20")).default;
+    const { buildSignedContractDocDefinition } = await import("../_shared/contractDocDefinition.ts");
+    const {
+      ROBOTO_NORMAL_B64,
+      ROBOTO_BOLD_B64,
+      ROBOTO_ITALICS_B64,
+      ROBOTO_BOLDITALICS_B64,
+    } = await import("../_shared/robotoFonts.ts");
+
+    const fonts = {
+      Roboto: {
+        normal:      Buffer.from(ROBOTO_NORMAL_B64,      "base64"),
+        bold:        Buffer.from(ROBOTO_BOLD_B64,        "base64"),
+        italics:     Buffer.from(ROBOTO_ITALICS_B64,     "base64"),
+        bolditalics: Buffer.from(ROBOTO_BOLDITALICS_B64, "base64"),
+      },
+      Courier: {
+        normal:      Buffer.from(ROBOTO_NORMAL_B64,      "base64"),
+        bold:        Buffer.from(ROBOTO_BOLD_B64,        "base64"),
+        italics:     Buffer.from(ROBOTO_ITALICS_B64,     "base64"),
+        bolditalics: Buffer.from(ROBOTO_BOLDITALICS_B64, "base64"),
+      },
     };
 
     // deno-lint-ignore no-explicit-any
