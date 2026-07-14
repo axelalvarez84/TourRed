@@ -20,7 +20,6 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
-  const [pdfBlob, setPdfBlob]     = useState<Blob | null>(null);
   const [pdfReady, setPdfReady]     = useState(false);
   const [pdfError, setPdfError]     = useState('');
   const [signingData, setSigningData] = useState<any>(null);
@@ -69,8 +68,7 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
       if (result?.signing_data && agencyId) {
         try {
           setPdfError('');
-          const { pdfBlob: blob } = await generateAndUploadSignedContract(agencyId, result.signing_data);
-          setPdfBlob(blob);
+          await generateAndUploadSignedContract(agencyId, result.signing_data);
           setPdfReady(true);
         } catch (pdfErr: any) {
           console.error('PDF generation failed:', pdfErr);
@@ -84,16 +82,20 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
     }
   };
 
-  const handleDownloadPdf = () => {
-    if (!pdfBlob) return;
-    const url = URL.createObjectURL(pdfBlob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `contrato-firmado.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const handleDownloadPdf = async () => {
+    if (!pdfReady || !signingData) return;
+    try {
+      const { signedUrl } = await generateAndUploadSignedContract(agencyId, signingData);
+      const a = document.createElement('a');
+      a.href = signedUrl;
+      a.download = `contrato-firmado.pdf`;
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err: any) {
+      setPdfError(err?.message ?? 'No se pudo descargar el PDF del contrato.');
+    }
   };
 
   if (stage === 'signed') {
@@ -139,8 +141,7 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
                   if (!signingData) return;
                   setPdfError('');
                   try {
-                    const { pdfBlob: blob } = await generateAndUploadSignedContract(agencyId, signingData);
-                    setPdfBlob(blob);
+                    await generateAndUploadSignedContract(agencyId, signingData);
                     setPdfReady(true);
                   } catch (err: any) {
                     setPdfError(err?.message ?? 'No se pudo generar el PDF del contrato.');
