@@ -182,7 +182,7 @@ const PublishModal: React.FC<{
               <EditorToolbar editor={editor} />
               <EditorContent
                 editor={editor}
-                className="min-h-96 max-h-[500px] overflow-y-auto p-4 text-sm prose prose-sm max-w-none focus:outline-none"
+                className="tiptap min-h-96 max-h-[500px] overflow-y-auto p-4 text-sm prose prose-sm max-w-none focus:outline-none"
               />
             </div>
           </div>
