@@ -22,6 +22,7 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
   const [pdfBlob, setPdfBlob]   = useState<Blob | null>(null);
   const [pdfReady, setPdfReady] = useState(false);
+  const [pdfError, setPdfError] = useState('');
 
   const callFn = async (slug: string, body: object) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -65,11 +66,13 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
 
       if (result?.signing_data && agencyId) {
         try {
+          setPdfError('');
           const { pdfBlob: blob } = await generateAndUploadSignedContract(agencyId, result.signing_data);
           setPdfBlob(blob);
           setPdfReady(true);
-        } catch (pdfErr) {
-          console.error('PDF generation failed (non-blocking):', pdfErr);
+        } catch (pdfErr: any) {
+          console.error('PDF generation failed:', pdfErr);
+          setPdfError(pdfErr?.message ?? 'No se pudo generar el PDF del contrato.');
         }
       }
     } catch (err: any) {
@@ -120,8 +123,33 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
-          {!pdfReady && (
+          {!pdfReady && !pdfError && (
             <p className="text-xs text-gray-400 mt-3">Generando tu contrato en PDF...</p>
+          )}
+          {pdfError && (
+            <div className="mt-4 max-w-sm mx-auto">
+              <div className="flex items-start gap-2 bg-amber-50 text-amber-800 rounded-xl p-3 text-sm mb-3">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>{pdfError}</span>
+              </div>
+              <button
+                onClick={async () => {
+                  if (!result?.signing_data) return;
+                  setPdfError('');
+                  try {
+                    const { pdfBlob: blob } = await generateAndUploadSignedContract(agencyId, result.signing_data);
+                    setPdfBlob(blob);
+                    setPdfReady(true);
+                  } catch (err: any) {
+                    setPdfError(err?.message ?? 'No se pudo generar el PDF del contrato.');
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm bg-amber-100 text-amber-800 hover:bg-amber-200 transition-all"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Reintentar descarga
+              </button>
+            </div>
           )}
         </div>
       </div>

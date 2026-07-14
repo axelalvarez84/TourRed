@@ -70,7 +70,7 @@ export async function generateAndUploadSignedContract(
 
   const pdfBlob = pdf.output('blob');
   const pdfBytes = new Uint8Array(await pdfBlob.arrayBuffer());
-  const storagePath = `contracts/${agencyId}/${data.folioContrato}.pdf`;
+  const storagePath = `${agencyId}/contratos/${data.folioContrato}.pdf`;
 
   const { error: uploadErr } = await supabase.storage
     .from('agency-documents')
