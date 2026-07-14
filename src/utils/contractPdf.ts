@@ -72,9 +72,12 @@ export async function generateAndUploadSignedContract(
   const pdfBytes = new Uint8Array(await pdfBlob.arrayBuffer());
   const storagePath = `${agencyId}/contratos/${data.folioContrato}.pdf`;
 
+  // Remove existing file at this path first (avoids RLS UPDATE policy gap with upsert)
+  await supabase.storage.from('agency-documents').remove([storagePath]);
+
   const { error: uploadErr } = await supabase.storage
     .from('agency-documents')
-    .upload(storagePath, pdfBytes, { contentType: 'application/pdf', upsert: true });
+    .upload(storagePath, pdfBytes, { contentType: 'application/pdf', upsert: false });
 
   if (uploadErr) throw new Error(`Error al subir el PDF: ${uploadErr.message}`);
 

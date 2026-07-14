@@ -20,9 +20,10 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
-  const [pdfBlob, setPdfBlob]   = useState<Blob | null>(null);
-  const [pdfReady, setPdfReady] = useState(false);
-  const [pdfError, setPdfError] = useState('');
+  const [pdfBlob, setPdfBlob]     = useState<Blob | null>(null);
+  const [pdfReady, setPdfReady]     = useState(false);
+  const [pdfError, setPdfError]     = useState('');
+  const [signingData, setSigningData] = useState<any>(null);
 
   const callFn = async (slug: string, body: object) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -63,6 +64,7 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
     try {
       const result = await callFn('verify-contract-otp', { otp });
       setStage('signed');
+      setSigningData(result?.signing_data ?? null);
 
       if (result?.signing_data && agencyId) {
         try {
@@ -134,10 +136,10 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
               </div>
               <button
                 onClick={async () => {
-                  if (!result?.signing_data) return;
+                  if (!signingData) return;
                   setPdfError('');
                   try {
-                    const { pdfBlob: blob } = await generateAndUploadSignedContract(agencyId, result.signing_data);
+                    const { pdfBlob: blob } = await generateAndUploadSignedContract(agencyId, signingData);
                     setPdfBlob(blob);
                     setPdfReady(true);
                   } catch (err: any) {
