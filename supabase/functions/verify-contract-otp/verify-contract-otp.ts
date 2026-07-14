@@ -151,7 +151,9 @@ Deno.serve(async (req: Request) => {
     // ── OTP válido — preparar datos del contrato ─────────────────────────────
     const now    = new Date();
     const nowIso = now.toISOString();
-    const ip     = req.headers.get("x-forwarded-for") ?? req.headers.get("cf-connecting-ip") ?? "No disponible";
+    const ip     = (req.headers.get("x-forwarded-for") ?? req.headers.get("cf-connecting-ip") ?? "No disponible")
+      .split(",")[0]
+      .trim();
     const ua     = req.headers.get("user-agent") ?? "No disponible";
 
     const MESES    = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
