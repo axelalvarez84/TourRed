@@ -58,15 +58,22 @@
     margin-bottom: 28px;
   }
   .cover-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 18px 28px;
+    width: 100%;
+    border-collapse: collapse;
     font-family: Arial, Helvetica, sans-serif;
     font-size: 13px;
     border-top: 1px solid #e4e1d8;
     padding-top: 24px;
   }
-  .cover-grid .full { grid-column: 1 / -1; }
+  .cover-grid td {
+    vertical-align: top;
+    padding: 9px 14px 9px 0;
+    width: 50%;
+  }
+  .cover-grid td.full {
+    width: 100%;
+    display: block;
+  }
   .cover-label {
     display: block;
     font-size: 10.5px;
@@ -118,11 +125,16 @@
   }
 
   .signature-block {
-    display: flex;
-    gap: 40px;
+    width: 100%;
+    border-collapse: collapse;
     margin: 36px 0 8px 0;
   }
-  .sig-col { flex: 1; text-align: center; }
+  .signature-block td.sig-col {
+    width: 50%;
+    text-align: center;
+    vertical-align: top;
+    padding: 0 20px;
+  }
   .sig-line {
     border-top: 1px solid #333;
     margin-bottom: 8px;
@@ -195,36 +207,44 @@
   <h1 class="cover-title">Contrato de Uso de Plataforma Digital, Intermediación y Comisión Mercantil</h1>
   <p class="cover-sub">Carátula de identificación — generada automáticamente al completar el registro de agencia</p>
 
-  <div class="cover-grid">
-    <div>
-      <span class="cover-label">Razón social / Nombre</span>
-      <span class="cover-value">{{razon_social}}</span>
-    </div>
-    <div>
-      <span class="cover-label">RFC</span>
-      <span class="cover-value">{{rfc_agencia}}</span>
-    </div>
-    <div>
-      <span class="cover-label">Representante legal</span>
-      <span class="cover-value">{{representante_legal}}</span>
-    </div>
-    <div>
-      <span class="cover-label">Correo de contacto</span>
-      <span class="cover-value">{{email_contacto}}</span>
-    </div>
-    <div class="full">
-      <span class="cover-label">Domicilio fiscal</span>
-      <span class="cover-value">{{domicilio_fiscal}}</span>
-    </div>
-    <div>
-      <span class="cover-label">Fecha de generación</span>
-      <span class="cover-value">{{fecha_dia}} de {{fecha_mes}} de {{fecha_anio}}</span>
-    </div>
-    <div>
-      <span class="cover-label">Folio de contrato</span>
-      <span class="cover-value">{{folio_contrato}}</span>
-    </div>
-  </div>
+  <table class="cover-grid">
+    <tr>
+      <td>
+        <span class="cover-label">Razón social / Nombre</span><br/>
+        <span class="cover-value">{{razon_social}}</span>
+      </td>
+      <td>
+        <span class="cover-label">RFC</span><br/>
+        <span class="cover-value">{{rfc_agencia}}</span>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <span class="cover-label">Representante legal</span><br/>
+        <span class="cover-value">{{representante_legal}}</span>
+      </td>
+      <td>
+        <span class="cover-label">Correo de contacto</span><br/>
+        <span class="cover-value">{{email_contacto}}</span>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" class="full">
+        <span class="cover-label">Domicilio fiscal</span><br/>
+        <span class="cover-value">{{domicilio_fiscal}}</span>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <span class="cover-label">Fecha de generación</span><br/>
+        <span class="cover-value">{{fecha_dia}} de {{fecha_mes}} de {{fecha_anio}}</span>
+      </td>
+      <td>
+        <span class="cover-label">Folio de contrato</span><br/>
+        <span class="cover-value">{{folio_contrato}}</span>
+      </td>
+    </tr>
+  </table>
 
   <div class="cover-folio">
     Este documento fue generado automáticamente por la plataforma ToursRed con los datos proporcionados por LA AGENCIA durante su registro. La versión con validez legal es la aceptada electrónicamente conforme al Anexo B de este contrato.
@@ -1355,7 +1375,7 @@ Homero 229 Int. 501 Polanco V Secc, Miguel Hidalgo, CDMX CP. 11560.</p></li>
 <p>El presente contrato surtirá efectos legales a partir de la fecha de aceptación electrónica realizada por LA AGENCIA dentro de la plataforma.</p>
 <p>Firmado en la Ciudad de México, el día <span class="fill">{{fecha_dia}}</span> de <span class="fill">{{fecha_mes}}</span> de <span class="fill">{{fecha_anio}}</span></p>
 <blockquote>
-<div class="signature-block"><div class="sig-col"><div class="sig-line"></div><p class="sig-name">TOURS RED GLOBAL S.A.S. DE C.V.</p><p class="sig-role">Alan Axel Álvarez Hernández<br/>Administrador Único</p></div><div class="sig-col"><div class="sig-line"></div><p class="sig-name">{{razon_social}}</p><p class="sig-role">{{representante_legal}}<br/>LA AGENCIA</p></div></div>
+<table class="signature-block"><tr><td class="sig-col"><div class="sig-line"></div><p class="sig-name">TOURS RED GLOBAL S.A.S. DE C.V.</p><p class="sig-role">Alan Axel Álvarez Hernández<br/>Administrador Único</p></td><td class="sig-col"><div class="sig-line"></div><p class="sig-name">{{razon_social}}</p><p class="sig-role">{{representante_legal}}<br/>LA AGENCIA</p></td></tr></table>
 </blockquote>
 <p><strong><br />
 </strong></p>
