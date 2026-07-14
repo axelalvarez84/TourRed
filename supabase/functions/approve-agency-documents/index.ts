@@ -287,13 +287,24 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "approve") {
+      // Get agency persona_type to filter required documents
+      const { data: agencyRow } = await supabase
+        .from("agencies")
+        .select("persona_type")
+        .eq("id", agency_id)
+        .maybeSingle();
+
+      const personaType = agencyRow?.persona_type ?? "persona_fisica";
+
       const { data: reqTypes } = await supabase
         .from("document_types")
-        .select("key")
+        .select("key, applies_to")
         .eq("required", true)
         .neq("key", "contrato_agencia");
 
-      const requiredKeys = (reqTypes ?? []).map((r: any) => r.key);
+      const requiredKeys = (reqTypes ?? [])
+        .filter((r: any) => r.applies_to === "ambas" || r.applies_to === personaType)
+        .map((r: any) => r.key);
 
       // All required current docs that are NOT rejected
       const { data: currentDocs } = await supabase

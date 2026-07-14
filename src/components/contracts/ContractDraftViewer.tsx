@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { FileText, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import contractTemplate from './contrato_agencia_template.html?raw';
 
 interface Props {
   agencyId: string;
@@ -60,9 +61,7 @@ const ContractDraftViewer: React.FC<Props> = ({ agencyId }) => {
           hash_documento:        'Pendiente de firma',
         };
 
-        const res = await fetch('/contrato_agencia_template.html');
-        if (!res.ok) throw new Error('No se pudo cargar la plantilla del contrato');
-        let template = await res.text();
+        let template = contractTemplate;
 
         for (const [key, value] of Object.entries(replacements)) {
           template = template.replaceAll(`{{${key}}}`, value);
