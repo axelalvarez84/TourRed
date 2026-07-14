@@ -69,7 +69,7 @@ const styles = {
   anexoTitle: { fontSize: 13, bold: true, decoration: "underline", margin: [0, 0, 0, 14] as [number, number, number, number] },
   evidenceLabel: { fontSize: 9, bold: true, color: "#555555" },
   evidenceValue: { fontSize: 9 },
-  evidenceHash: { fontSize: 7.5, font: "Courier" },
+  evidenceHash: { fontSize: 7.5 },
 };
 
 function coverPage(data: ContractData) {
