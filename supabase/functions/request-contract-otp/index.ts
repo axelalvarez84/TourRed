@@ -16,22 +16,71 @@ async function hashOtp(otp: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function sendOtpEmail(email: string, otp: string, supabaseUrl: string, serviceKey: string): Promise<void> {
-  const res = await fetch(`${supabaseUrl}/functions/v1/send-verification-email`, {
+async function sendOtpEmail(
+  email: string,
+  otp: string,
+  folio: string,
+  supabase: ReturnType<typeof createClient>
+): Promise<void> {
+  const { data: emailSettings } = await supabase
+    .from("email_settings")
+    .select("smtp_api_key, contact_email")
+    .maybeSingle();
+
+  const smtpApiKey = emailSettings?.smtp_api_key;
+  if (!smtpApiKey) {
+    console.warn("SMTP API key not configured — OTP stored in DB but email not sent");
+    return;
+  }
+
+  const fromEmail = emailSettings?.contact_email || "contacto@toursred.com";
+
+  const res = await fetch("https://api.smtp2go.com/v3/email/send", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${serviceKey}`,
+      "X-Smtp2go-Api-Key": smtpApiKey,
     },
     body: JSON.stringify({
-      email,
+      sender: fromEmail,
+      to: [email],
       subject: "Código de verificación para firma de contrato — ToursRed",
-      otp,
-      context: "contract_signature",
+      html_body: `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+  <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d6a9f 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+      <img src="https://huzsedewwzjywcpbkjkm.supabase.co/storage/v1/object/public/images/email-logo.png" alt="ToursRed Logo" style="max-width: 200px; height: auto; margin-bottom: 20px; background: white; padding: 10px; border-radius: 8px;" />
+      <h1 style="color: white; margin: 0; font-size: 24px;">Firma de Contrato</h1>
+    </div>
+    <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+      <p style="font-size: 16px; margin-bottom: 20px;">
+        Para firmar tu contrato de colaboración con ToursRed, usa el siguiente código de verificación:
+      </p>
+      <div style="background: white; padding: 25px; border-radius: 8px; text-align: center; margin: 30px 0; border: 2px dashed #2d6a9f;">
+        <p style="font-size: 14px; color: #666; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1px;">Código de verificación</p>
+        <p style="font-size: 36px; font-weight: bold; color: #1e3a5f; margin: 10px 0; letter-spacing: 8px; font-family: 'Courier New', monospace;">
+          ${otp}
+        </p>
+        <p style="font-size: 12px; color: #999; margin: 10px 0 0 0;">
+          Folio: ${folio} · Expira en 10 minutos
+        </p>
+      </div>
+      <p style="font-size: 14px; color: #999; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+        Si no solicitaste este código, ignora este correo.
+      </p>
+    </div>
+  </body>
+</html>`,
     }),
   });
+
   if (!res.ok) {
     const text = await res.text();
+    console.error("SMTP send failed:", text);
     throw new Error(`Email send failed: ${text}`);
   }
 }
@@ -65,7 +114,6 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "La agencia no tiene una firma pendiente" }), { status: 409, headers: corsHeaders });
     }
 
-    // Verify that a pending contract_acceptances record exists (created by approve-agency-documents)
     const { data: existing } = await supabase
       .from("contract_acceptances")
       .select("id, otp_request_count, otp_window_started_at, folio_contrato")
@@ -136,12 +184,25 @@ Deno.serve(async (req: Request) => {
 
     if (updErr) throw updErr;
 
-    // Send OTP via email
+    // Send OTP via email — non-blocking: if email fails, OTP is still in DB
     const recipientEmail = agency.contact_email ?? user.email ?? "";
-    await sendOtpEmail(recipientEmail, otp, supabaseUrl, serviceKey);
+    let emailSent = true;
+    try {
+      await sendOtpEmail(recipientEmail, otp, existing.folio_contrato, supabase);
+    } catch (emailErr) {
+      console.error("Failed to send OTP email:", emailErr);
+      emailSent = false;
+    }
 
     return new Response(
-      JSON.stringify({ ok: true, message: "Código enviado al correo registrado.", folio: existing.folio_contrato }),
+      JSON.stringify({
+        ok: true,
+        message: emailSent
+          ? "Código enviado al correo registrado."
+          : "Código generado. Revisa tu correo o contacta a soporte si no lo recibiste.",
+        folio: existing.folio_contrato,
+        email_sent: emailSent,
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
