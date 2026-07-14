@@ -1,37 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import PdfPrinter from "npm:pdfmake@0.2.20";
-import { Buffer } from "node:buffer";
-import { buildContractDocDefinition, type ContractData } from "../_shared/contractDocDefinition.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
-
-// Lazy-loaded so fonts are only decoded when PDF generation is actually needed.
-// deno-lint-ignore no-explicit-any
-let _fonts: any = null;
-async function getFonts() {
-  if (_fonts) return _fonts;
-  const { ROBOTO_NORMAL_B64, ROBOTO_BOLD_B64, ROBOTO_ITALICS_B64, ROBOTO_BOLDITALICS_B64 } =
-    await import("../_shared/robotoFonts.ts");
-  _fonts = {
-    Roboto: {
-      normal:      Buffer.from(ROBOTO_NORMAL_B64,      "base64"),
-      bold:        Buffer.from(ROBOTO_BOLD_B64,        "base64"),
-      italics:     Buffer.from(ROBOTO_ITALICS_B64,     "base64"),
-      bolditalics: Buffer.from(ROBOTO_BOLDITALICS_B64, "base64"),
-    },
-    Courier: {
-      normal:      Buffer.from(ROBOTO_NORMAL_B64,  "base64"),
-      bold:        Buffer.from(ROBOTO_BOLD_B64,    "base64"),
-      italics:     Buffer.from(ROBOTO_ITALICS_B64, "base64"),
-      bolditalics: Buffer.from(ROBOTO_BOLDITALICS_B64, "base64"),
-    },
-  };
-  return _fonts;
-}
 
 function buildDomicilio(a: {
   street?: string | null;
@@ -65,22 +38,6 @@ function generateFolio(agencyId: string): string {
   return `TRG-${Date.now()}-${hex}`;
 }
 
-// deno-lint-ignore no-explicit-any
-async function pdfDocToBytes(pdfDoc: any): Promise<Uint8Array> {
-  const chunks: Uint8Array[] = [];
-  return new Promise((resolve, reject) => {
-    pdfDoc.on("data",  (c: Uint8Array) => chunks.push(c));
-    pdfDoc.on("error", reject);
-    pdfDoc.on("end", () => {
-      const total = chunks.reduce((acc, c) => acc + c.length, 0);
-      const out   = new Uint8Array(total);
-      let off     = 0;
-      for (const c of chunks) { out.set(c, off); off += c.length; }
-      resolve(out);
-    });
-    pdfDoc.end();
-  });
-}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: corsHeaders });
@@ -366,7 +323,7 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        // Idempotency: if a pending contract_acceptances already exists, skip re-generation
+        // Idempotency: if a pending contract_acceptances already exists, skip
         const { data: existingAcceptance } = await supabase
           .from("contract_acceptances")
           .select("id, folio_contrato")
@@ -381,73 +338,9 @@ Deno.serve(async (req: Request) => {
           });
         }
 
-        // Load platform default commission
-        const { data: platformSettings } = await supabase
-          .from("platform_settings")
-          .select("agency_commission_percentage")
-          .limit(1)
-          .maybeSingle();
-
-        const platformDefault = platformSettings?.agency_commission_percentage ?? 15;
-        const effectiveCommission = agency.commission_percentage ?? platformDefault;
-
         const folio = generateFolio(agency_id);
-        const nowDate = new Date();
-        const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 
-        const specialClause = agency.commission_percentage !== null && agency.commission_percentage !== undefined
-          ? `No obstante lo dispuesto en la Cláusula Quinta, las partes acuerdan que la comisión aplicable a "${agency.razon_social ?? agency.name}" será del ${agency.commission_percentage}% conforme a negociación particular formalizada en la aprobación de su expediente.`
-          : undefined;
-
-        const contractData: ContractData = {
-          razonSocial:           agency.razon_social!,
-          rfcAgencia:            agency.rfc!,
-          domicilioFiscal:       buildDomicilio(agency),
-          representanteLegal:    agency.representante_legal_nombre!,
-          emailContacto:         agency.contact_email ?? "",
-          folioContrato:         folio,
-          fechaDia:              String(nowDate.getDate()).padStart(2, "0"),
-          fechaMes:              MESES[nowDate.getMonth()],
-          fechaAnio:             String(nowDate.getFullYear()),
-          versionContrato:       "1.0",
-          commissionPercentage:  effectiveCommission,
-          specialCommissionClause: specialClause,
-        };
-
-        // deno-lint-ignore no-explicit-any
-        const printer  = new (PdfPrinter as any)(await getFonts());
-        const docDef   = buildContractDocDefinition(contractData);
-        const pdfDoc   = printer.createPdfKitDocument(docDef);
-        const pdfBytes = await pdfDocToBytes(pdfDoc);
-
-        const pdfPath = `${agency_id}/contrato_agencia/contrato_previo_${Date.now()}.pdf`;
-        const { error: uploadErr } = await supabase.storage
-          .from("agency-documents")
-          .upload(pdfPath, pdfBytes, { contentType: "application/pdf", upsert: true });
-
-        if (uploadErr) {
-          console.error("Pre-signature PDF upload error:", uploadErr.message);
-          return new Response(JSON.stringify({ error: "Error al generar el contrato PDF" }), { status: 500, headers: corsHeaders });
-        }
-
-        // Supersede any prior contrato_agencia documents
-        await supabase.from("agency_documents")
-          .update({ is_current: false, status: "superseded" })
-          .eq("agency_id", agency_id)
-          .eq("document_type_key", "contrato_agencia")
-          .eq("is_current", true);
-
-        await supabase.from("agency_documents").insert({
-          agency_id:         agency_id,
-          document_type_key: "contrato_agencia",
-          storage_path:      pdfPath,
-          file_name:         `Contrato_ToursRed_${folio}.pdf`,
-          mime_type:         "application/pdf",
-          is_current:        true,
-          status:            "pending_review",
-          uploaded_by:       user.id,
-        });
-
+        // Create contract_acceptances record — PDF is generated at signing time (verify-contract-otp)
         await supabase.from("contract_acceptances").insert({
           agency_id:        agency_id,
           contract_version: "1.0",
