@@ -44,11 +44,9 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   membresia_amav_clia:         'Membresía AMAV / CLIA',
 };
 
-const isApproved = (doc: AgencyDocument) =>
-  doc.status === 'approved' || (doc.status === 'pending_review' && doc.reviewed_at !== null);
+const isApproved = (doc: AgencyDocument) => doc.status === 'approved';
 
-const isPending = (doc: AgencyDocument) =>
-  doc.status === 'pending_review' && doc.reviewed_at === null;
+const isPending = (doc: AgencyDocument) => doc.status === 'pending_review';
 
 const AgencyContractSection: React.FC<Props> = ({
   agencyId,

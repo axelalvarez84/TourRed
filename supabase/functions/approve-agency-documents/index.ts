@@ -300,8 +300,8 @@ Deno.serve(async (req: Request) => {
       .update({
         status:           newDocStatus,
         rejection_reason: action === "reject" ? rejectionReason : null,
-        reviewed_by:      user.id,
-        reviewed_at:      new Date().toISOString(),
+        reviewed_by:      action === "reject" ? null : user.id,
+        reviewed_at:      action === "reject" ? null : new Date().toISOString(),
       })
       .in("id", document_ids)
       .eq("agency_id", agency_id);
