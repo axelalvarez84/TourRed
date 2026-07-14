@@ -556,11 +556,19 @@ Deno.serve(async (req: Request) => {
       }
     } else {
       // Reject
+      // Cancel any pending contract_acceptances before reverting status
+      await supabase
+        .from("contract_acceptances")
+        .update({ status: "failed" })
+        .eq("agency_id", agency_id)
+        .eq("status", "pending");
+
+      // Clear pending_amendment_id so the agency doesn't see a stale amendment
       await supabase
         .from("agencies")
-        .update({ onboarding_status: "pending_documents" })
+        .update({ onboarding_status: "pending_documents", pending_amendment_id: null, documents_submitted_at: null })
         .eq("id", agency_id)
-        .in("onboarding_status", ["pending_review", "pending_documents"]);
+        .in("onboarding_status", ["pending_review", "pending_documents", "pending_signature"]);
 
       const { data: agencyRow } = await supabase
         .from("agencies")
