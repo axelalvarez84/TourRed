@@ -91,7 +91,7 @@ const AgencyOnboardingPage: React.FC = () => {
   const { onboarding_status } = agency;
 
   if (onboarding_status === 'active') {
-    window.location.href = '/agencia';
+    window.location.href = '/agency/dashboard';
     return null;
   }
 
@@ -130,7 +130,7 @@ const AgencyOnboardingPage: React.FC = () => {
         <OnboardingSignatureStep
           agencyId={agency.id}
           agencyEmail={agency.contact_email}
-          onSigned={() => { setAgency(prev => prev ? { ...prev, onboarding_status: 'active' } : prev); window.location.href = '/agencia'; }}
+          onSigned={() => { setAgency(prev => prev ? { ...prev, onboarding_status: 'active' } : prev); window.location.href = '/agency/dashboard'; }}
         />
       )}
     </AgencyOnboardingLayout>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Ligature as FileSignature, Send, CheckCircle, RefreshCw, AlertCircle } from 'lucide-react';
+import { Ligature as FileSignature, Send, CheckCircle, RefreshCw, AlertCircle, Download, ArrowRight } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import ContractDraftViewer from '../../../components/contracts/ContractDraftViewer';
 import { generateAndUploadSignedContract } from '../../../utils/contractPdf';
@@ -20,6 +20,8 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
+  const [pdfBlob, setPdfBlob]   = useState<Blob | null>(null);
+  const [pdfReady, setPdfReady] = useState(false);
 
   const callFn = async (slug: string, body: object) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -63,18 +65,30 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
 
       if (result?.signing_data && agencyId) {
         try {
-          await generateAndUploadSignedContract(agencyId, result.signing_data);
+          const { pdfBlob: blob } = await generateAndUploadSignedContract(agencyId, result.signing_data);
+          setPdfBlob(blob);
+          setPdfReady(true);
         } catch (pdfErr) {
           console.error('PDF generation failed (non-blocking):', pdfErr);
         }
       }
-
-      setTimeout(onSigned, 1800);
     } catch (err: any) {
       setError(err.message ?? 'Código incorrecto o expirado.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDownloadPdf = () => {
+    if (!pdfBlob) return;
+    const url = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `contrato-firmado.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   if (stage === 'signed') {
@@ -86,7 +100,29 @@ const OnboardingSignatureStep: React.FC<Props> = ({ agencyId, agencyEmail, onSig
             <CheckCircle className="w-10 h-10 text-green-500" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">¡Contrato firmado!</h2>
-          <p className="text-gray-500 text-sm">Tu cuenta será activada en unos momentos. Redirigiendo...</p>
+          <p className="text-gray-500 text-sm mb-6">Tu cuenta ha sido activada. Descarga tu contrato firmado y continúa a tu panel.</p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-sm mx-auto">
+            <button
+              onClick={handleDownloadPdf}
+              disabled={!pdfReady}
+              className={`flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-semibold text-sm transition-all ${
+                pdfReady ? 'bg-primary-600 text-white hover:bg-primary-700 shadow-sm' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              <Download className="w-4 h-4" />
+              {pdfReady ? 'Descargar PDF' : 'Generando PDF...'}
+            </button>
+            <button
+              onClick={onSigned}
+              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-semibold text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all"
+            >
+              Ir a mi panel
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+          {!pdfReady && (
+            <p className="text-xs text-gray-400 mt-3">Generando tu contrato en PDF...</p>
+          )}
         </div>
       </div>
     );

@@ -54,7 +54,7 @@ async function sha256Hex(text: string): Promise<string> {
 export async function generateAndUploadSignedContract(
   agencyId: string,
   data: SigningData,
-): Promise<{ signedUrl: string; documentHash: string }> {
+): Promise<{ signedUrl: string; documentHash: string; pdfBlob: Blob }> {
   const filledHtml = fillTemplate(data);
   const documentHash = await sha256Hex(filledHtml);
 
@@ -101,5 +101,5 @@ export async function generateAndUploadSignedContract(
     uploaded_by:       (await supabase.auth.getUser()).data.user?.id ?? null,
   }).select();
 
-  return { signedUrl: urlData.signedUrl, documentHash };
+  return { signedUrl: urlData.signedUrl, documentHash, pdfBlob };
 }
