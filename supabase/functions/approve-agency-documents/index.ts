@@ -33,6 +33,30 @@ async function getFonts() {
   return _fonts;
 }
 
+function buildDomicilio(a: {
+  street?: string | null;
+  exterior_number?: string | null;
+  interior_number?: string | null;
+  colony?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
+}): string {
+  const parts: string[] = [];
+  if (a.street) parts.push(a.street);
+  if (a.exterior_number) parts.push(`#${a.exterior_number}`);
+  if (a.interior_number) parts.push(`Int. ${a.interior_number}`);
+  const streetLine = parts.join(" ");
+  const rest: string[] = [];
+  if (a.colony) rest.push(a.colony);
+  if (a.city) rest.push(a.city);
+  if (a.state) rest.push(a.state);
+  if (a.postal_code) rest.push(a.postal_code);
+  if (a.country) rest.push(a.country);
+  return [streetLine, rest.join(", ")].filter(Boolean).join(", ") || "A confirmar";
+}
+
 function generateFolio(agencyId: string): string {
   const hex = Array.from(crypto.getRandomValues(new Uint8Array(2)))
     .map(b => b.toString(16).padStart(2, "0"))
@@ -112,7 +136,7 @@ Deno.serve(async (req: Request) => {
     if (action === "resign") {
       const { data: agency } = await supabase
         .from("agencies")
-        .select("id, user_id, razon_social, rfc, domicilio_fiscal, representante_legal_nombre, name, contact_email, commission_percentage, onboarding_status")
+        .select("id, user_id, razon_social, rfc, representante_legal_nombre, name, contact_email, commission_percentage, onboarding_status, street, exterior_number, interior_number, colony, city, state, postal_code, country")
         .eq("id", agency_id)
         .maybeSingle();
 
@@ -129,7 +153,8 @@ Deno.serve(async (req: Request) => {
       const missingFields: string[] = [];
       if (!agency.razon_social?.trim())               missingFields.push("razon_social");
       if (!agency.rfc?.trim())                        missingFields.push("rfc");
-      if (!agency.domicilio_fiscal?.trim())           missingFields.push("domicilio_fiscal");
+      if (!agency.street?.trim())                    missingFields.push("street");
+      if (!agency.postal_code?.trim())               missingFields.push("postal_code");
       if (!agency.representante_legal_nombre?.trim()) missingFields.push("representante_legal_nombre");
 
       if (missingFields.length > 0) {
@@ -165,7 +190,7 @@ Deno.serve(async (req: Request) => {
       const contractData: ContractData = {
         razonSocial:           agency.razon_social ?? agency.name ?? "Sin nombre",
         rfcAgencia:            agency.rfc!,
-        domicilioFiscal:       agency.domicilio_fiscal!,
+        domicilioFiscal:       buildDomicilio(agency),
         representanteLegal:    agency.representante_legal_nombre!,
         emailContacto:         agency.contact_email ?? "",
         folioContrato:         folio,
@@ -321,7 +346,7 @@ Deno.serve(async (req: Request) => {
       if (allPresent) {
         const { data: agency } = await supabase
           .from("agencies")
-          .select("id, user_id, razon_social, rfc, domicilio_fiscal, representante_legal_nombre, name, contact_email, commission_percentage")
+          .select("id, user_id, razon_social, rfc, representante_legal_nombre, name, contact_email, commission_percentage, street, exterior_number, interior_number, colony, city, state, postal_code, country")
           .eq("id", agency_id)
           .maybeSingle();
 
@@ -330,7 +355,8 @@ Deno.serve(async (req: Request) => {
         const missingFields: string[] = [];
         if (!agency.razon_social?.trim())               missingFields.push("razon_social");
         if (!agency.rfc?.trim())                        missingFields.push("rfc");
-        if (!agency.domicilio_fiscal?.trim())           missingFields.push("domicilio_fiscal");
+        if (!agency.street?.trim())                    missingFields.push("street");
+        if (!agency.postal_code?.trim())               missingFields.push("postal_code");
         if (!agency.representante_legal_nombre?.trim()) missingFields.push("representante_legal_nombre");
 
         if (missingFields.length > 0) {
@@ -376,7 +402,7 @@ Deno.serve(async (req: Request) => {
         const contractData: ContractData = {
           razonSocial:           agency.razon_social!,
           rfcAgencia:            agency.rfc!,
-          domicilioFiscal:       agency.domicilio_fiscal!,
+          domicilioFiscal:       buildDomicilio(agency),
           representanteLegal:    agency.representante_legal_nombre!,
           emailContacto:         agency.contact_email ?? "",
           folioContrato:         folio,
