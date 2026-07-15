@@ -88,6 +88,7 @@ export default function ExecutiveLeads() {
   const [form, setForm] = useState<typeof EMPTY_LEAD>({ ...EMPTY_LEAD });
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; rfc?: string }>({});
   const [showConvertModal, setShowConvertModal] = useState<AgencyLead | null>(null);
   const [convertPassword, setConvertPassword] = useState('');
   const [isConverting, setIsConverting] = useState(false);
@@ -114,11 +115,15 @@ export default function ExecutiveLeads() {
   const openCreate = () => {
     setEditingLead(null);
     setForm({ ...EMPTY_LEAD });
+    setFieldErrors({});
+    setMessage(null);
     setShowModal(true);
   };
 
   const openEdit = (lead: AgencyLead) => {
     setEditingLead(lead);
+    setFieldErrors({});
+    setMessage(null);
     setForm({
       agency_name: lead.agency_name,
       contact_first_name: lead.contact_first_name,
@@ -155,8 +160,52 @@ export default function ExecutiveLeads() {
       setMessage({ type: 'error', text: 'Nombre de agencia, nombre del contacto y email son requeridos.' });
       return;
     }
+
+    setFieldErrors({});
     setIsSaving(true);
     try {
+      // Check duplicates across all leads and registered agencies
+      const { data: conflicts, error: rpcError } = await supabase
+        .rpc('check_lead_duplicate', {
+          p_email: form.contact_email,
+          p_rfc: form.rfc || null,
+          p_exclude_lead_id: editingLead?.id || null,
+        });
+
+      if (rpcError) throw rpcError;
+
+      if (conflicts && Object.keys(conflicts).length > 0) {
+        const errors: { email?: string; rfc?: string } = {};
+        const messages: string[] = [];
+
+        if (conflicts.email_conflict) {
+          const c = conflicts.email_conflict;
+          if (c.type === 'lead') {
+            errors.email = `Ya existe un lead registrado por ${c.executive_name} para la agencia "${c.agency_name}"`;
+            messages.push(`El correo ya está registrado como lead por ${c.executive_name} (agencia "${c.agency_name}").`);
+          } else {
+            errors.email = `La agencia "${c.agency_name}" ya está aprobada en la plataforma con este correo`;
+            messages.push(`El correo ya pertenece a la agencia "${c.agency_name}", aprobada en la plataforma.`);
+          }
+        }
+
+        if (conflicts.rfc_conflict) {
+          const c = conflicts.rfc_conflict;
+          if (c.type === 'lead') {
+            errors.rfc = `Ya existe un lead con este RFC para la agencia "${c.agency_name}"`;
+            messages.push(`El RFC ya está registrado como lead (agencia "${c.agency_name}").`);
+          } else {
+            errors.rfc = `La agencia "${c.agency_name}" ya está aprobada en la plataforma con este RFC`;
+            messages.push(`El RFC ya pertenece a la agencia "${c.agency_name}", aprobada en la plataforma.`);
+          }
+        }
+
+        setFieldErrors(errors);
+        setMessage({ type: 'error', text: messages.join(' ') });
+        setIsSaving(false);
+        return;
+      }
+
       const payload = {
         ...form,
         executive_id: accountExecutiveInfo.executiveId,
@@ -469,9 +518,10 @@ export default function ExecutiveLeads() {
                     <input
                       value={form.rfc || ''}
                       onChange={e => setForm(f => ({ ...f, rfc: e.target.value.toUpperCase() }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${fieldErrors.rfc ? 'border-red-400 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
                       placeholder="XAXX010101000"
                     />
+                    {fieldErrors.rfc && <p className="mt-1 text-xs text-red-600">{fieldErrors.rfc}</p>}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1.5">Razón social</label>
@@ -526,8 +576,9 @@ export default function ExecutiveLeads() {
                       type="email"
                       value={form.contact_email}
                       onChange={e => setForm(f => ({ ...f, contact_email: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${fieldErrors.email ? 'border-red-400 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
                     />
+                    {fieldErrors.email && <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p>}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1.5">Teléfono</label>
