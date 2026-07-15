@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, ChevronDown, CreditCard as Edit2, Eye, ArrowRight, Trash2, User, Phone, Mail, MapPin, MessageSquare, Calendar, X, CheckCircle, Clock, AlertCircle, Building2, Upload } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Plus, Search, ChevronDown, CreditCard as Edit2, Eye, ArrowRight, Trash2, User, Phone, Mail, MapPin, MessageSquare, Calendar, X, CheckCircle, Clock, AlertCircle, Building2, Upload, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -89,6 +89,77 @@ export default function ExecutiveLeads() {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; rfc?: string }>({});
+  const [fieldStatus, setFieldStatus] = useState<{ email?: 'checking' | 'ok' | 'error'; rfc?: 'checking' | 'ok' | 'error' }>({});
+  const debounceTimerRef = useRef<{ email?: ReturnType<typeof setTimeout>; rfc?: ReturnType<typeof setTimeout> }>({});
+
+  const checkFieldDuplicate = useCallback(async (field: 'email' | 'rfc', value: string, excludeLeadId?: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setFieldErrors(prev => ({ ...prev, [field]: undefined }));
+      setFieldStatus(prev => ({ ...prev, [field]: undefined }));
+      return;
+    }
+    if (field === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setFieldErrors(prev => ({ ...prev, email: 'Formato de correo inválido' }));
+      setFieldStatus(prev => ({ ...prev, email: 'error' }));
+      return;
+    }
+    if (field === 'rfc' && trimmed.length < 12) {
+      setFieldErrors(prev => ({ ...prev, rfc: undefined }));
+      setFieldStatus(prev => ({ ...prev, rfc: undefined }));
+      return;
+    }
+
+    setFieldStatus(prev => ({ ...prev, [field]: 'checking' }));
+
+    try {
+      const params: any = field === 'email'
+        ? { p_email: trimmed, p_rfc: null, p_exclude_lead_id: excludeLeadId || null }
+        : { p_email: null, p_rfc: trimmed.toUpperCase(), p_exclude_lead_id: excludeLeadId || null };
+
+      const { data: conflicts, error } = await supabase.rpc('check_lead_duplicate', params);
+
+      if (error) throw error;
+
+      const conflictKey = field === 'email' ? 'email_conflict' : 'rfc_conflict';
+
+      if (conflicts && conflicts[conflictKey]) {
+        const c = conflicts[conflictKey];
+        let msg: string;
+        if (c.type === 'lead') {
+          msg = field === 'email'
+            ? `Ya existe un lead registrado por ${c.executive_name} para la agencia "${c.agency_name}"`
+            : `Ya existe un lead con este RFC para la agencia "${c.agency_name}"`;
+        } else {
+          msg = `La agencia "${c.agency_name}" ya está aprobada en la plataforma con este ${field === 'email' ? 'correo' : 'RFC'}`;
+        }
+        setFieldErrors(prev => ({ ...prev, [field]: msg }));
+        setFieldStatus(prev => ({ ...prev, [field]: 'error' }));
+      } else {
+        setFieldErrors(prev => ({ ...prev, [field]: undefined }));
+        setFieldStatus(prev => ({ ...prev, [field]: 'ok' }));
+      }
+    } catch {
+      setFieldErrors(prev => ({ ...prev, [field]: undefined }));
+      setFieldStatus(prev => ({ ...prev, [field]: undefined }));
+    }
+  }, []);
+
+  const handleFieldChange = useCallback((field: 'email' | 'rfc', value: string) => {
+    if (debounceTimerRef.current[field]) clearTimeout(debounceTimerRef.current[field]);
+    setFieldStatus(prev => ({ ...prev, [field]: undefined }));
+    setFieldErrors(prev => ({ ...prev, [field]: undefined }));
+
+    const timer = setTimeout(() => {
+      checkFieldDuplicate(field, value, editingLead?.id);
+    }, 500);
+    debounceTimerRef.current[field] = timer;
+  }, [checkFieldDuplicate, editingLead]);
+
+  useEffect(() => () => {
+    if (debounceTimerRef.current.email) clearTimeout(debounceTimerRef.current.email);
+    if (debounceTimerRef.current.rfc) clearTimeout(debounceTimerRef.current.rfc);
+  }, []);
   const [showConvertModal, setShowConvertModal] = useState<AgencyLead | null>(null);
   const [convertPassword, setConvertPassword] = useState('');
   const [isConverting, setIsConverting] = useState(false);
@@ -116,6 +187,7 @@ export default function ExecutiveLeads() {
     setEditingLead(null);
     setForm({ ...EMPTY_LEAD });
     setFieldErrors({});
+    setFieldStatus({});
     setMessage(null);
     setShowModal(true);
   };
@@ -123,6 +195,7 @@ export default function ExecutiveLeads() {
   const openEdit = (lead: AgencyLead) => {
     setEditingLead(lead);
     setFieldErrors({});
+    setFieldStatus({});
     setMessage(null);
     setForm({
       agency_name: lead.agency_name,
@@ -158,6 +231,16 @@ export default function ExecutiveLeads() {
     if (!accountExecutiveInfo?.executiveId) return;
     if (!form.agency_name || !form.contact_email || !form.contact_first_name) {
       setMessage({ type: 'error', text: 'Nombre de agencia, nombre del contacto y email son requeridos.' });
+      return;
+    }
+
+    // Block save if real-time validation found errors
+    if (fieldStatus.email === 'error' || fieldStatus.rfc === 'error') {
+      setMessage({ type: 'error', text: 'Corrige los campos marcados en rojo antes de guardar.' });
+      return;
+    }
+    if (fieldStatus.email === 'checking' || fieldStatus.rfc === 'checking') {
+      setMessage({ type: 'error', text: 'Espera a que termine la validación de correo/RFC.' });
       return;
     }
 
@@ -515,13 +598,21 @@ export default function ExecutiveLeads() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1.5">RFC</label>
-                    <input
-                      value={form.rfc || ''}
-                      onChange={e => setForm(f => ({ ...f, rfc: e.target.value.toUpperCase() }))}
-                      className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${fieldErrors.rfc ? 'border-red-400 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
-                      placeholder="XAXX010101000"
-                    />
-                    {fieldErrors.rfc && <p className="mt-1 text-xs text-red-600">{fieldErrors.rfc}</p>}
+                    <div className="relative">
+                      <input
+                        value={form.rfc || ''}
+                        onChange={e => {
+                          const val = e.target.value.toUpperCase();
+                          setForm(f => ({ ...f, rfc: val }));
+                          handleFieldChange('rfc', val);
+                        }}
+                        className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${fieldStatus.rfc === 'error' ? 'border-red-400 focus:ring-red-500' : fieldStatus.rfc === 'ok' ? 'border-green-400 focus:ring-green-500' : 'border-gray-300 focus:ring-blue-500'} ${fieldStatus.rfc === 'ok' ? 'pr-9' : ''}`}
+                        placeholder="XAXX010101000"
+                      />
+                      {fieldStatus.rfc === 'checking' && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />}
+                      {fieldStatus.rfc === 'ok' && <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />}
+                    </div>
+                    {fieldErrors.rfc && <p className="mt-1 text-xs text-red-600 flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {fieldErrors.rfc}</p>}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1.5">Razón social</label>
@@ -572,13 +663,20 @@ export default function ExecutiveLeads() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1.5">Email *</label>
-                    <input
-                      type="email"
-                      value={form.contact_email}
-                      onChange={e => setForm(f => ({ ...f, contact_email: e.target.value }))}
-                      className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${fieldErrors.email ? 'border-red-400 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
-                    />
-                    {fieldErrors.email && <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p>}
+                    <div className="relative">
+                      <input
+                        type="email"
+                        value={form.contact_email}
+                        onChange={e => {
+                          setForm(f => ({ ...f, contact_email: e.target.value }));
+                          handleFieldChange('email', e.target.value);
+                        }}
+                        className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${fieldStatus.email === 'error' ? 'border-red-400 focus:ring-red-500' : fieldStatus.email === 'ok' ? 'border-green-400 focus:ring-green-500' : 'border-gray-300 focus:ring-blue-500'} ${fieldStatus.email === 'ok' ? 'pr-9' : ''}`}
+                      />
+                      {fieldStatus.email === 'checking' && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />}
+                      {fieldStatus.email === 'ok' && <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />}
+                    </div>
+                    {fieldErrors.email && <p className="mt-1 text-xs text-red-600 flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {fieldErrors.email}</p>}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1.5">Teléfono</label>
