@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Building, Mail, Phone, Globe, Star, CreditCard as Edit, Save, X, Upload, User, Calendar, MapPin, FileText, Landmark, Hash, Shield, Link2, Building2, Image, ExternalLink, CheckCircle, AlertCircle } from 'lucide-react';
+import { Building, Mail, Phone, Globe, Star, CreditCard as Edit, Save, X, Upload, User, Calendar, MapPin, FileText, Landmark, Hash, Shield, Link2, Building2, Image, ExternalLink, CheckCircle, AlertCircle, Download } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { useAgencyId } from '../../hooks/useAgencyId';
@@ -81,6 +81,8 @@ const AgencyProfile: React.FC = () => {
   });
 
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
+  const [contractInfo, setContractInfo] = useState<{ folio: string; storagePath: string } | null>(null);
+  const [downloadingContract, setDownloadingContract] = useState(false);
 
   useEffect(() => {
     if (resolvedAgencyId) {
@@ -131,6 +133,23 @@ const AgencyProfile: React.FC = () => {
 
       setAgency(agencyWithStats);
 
+      // Buscar contrato firmado (documento más reciente de tipo contrato_agencia)
+      const { data: contractDoc } = await supabase
+        .from('agency_documents')
+        .select('storage_path, file_name')
+        .eq('agency_id', agencyData.id)
+        .eq('document_type_key', 'contrato_agencia')
+        .eq('is_current', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (contractDoc?.storage_path) {
+        setContractInfo({ folio: contractDoc.file_name?.replace('.pdf', '') || 'firmado', storagePath: contractDoc.storage_path });
+      } else {
+        setContractInfo(null);
+      }
+
       // Inicializar formulario de edición
       setEditForm({
         name: agencyData.name || '',
@@ -166,6 +185,28 @@ const AgencyProfile: React.FC = () => {
       setError(err.message || 'Error al cargar el perfil de la agencia');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDownloadContract = async () => {
+    if (!contractInfo) return;
+    setDownloadingContract(true);
+    try {
+      const { data, error } = await supabase.storage
+        .from('agency-documents')
+        .createSignedUrl(contractInfo.storagePath, 3600);
+      if (error || !data?.signedUrl) throw error;
+      const a = document.createElement('a');
+      a.href = data.signedUrl;
+      a.download = `contrato-${contractInfo.folio}.pdf`;
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (e: any) {
+      alert('No se pudo descargar el contrato: ' + (e?.message || 'error desconocido'));
+    } finally {
+      setDownloadingContract(false);
     }
   };
 
@@ -700,6 +741,26 @@ const AgencyProfile: React.FC = () => {
                     <div className="text-sm font-medium text-gray-900 mt-0.5">{agency.rnt || <span className="text-gray-400 font-normal">No especificado</span>}</div>
                   </div>
                 </div>
+
+                {contractInfo && (
+                  <div className="flex items-center justify-between gap-3 p-4 rounded-lg bg-red-50 border border-red-200">
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-5 w-5 text-red-600 flex-shrink-0" />
+                      <div>
+                        <div className="text-xs font-medium text-red-700 uppercase tracking-wide">Contrato firmado</div>
+                        <div className="text-sm font-medium text-gray-900 mt-0.5">Folio: {contractInfo.folio}</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleDownloadContract}
+                      disabled={downloadingContract}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                    >
+                      <Download className="h-4 w-4" />
+                      {downloadingContract ? 'Descargando...' : 'Descargar PDF'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
