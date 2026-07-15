@@ -123,6 +123,7 @@ interface AuthContextType {
   isEmailVerified: boolean;
   isSuperAdmin: boolean;
   isOnboardingPending: boolean;
+  mustChangePassword: boolean;
   permissions: AdminPermissions | null;
   accountantPermissions: AccountantPermissions | null;
   accountExecutiveInfo: AccountExecutiveInfo | null;
@@ -154,6 +155,7 @@ const AuthContext = createContext<AuthContextType>({
   isEmailVerified: false,
   isSuperAdmin: false,
   isOnboardingPending: false,
+  mustChangePassword: false,
   permissions: null,
   accountantPermissions: null,
   accountExecutiveInfo: null,
@@ -194,6 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return null;
     }
   });
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [needsTermsAcceptance, setNeedsTermsAcceptance] = useState(false);
   const [isOnboardingPending, setIsOnboardingPending] = useState(false);
   const [isAgencyApproved, setIsAgencyApproved] = useState(true);
@@ -310,7 +313,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { data: profile } = await supabase
         .from('users')
-        .select('role, email_verified, is_active')
+        .select('role, email_verified, is_active, must_change_password')
         .eq('id', authUser.id)
         .maybeSingle();
 
@@ -323,6 +326,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           throw new Error('Usuario bloqueado');
         }
 
+        setMustChangePassword(profile.must_change_password === true);
         const role = profile.role as UserRole;
         const emailVerified = profile.email_verified || false;
         setCachedRole(authUser.id, role);
@@ -631,6 +635,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsEmailVerified(false);
         setIsSuperAdmin(false);
         setIsOnboardingPending(false);
+        setMustChangePassword(false);
         setPermissions(null);
         setAccountantPermissions(null);
         setAccountExecutiveInfo(null);
@@ -799,6 +804,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLoading(false);
         setIsSuperAdmin(false);
         setIsOnboardingPending(false);
+        setMustChangePassword(false);
         setPermissions(null);
         setAllStaffInfo([]);
         setActiveAgencyId(null);
@@ -878,6 +884,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isEmailVerified,
     isSuperAdmin,
     isOnboardingPending,
+    mustChangePassword,
     permissions,
     accountantPermissions,
     accountExecutiveInfo,
@@ -895,7 +902,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signInWithFacebook,
     completeOnboarding,
     refreshAuthState,
-  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isAccountant, isAccountExecutive, isEmailVerified, isSuperAdmin, isOnboardingPending, permissions, accountantPermissions, accountExecutiveInfo, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency, isAgencyApproved, needsTermsAcceptance, markTermsAccepted, signInWithGoogle, signInWithAzure, signInWithTwitter, signInWithFacebook, completeOnboarding, refreshAuthState]);
+  }), [user, userRole, isLoading, isAdmin, isAgency, isTraveler, isAccountant, isAccountExecutive, isEmailVerified, isSuperAdmin, isOnboardingPending, mustChangePassword, permissions, accountantPermissions, accountExecutiveInfo, isAgencyStaff, staffInfo, allStaffInfo, activeAgencyId, switchActiveAgency, isAgencyApproved, needsTermsAcceptance, markTermsAccepted, signInWithGoogle, signInWithAzure, signInWithTwitter, signInWithFacebook, completeOnboarding, refreshAuthState]);
 
   return (
     <AuthContext.Provider value={contextValue}>

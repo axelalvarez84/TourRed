@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Building2, CheckCircle, Clock, AlertCircle, TrendingUp,
-  Calendar, Upload, X, Eye, ChevronDown, FileText
+  Calendar, X, Eye, FileText, ExternalLink
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -20,19 +21,26 @@ interface Agency {
   approval_period_start: string | null;
   first_tour_published_at: string | null;
   first_paid_booking_at: string | null;
+  onboarding_status: string | null;
   created_at: string;
   _tours_count?: number;
   _bookings_count?: number;
   _platform_revenue?: number;
 }
 
+const ONBOARDING_LABELS: Record<string, { label: string; color: string }> = {
+  pending_documents: { label: 'Pendiente de documentos', color: 'text-gray-600 bg-gray-100 border-gray-200' },
+  pending_review:    { label: 'En revisión',              color: 'text-amber-700 bg-amber-100 border-amber-200' },
+  pending_signature: { label: 'Pendiente de firma',       color: 'text-blue-700 bg-blue-100 border-blue-200' },
+  active:            { label: 'Activa',                   color: 'text-green-700 bg-green-100 border-green-200' },
+  rejected:          { label: 'Rechazada',                color: 'text-red-700 bg-red-100 border-red-200' },
+};
+
 export default function ExecutiveMisAgencias() {
   const { accountExecutiveInfo } = useAuth();
+  const navigate = useNavigate();
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [approveModal, setApproveModal] = useState<Agency | null>(null);
-  const [contractFile, setContractFile] = useState<File | null>(null);
-  const [isApproving, setIsApproving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const loadAgencies = useCallback(async () => {
@@ -45,7 +53,7 @@ export default function ExecutiveMisAgencias() {
           id, name, contact_email, contact_phone, is_approved, is_active,
           registered_by_executive, account_executive_id, signed_contract_url,
           approval_period_start, first_tour_published_at, first_paid_booking_at,
-          created_at
+          onboarding_status, created_at
         `)
         .eq('account_executive_id', accountExecutiveInfo.executiveId)
         .order('created_at', { ascending: false });
@@ -91,59 +99,6 @@ export default function ExecutiveMisAgencias() {
     return Math.max(0, Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
   };
 
-  const approveAgency = async () => {
-    if (!approveModal || !contractFile) {
-      setMessage({ type: 'error', text: 'Debes subir el contrato firmado.' });
-      return;
-    }
-    setIsApproving(true);
-    try {
-      const fileExt = contractFile.name.split('.').pop();
-      const filePath = `contracts/${approveModal.id}/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('signed-contracts')
-        .upload(filePath, contractFile, { cacheControl: '3600', upsert: false });
-
-      if (uploadError) throw uploadError;
-
-      const { error: updateError } = await supabase
-        .from('agencies')
-        .update({
-          is_approved: true,
-          signed_contract_url: filePath,
-        })
-        .eq('id', approveModal.id);
-
-      if (updateError) throw updateError;
-
-      // Enviar email de aprobación (fire-and-forget)
-      if (accountExecutiveInfo) {
-        const executiveName = `${accountExecutiveInfo.firstName} ${accountExecutiveInfo.lastName}`.trim();
-        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-agency-approval`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            agencyName: approveModal.name,
-            contactEmail: approveModal.contact_email,
-            contactFirstName: approveModal.name,
-            executiveName,
-            executiveEmail: accountExecutiveInfo.email,
-          }),
-        }).catch(err => console.error('Error sending approval email:', err));
-      }
-
-      setMessage({ type: 'success', text: `Agencia "${approveModal.name}" aprobada exitosamente. Se notificó a la agencia por correo.` });
-      setApproveModal(null);
-      setContractFile(null);
-      loadAgencies();
-    } catch (e: any) {
-      setMessage({ type: 'error', text: e.message || 'Error al aprobar la agencia.' });
-    } finally {
-      setIsApproving(false);
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-96">
@@ -182,6 +137,7 @@ export default function ExecutiveMisAgencias() {
             const daysLeft = agency.approval_period_start
               ? getDaysRemainingInPeriod(agency.approval_period_start)
               : 0;
+            const onboardingInfo = ONBOARDING_LABELS[agency.onboarding_status || ''] || ONBOARDING_LABELS.pending_documents;
 
             return (
               <div key={agency.id} className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
@@ -191,15 +147,9 @@ export default function ExecutiveMisAgencias() {
                     <p className="text-sm text-gray-400">{agency.contact_email}</p>
                   </div>
                   <div className="flex flex-col items-end gap-1.5">
-                    {agency.is_approved ? (
-                      <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded-full font-medium">
-                        <CheckCircle className="h-3 w-3" /> Aprobada
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full font-medium">
-                        <Clock className="h-3 w-3" /> Pendiente aprobación
-                      </span>
-                    )}
+                    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${onboardingInfo.color}`}>
+                      <Clock className="h-3 w-3" /> {onboardingInfo.label}
+                    </span>
                     {agency.is_approved && inPeriod && (
                       <span className="text-xs text-blue-600 font-medium">{daysLeft} días de comisión</span>
                     )}
@@ -244,110 +194,47 @@ export default function ExecutiveMisAgencias() {
                   </div>
                 </div>
 
-                {/* Aprobar */}
-                {!agency.is_approved && agency.registered_by_executive && (
+                {/* Actions */}
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => { setApproveModal(agency); setContractFile(null); }}
-                    className="w-full py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                    onClick={() => navigate(`/executive/agency/${agency.id}`)}
+                    className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                   >
-                    <Upload className="h-4 w-4" />
-                    Aprobar agencia (subir contrato)
+                    <Eye className="h-4 w-4" />
+                    Ver perfil
                   </button>
-                )}
+                  {agency.signed_contract_url && (
+                    <button
+                      onClick={async () => {
+                        const url = agency.signed_contract_url!;
+                        const isFullUrl = url.startsWith('http');
+                        const filePath = isFullUrl
+                          ? url.split('/signed-contracts/').pop() || url
+                          : url;
 
-                {agency.signed_contract_url && (
-                  <button
-                    onClick={async () => {
-                      const url = agency.signed_contract_url!;
-                      // Si ya es una URL completa (http/https), intentar extraer el path
-                      const isFullUrl = url.startsWith('http');
-                      const filePath = isFullUrl
-                        ? url.split('/signed-contracts/').pop() || url
-                        : url;
+                        if (isFullUrl && !url.includes('/signed-contracts/')) {
+                          window.open(url, '_blank');
+                          return;
+                        }
 
-                      if (isFullUrl && !url.includes('/signed-contracts/')) {
-                        window.open(url, '_blank');
-                        return;
-                      }
-
-                      const { data, error } = await supabase.storage
-                        .from('signed-contracts')
-                        .createSignedUrl(filePath, 60);
-                      if (error || !data?.signedUrl) {
-                        setMessage({ type: 'error', text: 'No se pudo generar el enlace del contrato.' });
-                        return;
-                      }
-                      window.open(data.signedUrl, '_blank');
-                    }}
-                    className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-                  >
-                    <FileText className="h-3 w-3" /> Ver contrato firmado
-                  </button>
-                )}
+                        const { data, error } = await supabase.storage
+                          .from('signed-contracts')
+                          .createSignedUrl(filePath, 60);
+                        if (error || !data?.signedUrl) {
+                          setMessage({ type: 'error', text: 'No se pudo generar el enlace del contrato.' });
+                          return;
+                        }
+                        window.open(data.signedUrl, '_blank');
+                      }}
+                      className="px-3 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1"
+                    >
+                      <FileText className="h-4 w-4" /> Contrato
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* Modal Aprobar */}
-      {approveModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-            <div className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-1">Aprobar agencia</h2>
-              <p className="text-sm text-gray-500 mb-5">
-                Subir contrato firmado para <strong>{approveModal.name}</strong>
-              </p>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-5">
-                <p className="text-xs text-blue-700">
-                  Al aprobar la agencia se generará automáticamente tu comisión de aprobación ($100 MXN por defecto).
-                  Además comenzará el periodo de 3 meses de comisiones sobre ingresos de plataforma.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-2">Contrato firmado (PDF) *</label>
-                <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${contractFile ? 'border-green-400 bg-green-50' : 'border-gray-300 bg-gray-50 hover:border-blue-400'}`}>
-                  {contractFile ? (
-                    <div className="text-center">
-                      <CheckCircle className="h-6 w-6 text-green-500 mx-auto mb-1" />
-                      <p className="text-sm text-green-700 font-medium">{contractFile.name}</p>
-                      <p className="text-xs text-green-500">{(contractFile.size / 1024).toFixed(0)} KB</p>
-                    </div>
-                  ) : (
-                    <div className="text-center">
-                      <Upload className="h-6 w-6 text-gray-400 mx-auto mb-1" />
-                      <p className="text-sm text-gray-500">Haz clic para seleccionar el PDF</p>
-                    </div>
-                  )}
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={e => setContractFile(e.target.files?.[0] || null)}
-                  />
-                </label>
-              </div>
-            </div>
-
-            <div className="px-6 pb-6 flex justify-end gap-3">
-              <button
-                onClick={() => { setApproveModal(null); setContractFile(null); }}
-                className="px-4 py-2 text-sm text-gray-600"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={approveAgency}
-                disabled={isApproving || !contractFile}
-                className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
-              >
-                {isApproving ? 'Aprobando...' : 'Aprobar agencia'}
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>

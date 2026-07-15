@@ -121,6 +121,7 @@ import AdminEjecutivosConfig from './pages/admin/AdminEjecutivosConfig';
 import ExecutiveDashboard from './pages/executive/ExecutiveDashboard';
 import ExecutiveLeads from './pages/executive/ExecutiveLeads';
 import ExecutiveMisAgencias from './pages/executive/ExecutiveMisAgencias';
+import ExecutiveAgencyProfile from './pages/executive/ExecutiveAgencyProfile';
 import ExecutiveComisiones from './pages/executive/ExecutiveComisiones';
 import ExecutivePerfil from './pages/executive/ExecutivePerfil';
 import AdminFeaturedTours from './pages/admin/AdminFeaturedTours';
@@ -138,9 +139,10 @@ import MaintenanceGate from './components/MaintenanceGate';
 import MaintenanceBanner from './components/MaintenanceBanner';
 import AnnouncementPopup from './components/AnnouncementPopup';
 import MaintenanceAdminPage from './pages/auth/MaintenanceAdminPage';
+import FirstLoginPasswordGate from './components/FirstLoginPasswordGate';
 
 const App: React.FC = () => {
-  const { isLoading, isOnboardingPending, user } = useAuth();
+  const { isLoading, isOnboardingPending, mustChangePassword, user, refreshAuthState } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -159,6 +161,15 @@ const App: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
       </div>
+    );
+  }
+
+  if (mustChangePassword && user) {
+    return (
+      <FirstLoginPasswordGate
+        userId={user.id}
+        onPasswordChanged={() => refreshAuthState()}
+      />
     );
   }
 
@@ -813,6 +824,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.ACCOUNT_EXECUTIVE]}>
                 <ExecutiveMisAgencias />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/executive/agency/:id"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ACCOUNT_EXECUTIVE]}>
+                <ExecutiveAgencyProfile />
               </ProtectedRoute>
             }
           />

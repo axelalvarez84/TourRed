@@ -26,7 +26,34 @@ interface ConvertLeadPayload {
   state: string | null;
   postalCode: string | null;
   country: string;
-  password: string;
+  personaType: "persona_fisica" | "persona_moral";
+  representanteLegalNombre: string | null;
+  regimenFiscal: string | null;
+  banco: string | null;
+  cuentaClabe: string | null;
+  titularCuenta: string | null;
+}
+
+function generateTempPassword(length = 12): string {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const symbols = "!@#$%&*?";
+  const all = upper + lower + digits + symbols;
+  const chars: string[] = [
+    upper[Math.floor(Math.random() * upper.length)],
+    lower[Math.floor(Math.random() * lower.length)],
+    digits[Math.floor(Math.random() * digits.length)],
+    symbols[Math.floor(Math.random() * symbols.length)],
+  ];
+  for (let i = chars.length; i < length; i++) {
+    chars.push(all[Math.floor(Math.random() * all.length)]);
+  }
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
 }
 
 Deno.serve(async (req: Request) => {
@@ -106,27 +133,35 @@ Deno.serve(async (req: Request) => {
       state,
       postalCode,
       country,
-      password,
+      personaType,
+      representanteLegalNombre,
+      regimenFiscal,
+      banco,
+      cuentaClabe,
+      titularCuenta,
     } = payload;
 
-    if (!leadId || !agencyName || !contactEmail || !contactFirstName || !password) {
+    if (!leadId || !agencyName || !contactEmail || !contactFirstName || !personaType) {
       return new Response(
         JSON.stringify({ error: "Faltan campos requeridos" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    if (password.length < 6) {
+    if (personaType === "persona_moral" && !representanteLegalNombre) {
       return new Response(
-        JSON.stringify({ error: "La contraseña debe tener al menos 6 caracteres" }),
+        JSON.stringify({ error: "El nombre del representante legal es obligatorio para personas morales" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    // Generate a secure temporary password — the agency must change it on first login
+    const tempPassword = generateTempPassword(12);
+
     // Create auth user with admin API — does NOT affect the executive's current session
     const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email: contactEmail,
-      password,
+      password: tempPassword,
       email_confirm: true,
       user_metadata: { role: "agency", first_name: contactFirstName, last_name: contactLastName },
     });
@@ -140,7 +175,7 @@ Deno.serve(async (req: Request) => {
 
     const newUserId = authData.user.id;
 
-    // Insert into public.users
+    // Insert into public.users — must_change_password forces a password change on first login
     const { error: profileError } = await supabaseAdmin.from("users").insert({
       id: newUserId,
       email: contactEmail,
@@ -148,6 +183,7 @@ Deno.serve(async (req: Request) => {
       last_name: contactLastName || "",
       role: "agency",
       email_verified: true,
+      must_change_password: true,
     });
 
     if (profileError) {
@@ -158,7 +194,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Insert into agencies
+    // Insert into agencies — onboarding_status defaults to 'pending_documents' so the
+    // agency enters the same onboarding flow (terms → documents → OTP signature) as
+    // self-registered agencies.
     const { data: agencyData, error: agencyError } = await supabaseAdmin
       .from("agencies")
       .insert({
@@ -178,6 +216,12 @@ Deno.serve(async (req: Request) => {
         state: state || null,
         postal_code: postalCode || null,
         country: country || "México",
+        regimen_fiscal: regimenFiscal || null,
+        banco: banco || null,
+        cuenta_clabe: cuentaClabe || null,
+        titular_cuenta: titularCuenta || null,
+        persona_type: personaType,
+        representante_legal_nombre: representanteLegalNombre || null,
         is_active: true,
         account_executive_id: execData.id,
         registered_by_executive: true,
@@ -212,7 +256,7 @@ Deno.serve(async (req: Request) => {
           contactFirstName,
           contactLastName: contactLastName || "",
           agencyName,
-          password,
+          password: tempPassword,
           executiveEmail: execData.email,
           executiveName,
         }),

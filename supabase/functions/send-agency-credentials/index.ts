@@ -107,7 +107,22 @@ Deno.serve(async (req: Request) => {
               <!-- Aviso cambio de contraseña -->
               <div style="background-color: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 16px 20px; margin: 0 0 32px 0;">
                 <p style="margin: 0; color: #c2410c; font-size: 14px; line-height: 22px;">
-                  <strong>Importante:</strong> Por seguridad, te pedimos cambiar tu contraseña la primera vez que inicies sesión en la plataforma.
+                  <strong>Importante:</strong> Por seguridad, deberás cambiar tu contraseña la primera vez que inicies sesión en la plataforma. Al entrar, se te mostrará una pantalla para establecer una nueva contraseña.
+                </p>
+              </div>
+
+              <!-- Onboarding -->
+              <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px 20px; margin: 0 0 32px 0;">
+                <p style="margin: 0; color: #1e40af; font-size: 14px; line-height: 22px;">
+                  <strong>Pasos siguientes:</strong> Al iniciar sesión por primera vez, deberás completar tu registro dentro de la plataforma:
+                </p>
+                <ol style="margin: 8px 0 0 20px; padding: 0; color: #1e40af; font-size: 14px; line-height: 22px;">
+                  <li>Aceptar los términos y condiciones.</li>
+                  <li>Subir los documentos requeridos según tu tipo de persona.</li>
+                  <li>Firmar digitalmente el contrato de colaboración con un código OTP.</li>
+                </ol>
+                <p style="margin: 8px 0 0 0; color: #1e40af; font-size: 13px; line-height: 20px;">
+                  Una vez que subas tus documentos, tu ejecutivo de cuenta los revisará y aprobará. Al firmar el contrato, tu cuenta quedará activa para publicar tours.
                 </p>
               </div>
 
@@ -205,9 +220,16 @@ CREDENCIALES DE ACCESO
 Correo electrónico: ${email}
 Contraseña temporal: ${password}
 
-IMPORTANTE: Por seguridad, te pedimos cambiar tu contraseña la primera vez que inicies sesión.
+IMPORTANTE: Por seguridad, deberás cambiar tu contraseña la primera vez que inicies sesión.
 
 Accede a la plataforma en: ${appUrl}/login
+
+PASOS SIGUIENTES DENTRO DE LA PLATAFORMA:
+1. Aceptar los términos y condiciones.
+2. Subir los documentos requeridos según tu tipo de persona.
+3. Firmar digitalmente el contrato de colaboración con un código OTP.
+
+Una vez que subas tus documentos, tu ejecutivo de cuenta los revisará y aprobará.
 
 
 DOCUMENTOS REQUERIDOS PARA APROBACIÓN

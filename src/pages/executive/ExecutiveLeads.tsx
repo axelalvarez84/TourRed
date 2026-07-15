@@ -161,7 +161,12 @@ export default function ExecutiveLeads() {
     if (debounceTimerRef.current.rfc) clearTimeout(debounceTimerRef.current.rfc);
   }, []);
   const [showConvertModal, setShowConvertModal] = useState<AgencyLead | null>(null);
-  const [convertPassword, setConvertPassword] = useState('');
+  const [convertPersonaType, setConvertPersonaType] = useState<'persona_fisica' | 'persona_moral'>('persona_fisica');
+  const [convertRepresentante, setConvertRepresentante] = useState('');
+  const [convertRegimenFiscal, setConvertRegimenFiscal] = useState('');
+  const [convertBanco, setConvertBanco] = useState('');
+  const [convertCuentaClabe, setConvertCuentaClabe] = useState('');
+  const [convertTitularCuenta, setConvertTitularCuenta] = useState('');
   const [isConverting, setIsConverting] = useState(false);
   const [showFollowUp, setShowFollowUp] = useState<AgencyLead | null>(null);
   const [newNote, setNewNote] = useState('');
@@ -312,8 +317,8 @@ export default function ExecutiveLeads() {
   };
 
   const convertToAgency = async (lead: AgencyLead) => {
-    if (!convertPassword || convertPassword.length < 6) {
-      setMessage({ type: 'error', text: 'La contraseña debe tener al menos 6 caracteres.' });
+    if (convertPersonaType === 'persona_moral' && !convertRepresentante.trim()) {
+      setMessage({ type: 'error', text: 'El nombre del representante legal es obligatorio para personas morales.' });
       return;
     }
     setIsConverting(true);
@@ -348,22 +353,36 @@ export default function ExecutiveLeads() {
             state: lead.state,
             postalCode: lead.postal_code,
             country: lead.country || 'México',
-            password: convertPassword,
+            personaType: convertPersonaType,
+            representanteLegalNombre: convertRepresentante.trim() || null,
+            regimenFiscal: convertRegimenFiscal.trim() || null,
+            banco: convertBanco.trim() || null,
+            cuentaClabe: convertCuentaClabe.trim() || null,
+            titularCuenta: convertTitularCuenta.trim() || null,
           }),
         }
       );
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Error al convertir el lead.');
 
-      setMessage({ type: 'success', text: `Agencia "${lead.agency_name}" registrada exitosamente. Se enviaron las credenciales al email.` });
+      setMessage({ type: 'success', text: `Agencia "${lead.agency_name}" registrada exitosamente. Se enviaron las credenciales y la contraseña temporal al email.` });
       setShowConvertModal(null);
-      setConvertPassword('');
+      resetConvertForm();
       loadLeads();
     } catch (e: any) {
       setMessage({ type: 'error', text: e.message || 'Error al convertir el lead.' });
     } finally {
       setIsConverting(false);
     }
+  };
+
+  const resetConvertForm = () => {
+    setConvertPersonaType('persona_fisica');
+    setConvertRepresentante('');
+    setConvertRegimenFiscal('');
+    setConvertBanco('');
+    setConvertCuentaClabe('');
+    setConvertTitularCuenta('');
   };
 
   const addFollowUpNote = async (lead: AgencyLead) => {
@@ -784,21 +803,84 @@ export default function ExecutiveLeads() {
                 Se creará la cuenta de usuario para <strong>{showConvertModal.contact_email}</strong> y el registro de la agencia <strong>{showConvertModal.agency_name}</strong>.
               </p>
 
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-5">
-                <p className="text-xs text-amber-700">
-                  Se enviará un email de bienvenida con la contraseña temporal asignada. La agencia podrá cambiarla desde su perfil.
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-5">
+                <p className="text-xs text-blue-700">
+                  Se generará una contraseña temporal automáticamente y se enviará al email de la agencia. Al iniciar sesión por primera vez, la agencia deberá cambiarla y completar su onboarding (términos, documentos y firma de contrato).
                 </p>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">Contraseña temporal *</label>
-                <input
-                  type="text"
-                  value={convertPassword}
-                  onChange={e => setConvertPassword(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Mínimo 6 caracteres"
-                />
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">Tipo de persona *</label>
+                  <select
+                    value={convertPersonaType}
+                    onChange={e => setConvertPersonaType(e.target.value as 'persona_fisica' | 'persona_moral')}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="persona_fisica">Persona Física</option>
+                    <option value="persona_moral">Persona Moral</option>
+                  </select>
+                </div>
+
+                {convertPersonaType === 'persona_moral' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Nombre del representante legal *</label>
+                    <input
+                      type="text"
+                      value={convertRepresentante}
+                      onChange={e => setConvertRepresentante(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Nombre completo del representante legal"
+                    />
+                  </div>
+                )}
+
+                <div className="border-t border-gray-100 pt-3">
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Datos fiscales (opcional)</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Régimen fiscal</label>
+                      <input
+                        type="text"
+                        value={convertRegimenFiscal}
+                        onChange={e => setConvertRegimenFiscal(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Ej: 601"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Banco</label>
+                      <input
+                        type="text"
+                        value={convertBanco}
+                        onChange={e => setConvertBanco(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Nombre del banco"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Cuenta CLABE</label>
+                      <input
+                        type="text"
+                        value={convertCuentaClabe}
+                        onChange={e => setConvertCuentaClabe(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="18 dígitos"
+                        maxLength={18}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Titular de la cuenta</label>
+                      <input
+                        type="text"
+                        value={convertTitularCuenta}
+                        onChange={e => setConvertTitularCuenta(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Nombre del titular"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="px-6 pb-6 flex justify-end gap-3">
