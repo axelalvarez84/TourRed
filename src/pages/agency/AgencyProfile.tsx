@@ -97,7 +97,7 @@ const AgencyProfile: React.FC = () => {
         .from('agencies')
         .select(`
           *,
-          users(first_name, last_name, email, profile_picture_url)
+          users!agencies_user_id_fkey(first_name, last_name, email, profile_picture_url)
         `)
         .eq('id', currentAgencyId)
         .maybeSingle();
