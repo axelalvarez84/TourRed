@@ -134,14 +134,11 @@ const AgencyProfile: React.FC = () => {
 
       setAgency(agencyWithStats);
 
-      // Buscar ejecutivo asignado
-      if (agencyData.account_executive_id) {
-        const { data: execData } = await supabase
-          .from('account_executives')
-          .select('first_name, last_name, email, phone')
-          .eq('id', agencyData.account_executive_id)
-          .maybeSingle();
-        setExecutive(execData);
+      // Buscar ejecutivo asignado via RPC (RLS de account_executives bloquea consulta directa)
+      const { data: execData } = await supabase
+        .rpc('get_my_agency_executive');
+      if (execData && execData.length > 0) {
+        setExecutive(execData[0]);
       } else {
         setExecutive(null);
       }
