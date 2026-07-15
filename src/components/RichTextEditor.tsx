@@ -1,11 +1,37 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
+import { Node, mergeAttributes } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
-import Image from '@tiptap/extension-image';
 import { Bold, Italic, Heading1, Heading2, Heading3, List, ListOrdered, CornerDownLeft, Link2, Link2Off, ImagePlus, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+
+const ImageExtension = Node.create({
+  name: 'image',
+  group: 'block',
+  draggable: true,
+  addAttributes() {
+    return {
+      src: { default: null },
+      alt: { default: null },
+      title: { default: null },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'img[src]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['img', mergeAttributes(HTMLAttributes)];
+  },
+  addCommands() {
+    return {
+      setImage: (options: { src: string; alt?: string; title?: string }) => ({ commands }: any) => {
+        return commands.insertContent({ type: this.name, attrs: options });
+      },
+    } as any;
+  },
+});
 
 interface RichTextEditorProps {
   value?: string;
@@ -32,7 +58,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       StarterKit,
       Link.configure({ openOnClick: false }),
       Placeholder.configure({ placeholder }),
-      ...(enableImages ? [Image.configure({ inline: false, allowBase64: false })] : []),
+      ...(enableImages ? [ImageExtension] : []),
     ],
     content: value,
     onUpdate: ({ editor }) => {
@@ -163,3 +189,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 };
 
 export default RichTextEditor;
+
+
+export default RichTextEditor
