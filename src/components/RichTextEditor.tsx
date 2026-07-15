@@ -165,7 +165,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           {btn(editor.isActive('heading', { level: 1 }), () => editor.chain().focus().toggleHeading({ level: 1 }).run(), <Heading1 className="h-4 w-4" />, 'Titulo 1')}
           {btn(editor.isActive('heading', { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run(), <Heading2 className="h-4 w-4" />, 'Titulo 2')}
           {btn(editor.isActive('heading', { level: 3 }), () => editor.chain().focus().toggleHeading({ level: 3 }).run(), <Heading3 className="h-4 w-4" />, 'Titulo 3')}
-          {btn(editor.isActive('bulletList'), () => editor.chain().focus().toggleBulletList().run(), <List className="h-4 w-4" />, 'Lista viñetas')}
+          {btn(editor.isActive('bulletList'), () => editor.chain().focus().toggleBulletList().run(), <List className="h-4 w-4" />, 'Lista vinetas')}
           {btn(editor.isActive('orderedList'), () => editor.chain().focus().toggleOrderedList().run(), <ListOrdered className="h-4 w-4" />, 'Lista numerada')}
           {btn(false, () => editor.chain().focus().setHardBreak().run(), <CornerDownLeft className="h-4 w-4" />, 'Salto de linea')}
           {btn(editor.isActive('link'), openLinkModal, <Link2 className="h-4 w-4" />, 'Agregar link')}
@@ -205,7 +205,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         )}
       </div>
 
-      {/* Modal de insercion de link */}
       {linkModalOpen && (
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50"
