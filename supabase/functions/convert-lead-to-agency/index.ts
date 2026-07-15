@@ -148,9 +148,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (personaType === "persona_moral" && !representanteLegalNombre) {
+    if (!representanteLegalNombre) {
       return new Response(
-        JSON.stringify({ error: "El nombre del representante legal es obligatorio para personas morales" }),
+        JSON.stringify({ error: "El nombre del representante legal o titular es obligatorio" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

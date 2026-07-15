@@ -271,12 +271,10 @@ Con copia a: agencias@toursred.com.mx
 
     const response = await fetch("https://api.smtp2go.com/v3/email/send", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Smtp2go-Api-Key": emailSettings.smtp_api_key,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        sender: fromEmail,
+        api_key: emailSettings.smtp_api_key,
+        sender: `ToursRed <${fromEmail}>`,
         to: [email],
         subject: `¡Bienvenidos a ToursRed! Credenciales de acceso - ${agencyName}`,
         html_body: htmlContent,
@@ -285,6 +283,7 @@ Con copia a: agencias@toursred.com.mx
     });
 
     const result = await response.json();
+    console.log("SMTP2GO response:", JSON.stringify(result));
 
     if (!response.ok || result.data?.error) {
       console.error("SMTP2GO API Error:", result);

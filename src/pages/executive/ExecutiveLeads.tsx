@@ -327,8 +327,8 @@ export default function ExecutiveLeads() {
   };
 
   const convertToAgency = async (lead: AgencyLead) => {
-    if (convertPersonaType === 'persona_moral' && !convertRepresentante.trim()) {
-      setMessage({ type: 'error', text: 'El nombre del representante legal es obligatorio para personas morales.' });
+    if (!convertRepresentante.trim()) {
+      setMessage({ type: 'error', text: 'El nombre del representante legal o titular es obligatorio.' });
       return;
     }
     setIsConverting(true);
@@ -832,18 +832,19 @@ export default function ExecutiveLeads() {
                   </select>
                 </div>
 
-                {convertPersonaType === 'persona_moral' && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Nombre del representante legal *</label>
-                    <input
-                      type="text"
-                      value={convertRepresentante}
-                      onChange={e => setConvertRepresentante(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Nombre completo del representante legal"
-                    />
-                  </div>
-                )}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                    {convertPersonaType === 'persona_moral' ? 'Nombre del representante legal *' : 'Nombre del titular *'}
+                  </label>
+                  <input
+                    type="text"
+                    value={convertRepresentante}
+                    onChange={e => setConvertRepresentante(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder={convertPersonaType === 'persona_moral' ? 'Nombre completo del representante legal' : 'Nombre completo del titular de la agencia'}
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">Requerido para generar el contrato de colaboración</p>
+                </div>
 
                 <div className="border-t border-gray-100 pt-3">
                   <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Datos fiscales (opcional)</p>
