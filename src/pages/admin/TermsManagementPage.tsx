@@ -1,15 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FileText, Plus, Eye, Download, Shield, Clock, Users, ChevronDown, ChevronUp, X, Check, AlertTriangle, Search, Calendar } from 'lucide-react';
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Link from '@tiptap/extension-link';
-import Placeholder from '@tiptap/extension-placeholder';
 import { supabase } from '../../lib/supabase';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import RichTextEditor from '../../components/RichTextEditor';
 
 interface TermsVersion {
   id: string;
@@ -44,53 +41,6 @@ const TABS = [
 
 type TabKey = typeof TABS[number]['key'];
 
-// ── Rich Text Editor Toolbar ─────────────────────────────────────────────────
-const EditorToolbar: React.FC<{ editor: ReturnType<typeof useEditor> }> = ({ editor }) => {
-  if (!editor) return null;
-
-  const btn = (active: boolean, onClick: () => void, label: string) => (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-2 py-1 rounded text-sm font-medium transition-colors ${
-        active ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-      }`}
-    >
-      {label}
-    </button>
-  );
-
-  return (
-    <div className="flex flex-wrap gap-1 p-2 border-b border-gray-200 bg-gray-50 rounded-t-lg">
-      {btn(editor.isActive('bold'), () => editor.chain().focus().toggleBold().run(), 'B')}
-      {btn(editor.isActive('italic'), () => editor.chain().focus().toggleItalic().run(), 'I')}
-      {btn(editor.isActive('heading', { level: 1 }), () => editor.chain().focus().toggleHeading({ level: 1 }).run(), 'H1')}
-      {btn(editor.isActive('heading', { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run(), 'H2')}
-      {btn(editor.isActive('heading', { level: 3 }), () => editor.chain().focus().toggleHeading({ level: 3 }).run(), 'H3')}
-      {btn(editor.isActive('bulletList'), () => editor.chain().focus().toggleBulletList().run(), '• Lista')}
-      {btn(editor.isActive('orderedList'), () => editor.chain().focus().toggleOrderedList().run(), '1. Lista')}
-      {btn(false, () => editor.chain().focus().setHardBreak().run(), '↵ Salto')}
-      <button
-        type="button"
-        onClick={() => {
-          const url = window.prompt('URL del enlace:');
-          if (url) editor.chain().focus().setLink({ href: url }).run();
-        }}
-        className="px-2 py-1 rounded text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200"
-      >
-        Link
-      </button>
-      <button
-        type="button"
-        onClick={() => editor.chain().focus().unsetLink().run()}
-        className="px-2 py-1 rounded text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200"
-      >
-        Quitar Link
-      </button>
-    </div>
-  );
-};
-
 // ── Publish Modal ─────────────────────────────────────────────────────────────
 const PublishModal: React.FC<{
   termsType: 'traveler' | 'agency';
@@ -100,22 +50,13 @@ const PublishModal: React.FC<{
 }> = ({ termsType, currentVersion, onClose, onPublished }) => {
   const [title, setTitle] = useState(currentVersion?.title || '');
   const [changeSummary, setChangeSummary] = useState('');
+  const [content, setContent] = useState(currentVersion?.content || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Link.configure({ openOnClick: false }),
-      Placeholder.configure({ placeholder: 'Escribe el contenido de los términos aquí...' }),
-    ],
-    content: currentVersion?.content || '',
-  });
 
   const handlePublish = async () => {
     if (!title.trim()) { setError('El título es obligatorio.'); return; }
     if (!changeSummary.trim()) { setError('El resumen de cambios es obligatorio.'); return; }
-    const content = editor?.getHTML() || '';
     if (!content || content === '<p></p>') { setError('El contenido no puede estar vacío.'); return; }
 
     setSaving(true);
@@ -178,13 +119,12 @@ const PublishModal: React.FC<{
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Contenido</label>
-            <div className="border border-gray-300 rounded-lg overflow-hidden">
-              <EditorToolbar editor={editor} />
-              <EditorContent
-                editor={editor}
-                className="tiptap min-h-96 max-h-[500px] overflow-y-auto p-4 text-sm prose prose-sm max-w-none focus:outline-none"
-              />
-            </div>
+            <RichTextEditor
+              value={content}
+              onChange={setContent}
+              placeholder="Escribe el contenido de los términos aquí..."
+              enableImages={false}
+            />
           </div>
 
           {error && (

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Mail, Users, UserMinus, UserCheck, Send, Search, RefreshCw, CheckCheck, Clock, AlertCircle, ChevronDown, ChevronUp, X, Tag } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { format } from 'date-fns';
+import RichTextEditor from '../../components/RichTextEditor';
 
 interface NewsletterSubscriber {
   id: string;
@@ -384,7 +385,7 @@ const AdminNewsletter: React.FC = () => {
                   {expandedBroadcast === broadcast.id && (
                     <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
                       <div className="bg-white border-l-4 border-blue-400 rounded-r-xl px-4 py-3">
-                        <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{broadcast.message_body}</p>
+                        <div className="text-sm text-gray-800 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: broadcast.message_body }} />
                       </div>
                     </div>
                   )}
@@ -398,7 +399,7 @@ const AdminNewsletter: React.FC = () => {
       {/* Send broadcast modal */}
       {showSendModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={closeSendModal}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h3 className="text-lg font-bold text-gray-900">Enviar comunicado al newsletter</h3>
               <button onClick={closeSendModal} className="text-gray-400 hover:text-gray-600 transition-colors">
@@ -431,16 +432,32 @@ const AdminNewsletter: React.FC = () => {
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Mensaje <span className="text-red-500">*</span>
                 </label>
-                <textarea
+                <RichTextEditor
                   value={sendMessage}
-                  onChange={e => setSendMessage(e.target.value)}
-                  maxLength={3000}
-                  rows={7}
-                  placeholder="Escribe aqui el contenido del comunicado..."
-                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
+                  onChange={setSendMessage}
+                  placeholder="Escribe aqui el contenido del comunicado. Puedes usar negritas, listas, links e imagenes..."
+                  minHeight="min-h-48"
                 />
-                <p className="text-xs text-gray-400 mt-1 text-right">{sendMessage.length}/3000</p>
               </div>
+
+              {/* Preview */}
+              {sendMessage && sendMessage !== '<p></p>' && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Vista previa del correo</label>
+                  <div className="border border-gray-200 rounded-xl overflow-hidden">
+                    <div className="bg-[#b8dfe6] px-4 py-3 text-center">
+                      <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e40af' }}>Boletin ToursRed</div>
+                    </div>
+                    <div className="bg-white px-4 py-3">
+                      <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>{sendSubject || 'Asunto del comunicado'}</div>
+                      <div className="bg-gray-50 border-l-4 border-blue-500 rounded-r-lg px-3 py-2 text-sm text-gray-800 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: sendMessage }} />
+                    </div>
+                    <div className="bg-gray-50 px-4 py-2 text-center text-xs text-gray-400 border-t border-gray-100">
+                      Recibes este correo porque estas suscrito al boletin de ToursRed.
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {sendResult && (
                 <div className={`rounded-xl px-4 py-3 text-sm ${sendResult.success ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
@@ -463,7 +480,7 @@ const AdminNewsletter: React.FC = () => {
                 </button>
                 <button
                   onClick={handleSend}
-                  disabled={!sendSubject.trim() || !sendMessage.trim() || isSending}
+                  disabled={!sendSubject.trim() || !sendMessage.replace(/<[^>]*>/g, '').trim() || isSending}
                   className="btn btn-primary flex-1 text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSending ? (

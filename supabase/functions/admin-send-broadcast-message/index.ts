@@ -164,8 +164,6 @@ Deno.serve(async (req: Request) => {
             const lastName = recipient.last_name || "";
             const displayName = (firstName + " " + lastName).trim() || recipient.email;
 
-            const messageBodyFormatted = message_body.replace(/\n/g, "<br>");
-
             const audienceLabel =
               audience === "travelers"
                 ? "viajeros de ToursRed"
@@ -185,7 +183,15 @@ Deno.serve(async (req: Request) => {
     .logo { max-width: 180px; height: auto; margin-bottom: 8px; }
     .content { background-color: #ffffff; padding: 30px 24px; border: 1px solid #e5e7eb; }
     .badge { background-color: #dbeafe; border-radius: 8px; padding: 10px 14px; margin-bottom: 24px; display: inline-block; font-size: 12px; font-weight: 600; color: #1e40af; text-transform: uppercase; letter-spacing: 0.05em; }
-    .message-box { background-color: #f9fafb; border-left: 4px solid #3b82f6; border-radius: 0 8px 8px 0; padding: 18px 20px; margin: 20px 0; font-size: 15px; color: #1f2937; white-space: pre-wrap; word-break: break-word; }
+    .message-box { background-color: #f9fafb; border-left: 4px solid #3b82f6; border-radius: 0 8px 8px 0; padding: 18px 20px; margin: 20px 0; font-size: 15px; color: #1f2937; word-break: break-word; }
+    .message-box img { max-width: 100% !important; height: auto !important; border-radius: 8px; margin: 10px 0; }
+    .message-box a { color: #2563eb; text-decoration: underline; }
+    .message-box ul, .message-box ol { margin: 10px 0; padding-left: 24px; }
+    .message-box li { margin: 4px 0; }
+    .message-box h1 { font-size: 22px; font-weight: bold; margin: 14px 0 8px; }
+    .message-box h2 { font-size: 18px; font-weight: bold; margin: 12px 0 6px; }
+    .message-box h3 { font-size: 16px; font-weight: bold; margin: 10px 0 4px; }
+    .message-box p { margin: 8px 0; }
     .footer { text-align: center; padding: 20px; color: #9ca3af; font-size: 12px; }
   </style>
 </head>
@@ -199,7 +205,7 @@ Deno.serve(async (req: Request) => {
       <p style="margin-top:0;">Hola${displayName ? " <strong>" + displayName + "</strong>" : ""},</p>
       <div class="badge">Mensaje para todos los ${audienceLabel}</div>
       <div style="font-size: 13px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Mensaje del equipo ToursRed</div>
-      <div class="message-box">${messageBodyFormatted}</div>
+      <div class="message-box">${message_body}</div>
     </div>
     <div class="footer">
       Este mensaje fue enviado a todos los ${audienceLabel} de ToursRed.<br>

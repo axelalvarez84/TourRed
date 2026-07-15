@@ -3,6 +3,7 @@ import { Send, Users, Building2, Globe, Mail, Bell, BellRing, CheckCheck, Clock,
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { format } from 'date-fns';
+import RichTextEditor from '../../components/RichTextEditor';
 
 type SendChannel = 'email' | 'notification' | 'both';
 type Audience = 'travelers' | 'agencies' | 'all';
@@ -110,7 +111,7 @@ const AdminBroadcastMessages: React.FC = () => {
   };
 
   const handleSend = async () => {
-    if (!subject.trim() || !messageBody.trim()) return;
+    if (!subject.trim() || !messageBody.replace(/<[^>]*>/g, '').trim()) return;
     setIsSending(true);
     setSendResult(null);
 
@@ -176,7 +177,7 @@ const AdminBroadcastMessages: React.FC = () => {
     return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700"><AlertCircle className="h-3 w-3" />Fallido</span>;
   };
 
-  const canSend = subject.trim().length > 0 && messageBody.trim().length > 0 && !isSending;
+  const canSend = subject.trim().length > 0 && messageBody.replace(/<[^>]*>/g, '').trim().length > 0 && !isSending;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -261,15 +262,12 @@ const AdminBroadcastMessages: React.FC = () => {
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Mensaje <span className="text-red-500">*</span>
                 </label>
-                <textarea
+                <RichTextEditor
                   value={messageBody}
-                  onChange={(e) => setMessageBody(e.target.value)}
-                  maxLength={3000}
-                  rows={7}
-                  placeholder="Escribe aquí el contenido del mensaje..."
-                  className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
+                  onChange={setMessageBody}
+                  placeholder="Escribe aqui el contenido del mensaje. Puedes usar negritas, listas, links e imagenes..."
+                  minHeight="min-h-48"
                 />
-                <p className="text-xs text-gray-400 mt-1 text-right">{messageBody.length}/3000</p>
               </div>
 
               {/* Result */}
@@ -316,7 +314,7 @@ const AdminBroadcastMessages: React.FC = () => {
                   <Bell className="h-4 w-4 text-primary-600" />
                   <span className="text-sm font-semibold text-gray-900 truncate">{subject || 'Asunto del mensaje'}</span>
                 </div>
-                <p className="text-xs text-gray-600 line-clamp-3">{messageBody || 'El contenido del mensaje aparecerá aquí...'}</p>
+                <div className="text-xs text-gray-600 line-clamp-3 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: messageBody || 'El contenido del mensaje aparecerá aquí...' }} />
                 <p className="text-xs text-gray-400 mt-1">Ahora mismo · ToursRed</p>
               </div>
             </div>
@@ -379,7 +377,7 @@ const AdminBroadcastMessages: React.FC = () => {
                         {msg.error_count > 0 && <span className="text-red-600 font-semibold">{msg.error_count} fallidos</span>}
                       </div>
                       <div className="bg-white border-l-4 border-primary-400 rounded-r-xl px-4 py-3">
-                        <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{msg.message_body}</p>
+                        <div className="text-sm text-gray-800 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: msg.message_body }} />
                       </div>
                     </div>
                   )}
