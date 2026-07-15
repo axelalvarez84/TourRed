@@ -8,8 +8,12 @@ import TicketPriorityBadge from '../../components/support/TicketPriorityBadge';
 
 const PAGE_SIZE = 20;
 
-type SortColumn = 'folio' | 'tipo' | 'prioridad' | 'status' | 'solicitante_nombre' | 'created_at';
+type SortColumn = 'folio' | 'tipo' | 'prioridad' | 'status' | 'solicitante_nombre' | 'created_at' | 'agente_asignado_id' | 'sla';
 type SortDir = 'asc' | 'desc';
+
+const SORT_COL_MAP: Partial<Record<SortColumn, string>> = {
+  sla: 'sla_deadline',
+};
 
 interface AgentOption {
   id: string;
@@ -51,6 +55,8 @@ const AdminServiceDesk: React.FC = () => {
 
   const fetchTickets = useCallback(async () => {
     setLoading(true);
+    const dbSortCol = SORT_COL_MAP[sortCol] ?? sortCol;
+
     let query = supabase
       .from('support_tickets')
       .select(`
@@ -60,7 +66,10 @@ const AdminServiceDesk: React.FC = () => {
         agente:users!support_tickets_agente_asignado_id_fkey(id, first_name, last_name),
         agencia:agencies!support_tickets_agencia_asignada_id_fkey(id, name)
       `, { count: 'exact' })
-      .order(sortCol, { ascending: sortDir === 'asc' })
+      .order(dbSortCol, {
+        ascending: sortDir === 'asc',
+        nullsFirst: sortCol === 'agente_asignado_id' ? sortDir === 'asc' : undefined,
+      })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
     if (filterStatus) query = query.eq('status', filterStatus);
@@ -104,13 +113,11 @@ const AdminServiceDesk: React.FC = () => {
       : <ArrowDown className="h-3.5 w-3.5 text-primary-500 ml-1 flex-shrink-0" />;
   };
 
-  const slaStatus = (ticket: SupportTicket) => {
-    const sla = (ticket.subcategory as any)?.sla_horas ?? 24;
-    const created = new Date(ticket.created_at).getTime();
-    const deadline = created + sla * 3600 * 1000;
-    const remaining = deadline - Date.now();
+  const slaStatus = (ticket: any) => {
     const closed = ticket.status === 'resuelto' || ticket.status === 'cancelado' || ticket.status === 'duplicado';
     if (closed) return null;
+    if (!ticket.sla_deadline) return null;
+    const remaining = new Date(ticket.sla_deadline).getTime() - Date.now();
     if (remaining <= 0) return <span className="text-xs text-red-600 font-medium">SLA vencido</span>;
     const hours = Math.floor(remaining / 3600000);
     if (hours < 2) return <span className="text-xs text-orange-600 font-medium">{hours}h</span>;
@@ -138,8 +145,7 @@ const AdminServiceDesk: React.FC = () => {
   const activeFiltersCount = [filterStatus, filterPriority, filterType, filterCategory, filterSubcategory, search, filterAgente]
     .filter(Boolean).length;
 
-  const thClass = (col: SortColumn) =>
-    `text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 transition-colors group`;
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -287,31 +293,31 @@ const AdminServiceDesk: React.FC = () => {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className={thClass('folio')} onClick={() => handleSort('folio')}>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 transition-colors" onClick={() => handleSort('folio')}>
                         <span className="flex items-center">Folio <SortIcon col="folio" /></span>
                       </th>
-                      <th className={thClass('tipo')} onClick={() => handleSort('tipo')}>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 transition-colors" onClick={() => handleSort('tipo')}>
                         <span className="flex items-center">Tipo <SortIcon col="tipo" /></span>
                       </th>
                       <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                         Subcategoria
                       </th>
-                      <th className={thClass('prioridad')} onClick={() => handleSort('prioridad')}>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 transition-colors" onClick={() => handleSort('prioridad')}>
                         <span className="flex items-center">Prioridad <SortIcon col="prioridad" /></span>
                       </th>
-                      <th className={thClass('status')} onClick={() => handleSort('status')}>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 transition-colors" onClick={() => handleSort('status')}>
                         <span className="flex items-center">Estado <SortIcon col="status" /></span>
                       </th>
-                      <th className={thClass('solicitante_nombre')} onClick={() => handleSort('solicitante_nombre')}>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 transition-colors" onClick={() => handleSort('solicitante_nombre')}>
                         <span className="flex items-center">Solicitante <SortIcon col="solicitante_nombre" /></span>
                       </th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        Asignado a
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 transition-colors" onClick={() => handleSort('agente_asignado_id')}>
+                        <span className="flex items-center">Asignado a <SortIcon col="agente_asignado_id" /></span>
                       </th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        SLA
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 transition-colors" onClick={() => handleSort('sla')}>
+                        <span className="flex items-center">SLA <SortIcon col="sla" /></span>
                       </th>
-                      <th className={thClass('created_at')} onClick={() => handleSort('created_at')}>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 transition-colors" onClick={() => handleSort('created_at')}>
                         <span className="flex items-center">Fecha <SortIcon col="created_at" /></span>
                       </th>
                       <th className="px-4 py-3"></th>
