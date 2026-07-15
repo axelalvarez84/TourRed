@@ -9,6 +9,7 @@ const corsHeaders = {
 
 interface SubscribeRequest {
   email: string;
+  name?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -24,7 +25,7 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { email }: SubscribeRequest = await req.json();
+    const { email, name }: SubscribeRequest = await req.json();
 
     if (!email) {
       return new Response(
@@ -49,33 +50,60 @@ Deno.serve(async (req: Request) => {
 
     const { data: existingSubscription } = await supabase
       .from("newsletter_subscriptions")
-      .select("email, active")
+      .select("email, active, unsubscribe_token")
       .eq("email", email.toLowerCase())
       .maybeSingle();
 
+    let unsubscribeToken: string;
+
     if (existingSubscription) {
-      return new Response(
-        JSON.stringify({ 
-          error: "Este email ya está suscrito a nuestro boletín",
-          already_subscribed: true 
-        }),
-        {
-          status: 409,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+      if (existingSubscription.active) {
+        return new Response(
+          JSON.stringify({
+            error: "Este email ya está suscrito a nuestro boletín",
+            already_subscribed: true
+          }),
+          {
+            status: 409,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
 
-    const { error: insertError } = await supabase
-      .from("newsletter_subscriptions")
-      .insert({
-        email: email.toLowerCase(),
-        active: true,
-      });
+      // Reactivate previously unsubscribed user
+      const { data: reactivated, error: reactivateError } = await supabase
+        .from("newsletter_subscriptions")
+        .update({
+          active: true,
+          unsubscribed_at: null,
+          name: name || null,
+        })
+        .eq("email", email.toLowerCase())
+        .select("unsubscribe_token")
+        .single();
 
-    if (insertError) {
-      console.error("Error inserting subscription:", insertError);
-      throw new Error("Error al guardar la suscripción");
+      if (reactivateError || !reactivated) {
+        throw new Error("Error al reactivar la suscripción");
+      }
+
+      unsubscribeToken = reactivated.unsubscribe_token;
+    } else {
+      const { data: inserted, error: insertError } = await supabase
+        .from("newsletter_subscriptions")
+        .insert({
+          email: email.toLowerCase(),
+          active: true,
+          name: name || null,
+        })
+        .select("unsubscribe_token")
+        .single();
+
+      if (insertError || !inserted) {
+        console.error("Error inserting subscription:", insertError);
+        throw new Error("Error al guardar la suscripción");
+      }
+
+      unsubscribeToken = inserted.unsubscribe_token;
     }
 
     const { data: emailSettings, error: settingsError } = await supabase
@@ -86,9 +114,9 @@ Deno.serve(async (req: Request) => {
     if (settingsError || !emailSettings) {
       console.error("Error fetching email settings:", settingsError);
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: "Suscripción guardada pero no se pudo enviar el email de confirmación" 
+        JSON.stringify({
+          success: true,
+          message: "Suscripción guardada pero no se pudo enviar el email de confirmación"
         }),
         {
           status: 200,
@@ -100,9 +128,9 @@ Deno.serve(async (req: Request) => {
     if (!emailSettings.smtp_api_key) {
       console.error("SMTP API key not configured");
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: "Suscripción guardada pero no se pudo enviar el email de confirmación" 
+        JSON.stringify({
+          success: true,
+          message: "Suscripción guardada pero no se pudo enviar el email de confirmación"
         }),
         {
           status: 200,
@@ -110,6 +138,14 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
+
+    // Fetch platform_url for unsubscribe link
+    const { data: platformSettings } = await supabase
+      .from("platform_settings")
+      .select("platform_url")
+      .maybeSingle();
+    const platformUrl = platformSettings?.platform_url || "https://toursredmx.netlify.app";
+    const unsubscribeLink = `${platformUrl}/unsubscribe?token=${unsubscribeToken}`;
 
     const textContent = `
 ¡Bienvenido a ToursRed!
@@ -123,6 +159,7 @@ El equipo de ToursRed
 
 ---
 Si no te suscribiste a este boletín, puedes ignorar este mensaje.
+Para darte de baja visita: ${unsubscribeLink}
     `;
 
     const htmlContent = `
@@ -139,6 +176,7 @@ Si no te suscribiste a este boletín, puedes ignorar este mensaje.
     .message { margin-bottom: 20px; }
     .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
     .highlight { background-color: white; padding: 15px; border-left: 4px solid #1e40af; margin: 20px 0; }
+    .unsubscribe-link { color: #6b7280; text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -170,6 +208,7 @@ Si no te suscribiste a este boletín, puedes ignorar este mensaje.
     </div>
     <div class="footer">
       <p>Si no te suscribiste a este boletín, puedes ignorar este mensaje.</p>
+      <p><a href="${unsubscribeLink}" class="unsubscribe-link">Darse de baja del boletín</a></p>
     </div>
   </div>
 </body>
@@ -200,9 +239,9 @@ Si no te suscribiste a este boletín, puedes ignorar este mensaje.
     if (!response.ok || result.data?.error) {
       console.error("SMTP2GO API Error:", result);
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: "¡Gracias por suscribirte! Sin embargo, hubo un problema al enviar el email de confirmación." 
+        JSON.stringify({
+          success: true,
+          message: "¡Gracias por suscribirte! Sin embargo, hubo un problema al enviar el email de confirmación."
         }),
         {
           status: 200,
@@ -214,9 +253,9 @@ Si no te suscribiste a este boletín, puedes ignorar este mensaje.
     console.log("Welcome email sent successfully:", result);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: "¡Gracias por suscribirte! Revisa tu correo para confirmar tu suscripción." 
+      JSON.stringify({
+        success: true,
+        message: "¡Gracias por suscribirte! Revisa tu correo para confirmar tu suscripción."
       }),
       {
         status: 200,
@@ -226,9 +265,9 @@ Si no te suscribiste a este boletín, puedes ignorar este mensaje.
   } catch (error) {
     console.error("Error in newsletter subscription:", error);
     return new Response(
-      JSON.stringify({ 
-        error: "Error al procesar la suscripción", 
-        details: error.message 
+      JSON.stringify({
+        error: "Error al procesar la suscripción",
+        details: error.message
       }),
       {
         status: 500,

@@ -78,6 +78,7 @@ import AdminReferrals from './pages/admin/AdminReferrals';
 import AdminPromotions from './pages/admin/AdminPromotions';
 import AdminTourMessages from './pages/admin/AdminTourMessages';
 import AdminBroadcastMessages from './pages/admin/AdminBroadcastMessages';
+import AdminNewsletter from './pages/admin/AdminNewsletter';
 import AdminCfdi from './pages/admin/AdminCfdi';
 import AdminCfdiManual from './pages/admin/AdminCfdiManual';
 import AdminContabilidad from './pages/admin/AdminContabilidad';
@@ -101,6 +102,7 @@ import TravelersInfoPage from './pages/TravelersInfoPage';
 import NotificationsPage from './pages/NotificationsPage';
 import AgencyPublicProfile from './pages/AgencyPublicProfile';
 import NotFoundPage from './pages/NotFoundPage';
+import UnsubscribePage from './pages/UnsubscribePage';
 import GiftCardsPage from './pages/GiftCardsPage';
 import GiftCardRedeemPage from './pages/GiftCardRedeemPage';
 import GiftCardSuccessPage from './pages/GiftCardSuccessPage';
@@ -196,6 +198,7 @@ const App: React.FC = () => {
           <Route path="/aviso-privacidad" element={<PrivacyPolicyPage />} />
           <Route path="/terminos-servicio" element={<TermsOfServicePage />} />
           <Route path="/politica-cookies" element={<CookiePolicyPage />} />
+          <Route path="/unsubscribe" element={<UnsubscribePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/agency-signup" element={<AgencySignupPage />} />
@@ -646,6 +649,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                 <AdminBroadcastMessages />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/newsletter"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminNewsletter />
               </ProtectedRoute>
             }
           />
