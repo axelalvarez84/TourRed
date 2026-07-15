@@ -1,12 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { TicketCheck, Search, RefreshCw, Filter, Eye, ChevronDown, ChevronUp, Plus, Tag, Headphones as HeadphonesIcon, Clock, User, Building2 } from 'lucide-react';
+import { TicketCheck, Search, RefreshCw, Filter, Eye, ChevronDown, ChevronUp, Tag, Headphones as HeadphonesIcon, Clock, User, Building2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { SupportTicket, SupportCategory, SupportSubcategory, SupportTicketStatus, SupportTicketPriority, SupportTicketType } from '../../types';
 import TicketStatusBadge from '../../components/support/TicketStatusBadge';
 import TicketPriorityBadge from '../../components/support/TicketPriorityBadge';
 
 const PAGE_SIZE = 20;
+
+type SortColumn = 'folio' | 'tipo' | 'prioridad' | 'status' | 'solicitante_nombre' | 'created_at';
+type SortDir = 'asc' | 'desc';
+
+interface AgentOption {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
 
 const AdminServiceDesk: React.FC = () => {
   const navigate = useNavigate();
@@ -20,13 +29,24 @@ const AdminServiceDesk: React.FC = () => {
   const [filterType, setFilterType] = useState<SupportTicketType | ''>('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterSubcategory, setFilterSubcategory] = useState('');
+  const [filterAgente, setFilterAgente] = useState('');   // '' = todos | 'unassigned' | uuid del agente
   const [showFilters, setShowFilters] = useState(false);
   const [categories, setCategories] = useState<SupportCategory[]>([]);
   const [subcategories, setSubcategories] = useState<SupportSubcategory[]>([]);
+  const [agentes, setAgentes] = useState<AgentOption[]>([]);
+  const [sortCol, setSortCol] = useState<SortColumn>('created_at');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   useEffect(() => {
     supabase.from('support_categories').select('*').order('nombre').then(r => setCategories(r.data ?? []));
     supabase.from('support_subcategories').select('*').order('nombre').then(r => setSubcategories(r.data ?? []));
+    // Cargar agentes de soporte para el filtro
+    supabase
+      .from('users')
+      .select('id, first_name, last_name')
+      .eq('role', 'admin')
+      .order('first_name')
+      .then(r => setAgentes(r.data ?? []));
   }, []);
 
   const fetchTickets = useCallback(async () => {
@@ -40,7 +60,7 @@ const AdminServiceDesk: React.FC = () => {
         agente:users!support_tickets_agente_asignado_id_fkey(id, first_name, last_name),
         agencia:agencies!support_tickets_agencia_asignada_id_fkey(id, name)
       `, { count: 'exact' })
-      .order('created_at', { ascending: false })
+      .order(sortCol, { ascending: sortDir === 'asc' })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
     if (filterStatus) query = query.eq('status', filterStatus);
@@ -48,6 +68,11 @@ const AdminServiceDesk: React.FC = () => {
     if (filterType) query = query.eq('tipo', filterType);
     if (filterCategory) query = query.eq('category_id', filterCategory);
     if (filterSubcategory) query = query.eq('subcategory_id', filterSubcategory);
+    if (filterAgente === 'unassigned') {
+      query = query.is('agente_asignado_id', null);
+    } else if (filterAgente) {
+      query = query.eq('agente_asignado_id', filterAgente);
+    }
     if (search) {
       query = query.or(
         `folio.ilike.%${search}%,solicitante_nombre.ilike.%${search}%,solicitante_email.ilike.%${search}%,descripcion.ilike.%${search}%`
@@ -58,9 +83,26 @@ const AdminServiceDesk: React.FC = () => {
     setTickets(data ?? []);
     setTotal(count ?? 0);
     setLoading(false);
-  }, [page, search, filterStatus, filterPriority, filterType, filterCategory, filterSubcategory]);
+  }, [page, search, filterStatus, filterPriority, filterType, filterCategory, filterSubcategory, filterAgente, sortCol, sortDir]);
 
   useEffect(() => { fetchTickets(); }, [fetchTickets]);
+
+  const handleSort = (col: SortColumn) => {
+    if (sortCol === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortCol(col);
+      setSortDir('asc');
+    }
+    setPage(0);
+  };
+
+  const SortIcon = ({ col }: { col: SortColumn }) => {
+    if (sortCol !== col) return <ArrowUpDown className="h-3.5 w-3.5 text-gray-300 ml-1 flex-shrink-0" />;
+    return sortDir === 'asc'
+      ? <ArrowUp className="h-3.5 w-3.5 text-primary-500 ml-1 flex-shrink-0" />
+      : <ArrowDown className="h-3.5 w-3.5 text-primary-500 ml-1 flex-shrink-0" />;
+  };
 
   const slaStatus = (ticket: SupportTicket) => {
     const sla = (ticket.subcategory as any)?.sla_horas ?? 24;
@@ -88,12 +130,16 @@ const AdminServiceDesk: React.FC = () => {
     setFilterType('');
     setFilterCategory('');
     setFilterSubcategory('');
+    setFilterAgente('');
     setSearch('');
     setPage(0);
   };
 
-  const activeFiltersCount = [filterStatus, filterPriority, filterType, filterCategory, filterSubcategory, search]
+  const activeFiltersCount = [filterStatus, filterPriority, filterType, filterCategory, filterSubcategory, search, filterAgente]
     .filter(Boolean).length;
+
+  const thClass = (col: SortColumn) =>
+    `text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 transition-colors group`;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -156,7 +202,7 @@ const AdminServiceDesk: React.FC = () => {
         {/* Filters panel */}
         {showFilters && (
           <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Estado</label>
                 <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value as any); setPage(0); }} className="input text-sm">
@@ -186,6 +232,16 @@ const AdminServiceDesk: React.FC = () => {
                   <option value="traveler">Viajero</option>
                   <option value="agency">Agencia</option>
                   <option value="general">General</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Asignado a</label>
+                <select value={filterAgente} onChange={e => { setFilterAgente(e.target.value); setPage(0); }} className="input text-sm">
+                  <option value="">Todos</option>
+                  <option value="unassigned">Sin asignar</option>
+                  {agentes.map(a => (
+                    <option key={a.id} value={a.id}>{a.first_name} {a.last_name}</option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -231,15 +287,33 @@ const AdminServiceDesk: React.FC = () => {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Folio</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tipo</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Subcategoria</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Prioridad</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Solicitante</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Asignado a</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">SLA</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha</th>
+                      <th className={thClass('folio')} onClick={() => handleSort('folio')}>
+                        <span className="flex items-center">Folio <SortIcon col="folio" /></span>
+                      </th>
+                      <th className={thClass('tipo')} onClick={() => handleSort('tipo')}>
+                        <span className="flex items-center">Tipo <SortIcon col="tipo" /></span>
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Subcategoria
+                      </th>
+                      <th className={thClass('prioridad')} onClick={() => handleSort('prioridad')}>
+                        <span className="flex items-center">Prioridad <SortIcon col="prioridad" /></span>
+                      </th>
+                      <th className={thClass('status')} onClick={() => handleSort('status')}>
+                        <span className="flex items-center">Estado <SortIcon col="status" /></span>
+                      </th>
+                      <th className={thClass('solicitante_nombre')} onClick={() => handleSort('solicitante_nombre')}>
+                        <span className="flex items-center">Solicitante <SortIcon col="solicitante_nombre" /></span>
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Asignado a
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        SLA
+                      </th>
+                      <th className={thClass('created_at')} onClick={() => handleSort('created_at')}>
+                        <span className="flex items-center">Fecha <SortIcon col="created_at" /></span>
+                      </th>
                       <th className="px-4 py-3"></th>
                     </tr>
                   </thead>
