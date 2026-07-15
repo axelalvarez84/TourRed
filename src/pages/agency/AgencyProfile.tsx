@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Building, Mail, Phone, Globe, Star, CreditCard as Edit, Save, X, Upload, User, Calendar, MapPin, FileText, Landmark, Hash, Shield, Link2, Building2, Image, ExternalLink, CheckCircle, AlertCircle, Download } from 'lucide-react';
+import { Building, Mail, Phone, Globe, Star, CreditCard as Edit, Save, X, Upload, User, Calendar, MapPin, FileText, Landmark, Hash, Shield, Link2, Building2, Image, ExternalLink, CheckCircle, AlertCircle, Download, Briefcase } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { useAgencyId } from '../../hooks/useAgencyId';
@@ -83,6 +83,7 @@ const AgencyProfile: React.FC = () => {
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
   const [contractInfo, setContractInfo] = useState<{ folio: string; storagePath: string } | null>(null);
   const [downloadingContract, setDownloadingContract] = useState(false);
+  const [executive, setExecutive] = useState<{ first_name: string; last_name: string; email: string; phone?: string } | null>(null);
 
   useEffect(() => {
     if (resolvedAgencyId) {
@@ -132,6 +133,18 @@ const AgencyProfile: React.FC = () => {
       };
 
       setAgency(agencyWithStats);
+
+      // Buscar ejecutivo asignado
+      if (agencyData.account_executive_id) {
+        const { data: execData } = await supabase
+          .from('account_executives')
+          .select('first_name, last_name, email, phone')
+          .eq('id', agencyData.account_executive_id)
+          .maybeSingle();
+        setExecutive(execData);
+      } else {
+        setExecutive(null);
+      }
 
       // Buscar contrato firmado (documento más reciente de tipo contrato_agencia)
       const { data: contractDoc } = await supabase
@@ -1176,6 +1189,46 @@ const AgencyProfile: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {executive && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden mt-6">
+            <div className="flex items-center gap-2 px-6 pt-6 pb-1">
+              <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                <Briefcase className="h-4 w-4 text-blue-600" />
+              </div>
+              <h2 className="text-base font-semibold text-gray-900">Ejecutivo de Cuenta</h2>
+            </div>
+            <div className="px-6 pb-6 pt-2">
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border-l-4 border-blue-200">
+                  <User className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Nombre</div>
+                    <div className="text-sm font-medium text-gray-900 mt-0.5">
+                      {`${executive.first_name} ${executive.last_name}`.trim()}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border-l-4 border-blue-200">
+                  <Mail className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Email</div>
+                    <div className="text-sm font-medium text-gray-900 mt-0.5 break-all">{executive.email}</div>
+                  </div>
+                </div>
+                {executive.phone && (
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border-l-4 border-blue-200">
+                    <Phone className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Teléfono</div>
+                      <div className="text-sm font-medium text-gray-900 mt-0.5">{executive.phone}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Fila 3: Seguridad + Cuentas Vinculadas */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
