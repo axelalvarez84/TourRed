@@ -309,6 +309,16 @@ export default function ExecutiveLeads() {
       setMessage({ type: 'success', text: editingLead ? 'Lead actualizado.' : 'Lead creado.' });
       setShowModal(false);
       loadLeads();
+
+      // Si el lead se guardó con estado "registrado" y aún no ha sido convertido,
+      // abrir automáticamente el modal de conversión
+      if (form.status === 'registrado' && editingLead && !editingLead.converted_agency_id) {
+        const leadToConvert = { ...editingLead, ...form };
+        setTimeout(() => {
+          setShowConvertModal(leadToConvert);
+          resetConvertForm();
+        }, 300);
+      }
     } catch (e: any) {
       setMessage({ type: 'error', text: e.message || 'Error al guardar.' });
     } finally {
@@ -540,9 +550,9 @@ export default function ExecutiveLeads() {
                           >
                             <MessageSquare className="h-4 w-4" />
                           </button>
-                          {lead.status !== 'registrado' && lead.status !== 'aprobado' && (
+                          {!lead.converted_agency_id && (
                             <button
-                              onClick={() => { setShowConvertModal(lead); setConvertPassword(''); }}
+                              onClick={() => { setShowConvertModal(lead); resetConvertForm(); }}
                               className="p-1.5 hover:bg-blue-50 rounded text-blue-500 hover:text-blue-700 transition-colors"
                               title="Convertir a agencia"
                             >
