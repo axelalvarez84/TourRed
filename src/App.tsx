@@ -34,6 +34,7 @@ import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import TravelerDashboard from './pages/traveler/TravelerDashboard';
 import TravelerBookings from './pages/traveler/TravelerBookings';
 import SupplementSuccessPage from './pages/traveler/SupplementSuccessPage';
+import PaymentPlanSuccessPage from './pages/traveler/PaymentPlanSuccessPage';
 import ExtrasSuccessPage from './pages/traveler/ExtrasSuccessPage';
 import TravelerProfile from './pages/traveler/TravelerProfile';
 import TravelerMembership from './pages/traveler/TravelerMembership';
@@ -228,6 +229,7 @@ const App: React.FC = () => {
           <Route path="/booking-pending/:bookingId" element={<BookingPendingPage />} />
           <Route path="/booking-travelers/:bookingId" element={<TravelersInfoPage />} />
           <Route path="/supplement-success" element={<SupplementSuccessPage />} />
+          <Route path="/payment-plan-success" element={<PaymentPlanSuccessPage />} />
           <Route path="/extras-success" element={<ExtrasSuccessPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/gift-cards" element={<GiftCardsPage />} />

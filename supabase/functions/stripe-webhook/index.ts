@@ -456,6 +456,217 @@ Deno.serve(async (req) => {
           break;
         }
 
+        // Handle payment plan installment payment
+        const paymentForPlanInstallment = session.metadata?.payment_for === 'payment_plan_installment';
+        if (paymentForPlanInstallment) {
+          const planId = session.metadata?.plan_id;
+          const planUserId = session.metadata?.user_id;
+          const effectiveAmount = parseFloat(session.metadata?.effective_amount || '0');
+          const netServiceCharge = parseFloat(session.metadata?.net_service_charge || '0');
+          const planPaymentStatus = session.payment_status;
+
+          console.log(`Payment plan installment checkout completed: plan=${planId}, status=${planPaymentStatus}`);
+
+          if (planPaymentStatus === 'paid' && planId && planUserId) {
+            // Call the shared finalization logic via RPC-like edge function call
+            const { data: planData } = await supabase
+              .from('booking_payment_plans')
+              .select(`
+                id, booking_id, total_plan_amount, total_amount_paid,
+                bookings!inner(id, user_id, tour_id, booking_code, tours!inner(name))
+              `)
+              .eq('id', planId)
+              .maybeSingle();
+
+            if (!planData) {
+              console.error(`Payment plan ${planId} not found`);
+              break;
+            }
+
+            const bookingRow = planData.bookings as any;
+
+            // Load overdue and pending installments ordered by due_date (oldest first)
+            const { data: installments } = await supabase
+              .from('booking_payment_plan_installments')
+              .select('id, installment_number, label, amount_due, amount_paid, due_date, status, penalty_applied')
+              .eq('plan_id', planId)
+              .in('status', ['overdue', 'overdue_grace', 'pending', 'partially_paid'])
+              .order('due_date', { ascending: true });
+
+            if (!installments || installments.length === 0) {
+              console.error(`No pending installments for plan ${planId}`);
+              break;
+            }
+
+            // Allocate payment chronologically (oldest first)
+            const allocations: Array<{ installment_id: string; amount_allocated: number }> = [];
+            let remaining = effectiveAmount;
+
+            for (const inst of installments) {
+              if (remaining <= 0) break;
+              const amountOwed = Number(inst.amount_due) + Number(inst.penalty_applied) - Number(inst.amount_paid);
+              if (amountOwed <= 0) continue;
+              const allocated = Math.min(remaining, amountOwed);
+              allocations.push({ installment_id: inst.id, amount_allocated: parseFloat(allocated.toFixed(2)) });
+              remaining = parseFloat((remaining - allocated).toFixed(2));
+            }
+
+            // Consume membership exemption
+            if (netServiceCharge > 0) {
+              const grossServiceCharge = parseFloat((effectiveAmount * 5 / 100).toFixed(2));
+              const exemptionApplied = Math.max(0, grossServiceCharge - netServiceCharge);
+              if (exemptionApplied > 0) {
+                const { data: membership } = await supabase
+                  .from('memberships')
+                  .select('id, service_fee_exemption_used')
+                  .eq('user_id', planUserId)
+                  .eq('status', 'active')
+                  .maybeSingle();
+                if (membership) {
+                  await supabase.from('memberships').update({
+                    service_fee_exemption_used: (Number(membership.service_fee_exemption_used) || 0) + exemptionApplied,
+                  }).eq('id', membership.id);
+                }
+              }
+            }
+
+            // Award points if active membership
+            let pointsEarned = 0;
+            const { data: activeMembership } = await supabase
+              .from('memberships')
+              .select('id')
+              .eq('user_id', planUserId)
+              .eq('status', 'active')
+              .gt('current_period_end', new Date().toISOString())
+              .maybeSingle();
+
+            if (activeMembership) {
+              pointsEarned = Math.floor(effectiveAmount + netServiceCharge);
+              if (pointsEarned > 0) {
+                const { data: walletId } = await supabase.rpc('get_or_create_points_wallet', { p_user_id: planUserId });
+                if (walletId) {
+                  const { data: pWallet } = await supabase
+                    .from('toursred_points_wallets')
+                    .select('id, balance, total_earned')
+                    .eq('id', walletId)
+                    .maybeSingle();
+                  if (pWallet) {
+                    const newBalance = pWallet.balance + pointsEarned;
+                    await supabase.from('toursred_points_transactions').insert({
+                      wallet_id: walletId,
+                      user_id: planUserId,
+                      amount: pointsEarned,
+                      balance_after: newBalance,
+                      type: 'earned',
+                      description: `Puntos por abono: ${bookingRow.tours?.name ?? 'Tour'} (${bookingRow.booking_code ?? ''})`,
+                      reference_id: planId,
+                      reference_type: 'payment_plan',
+                      expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                    });
+                    await supabase.from('toursred_points_wallets').update({
+                      balance: newBalance,
+                      total_earned: pWallet.total_earned + pointsEarned,
+                    }).eq('id', walletId);
+                  }
+                }
+              }
+            }
+
+            // Create transaction record
+            const { data: txRecord, error: txError } = await supabase
+              .from('booking_payment_plan_transactions')
+              .insert({
+                plan_id: planId,
+                booking_id: bookingRow.id,
+                user_id: planUserId,
+                amount: effectiveAmount,
+                service_charge: netServiceCharge,
+                payment_provider: 'stripe',
+                provider_transaction_id: session.payment_intent as string ?? session.id,
+                membership_exemption_used: netServiceCharge > 0,
+                points_earned: pointsEarned,
+                status: 'completed',
+              })
+              .select()
+              .single();
+
+            if (txError || !txRecord) {
+              console.error(`Error creating payment plan transaction: ${txError?.message}`);
+              break;
+            }
+
+            // Create allocations
+            if (allocations.length > 0) {
+              await supabase.from('booking_payment_plan_transaction_allocations').insert(
+                allocations.map((a) => ({
+                  transaction_id: txRecord.id,
+                  installment_id: a.installment_id,
+                  amount_allocated: a.amount_allocated,
+                }))
+              );
+            }
+
+            // Update each installment based on allocation
+            for (const alloc of allocations) {
+              const inst = installments.find((i) => i.id === alloc.installment_id)!;
+              const totalPaid = parseFloat((Number(inst.amount_paid) + alloc.amount_allocated).toFixed(2));
+              const totalDue = parseFloat((Number(inst.amount_due) + Number(inst.penalty_applied)).toFixed(2));
+              const newStatus = totalPaid >= totalDue ? 'paid' : 'partially_paid';
+              await supabase.from('booking_payment_plan_installments').update({
+                amount_paid: totalPaid,
+                status: newStatus,
+                ...(newStatus === 'paid' ? { paid_at: new Date().toISOString() } : {}),
+                updated_at: new Date().toISOString(),
+              }).eq('id', alloc.installment_id);
+            }
+
+            // Update plan totals
+            const newTotalPaid = parseFloat((Number(planData.total_amount_paid) + effectiveAmount).toFixed(2));
+            const planComplete = newTotalPaid >= Number(planData.total_plan_amount);
+            await supabase.from('booking_payment_plans').update({
+              total_amount_paid: newTotalPaid,
+              status: planComplete ? 'completed' : 'active',
+              updated_at: new Date().toISOString(),
+            }).eq('id', planId);
+
+            // Update bookings.payment_plan_paid
+            await supabase.from('bookings').update({
+              payment_plan_paid: newTotalPaid,
+              payment_plan_status: planComplete ? 'completed' : 'active',
+              updated_at: new Date().toISOString(),
+            }).eq('id', bookingRow.id);
+
+            // Trigger CFDI generation for each newly-paid installment
+            const { data: platformSettings } = await supabase
+              .from('platform_settings')
+              .select('pac_provider, pac_api_key_encrypted')
+              .maybeSingle();
+
+            if (platformSettings?.pac_provider && platformSettings.pac_provider !== 'none' && platformSettings.pac_api_key_encrypted) {
+              for (const alloc of allocations) {
+                const inst = installments.find((i) => i.id === alloc.installment_id)!;
+                const instAfterPaid = parseFloat((Number(inst.amount_paid) + alloc.amount_allocated).toFixed(2));
+                const instTotalDue = parseFloat((Number(inst.amount_due) + Number(inst.penalty_applied)).toFixed(2));
+                if (instAfterPaid >= instTotalDue) {
+                  EdgeRuntime.waitUntil(
+                    fetch(`${supabaseUrl}/functions/v1/generate-booking-installment-cfdi`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabaseServiceKey}` },
+                      body: JSON.stringify({
+                        installment_id: alloc.installment_id,
+                        transaction_id: txRecord.id,
+                      }),
+                    }).catch(() => {})
+                  );
+                }
+              }
+            }
+
+            console.log(`✅ Payment plan installment processed for plan ${planId}`);
+          }
+          break;
+        }
+
         if (!bookingId) {
           console.error("No booking ID or gift card ID in session metadata");
           break;
