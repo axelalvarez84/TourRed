@@ -109,7 +109,7 @@ const PreventasSection: React.FC = () => {
           </div>
           {!hasMembership && (
             <Link
-              to="/membresia"
+              to="/traveler/membership"
               className="hidden md:flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex-shrink-0"
             >
               <Crown className="w-4 h-4" />
@@ -163,7 +163,7 @@ const PreventasSection: React.FC = () => {
                       <div className="bg-white/95 rounded-xl px-4 py-3 text-center shadow-lg">
                         <Lock className="w-5 h-5 text-amber-600 mx-auto mb-1" />
                         <p className="text-xs font-semibold text-gray-800">Solo socios ToursRed Plus</p>
-                        <Link to="/membresia" className="text-xs text-amber-600 hover:text-amber-700 font-medium">
+                        <Link to="/traveler/membership" className="text-xs text-amber-600 hover:text-amber-700 font-medium">
                           Obtener membresía
                         </Link>
                       </div>
@@ -233,7 +233,7 @@ const PreventasSection: React.FC = () => {
               </div>
             </div>
             <Link
-              to="/membresia"
+              to="/traveler/membership"
               className="flex-shrink-0 flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold px-6 py-3 rounded-xl transition-colors shadow-md"
             >
               <Crown className="w-4 h-4" />

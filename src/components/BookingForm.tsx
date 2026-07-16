@@ -1333,7 +1333,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
             </div>
           )}
           <Link
-            to="/membresia"
+            to="/traveler/membership"
             className="block w-full text-center bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
           >
             <Crown className="w-4 h-4 inline mr-2" />
