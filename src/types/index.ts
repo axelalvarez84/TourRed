@@ -869,6 +869,7 @@ export interface ReferralCode {
   max_referrals_allowed: number;
   created_at: string;
   updated_at: string;
+  code_changed_at?: string | null;
 }
 
 export interface ReferralRelationship {
