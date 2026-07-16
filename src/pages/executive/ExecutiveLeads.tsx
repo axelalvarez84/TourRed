@@ -499,6 +499,7 @@ export default function ExecutiveLeads() {
   };
 
   const filtered = leads.filter(l => {
+    if (l.status === 'aprobado') return false;
     const matchSearch = !search ||
       l.agency_name.toLowerCase().includes(search.toLowerCase()) ||
       l.contact_email.toLowerCase().includes(search.toLowerCase()) ||
@@ -626,20 +627,24 @@ export default function ExecutiveLeads() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => openEdit(lead)}
-                            className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700 transition-colors"
-                            title="Editar"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => { setShowFollowUp(lead); setNewNote(''); }}
-                            className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700 transition-colors"
-                            title="Agregar nota"
-                          >
-                            <MessageSquare className="h-4 w-4" />
-                          </button>
+                          {lead.status !== 'aprobado' && (
+                            <button
+                              onClick={() => openEdit(lead)}
+                              className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700 transition-colors"
+                              title="Editar"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                          )}
+                          {lead.status !== 'aprobado' && (
+                            <button
+                              onClick={() => { setShowFollowUp(lead); setNewNote(''); }}
+                              className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700 transition-colors"
+                              title="Agregar nota"
+                            >
+                              <MessageSquare className="h-4 w-4" />
+                            </button>
+                          )}
                           {!lead.converted_agency_id && (
                             <button
                               onClick={() => { setShowConvertModal(lead); resetConvertForm(); }}

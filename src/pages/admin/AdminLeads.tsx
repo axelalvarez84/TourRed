@@ -169,6 +169,7 @@ export default function AdminLeads() {
   };
 
   const filtered = leads.filter(l => {
+    if (l.status === 'aprobado') return false;
     const matchSearch = !search ||
       l.agency_name.toLowerCase().includes(search.toLowerCase()) ||
       l.contact_email.toLowerCase().includes(search.toLowerCase()) ||
