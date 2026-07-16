@@ -8,6 +8,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+function resolvePlanType(metadata: any, periodStart: number, periodEnd: number, fallback: string = 'monthly'): string {
+  if (metadata?.plan_type === 'annual' || metadata?.plan_type === 'monthly') return metadata.plan_type;
+  const daysDiff = (periodEnd - periodStart) / 86400;
+  return daysDiff >= 360 ? 'annual' : fallback;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -789,7 +795,7 @@ Deno.serve(async (req) => {
                     user_id: membershipUserId,
                     stripe_customer_id: subscriptionData.customer as string,
                     stripe_subscription_id: subscriptionId,
-                    plan_type: subscriptionData.metadata?.plan_type || membershipPlan,
+                    plan_type: resolvePlanType(subscriptionData.metadata, (subscriptionData as any).items.data[0].current_period_start, (subscriptionData as any).items.data[0].current_period_end, membershipPlan),
                     status: statusMapMixed[subscriptionData.status] || 'active',
                     start_date: new Date((subscriptionData.start_date as number) * 1000).toISOString(),
                     current_period_start: new Date((subscriptionData as any).items.data[0].current_period_start * 1000).toISOString(),
@@ -823,7 +829,7 @@ Deno.serve(async (req) => {
                           body: JSON.stringify({
                             email: userData.email,
                             firstName: userData.first_name || 'Viajero',
-                            planType: subscriptionData.metadata?.plan_type || membershipPlan,
+                            planType: resolvePlanType(subscriptionData.metadata, (subscriptionData as any).items.data[0].current_period_start, (subscriptionData as any).items.data[0].current_period_end, membershipPlan),
                             startDate: new Date((subscriptionData as any).items.data[0].current_period_start * 1000).toISOString(),
                             endDate: new Date((subscriptionData as any).items.data[0].current_period_end * 1000).toISOString(),
                           }),
@@ -1682,7 +1688,7 @@ Deno.serve(async (req) => {
           user_id: userId,
           stripe_customer_id: subscription.customer,
           stripe_subscription_id: subscription.id,
-          plan_type: subscription.metadata?.plan_type || 'monthly',
+          plan_type: resolvePlanType(subscription.metadata, subscription.items.data[0].current_period_start, subscription.items.data[0].current_period_end),
           status: mappedStatus,
           start_date: new Date(subscription.start_date * 1000).toISOString(),
           current_period_start: new Date(subscription.items.data[0].current_period_start * 1000).toISOString(),
@@ -1693,7 +1699,6 @@ Deno.serve(async (req) => {
         };
 
         console.log('Upserting membership:', membershipData);
-
         const { data: membershipResult, error: membershipError } = await supabase
           .from('memberships')
           .upsert(membershipData, {
@@ -1747,7 +1752,7 @@ Deno.serve(async (req) => {
                     body: JSON.stringify({
                       email: userData.email,
                       firstName: userData.first_name || 'Viajero',
-                      planType: subscription.metadata?.plan_type || 'monthly',
+                      planType: resolvePlanType(subscription.metadata, subscription.items.data[0].current_period_start, subscription.items.data[0].current_period_end),
                       startDate: new Date(subscription.items.data[0].current_period_start * 1000).toISOString(),
                       endDate: new Date(subscription.items.data[0].current_period_end * 1000).toISOString(),
                     }),
@@ -1818,7 +1823,7 @@ Deno.serve(async (req) => {
                   user_id: userId,
                   stripe_customer_id: subscriptionData.customer as string,
                   stripe_subscription_id: subscriptionData.id,
-                  plan_type: subscriptionData.metadata?.plan_type || 'monthly',
+                  plan_type: resolvePlanType(subscriptionData.metadata, (subscriptionData as any).items.data[0].current_period_start, (subscriptionData as any).items.data[0].current_period_end),
                   status: statusMapLocal[subscriptionData.status] || 'active',
                   start_date: new Date((subscriptionData.start_date as number) * 1000).toISOString(),
                   current_period_start: new Date((subscriptionData as any).items.data[0].current_period_start * 1000).toISOString(),
