@@ -508,7 +508,9 @@ export default function ExecutiveLeads() {
     return matchSearch && matchStatus;
   });
 
-  const statusCounts = leads.reduce((acc, l) => {
+  const activeLeads = leads.filter(l => l.status !== 'aprobado');
+
+  const statusCounts = activeLeads.reduce((acc, l) => {
     acc[l.status] = (acc[l.status] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -543,9 +545,9 @@ export default function ExecutiveLeads() {
           onClick={() => setStatusFilter('all')}
           className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${statusFilter === 'all' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
         >
-          Todos ({leads.length})
+          Todos ({activeLeads.length})
         </button>
-        {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+        {Object.entries(STATUS_CONFIG).filter(([key]) => key !== 'aprobado').map(([key, cfg]) => (
           <button
             key={key}
             onClick={() => setStatusFilter(key)}
@@ -711,7 +713,7 @@ export default function ExecutiveLeads() {
                     onChange={e => setForm(f => ({ ...f, status: e.target.value as LeadStatus }))}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                    {Object.entries(STATUS_CONFIG).filter(([key]) => key !== 'aprobado').map(([key, cfg]) => (
                       <option key={key} value={key}>{cfg.label}</option>
                     ))}
                   </select>
