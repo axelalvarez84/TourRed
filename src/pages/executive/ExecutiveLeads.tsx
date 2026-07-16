@@ -451,7 +451,7 @@ export default function ExecutiveLeads() {
     setActionLoading(true);
     setActionMessage('');
     try {
-      const { data: session } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fix-agency-email`, {
         method: 'POST',
         headers: {
@@ -478,7 +478,8 @@ export default function ExecutiveLeads() {
     setActionLoading(true);
     setActionMessage('');
     try {
-      const { data: session } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Tu sesión ha expirado, vuelve a iniciar sesión');
       const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resend-agency-credentials`, {
         method: 'POST',
         headers: {

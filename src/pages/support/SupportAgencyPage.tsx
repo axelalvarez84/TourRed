@@ -71,7 +71,7 @@ const SupportAgencyPage: React.FC = () => {
     setError(null);
 
     try {
-      const { data: session } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       const token = session.session?.access_token;
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 

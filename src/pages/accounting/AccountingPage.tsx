@@ -553,7 +553,7 @@ const AccountingPage: React.FC = () => {
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      const { data: session } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       const token = session.session?.access_token;
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-accounting-entries`;
       const res = await fetch(url, {
@@ -579,7 +579,7 @@ const AccountingPage: React.FC = () => {
     if (!canExport) return;
     setExporting(true);
     try {
-      const { data: session } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       const token = session.session?.access_token;
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-sat-xml?year=${year}&month=${month}`;
       const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
