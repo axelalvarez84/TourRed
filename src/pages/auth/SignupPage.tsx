@@ -114,7 +114,7 @@ const SignupPage: React.FC = () => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify({ code: code.toUpperCase() }),
+          body: JSON.stringify({ code: code.trim().toLowerCase() }),
         }
       );
 

@@ -84,7 +84,7 @@ const FacebookTravelerSignupPage: React.FC = () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
-          body: JSON.stringify({ code: code.toUpperCase() }),
+          body: JSON.stringify({ code: code.trim().toLowerCase() }),
         }
       );
       setReferralValidation(await res.json());
@@ -187,12 +187,12 @@ const FacebookTravelerSignupPage: React.FC = () => {
         try {
           await supabase.from('users').update({
             referred_by_user_id: referralValidation.referrer_id,
-            referral_code_used: referralCode.toUpperCase(),
+            referral_code_used: referralCode.trim().toLowerCase(),
           }).eq('id', user.id);
           await supabase.from('referral_relationships').insert({
             referrer_user_id: referralValidation.referrer_id,
             referred_user_id: user.id,
-            referral_code_used: referralCode.toUpperCase(),
+            referral_code_used: referralCode.trim().toLowerCase(),
             status: 'pending',
           });
         } catch { /* best-effort */ }
@@ -274,7 +274,7 @@ const FacebookTravelerSignupPage: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700">Código de Referido <span className="text-gray-400 font-normal">(Opcional)</span></label>
               <div className="mt-1 relative">
-                <input type="text" value={referralCode} onChange={e => setReferralCode(e.target.value.toUpperCase())} placeholder="Ej: ABC12345" maxLength={8} className={`${inputClass} pr-10 uppercase`} />
+                <input type="text" value={referralCode} onChange={e => setReferralCode(e.target.value.toLowerCase())} placeholder="Ej: juan_perez" maxLength={20} className={`${inputClass} pr-10 lowercase`} />
                 {isValidatingReferral && <div className="absolute inset-y-0 right-0 pr-3 flex items-center"><Loader className="h-5 w-5 text-gray-400 animate-spin" /></div>}
                 {!isValidatingReferral && referralValidation && (
                   <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
