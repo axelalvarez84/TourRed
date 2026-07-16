@@ -121,7 +121,23 @@ Deno.serve(async (req: Request) => {
     const insuranceCost = booking.travel_insurance_included
       ? Number(booking.travel_insurance_cost || 0)
       : 0;
-    const suggestedRefund = Number(booking.deposit_amount || 0) + insuranceCost + optionalServicesRefundable;
+
+    // Calculate total actually paid by traveler (deposit + payment plan installments)
+    let totalPaidByTraveler = Number(booking.deposit_amount || 0);
+
+    if (booking.has_payment_plan) {
+      const { data: installments } = await supabase
+        .from("booking_payment_plan_installments")
+        .select("amount_paid")
+        .eq("booking_id", booking_id)
+        .in("status", ["paid", "partially_paid"]);
+
+      for (const inst of (installments || [])) {
+        totalPaidByTraveler += Number(inst.amount_paid || 0);
+      }
+    }
+
+    const suggestedRefund = totalPaidByTraveler + insuranceCost + optionalServicesRefundable;
 
     const now = new Date().toISOString();
     let receiptFilePath: string | null = null;

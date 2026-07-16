@@ -69,7 +69,29 @@ interface BookingRow {
   travel_insurance_included: boolean;
   travel_insurance_cost: number;
   insurance_email_sent: boolean;
+  has_payment_plan: boolean;
+  payment_plan_total: number | null;
+  payment_plan_paid: number | null;
+  payment_plan_status: string | null;
+  selected_payment_mode: string | null;
   admin_cancellation_id: string | null;
+  payment_plan?: {
+    id: string;
+    mode: string;
+    total_plan_amount: number;
+    total_amount_paid: number;
+    status: string;
+    installments: {
+      id: string;
+      installment_number: number;
+      label: string;
+      amount_due: number;
+      amount_paid: number;
+      due_date: string;
+      status: string;
+      paid_at: string | null;
+    }[];
+  } | null;
   // joined (estructura de la Edge Function)
   users: {
     first_name: string;
@@ -264,7 +286,8 @@ function AdminBookings() {
           preventa_comision_descuento, discount_amount, es_reserva_preventa,
           needs_seat_reselection, selected_seats,
           travel_insurance_included, travel_insurance_cost, insurance_email_sent,
-  admin_cancellation_id
+          has_payment_plan, payment_plan_total, payment_plan_paid, payment_plan_status,
+          selected_payment_mode, admin_cancellation_id
         `)
         .neq('status', 'draft')
         .order('created_at', { ascending: false });
@@ -283,11 +306,19 @@ function AdminBookings() {
       const bookingIds = rawBookings.map(b => b.id);
 
       // Queries paralelos de lookup
-      const [usersRes, toursRes, agenciesRes, commRes] = await Promise.all([
+      const planBookingIds = rawBookings.filter(b => b.has_payment_plan).map(b => b.id);
+
+      const [usersRes, toursRes, agenciesRes, commRes, plansRes, installmentsRes] = await Promise.all([
         supabase.from('users').select('id, first_name, last_name, email, profile_picture_url, phone_number, is_active, curp, rfc, razon_social, regimen_fiscal, uso_cfdi, is_foreign_traveler, passport_number').in('id', userIds),
         supabase.from('tours').select('id, name, destination, start_date, end_date, image_url, price, deposit_percentage, booking_approval_type, category').in('id', tourIds),
         supabase.from('agencies').select('id, name, logo, contact_email, contact_phone, commission_rate').in('id', agencyIds),
         supabase.from('commission_records').select('id, booking_id, agency_commission_rate, agency_commission_amount, service_charge_rate, service_charge_amount, platform_total_revenue, agency_net_amount, status, processed_at').in('booking_id', bookingIds),
+        planBookingIds.length > 0
+          ? supabase.from('booking_payment_plans').select('id, booking_id, mode, total_plan_amount, total_amount_paid, status').in('booking_id', planBookingIds)
+          : Promise.resolve({ data: [], error: null } as any),
+        planBookingIds.length > 0
+          ? supabase.from('booking_payment_plan_installments').select('id, plan_id, booking_id, installment_number, label, amount_due, amount_paid, due_date, status, paid_at').in('booking_id', planBookingIds).order('installment_number', { ascending: true })
+          : Promise.resolve({ data: [], error: null } as any),
       ]);
 
       // Mapas para lookup O(1)
@@ -300,6 +331,16 @@ function AdminBookings() {
         commMap[c.booking_id]!.push(c);
       }
 
+      const plansMap: Record<string, any> = {};
+      for (const p of (plansRes.data || [])) {
+        plansMap[p.booking_id] = { ...p, installments: [] };
+      }
+      for (const i of (installmentsRes.data || [])) {
+        if (plansMap[i.booking_id]) {
+          plansMap[i.booking_id].installments.push(i);
+        }
+      }
+
       // Ensamblar resultado final
       const enriched: BookingRow[] = rawBookings.map(b => ({
         ...b,
@@ -307,6 +348,7 @@ function AdminBookings() {
         tours: toursMap[b.tour_id] ?? null,
         agencies: agenciesMap[b.agency_id] ?? null,
         commission_records: commMap[b.id] ?? null,
+        payment_plan: plansMap[b.id] ?? null,
       }));
 
       setBookings(enriched);
@@ -834,13 +876,19 @@ const DetailModal: React.FC<{ booking: BookingRow; onClose: () => void }> = ({ b
           {/* ── Desglose financiero ─────────────────────────────────────────────── */}
           <div className="lg:col-span-2">
             <Section title="Desglose Financiero" icon={<DollarSign className="h-4 w-4" />}>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
                 {[
                   { label: 'Total Reserva', val: Number(b.total_price), highlight: true },
                   { label: 'Deposito requerido', val: Number(b.deposit_amount ?? 0) },
-                  { label: 'Pago del viajero', val: Number(b.user_payment ?? 0) },
+                  { label: 'Total pagado', val: (() => {
+                    if (b.payment_plan?.installments?.length) {
+                      return b.payment_plan.installments.reduce((s, i) => s + Number(i.amount_paid || 0), 0);
+                    }
+                    return Number(b.user_payment ?? 0);
+                  })(), highlight: b.has_payment_plan },
                   { label: 'Cargo por servicio', val: Number(b.service_charge) },
                   { label: 'Ingreso plataforma', val: Number(b.platform_revenue ?? 0) },
+                  { label: 'Seguro de viajero', val: Number(b.travel_insurance_included ? b.travel_insurance_cost || 0 : 0), highlight: b.travel_insurance_included },
                 ].map(({ label, val, highlight }) => (
                   <div key={label} className={`rounded-lg p-3 ${highlight ? 'bg-blue-50 border border-blue-100' : 'bg-gray-50'}`}>
                     <div className={`text-base font-bold ${highlight ? 'text-blue-700' : 'text-gray-900'}`}>
@@ -972,6 +1020,61 @@ const DetailModal: React.FC<{ booking: BookingRow; onClose: () => void }> = ({ b
             </Section>
           )}
 
+          {/* ── Plan de Pagos ──────────────────────────────────────────────────── */}
+          {b.payment_plan && b.payment_plan.installments?.length > 0 && (
+            <Section title="Plan de Pagos" icon={<CreditCard className="h-4 w-4" />}>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-3 mb-4 border-b border-gray-100 pb-4">
+                <Field label="Modo" value={b.payment_plan.mode === 'installments' ? 'Parcialidades' : b.payment_plan.mode === 'free_form' ? 'Libre' : 'Pago unico'} />
+                <Field label="Total del plan" value={formatCurrencyMXN(Number(b.payment_plan.total_plan_amount))} />
+                <Field label="Total pagado" value={formatCurrencyMXN(Number(b.payment_plan.total_amount_paid))} highlight />
+                <Field label="Pendiente" value={formatCurrencyMXN(Number(b.payment_plan.total_plan_amount) - Number(b.payment_plan.total_amount_paid))} />
+                <Field label="Estado" value={b.payment_plan.status === 'active' ? 'Activo' : b.payment_plan.status === 'completed' ? 'Completado' : b.payment_plan.status === 'defaulted' ? 'Incumplido' : 'Cancelado'} />
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
+                      <th className="py-2 pr-4">#</th>
+                      <th className="py-2 pr-4">Etiqueta</th>
+                      <th className="py-2 pr-4">Vencimiento</th>
+                      <th className="py-2 pr-4 text-right">Monto</th>
+                      <th className="py-2 pr-4 text-right">Pagado</th>
+                      <th className="py-2 pr-4">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {b.payment_plan.installments.map((inst) => (
+                      <tr key={inst.id} className="border-b border-gray-50">
+                        <td className="py-2 pr-4 text-gray-600">{inst.installment_number}</td>
+                        <td className="py-2 pr-4 text-gray-800">{inst.label}</td>
+                        <td className="py-2 pr-4 text-gray-600">{new Date(inst.due_date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                        <td className="py-2 pr-4 text-right font-medium text-gray-800">{formatCurrencyMXN(Number(inst.amount_due))}</td>
+                        <td className="py-2 pr-4 text-right font-medium text-green-700">{formatCurrencyMXN(Number(inst.amount_paid))}</td>
+                        <td className="py-2 pr-4">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            inst.status === 'paid' ? 'bg-green-100 text-green-700' :
+                            inst.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                            inst.status === 'overdue' || inst.status === 'overdue_grace' ? 'bg-red-100 text-red-700' :
+                            inst.status === 'partially_paid' ? 'bg-blue-100 text-blue-700' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {inst.status === 'paid' ? 'Pagada' :
+                             inst.status === 'pending' ? 'Pendiente' :
+                             inst.status === 'overdue' ? 'Vencida' :
+                             inst.status === 'overdue_grace' ? 'Gracia' :
+                             inst.status === 'partially_paid' ? 'Pago parcial' :
+                             inst.status === 'waived' ? 'Exenta' :
+                             inst.status === 'cancelled' ? 'Cancelada' : inst.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Section>
+          )}
+
           {/* ── Seguro de Viajero ────────────────────────────────────────────────── */}
           {b.travel_insurance_included && (
             <Section title="Seguro de Viajero" icon={<Shield className="h-4 w-4 text-emerald-600" />}>
@@ -1069,10 +1172,15 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
   const [confirmStep, setConfirmStep] = useState(false);
 
   useEffect(() => {
-    // Suggest refund amount based on booking data
+    // Suggest refund amount based on total actually paid by traveler
     const insurance = booking.travel_insurance_included ? Number(booking.travel_insurance_cost || 0) : 0;
-    const suggested = Number(booking.deposit_amount || 0) + insurance;
-    setRefundAmount(suggested);
+    let totalPaid: number;
+    if (booking.payment_plan?.installments?.length) {
+      totalPaid = booking.payment_plan.installments.reduce((s, i) => s + Number(i.amount_paid || 0), 0);
+    } else {
+      totalPaid = Number(booking.user_payment ?? booking.deposit_amount ?? 0);
+    }
+    setRefundAmount(totalPaid + insurance);
   }, [booking]);
 
   const handleSubmit = async () => {
@@ -1168,7 +1276,10 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
   };
 
   const insuranceCost = booking.travel_insurance_included ? Number(booking.travel_insurance_cost || 0) : 0;
-  const suggestedAmount = Number(booking.deposit_amount || 0) + insuranceCost;
+  const totalPaidByTraveler = booking.payment_plan?.installments?.length
+    ? booking.payment_plan.installments.reduce((s, i) => s + Number(i.amount_paid || 0), 0)
+    : Number(booking.user_payment ?? booking.deposit_amount ?? 0);
+  const suggestedAmount = totalPaidByTraveler + insuranceCost;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
@@ -1203,7 +1314,7 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div><span className="text-gray-500">Tour:</span> <span className="font-medium text-gray-800">{booking.tours?.name}</span></div>
               <div><span className="text-gray-500">Viajero:</span> <span className="font-medium text-gray-800">{booking.users ? `${booking.users.first_name} ${booking.users.last_name}` : '—'}</span></div>
-              <div><span className="text-gray-500">Depósito:</span> <span className="font-medium text-gray-800">{formatCurrencyMXN(Number(booking.deposit_amount || 0))}</span></div>
+              <div><span className="text-gray-500">Total pagado por viajero:</span> <span className="font-medium text-gray-800">{formatCurrencyMXN(totalPaidByTraveler)}</span></div>
               <div><span className="text-gray-500">Seguro:</span> <span className="font-medium text-gray-800">{insuranceCost > 0 ? formatCurrencyMXN(insuranceCost) : 'N/A'}</span></div>
             </div>
           </div>
