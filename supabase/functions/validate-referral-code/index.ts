@@ -49,7 +49,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const upperCode = code.toUpperCase().trim();
+    const normalizedCode = code.trim().toLowerCase();
 
     const { data: referralCode, error: codeError } = await supabase
       .from('referral_codes')
@@ -68,7 +68,7 @@ Deno.serve(async (req: Request) => {
           role
         )
       `)
-      .eq('code', upperCode)
+      .ilike('code', normalizedCode)
       .maybeSingle();
 
     if (codeError) {

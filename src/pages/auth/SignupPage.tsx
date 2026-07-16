@@ -289,7 +289,7 @@ const SignupPage: React.FC = () => {
             .from('users')
             .update({
               referred_by_user_id: referralValidation.referrer_id,
-              referral_code_used: referralCode.toUpperCase()
+              referral_code_used: referralCode.trim().toLowerCase()
             })
             .eq('id', data.user.id);
 
@@ -302,7 +302,7 @@ const SignupPage: React.FC = () => {
             .insert({
               referrer_user_id: referralValidation.referrer_id,
               referred_user_id: data.user.id,
-              referral_code_used: referralCode.toUpperCase(),
+              referral_code_used: referralCode.trim().toLowerCase(),
               status: 'pending'
             });
 
@@ -337,7 +337,7 @@ const SignupPage: React.FC = () => {
                       ? `${referrerData.first_name} ${referrerData.last_name}`
                       : referrerData.email,
                     referredName: `${firstName} ${lastName}`,
-                    referralCode: referralCode.toUpperCase()
+                    referralCode: referralCode.trim().toLowerCase()
                   })
                 });
 
@@ -854,10 +854,10 @@ const SignupPage: React.FC = () => {
                   name="referralCode"
                   type="text"
                   value={referralCode}
-                  onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                  placeholder="Ej: ABC12345"
-                  maxLength={8}
-                  className="appearance-none block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm uppercase"
+                  onChange={(e) => setReferralCode(e.target.value.toLowerCase())}
+                  placeholder="Ej: juan_perez"
+                  maxLength={20}
+                  className="appearance-none block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm lowercase"
                 />
                 {isValidatingReferral && (
                   <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
