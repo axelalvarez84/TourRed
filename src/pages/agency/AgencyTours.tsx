@@ -353,7 +353,6 @@ const AgencyTours: React.FC = () => {
   const [departurePoints, setDeparturePoints] = useState<string[]>(['']);
   const [selectedDeparturePoints, setSelectedDeparturePoints] = useState<SelectedDeparturePoint[]>([]);
   const [showCreateDepartureForm, setShowCreateDepartureForm] = useState(false);
-  const [tourImageData, setTourImageData] = useState<{base64: string, type: string, size: number} | null>(null);
   const [hasDraft, setHasDraft] = useState(false);
   const [optionalServices, setOptionalServices] = useState<OptionalService[]>([]);
   const [supplements, setSupplements] = useState<TourSupplement[]>([]);
@@ -1916,10 +1915,8 @@ const AgencyTours: React.FC = () => {
   };
 
 
-  const handleImageSelect = (base64: string, type: string, size: number) => {
-    setTourImageData({ base64, type, size });
-    // También actualizar la URL para vista previa
-    setFormData({ ...formData, image_url: base64 });
+  const handleImageSelect = (publicUrl: string, _type: string, _size: number) => {
+    setFormData({ ...formData, image_url: publicUrl });
   };
 
   const handleSubmit = async () => {
@@ -1935,8 +1932,8 @@ const AgencyTours: React.FC = () => {
         throw new Error('Debe seleccionar al menos un destino para el tour');
       }
 
-      // Validar que haya una imagen (URL o base64)
-      if (!formData.image_url && !tourImageData) {
+      // Validar que haya una imagen
+      if (!formData.image_url) {
         throw new Error('Debe proporcionar una imagen para el tour');
       }
 
@@ -2015,7 +2012,7 @@ const AgencyTours: React.FC = () => {
         itinerary: formData.itinerary,
         price: parseFloat(formData.price),
         deposit_percentage: parseInt(formData.deposit_percentage),
-        image_url: tourImageData ? tourImageData.base64 : formData.image_url,
+        image_url: formData.image_url,
         start_date: isReceptivo ? null : (editingTour && editingTourHasActiveBookings ? editingTour.start_date : formData.start_date),
         end_date: isReceptivo ? null : (editingTour && editingTourHasActiveBookings ? editingTour.end_date : formData.end_date),
         max_travelers: formData.max_travelers ? parseInt(formData.max_travelers) : null,
@@ -4073,26 +4070,19 @@ const AgencyTours: React.FC = () => {
                     currentImage={formData.image_url}
                     maxSizeMB={5}
                     placeholder="Subir imagen del tour"
+                    storageFolder="tours"
                   />
                   <div className="mt-3">
                     <label className="block text-xs font-medium text-gray-500 mb-1">O pega una URL de imagen</label>
                     <input
                       type="url"
-                      value={tourImageData ? '' : formData.image_url}
+                      value={formData.image_url}
                       onChange={(e) => {
                         setFormData({...formData, image_url: e.target.value});
-                        if (e.target.value) setTourImageData(null);
                       }}
                       className="input text-sm"
                       placeholder="https://ejemplo.com/imagen.jpg"
-                      disabled={!!tourImageData}
                     />
-                    {tourImageData && (
-                      <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                        <CheckSquare className="w-3.5 h-3.5" />
-                        Imagen subida correctamente
-                      </p>
-                    )}
                   </div>
                 </div>
               </div>

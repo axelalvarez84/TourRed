@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin } from 'lucide-react';
-import { supabase, getImageSrc } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 
 interface Destination {
   id: string;

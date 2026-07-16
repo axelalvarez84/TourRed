@@ -1,13 +1,15 @@
 import React, { useState, useRef } from 'react';
-import { Upload, X, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, AlertCircle, Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 interface ImageUploaderProps {
-  onImageSelect: (base64: string, type: string, size: number) => void;
+  onImageSelect: (publicUrl: string, type: string, size: number) => void;
   currentImage?: string;
   maxSizeMB?: number;
   acceptedTypes?: string[];
   className?: string;
   placeholder?: string;
+  storageFolder?: string;
 }
 
 const ImageUploader: React.FC<ImageUploaderProps> = ({
@@ -16,10 +18,11 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   maxSizeMB = 5,
   acceptedTypes = ['image/jpeg', 'image/png', 'image/webp'],
   className = '',
-  placeholder = 'Seleccionar imagen'
+  placeholder = 'Seleccionar imagen',
+  storageFolder = 'tours',
 }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
   const [preview, setPreview] = useState<string | null>(currentImage || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -33,12 +36,10 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   };
 
   const validateFile = (file: File): string | null => {
-    // Validar tipo de archivo
     if (!acceptedTypes.includes(file.type)) {
       return `Tipo de archivo no permitido. Solo se permiten: ${acceptedTypes.join(', ')}`;
     }
 
-    // Validar tamaño
     const maxSizeBytes = maxSizeMB * 1024 * 1024;
     if (file.size > maxSizeBytes) {
       return `El archivo es demasiado grande. Máximo ${maxSizeMB}MB permitido. Tamaño actual: ${formatFileSize(file.size)}`;
@@ -48,7 +49,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   };
 
   const processFile = async (file: File) => {
-    setIsProcessing(true);
+    setIsUploading(true);
     setError('');
 
     try {
@@ -58,24 +59,33 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         return;
       }
 
-      // Convertir a base64
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64 = e.target?.result as string;
-        setPreview(base64);
-        onImageSelect(base64, file.type, file.size);
-        setIsProcessing(false);
-      };
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const fileName = `${storageFolder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
 
-      reader.onerror = () => {
-        setError('Error al leer el archivo');
-        setIsProcessing(false);
-      };
+      const { error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: file.type,
+        });
 
-      reader.readAsDataURL(file);
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('images')
+        .getPublicUrl(fileName);
+
+      if (!urlData?.publicUrl) {
+        throw new Error('No se pudo obtener la URL pública de la imagen');
+      }
+
+      setPreview(urlData.publicUrl);
+      onImageSelect(urlData.publicUrl, file.type, file.size);
     } catch (err: any) {
-      setError(err.message || 'Error al procesar la imagen');
-      setIsProcessing(false);
+      setError(err.message || 'Error al subir la imagen');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -90,7 +100,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     e.preventDefault();
     setIsDragging(false);
 
-    const file = e.dataTransfer.files[0];
+    const file = e.dataTransfer.files?.[0];
     if (file) {
       processFile(file);
     }
@@ -143,10 +153,10 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           className="hidden"
         />
 
-        {isProcessing ? (
+        {isUploading ? (
           <div className="flex flex-col items-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600 mb-2"></div>
-            <p className="text-sm text-gray-600">Procesando imagen...</p>
+            <Loader2 className="h-8 w-8 text-primary-600 mb-2 animate-spin" />
+            <p className="text-sm text-gray-600">Subiendo imagen...</p>
           </div>
         ) : preview ? (
           <div className="space-y-3">
@@ -168,7 +178,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
               </button>
             </div>
             <p className="text-sm text-green-600 font-medium">
-              ✓ Imagen cargada correctamente
+              Imagen cargada correctamente
             </p>
             <p className="text-xs text-gray-500">
               Haz clic para cambiar la imagen
@@ -204,7 +214,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
       {/* Tips */}
       <div className="text-xs text-gray-500 space-y-1">
-        <p><strong>💡 Consejos:</strong></p>
+        <p><strong>Consejos:</strong></p>
         <ul className="list-disc list-inside space-y-1 ml-2">
           <li>Usa imágenes de alta calidad para mejor presentación</li>
           <li>Formatos recomendados: JPEG para fotos, PNG para gráficos</li>

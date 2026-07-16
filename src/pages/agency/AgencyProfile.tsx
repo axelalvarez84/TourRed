@@ -317,8 +317,8 @@ const AgencyProfile: React.FC = () => {
     setSuccess('');
   };
 
-  const handleLogoSelect = (base64: string, type: string, size: number) => {
-    setEditForm({ ...editForm, logo: base64 });
+  const handleLogoSelect = (publicUrl: string, _type: string, _size: number) => {
+    setEditForm({ ...editForm, logo: publicUrl });
   };
 
   const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -900,6 +900,7 @@ const AgencyProfile: React.FC = () => {
                       currentImage={editForm.logo}
                       maxSizeMB={2}
                       placeholder="Subir logo de la agencia"
+                      storageFolder="agencies"
                     />
                   </div>
 
@@ -916,6 +917,7 @@ const AgencyProfile: React.FC = () => {
                       currentImage={editForm.cover_image_url}
                       maxSizeMB={5}
                       placeholder="Subir imagen de portada"
+                      storageFolder="agencies"
                     />
                   </div>
 

@@ -1347,7 +1347,7 @@ export const getAllDestinations = async () => {
       .from('destinations')
       .select(`
         *,
-        destination_images(id, image_url, image_base64, caption, is_featured),
+        destination_images(id, image_url, caption, is_featured),
         tour_destinations(tour_id)
       `)
       .order('name', { ascending: true });

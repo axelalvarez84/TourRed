@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Image, MapPin, Globe, Clock, DollarSign, Users, Save, X, Upload, AlertCircle } from 'lucide-react';
+import { Plus, CreditCard as Edit, Trash2, Image, MapPin, Globe, Clock, DollarSign, Users, Save, X, Upload, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { getAllDestinations, createDestination, updateDestination, addDestinationImage, deleteDestinationImage, deleteDestination, getImageSrc } from '../../lib/supabase';
+import { getAllDestinations, createDestination, updateDestination, addDestinationImage, deleteDestinationImage, deleteDestination } from '../../lib/supabase';
 import { Destination, DestinationImage, ImageUploadData } from '../../types';
 import ImageUploader from '../../components/ImageUploader';
 
@@ -17,15 +17,13 @@ const AgencyDestinations: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    main_image_base64: '',
-    main_image_type: '',
-    main_image_size: 0,
+    main_image_url: '',
     country: 'México',
     region: '',
     best_time_to_visit: '',
   });
 
-  const [newImageData, setNewImageData] = useState<ImageUploadData | null>(null);
+  const [newImageUrl, setNewImageUrl] = useState('');
   const [newImageCaption, setNewImageCaption] = useState('');
   const [deletingDestination, setDeletingDestination] = useState<string | null>(null);
 
@@ -56,14 +54,12 @@ const AgencyDestinations: React.FC = () => {
     setFormData({
       name: '',
       description: '',
-      main_image_base64: '',
-      main_image_type: '',
-      main_image_size: 0,
+      main_image_url: '',
       country: 'México',
       region: '',
       best_time_to_visit: '',
     });
-    setNewImageData(null);
+    setNewImageUrl('');
     setNewImageCaption('');
   };
 
@@ -77,9 +73,7 @@ const AgencyDestinations: React.FC = () => {
     setFormData({
       name: destination.name || '',
       description: destination.description || '',
-      main_image_base64: destination.main_image_base64 || '',
-      main_image_type: destination.main_image_type || '',
-      main_image_size: destination.main_image_size || 0,
+      main_image_url: destination.main_image_url || '',
       country: destination.country || 'México',
       region: destination.region || '',
       best_time_to_visit: destination.best_time_to_visit || '',
@@ -94,13 +88,8 @@ const AgencyDestinations: React.FC = () => {
     resetForm();
   };
 
-  const handleMainImageSelect = (base64: string, type: string, size: number) => {
-    setFormData({
-      ...formData,
-      main_image_base64: base64,
-      main_image_type: type,
-      main_image_size: size
-    });
+  const handleMainImageSelect = (publicUrl: string, _type: string, _size: number) => {
+    setFormData({ ...formData, main_image_url: publicUrl });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -131,11 +120,8 @@ const AgencyDestinations: React.FC = () => {
         if (formData.region) updateData.region = formData.region;
         if (formData.best_time_to_visit) updateData.best_time_to_visit = formData.best_time_to_visit;
         
-        // Solo agregar campos de imagen si están presentes
-        if (formData.main_image_base64) {
-          updateData.main_image_base64 = formData.main_image_base64;
-          updateData.main_image_type = formData.main_image_type;
-          updateData.main_image_size = formData.main_image_size;
+        if (formData.main_image_url) {
+          updateData.main_image_url = formData.main_image_url;
         }
         
         const { error } = await updateDestination(editingDestination.id, updateData);
@@ -153,11 +139,8 @@ const AgencyDestinations: React.FC = () => {
         if (formData.region) createData.region = formData.region;
         if (formData.best_time_to_visit) createData.best_time_to_visit = formData.best_time_to_visit;
         
-        // Only add image fields if present
-        if (formData.main_image_base64) {
-          createData.main_image_base64 = formData.main_image_base64;
-          createData.main_image_type = formData.main_image_type;
-          createData.main_image_size = formData.main_image_size || formData.main_image_base64.length;
+        if (formData.main_image_url) {
+          createData.main_image_url = formData.main_image_url;
         }
         
         console.log('🌍 Enviando datos para crear destino:', createData);
@@ -178,15 +161,13 @@ const AgencyDestinations: React.FC = () => {
   };
 
   const handleAddImage = async (destinationId: string) => {
-    if (!newImageData) return;
+    if (!newImageUrl) return;
 
     try {
       setIsSubmitting(true);
       
       const imageData = {
-        image_base64: newImageData.base64,
-        image_type: newImageData.type,
-        image_size: newImageData.size,
+        image_url: newImageUrl,
         caption: newImageCaption || null,
         is_featured: false,
         uploaded_by: user?.id
@@ -196,7 +177,7 @@ const AgencyDestinations: React.FC = () => {
       if (error) throw error;
 
       await fetchDestinations();
-      setNewImageData(null);
+      setNewImageUrl('');
       setNewImageCaption('');
     } catch (err: any) {
       setError(err.message || 'Error al agregar imagen');
@@ -356,9 +337,10 @@ const AgencyDestinations: React.FC = () => {
               </label>
               <ImageUploader
                 onImageSelect={handleMainImageSelect}
-                currentImage={formData.main_image_base64}
+                currentImage={formData.main_image_url}
                 maxSizeMB={5}
                 placeholder="Seleccionar imagen principal (opcional)"
+                storageFolder="destinations"
               />
               <p className="text-xs text-gray-500 mt-1">
                 Puedes agregar la imagen principal después de crear el destino
@@ -408,7 +390,7 @@ const AgencyDestinations: React.FC = () => {
             {/* Destination Header */}
             <div className="relative h-48">
               <img
-                src={getImageSrc(destination.main_image_base64, destination.main_image_url)}
+                src={destination.main_image_url || 'https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg'}
                 alt={destination.name}
                 className="w-full h-full object-cover"
               />
@@ -482,13 +464,14 @@ const AgencyDestinations: React.FC = () => {
                 {/* Add Image Form */}
                 <div className="space-y-2 mb-3">
                   <ImageUploader
-                    onImageSelect={(base64, type, size) => setNewImageData({ base64, type, size })}
+                    onImageSelect={(url) => setNewImageUrl(url)}
                     maxSizeMB={3}
                     placeholder="Agregar imagen a galería"
                     className="text-xs"
+                    storageFolder="destinations"
                   />
                   
-                  {newImageData && (
+                  {newImageUrl && (
                     <div className="flex space-x-2">
                       <input
                         type="text"
@@ -514,7 +497,7 @@ const AgencyDestinations: React.FC = () => {
                     {destination.destination_images.slice(0, 6).map((image) => (
                       <div key={image.id} className="relative group">
                         <img
-                          src={getImageSrc(image.image_base64, image.image_url)}
+                          src={image.image_url || 'https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg'}
                           alt={image.caption || 'Imagen del destino'}
                           className="w-full h-16 object-cover rounded"
                         />

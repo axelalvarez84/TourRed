@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Plus, Edit, Trash2, Image, Globe, Clock, Search, Filter, Eye, EyeOff, Save, X, Upload, AlertTriangle, Calendar, User } from 'lucide-react';
-import { getAllDestinations, createDestination, updateDestination, deleteDestination, addDestinationImage, deleteDestinationImage, getImageSrc, supabase } from '../../lib/supabase';
+import { getAllDestinations, createDestination, updateDestination, deleteDestination, addDestinationImage, deleteDestinationImage, supabase } from '../../lib/supabase';
 import { Destination, DestinationImage } from '../../types';
 import { format } from 'date-fns';
 import ImageUploader from '../../components/ImageUploader';
@@ -26,13 +26,10 @@ const AdminDestinations: React.FC = () => {
     currency: 'MXN',
     language: 'Español',
     time_zone: 'America/Mexico_City',
-    main_image_base64: '',
-    main_image_type: '',
-    main_image_size: 0,
     main_image_url: ''
   });
 
-  const [newImageData, setNewImageData] = useState<{base64: string, type: string, size: number} | null>(null);
+  const [newImageUrl, setNewImageUrl] = useState('');
   const [newImageCaption, setNewImageCaption] = useState('');
 
   useEffect(() => {
@@ -73,12 +70,8 @@ const AdminDestinations: React.FC = () => {
       currency: 'MXN',
       language: 'Español',
       time_zone: 'America/Mexico_City',
-      main_image_base64: '',
-      main_image_type: '',
-      main_image_size: 0,
       main_image_url: ''
     });
-    setNewImageData(null);
     setNewImageCaption('');
   };
 
@@ -99,9 +92,6 @@ const AdminDestinations: React.FC = () => {
       currency: destination.currency || 'MXN',
       language: destination.language || 'Español',
       time_zone: destination.time_zone || 'America/Mexico_City',
-      main_image_base64: destination.main_image_base64 || '',
-      main_image_type: destination.main_image_type || '',
-      main_image_size: destination.main_image_size || 0,
       main_image_url: destination.main_image_url || ''
     });
     setEditingDestination(destination);
@@ -115,13 +105,10 @@ const AdminDestinations: React.FC = () => {
     setError('');
   };
 
-  const handleMainImageSelect = (base64: string, type: string, size: number) => {
+  const handleMainImageSelect = (publicUrl: string, _type: string, _size: number) => {
     setFormData({
       ...formData,
-      main_image_base64: base64,
-      main_image_type: type,
-      main_image_size: size,
-      main_image_url: '' // Clear URL when uploading base64
+      main_image_url: publicUrl
     });
   };
 
@@ -148,12 +135,7 @@ const AdminDestinations: React.FC = () => {
         is_active: true
       };
 
-      // Add image data if present
-      if (formData.main_image_base64) {
-        destinationData.main_image_base64 = formData.main_image_base64;
-        destinationData.main_image_type = formData.main_image_type;
-        destinationData.main_image_size = formData.main_image_size;
-      } else if (formData.main_image_url) {
+      if (formData.main_image_url) {
         destinationData.main_image_url = formData.main_image_url;
       }
 
@@ -238,15 +220,13 @@ const AdminDestinations: React.FC = () => {
   };
 
   const handleAddImage = async (destinationId: string) => {
-    if (!newImageData) return;
+    if (!newImageUrl) return;
 
     try {
       setIsSubmitting(true);
       
       const imageData = {
-        image_base64: newImageData.base64,
-        image_type: newImageData.type,
-        image_size: newImageData.size,
+        image_url: newImageUrl,
         caption: newImageCaption || null,
         is_featured: false
       };
@@ -255,7 +235,7 @@ const AdminDestinations: React.FC = () => {
       if (error) throw error;
 
       await fetchDestinations();
-      setNewImageData(null);
+      setNewImageUrl('');
       setNewImageCaption('');
     } catch (err: any) {
       setError(err.message || 'Error al agregar imagen');
@@ -562,25 +542,24 @@ const AdminDestinations: React.FC = () => {
               </label>
               <ImageUploader
                 onImageSelect={handleMainImageSelect}
-                currentImage={formData.main_image_base64 || formData.main_image_url}
+                currentImage={formData.main_image_url}
                 maxSizeMB={5}
                 placeholder="Seleccionar imagen principal del destino"
+                storageFolder="destinations"
               />
-              
-              {!formData.main_image_base64 && (
-                <div className="mt-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    O proporciona una URL de imagen
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.main_image_url}
-                    onChange={(e) => setFormData({...formData, main_image_url: e.target.value})}
-                    className="input"
-                    placeholder="https://ejemplo.com/imagen.jpg"
-                  />
-                </div>
-              )}
+
+              <div className="mt-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  O proporciona una URL de imagen
+                </label>
+                <input
+                  type="url"
+                  value={formData.main_image_url}
+                  onChange={(e) => setFormData({...formData, main_image_url: e.target.value})}
+                  className="input"
+                  placeholder="https://ejemplo.com/imagen.jpg"
+                />
+              </div>
             </div>
 
             <div className="flex justify-end space-x-4">
@@ -639,7 +618,7 @@ const AdminDestinations: React.FC = () => {
               {/* Imagen Principal */}
               <div className="relative h-48">
                 <img
-                  src={getImageSrc(destination.main_image_base64, destination.main_image_url)}
+                  src={destination.main_image_url || 'https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg'}
                   alt={destination.name}
                   className="w-full h-full object-cover"
                 />
@@ -738,13 +717,14 @@ const AdminDestinations: React.FC = () => {
                   {/* Add Image Form */}
                   <div className="space-y-2 mb-3">
                     <ImageUploader
-                      onImageSelect={(base64, type, size) => setNewImageData({ base64, type, size })}
+                      onImageSelect={(url) => setNewImageUrl(url)}
                       maxSizeMB={3}
                       placeholder="Agregar imagen a galería"
                       className="text-xs"
+                      storageFolder="destinations"
                     />
                     
-                    {newImageData && (
+                    {newImageUrl && (
                       <div className="flex space-x-2">
                         <input
                           type="text"
@@ -771,7 +751,7 @@ const AdminDestinations: React.FC = () => {
                       {destination.destination_images.slice(0, 6).map((image) => (
                         <div key={image.id} className="relative group">
                           <img
-                            src={getImageSrc(image.image_base64, image.image_url)}
+                            src={image.image_url || 'https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg'}
                             alt={image.caption || 'Imagen del destino'}
                             className="w-full h-16 object-cover rounded"
                           />
