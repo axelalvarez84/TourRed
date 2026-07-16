@@ -201,7 +201,7 @@ Deno.serve(async (req: Request) => {
               .maybeSingle();
             if (pWallet) {
               const newBalance = pWallet.balance + pointsEarned;
-              await supabase.from("toursred_points_transactions").insert({
+              const { error: ptsTxError } = await supabase.from("toursred_points_transactions").insert({
                 wallet_id: walletId,
                 user_id: user.id,
                 amount: pointsEarned,
@@ -212,10 +212,14 @@ Deno.serve(async (req: Request) => {
                 reference_type: "payment_plan",
                 expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
               });
-              await supabase.from("toursred_points_wallets").update({
-                balance: newBalance,
-                total_earned: pWallet.total_earned + pointsEarned,
-              }).eq("id", walletId);
+              if (ptsTxError) {
+                console.error(`Error inserting points transaction for plan ${plan_id}: ${ptsTxError.message}`);
+              } else {
+                await supabase.from("toursred_points_wallets").update({
+                  balance: newBalance,
+                  total_earned: pWallet.total_earned + pointsEarned,
+                }).eq("id", walletId);
+              }
             }
           }
         }
