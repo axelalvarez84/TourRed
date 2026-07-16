@@ -10,6 +10,8 @@ const corsHeaders = {
 interface RequestBody {
   booking_id: string;
   cancellation_id: string;
+  admin_cancellation?: boolean;
+  admin_reason?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -25,7 +27,7 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { booking_id, cancellation_id }: RequestBody = await req.json();
+    const { booking_id, cancellation_id, admin_cancellation, admin_reason }: RequestBody = await req.json();
 
     const { data: cancellation, error: cancellationError } = await supabase
       .from('booking_cancellations')
@@ -99,37 +101,44 @@ Deno.serve(async (req: Request) => {
     let policyDescription = '';
     let paymentInfo = '';
 
-    switch (cancellation.cancellation_policy_type) {
-      case '100_percent':
-        policyTitle = 'Reembolso Completo (15+ días)';
-        policyColor = '#10b981';
-        policyDescription = 'El viajero canceló con más de 15 días de anticipación y recibió un reembolso del 100% en su ToursRed Cash.';
-        paymentInfo = 'No recibirá ningún pago por esta reserva.';
-        break;
-      case '50_percent':
-        policyTitle = 'Reembolso Parcial (7-14 días)';
-        policyColor = '#f59e0b';
-        policyDescription = 'El viajero canceló entre 7 y 14 días antes del tour. Se reembolsó el 50% del anticipo al viajero.';
-        paymentInfo = `<strong>Recibirá $${cancellation.amount_to_agency.toFixed(2)}</strong> (70% del 50% retenido) en su próximo depósito de comisiones.`;
-        break;
-      case 'no_refund':
-        policyTitle = 'Sin Reembolso (1-6 días)';
-        policyColor = '#ef4444';
-        policyDescription = 'El viajero canceló entre 1 y 6 días antes del tour. No hay reembolso para el viajero.';
-        paymentInfo = `<strong>Recibirá $${cancellation.amount_to_agency.toFixed(2)}</strong> (anticipo menos comisión del ${commissionRate.toFixed(0)}%) en su próximo depósito de comisiones.`;
-        break;
-      case 'no_show':
-        policyTitle = 'Cancelación Tardía - No Show';
-        policyColor = '#991b1b';
-        policyDescription = 'El viajero canceló con menos de 1 día de anticipación y se marcó como No Show.';
-        paymentInfo = `<strong>Recibirá $${cancellation.amount_to_agency.toFixed(2)}</strong> (anticipo menos comisión del ${commissionRate.toFixed(0)}%) en su próximo depósito de comisiones.`;
-        break;
-      case 'pending_approval':
-        policyTitle = 'Reserva Pendiente Cancelada';
-        policyColor = '#6b7280';
-        policyDescription = 'El viajero canceló una reserva que aún estaba pendiente de su aprobación. No se había realizado ningún pago.';
-        paymentInfo = 'No había pago asociado a esta reserva.';
-        break;
+    if (admin_cancellation) {
+      policyTitle = 'Cancelación Administrativa';
+      policyColor = '#7c3aed';
+      policyDescription = 'El equipo administrativo de ToursRed ha cancelado esta reserva.';
+      paymentInfo = 'No recibirá ningún pago por esta reserva.';
+    } else {
+      switch (cancellation.cancellation_policy_type) {
+        case '100_percent':
+          policyTitle = 'Reembolso Completo (15+ días)';
+          policyColor = '#10b981';
+          policyDescription = 'El viajero canceló con más de 15 días de anticipación y recibió un reembolso del 100% en su ToursRed Cash.';
+          paymentInfo = 'No recibirá ningún pago por esta reserva.';
+          break;
+        case '50_percent':
+          policyTitle = 'Reembolso Parcial (7-14 días)';
+          policyColor = '#f59e0b';
+          policyDescription = 'El viajero canceló entre 7 y 14 días antes del tour. Se reembolsó el 50% del anticipo al viajero.';
+          paymentInfo = `<strong>Recibirá ${cancellation.amount_to_agency.toFixed(2)}</strong> (70% del 50% retenido) en su próximo depósito de comisiones.`;
+          break;
+        case 'no_refund':
+          policyTitle = 'Sin Reembolso (1-6 días)';
+          policyColor = '#ef4444';
+          policyDescription = 'El viajero canceló entre 1 y 6 días antes del tour. No hay reembolso para el viajero.';
+          paymentInfo = `<strong>Recibirá ${cancellation.amount_to_agency.toFixed(2)}</strong> (anticipo menos comisión del ${commissionRate.toFixed(0)}%) en su próximo depósito de comisiones.`;
+          break;
+        case 'no_show':
+          policyTitle = 'Cancelación Tardía - No Show';
+          policyColor = '#991b1b';
+          policyDescription = 'El viajero canceló con menos de 1 día de anticipación y se marcó como No Show.';
+          paymentInfo = `<strong>Recibirá ${cancellation.amount_to_agency.toFixed(2)}</strong> (anticipo menos comisión del ${commissionRate.toFixed(0)}%) en su próximo depósito de comisiones.`;
+          break;
+        case 'pending_approval':
+          policyTitle = 'Reserva Pendiente Cancelada';
+          policyColor = '#6b7280';
+          policyDescription = 'El viajero canceló una reserva que aún estaba pendiente de su aprobación. No se había realizado ningún pago.';
+          paymentInfo = 'No había pago asociado a esta reserva.';
+          break;
+      }
     }
 
     const emailHtml = `
@@ -150,7 +159,7 @@ Deno.serve(async (req: Request) => {
             <td style="background-color: #b8dfe6; padding: 30px 20px; text-align: center;">
               <img src="https://huzsedewwzjywcpbkjkm.supabase.co/storage/v1/object/public/images/email-logo.png" alt="ToursRed Logo" style="max-width: 200px; height: auto; margin-bottom: 10px;" />
               <h1 style="color: #1e40af; margin: 0; font-size: 28px;">Cancelación de Reserva</h1>
-              <p style="color: #1e40af; margin: 10px 0 0 0; font-size: 16px;">Un viajero ha cancelado su reserva</p>
+              <p style="color: #1e40af; margin: 10px 0 0 0; font-size: 16px;">${admin_cancellation ? 'Cancelación administrativa de reserva' : 'Un viajero ha cancelado su reserva'}</p>
             </td>
           </tr>
 
@@ -161,7 +170,7 @@ Deno.serve(async (req: Request) => {
               </p>
 
               <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 0 0 25px 0;">
-                Le informamos que se ha cancelado una reserva para uno de sus tours.
+                ${admin_cancellation ? 'Le informamos que el equipo administrativo de ToursRed ha cancelado una reserva para uno de sus tours.' : 'Le informamos que se ha cancelado una reserva para uno de sus tours.'}
               </p>
 
               <div style="background-color: #f9fafb; border-left: 4px solid ${policyColor}; padding: 20px; margin-bottom: 25px; border-radius: 4px;">
@@ -189,10 +198,12 @@ Deno.serve(async (req: Request) => {
                     <td style="padding: 8px 0; color: #1f2937; font-size: 14px; text-align: right;">${user.phone_number}</td>
                   </tr>
                   ` : ''}
+                  ${!admin_cancellation ? `
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Cancelado con:</td>
                     <td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600; text-align: right;">${cancellation.days_before_tour} día(s) de anticipación</td>
                   </tr>
+                  ` : ''}
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Fecha de cancelación:</td>
                     <td style="padding: 8px 0; color: #1f2937; font-size: 14px; text-align: right;">${new Date(cancellation.cancelled_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
@@ -210,11 +221,11 @@ Deno.serve(async (req: Request) => {
                 </p>
               </div>
 
-              ${cancellation.cancellation_reason ? `
+              ${(admin_cancellation && admin_reason) || (!admin_cancellation && cancellation.cancellation_reason) ? `
               <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; padding: 15px; margin-bottom: 25px; border-radius: 8px;">
                 <h4 style="color: #374151; margin: 0 0 10px 0; font-size: 14px; font-weight: 600;">Motivo de cancelación:</h4>
                 <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 0; font-style: italic;">
-                  "${cancellation.cancellation_reason}"
+                  "${admin_cancellation ? admin_reason : cancellation.cancellation_reason}"
                 </p>
               </div>
               ` : ''}
@@ -260,7 +271,7 @@ Deno.serve(async (req: Request) => {
     const emailData = {
       from: `ToursRed <${emailSettings.contact_email}>`,
       to: agency.contact_email,
-      subject: `Cancelación de Reserva - ${tour.name}`,
+      subject: admin_cancellation ? `Cancelación Administrativa de Reserva - ${tour.name}` : `Cancelación de Reserva - ${tour.name}`,
       html: emailHtml,
     };
 

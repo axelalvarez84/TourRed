@@ -10,6 +10,12 @@ const corsHeaders = {
 interface RequestBody {
   booking_id: string;
   cancellation_id: string;
+  admin_cancellation?: boolean;
+  admin_reason?: string;
+  refund_amount?: number;
+  refund_method?: string;
+  receipt_url?: string | null;
+  receipt_file_path?: string | null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -25,7 +31,8 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { booking_id, cancellation_id }: RequestBody = await req.json();
+    const body: RequestBody = await req.json();
+    const { booking_id, cancellation_id, admin_cancellation, admin_reason, refund_amount, refund_method, receipt_url, receipt_file_path } = body;
 
     const { data: cancellation, error: cancellationError } = await supabase
       .from('booking_cancellations')
@@ -56,8 +63,6 @@ Deno.serve(async (req: Request) => {
     if (userError || !user || !user.email) {
       throw new Error('Usuario no encontrado');
     }
-
-    console.log('DEBUG - Usuario:', JSON.stringify({ id: user.id, email: user.email, name: user.first_name }));
 
     const { data: tour, error: tourError } = await supabase
       .from('tours')
@@ -92,32 +97,91 @@ Deno.serve(async (req: Request) => {
     let policyColor = '';
     let policyBadge = '';
 
-    switch (cancellation.cancellation_policy_type) {
-      case '100_percent':
-        policyTitle = 'Reembolso del 100%';
-        policyColor = '#10b981';
-        policyBadge = '✅ Reembolso Completo';
-        break;
-      case '50_percent':
-        policyTitle = 'Reembolso del 50%';
-        policyColor = '#f59e0b';
-        policyBadge = '⚠️ Reembolso Parcial';
-        break;
-      case 'no_refund':
-        policyTitle = 'Sin Reembolso';
-        policyColor = '#ef4444';
-        policyBadge = '❌ Sin Reembolso';
-        break;
-      case 'no_show':
-        policyTitle = 'Cancelación Tardía - No Show';
-        policyColor = '#991b1b';
-        policyBadge = '🚫 No Show';
-        break;
-      case 'pending_approval':
-        policyTitle = 'Reserva Pendiente Cancelada';
-        policyColor = '#6b7280';
-        policyBadge = '⏳ Sin Cargos';
-        break;
+    if (admin_cancellation) {
+      policyTitle = 'Cancelación Administrativa';
+      policyColor = '#7c3aed';
+      policyBadge = 'Cancelación Administrativa';
+    } else {
+      switch (cancellation.cancellation_policy_type) {
+        case '100_percent':
+          policyTitle = 'Reembolso del 100%';
+          policyColor = '#10b981';
+          policyBadge = 'Reembolso Completo';
+          break;
+        case '50_percent':
+          policyTitle = 'Reembolso del 50%';
+          policyColor = '#f59e0b';
+          policyBadge = 'Reembolso Parcial';
+          break;
+        case 'no_refund':
+          policyTitle = 'Sin Reembolso';
+          policyColor = '#ef4444';
+          policyBadge = 'Sin Reembolso';
+          break;
+        case 'no_show':
+          policyTitle = 'Cancelación Tardía - No Show';
+          policyColor = '#991b1b';
+          policyBadge = 'No Show';
+          break;
+        case 'pending_approval':
+          policyTitle = 'Reserva Pendiente Cancelada';
+          policyColor = '#6b7280';
+          policyBadge = 'Sin Cargos';
+          break;
+      }
+    }
+
+    // Build refund section for admin cancellation
+    let adminRefundSection = '';
+    if (admin_cancellation) {
+      const refundAmt = Number(refund_amount || 0);
+      if (refundAmt > 0) {
+        const methodLabel = refund_method === 'toursred_cash' ? 'ToursRed Cash' : 'Transferencia Bancaria';
+        adminRefundSection = `
+        <div style="background-color: #ecfdf5; border: 2px solid #10b981; padding: 20px; margin-bottom: 25px; border-radius: 8px;">
+          <h3 style="color: #065f46; margin: 0 0 15px 0; font-size: 18px;">Detalles del Reembolso</h3>
+          <table width="100%" style="border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px 0; color: #047857; font-size: 14px;">Monto reembolsado:</td>
+              <td style="padding: 8px 0; color: #065f46; font-size: 18px; font-weight: bold; text-align: right;">$${refundAmt.toFixed(2)} MXN</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #047857; font-size: 14px;">Método:</td>
+              <td style="padding: 8px 0; color: #047857; font-size: 14px; font-weight: 600; text-align: right;">${methodLabel}</td>
+            </tr>
+            ${refund_method === 'toursred_cash' ? `
+            <tr>
+              <td colspan="2" style="padding-top: 15px; border-top: 1px solid #10b981; margin-top: 10px;">
+                <p style="color: #047857; font-size: 14px; margin: 10px 0 0 0;">
+                  Tu nuevo balance de ToursRed Cash: <strong>$${currentBalance.toFixed(2)}</strong>
+                </p>
+              </td>
+            </tr>
+            ` : ''}
+            ${refund_method === 'bank_transfer' && receipt_url ? `
+            <tr>
+              <td colspan="2" style="padding-top: 15px; border-top: 1px solid #10b981;">
+                <p style="color: #047857; font-size: 14px; margin: 10px 0 0 0;">
+                  Puedes descargar el comprobante de transferencia adjunto a este correo.
+                </p>
+              </td>
+            </tr>
+            ` : ''}
+          </table>
+        </div>`;
+      }
+    }
+
+    // Build admin reason section
+    let adminReasonSection = '';
+    if (admin_cancellation && admin_reason) {
+      adminReasonSection = `
+      <div style="background-color: #f9fafb; border-left: 4px solid #7c3aed; padding: 20px; margin-bottom: 25px; border-radius: 4px;">
+        <h3 style="color: #1f2937; margin: 0 0 15px 0; font-size: 18px;">Motivo de Cancelación</h3>
+        <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 0;">
+          ${admin_reason}
+        </p>
+      </div>`;
     }
 
     const emailHtml = `
@@ -138,7 +202,7 @@ Deno.serve(async (req: Request) => {
             <td style="background-color: #b8dfe6; padding: 30px 20px; text-align: center;">
               <img src="https://huzsedewwzjywcpbkjkm.supabase.co/storage/v1/object/public/images/email-logo.png" alt="ToursRed Logo" style="max-width: 200px; height: auto; margin-bottom: 10px;" />
               <h1 style="color: #1e40af; margin: 0; font-size: 28px;">Cancelación Confirmada</h1>
-              <p style="color: #1e40af; margin: 10px 0 0 0; font-size: 16px;">Tu reserva ha sido cancelada exitosamente</p>
+              <p style="color: #1e40af; margin: 10px 0 0 0; font-size: 16px;">${admin_cancellation ? 'Tu reserva ha sido cancelada administrativamente' : 'Tu reserva ha sido cancelada exitosamente'}</p>
             </td>
           </tr>
 
@@ -149,7 +213,7 @@ Deno.serve(async (req: Request) => {
               </p>
 
               <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 0 0 25px 0;">
-                Tu cancelación ha sido procesada con éxito. A continuación encontrarás los detalles:
+                ${admin_cancellation ? 'Tu reserva ha sido cancelada por el equipo administrativo de ToursRed. A continuación encontrarás los detalles:' : 'Tu cancelación ha sido procesada con éxito. A continuación encontrarás los detalles:'}
               </p>
 
               <div style="background-color: #f9fafb; border-left: 4px solid ${policyColor}; padding: 20px; margin-bottom: 25px; border-radius: 4px;">
@@ -166,10 +230,12 @@ Deno.serve(async (req: Request) => {
                     <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Fecha del tour:</td>
                     <td style="padding: 8px 0; color: #1f2937; font-size: 14px; text-align: right;">${new Date(tour.start_date).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
                   </tr>
+                  ${!admin_cancellation ? `
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Cancelado con:</td>
                     <td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600; text-align: right;">${cancellation.days_before_tour} día(s) de anticipación</td>
                   </tr>
+                  ` : ''}
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Fecha de cancelación:</td>
                     <td style="padding: 8px 0; color: #1f2937; font-size: 14px; text-align: right;">${new Date(cancellation.cancelled_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
@@ -177,9 +243,13 @@ Deno.serve(async (req: Request) => {
                 </table>
               </div>
 
-              ${cancellation.refund_amount_to_traveler > 0 ? `
+              ${adminReasonSection}
+
+              ${admin_cancellation ? adminRefundSection : ''}
+
+              ${!admin_cancellation && cancellation.refund_amount_to_traveler > 0 ? `
               <div style="background-color: #ecfdf5; border: 2px solid #10b981; padding: 20px; margin-bottom: 25px; border-radius: 8px;">
-                <h3 style="color: #065f46; margin: 0 0 15px 0; font-size: 18px;">💰 Detalles del Reembolso</h3>
+                <h3 style="color: #065f46; margin: 0 0 15px 0; font-size: 18px;">Detalles del Reembolso</h3>
                 <table width="100%" style="border-collapse: collapse;">
                   <tr>
                     <td style="padding: 8px 0; color: #047857; font-size: 14px;">Anticipo original:</td>
@@ -200,7 +270,7 @@ Deno.serve(async (req: Request) => {
               </div>
               ` : ''}
 
-              ${cancellation.cancellation_policy_type === 'no_refund' || cancellation.cancellation_policy_type === 'no_show' ? `
+              ${!admin_cancellation && (cancellation.cancellation_policy_type === 'no_refund' || cancellation.cancellation_policy_type === 'no_show') ? `
               <div style="background-color: #fef2f2; border: 2px solid #ef4444; padding: 20px; margin-bottom: 25px; border-radius: 8px;">
                 <h3 style="color: #991b1b; margin: 0 0 10px 0; font-size: 16px;">Información Importante</h3>
                 <p style="color: #7f1d1d; font-size: 14px; line-height: 1.6; margin: 0;">
@@ -211,7 +281,7 @@ Deno.serve(async (req: Request) => {
               </div>
               ` : ''}
 
-              ${cancellation.cancellation_policy_type === 'pending_approval' ? `
+              ${!admin_cancellation && cancellation.cancellation_policy_type === 'pending_approval' ? `
               <div style="background-color: #f3f4f6; border: 2px solid #6b7280; padding: 20px; margin-bottom: 25px; border-radius: 8px;">
                 <h3 style="color: #374151; margin: 0 0 10px 0; font-size: 16px;">Reserva Pendiente</h3>
                 <p style="color: #4b5563; font-size: 14px; line-height: 1.6; margin: 0;">
@@ -220,7 +290,7 @@ Deno.serve(async (req: Request) => {
               </div>
               ` : ''}
 
-              ${cancellation.original_service_charge > 0 ? `
+              ${!admin_cancellation && cancellation.original_service_charge > 0 ? `
               <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 15px; margin-bottom: 25px; border-radius: 4px;">
                 <p style="color: #92400e; font-size: 13px; line-height: 1.6; margin: 0;">
                   <strong>Nota:</strong> El cargo por servicio de $${cancellation.original_service_charge.toFixed(2)} no es reembolsable. Si utilizaste beneficios de ToursRed+, estos tampoco son recuperables ya que fueron cobrados por Stripe en el momento de la reserva.
@@ -258,25 +328,62 @@ Deno.serve(async (req: Request) => {
 </html>
     `;
 
-    const emailData = {
-      from: `ToursRed <${settings.contact_email}>`,
-      to: user.email,
-      subject: `Confirmación de Cancelación - ${tour.name}`,
-      html: emailHtml,
+    // For bank transfer refunds, try to attach the receipt file
+    let attachments: any[] = [];
+    if (admin_cancellation && refund_method === 'bank_transfer' && receipt_file_path) {
+      try {
+        const { data: fileData, error: fileErr } = await supabase.storage
+          .from('cancellation-receipts')
+          .download(receipt_file_path);
+
+        if (fileData && !fileErr) {
+          const arrayBuffer = await fileData.arrayBuffer();
+          const bytes = new Uint8Array(arrayBuffer);
+          let binary = '';
+          for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const base64 = btoa(binary);
+
+          const fileName = receipt_file_path.split("/").pop() || "comprobante.pdf";
+          const fileExt = fileName.split(".").pop()?.toLowerCase() || "pdf";
+          const mimeType = fileExt === "pdf" ? "application/pdf"
+            : fileExt === "png" ? "image/png"
+            : "image/jpeg";
+
+          attachments = [{
+            filename: fileName,
+            fileblob: base64,
+            mimetype: mimeType,
+          }];
+        }
+      } catch (e) {
+        console.error('Error downloading receipt for attachment:', e);
+      }
+    }
+
+    const subject = admin_cancellation
+      ? `Cancelación Administrativa - ${tour.name}`
+      : `Confirmación de Cancelación - ${tour.name}`;
+
+    const emailPayload: any = {
+      api_key: settings.smtp_api_key,
+      to: [user.email],
+      sender: settings.contact_email,
+      subject,
+      html_body: emailHtml,
     };
+
+    if (attachments.length > 0) {
+      emailPayload.attachments = attachments;
+    }
 
     const sendEmailResponse = await fetch('https://api.smtp2go.com/v3/email/send', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        api_key: settings.smtp_api_key,
-        to: [user.email],
-        sender: settings.contact_email,
-        subject: emailData.subject,
-        html_body: emailData.html,
-      }),
+      body: JSON.stringify(emailPayload),
     });
 
     if (!sendEmailResponse.ok) {

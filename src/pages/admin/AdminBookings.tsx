@@ -5,10 +5,11 @@ import {
   CheckCircle, Clock, XCircle, AlertTriangle, RefreshCw,
   Users, Star, Coins, Shield, FileText, ArrowLeftRight,
   Phone, Mail, Package, Percent, Hash, Tag, Info,
-  TrendingUp, BarChart2, Activity
+  TrendingUp, BarChart2, Activity, Upload, Ban, Loader2
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrencyMXN } from '../../utils/formatCurrency';
+import { useAuth } from '../../context/AuthContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,6 +69,7 @@ interface BookingRow {
   travel_insurance_included: boolean;
   travel_insurance_cost: number;
   insurance_email_sent: boolean;
+  admin_cancellation_id: string | null;
   // joined (estructura de la Edge Function)
   users: {
     first_name: string;
@@ -209,6 +211,10 @@ function AdminBookings() {
 
   // Detail modal
   const [selected, setSelected] = useState<BookingRow | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const { permissions, isSuperAdmin } = useAuth();
+  const canCancel = isSuperAdmin || permissions?.canCancelBookings;
+  const [adminCancellationData, setAdminCancellationData] = useState<any>(null);
 
   // Scroll horizontal sincronizado (scrollbar arriba y abajo)
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -257,7 +263,8 @@ function AdminBookings() {
           service_charge_discount, membership_service_fee_saved,
           preventa_comision_descuento, discount_amount, es_reserva_preventa,
           needs_seat_reselection, selected_seats,
-          travel_insurance_included, travel_insurance_cost, insurance_email_sent
+          travel_insurance_included, travel_insurance_cost, insurance_email_sent,
+  admin_cancellation_id
         `)
         .neq('status', 'draft')
         .order('created_at', { ascending: false });
@@ -642,6 +649,23 @@ const DetailModal: React.FC<{ booking: BookingRow; onClose: () => void }> = ({ b
   const pax = (b.count_adultos || 0) + (b.count_ninos || 0) + (b.count_infantes || 0) + (b.count_adultos_mayores || 0) + (b.count_mascotas || 0) || b.travelers_count || 0;
   const commRec = b.commission_records?.[0] ?? null;
   const [isDownloadingXlsx, setIsDownloadingXlsx] = React.useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const { permissions, isSuperAdmin } = useAuth();
+  const canCancel = isSuperAdmin || permissions?.canCancelBookings;
+  const [adminCancellationData, setAdminCancellationData] = useState<any>(null);
+
+  useEffect(() => {
+    if (b.cancellation_type === 'admin_cancelled' && b.admin_cancellation_id) {
+      supabase
+        .from('admin_booking_cancellations')
+        .select('*')
+        .eq('id', b.admin_cancellation_id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) setAdminCancellationData(data);
+        });
+    }
+  }, [b.id, b.cancellation_type, b.admin_cancellation_id]);
 
   const downloadInsuranceXlsx = async () => {
     try {
@@ -905,6 +929,34 @@ const DetailModal: React.FC<{ booking: BookingRow; onClose: () => void }> = ({ b
                   </>
                 )}
               </div>
+              {b.cancellation_type === 'admin_cancelled' && adminCancellationData && (
+                <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                  <h4 className="text-sm font-semibold text-gray-700">Detalle de Cancelacion Administrativa</h4>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                    <Field label="Motivo viajero" value={adminCancellationData.reason_for_traveler || '—'} />
+                    <Field label="Motivo agencia" value={adminCancellationData.reason_for_agency || '—'} />
+                    <Field label="Metodo reembolso" value={
+                      adminCancellationData.refund_method === 'toursred_cash' ? 'ToursRed Cash' :
+                      adminCancellationData.refund_method === 'bank_transfer' ? 'Transferencia' :
+                      'Sin reembolso'
+                    } />
+                    <Field label="Monto reembolsado" value={adminCancellationData.refund_amount ? formatCurrencyMXN(Number(adminCancellationData.refund_amount)) : '—'} />
+                    <Field label="Puntos descontados" value={adminCancellationData.points_deducted?.toString() || '0'} />
+                    <Field label="Fecha" value={fmtDateTime(adminCancellationData.cancelled_at)} />
+                  </div>
+                  {adminCancellationData.receipt_file_path && (
+                    <a
+                      href={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/cancellation-receipts/${adminCancellationData.receipt_file_path}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 transition"
+                    >
+                      <FileText className="h-4 w-4" />
+                      Ver comprobante de transferencia
+                    </a>
+                  )}
+                </div>
+              )}
             </Section>
           )}
 
@@ -959,12 +1011,393 @@ const DetailModal: React.FC<{ booking: BookingRow; onClose: () => void }> = ({ b
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+        <div className="flex justify-between items-center px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+          {canCancel && b.status !== 'cancelled' && !b.cancelled_at ? (
+            <button
+              onClick={() => setShowCancelModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg shadow-sm transition"
+            >
+              <Ban className="h-4 w-4" />
+              Cancelar Reserva
+            </button>
+          ) : (
+            <div />
+          )}
           <button
             onClick={onClose}
             className="px-5 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 shadow-sm transition"
           >
             Cerrar
+          </button>
+        </div>
+      </div>
+
+      {showCancelModal && (
+        <AdminCancelBookingModal
+          booking={b}
+          adminCancellationData={adminCancellationData}
+          onClose={() => setShowCancelModal(false)}
+          onSuccess={() => {
+            setShowCancelModal(false);
+            load();
+            onClose();
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// ─── Admin Cancel Booking Modal ──────────────────────────────────────────────
+
+interface AdminCancelModalProps {
+  booking: BookingRow;
+  adminCancellationData: any;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adminCancellationData, onClose, onSuccess }) => {
+  const [reasonForTraveler, setReasonForTraveler] = useState('');
+  const [reasonForAgency, setReasonForAgency] = useState('');
+  const [withRefund, setWithRefund] = useState(true);
+  const [refundAmount, setRefundAmount] = useState(0);
+  const [refundMethod, setRefundMethod] = useState<'toursred_cash' | 'bank_transfer'>('toursred_cash');
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmStep, setConfirmStep] = useState(false);
+
+  useEffect(() => {
+    // Suggest refund amount based on booking data
+    const insurance = booking.travel_insurance_included ? Number(booking.travel_insurance_cost || 0) : 0;
+    const suggested = Number(booking.deposit_amount || 0) + insurance;
+    setRefundAmount(suggested);
+  }, [booking]);
+
+  const handleSubmit = async () => {
+    setError(null);
+
+    if (reasonForTraveler.trim().length < 10) {
+      setError('El motivo para el viajero debe tener al menos 10 caracteres');
+      return;
+    }
+    if (reasonForAgency.trim().length < 10) {
+      setError('El motivo para la agencia debe tener al menos 10 caracteres');
+      return;
+    }
+    if (withRefund && refundAmount <= 0) {
+      setError('El monto del reembolso debe ser mayor a 0');
+      return;
+    }
+    if (withRefund && refundMethod === 'bank_transfer' && !receiptFile) {
+      setError('Debes subir el comprobante de transferencia');
+      return;
+    }
+
+    if (!confirmStep) {
+      setConfirmStep(true);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      let receiptBase64: string | undefined;
+      let receiptFilename: string | undefined;
+
+      if (withRefund && refundMethod === 'bank_transfer' && receiptFile) {
+        const arrayBuffer = await receiptFile.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        receiptBase64 = btoa(binary);
+        receiptFilename = receiptFile.name;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No hay sesión activa');
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-cancel-booking`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          booking_id: booking.id,
+          reason_for_traveler: reasonForTraveler.trim(),
+          reason_for_agency: reasonForAgency.trim(),
+          refund_method: withRefund ? refundMethod : 'none',
+          refund_amount: withRefund ? Number(refundAmount) : 0,
+          receipt_base64: receiptBase64,
+          receipt_filename: receiptFilename,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Error al cancelar la reserva');
+      }
+
+      onSuccess();
+    } catch (e: any) {
+      setError(e.message || 'Error al procesar la cancelación');
+      setConfirmStep(false);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError('El archivo no debe exceder 5MB');
+      return;
+    }
+    const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    if (!validTypes.includes(file.type)) {
+      setError('Formato no válido. Use PDF, JPG o PNG');
+      return;
+    }
+    setReceiptFile(file);
+    setError(null);
+  };
+
+  const insuranceCost = booking.travel_insurance_included ? Number(booking.travel_insurance_cost || 0) : 0;
+  const suggestedAmount = Number(booking.deposit_amount || 0) + insuranceCost;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-red-50 rounded-t-2xl">
+          <div className="flex items-center gap-3">
+            <div className="bg-red-100 rounded-full p-2">
+              <Ban className="h-5 w-5 text-red-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Cancelar Reserva</h2>
+              <p className="text-sm text-gray-500">Reserva {booking.booking_code || booking.id.slice(0, 8)}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-5">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Booking summary */}
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div><span className="text-gray-500">Tour:</span> <span className="font-medium text-gray-800">{booking.tours?.name}</span></div>
+              <div><span className="text-gray-500">Viajero:</span> <span className="font-medium text-gray-800">{booking.users ? `${booking.users.first_name} ${booking.users.last_name}` : '—'}</span></div>
+              <div><span className="text-gray-500">Depósito:</span> <span className="font-medium text-gray-800">{formatCurrencyMXN(Number(booking.deposit_amount || 0))}</span></div>
+              <div><span className="text-gray-500">Seguro:</span> <span className="font-medium text-gray-800">{insuranceCost > 0 ? formatCurrencyMXN(insuranceCost) : 'N/A'}</span></div>
+            </div>
+          </div>
+
+          {/* Reasons */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Motivo para el viajero <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={reasonForTraveler}
+              onChange={(e) => setReasonForTraveler(e.target.value)}
+              rows={3}
+              className="w-full border border-gray-200 rounded-lg p-3 text-sm text-gray-800 focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+              placeholder="Explica el motivo de la cancelación que se enviará al viajero por correo..."
+            />
+            <p className="text-xs text-gray-400 mt-1">Mínimo 10 caracteres ({reasonForTraveler.trim().length}/10)</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Motivo para la agencia <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={reasonForAgency}
+              onChange={(e) => setReasonForAgency(e.target.value)}
+              rows={3}
+              className="w-full border border-gray-200 rounded-lg p-3 text-sm text-gray-800 focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+              placeholder="Explica el motivo de la cancelación que se enviará a la agencia por correo..."
+            />
+            <p className="text-xs text-gray-400 mt-1">Mínimo 10 caracteres ({reasonForAgency.trim().length}/10)</p>
+          </div>
+
+          {/* Refund selector */}
+          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
+            <label className="flex items-center gap-3 cursor-pointer mb-3">
+              <input
+                type="checkbox"
+                checked={withRefund}
+                onChange={(e) => setWithRefund(e.target.checked)}
+                className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm font-semibold text-gray-700">Con reembolso</span>
+            </label>
+
+            {withRefund && (
+              <div className="space-y-4 mt-3 pl-8">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Monto a reembolsar (MXN)</label>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                      <input
+                        type="number"
+                        value={refundAmount}
+                        onChange={(e) => setRefundAmount(Number(e.target.value))}
+                        step="0.01"
+                        min="0"
+                        className="w-full border border-gray-200 rounded-lg pl-7 pr-3 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <button
+                      onClick={() => setRefundAmount(suggestedAmount)}
+                      className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs rounded-lg transition whitespace-nowrap"
+                    >
+                      Sugerido: {formatCurrencyMXN(suggestedAmount)}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Sugerido: depósito + seguro = {formatCurrencyMXN(suggestedAmount)}</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-2">Método de reembolso</label>
+                  <div className="flex gap-3">
+                    <label className={`flex-1 cursor-pointer border-2 rounded-lg p-3 text-center text-sm transition ${refundMethod === 'toursred_cash' ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
+                      <input
+                        type="radio"
+                        name="refundMethod"
+                        value="toursred_cash"
+                        checked={refundMethod === 'toursred_cash'}
+                        onChange={() => setRefundMethod('toursred_cash')}
+                        className="sr-only"
+                      />
+                      <Coins className="h-5 w-5 mx-auto mb-1" />
+                      ToursRed Cash
+                    </label>
+                    <label className={`flex-1 cursor-pointer border-2 rounded-lg p-3 text-center text-sm transition ${refundMethod === 'bank_transfer' ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
+                      <input
+                        type="radio"
+                        name="refundMethod"
+                        value="bank_transfer"
+                        checked={refundMethod === 'bank_transfer'}
+                        onChange={() => setRefundMethod('bank_transfer')}
+                        className="sr-only"
+                      />
+                      <CreditCard className="h-5 w-5 mx-auto mb-1" />
+                      Transferencia
+                    </label>
+                  </div>
+                </div>
+
+                {refundMethod === 'bank_transfer' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-2">Comprobante de transferencia <span className="text-red-500">*</span></label>
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition">
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={handleFileChange}
+                        className="hidden"
+                        id="receipt-upload"
+                      />
+                      <label htmlFor="receipt-upload" className="cursor-pointer">
+                        {receiptFile ? (
+                          <div className="text-sm text-gray-700">
+                            <FileText className="h-8 w-8 mx-auto mb-2 text-blue-500" />
+                            <span className="font-medium">{receiptFile.name}</span>
+                            <span className="text-gray-400 ml-2">({(receiptFile.size / 1024).toFixed(0)} KB)</span>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500">
+                            <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                            Haz clic para subir el comprobante
+                            <p className="text-xs text-gray-400 mt-1">PDF, JPG o PNG (máx. 5MB)</p>
+                          </div>
+                        )}
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Points info */}
+          {booking.points_earned > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+              <Coins className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-amber-700">
+                Se descontarán <strong>{booking.points_earned} puntos</strong> acumulados por esta reserva al viajero.
+              </p>
+            </div>
+          )}
+
+          {/* Confirmation step */}
+          {confirmStep && (
+            <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
+              <div className="flex items-start gap-2 mb-2">
+                <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-red-800">Confirmar cancelación</p>
+                  <p className="text-xs text-red-600 mt-1">
+                    {withRefund
+                      ? `Se reembolsarán ${formatCurrencyMXN(refundAmount)} vía ${refundMethod === 'toursred_cash' ? 'ToursRed Cash' : 'transferencia bancaria'} al viajero.`
+                      : 'No se procesará reembolso al viajero.'}
+                    {booking.points_earned > 0 && ` Se descontarán ${booking.points_earned} puntos.`}
+                    {' '}Se enviarán correos al viajero, agencia y a contacto@toursred.com.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+          <button
+            onClick={() => confirmStep ? setConfirmStep(false) : onClose()}
+            disabled={submitting}
+            className="px-5 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
+          >
+            {confirmStep ? 'Volver' : 'Cancelar'}
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="inline-flex items-center gap-2 px-5 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Procesando...
+              </>
+            ) : confirmStep ? (
+              <>
+                <Ban className="h-4 w-4" />
+                Confirmar Cancelación
+              </>
+            ) : (
+              <>
+                <Ban className="h-4 w-4" />
+                Continuar
+              </>
+            )}
           </button>
         </div>
       </div>

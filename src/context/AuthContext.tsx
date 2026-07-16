@@ -24,6 +24,8 @@ export interface AdminPermissions {
   canViewAuditLog: boolean;
   canViewAuditSensitiveData: boolean;
   canExportAuditLog: boolean;
+  // Booking cancellation permission
+  canCancelBookings: boolean;
 }
 
 // Stable device fingerprint (no PII — only browser characteristics)
@@ -472,6 +474,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 canViewAuditLog: p.can_view_audit_log ?? false,
                 canViewAuditSensitiveData: p.can_view_audit_sensitive_data ?? false,
                 canExportAuditLog: p.can_export_audit_log ?? false,
+                canCancelBookings: p.can_cancel_bookings ?? false,
               });
             } else {
               setPermissions(null);

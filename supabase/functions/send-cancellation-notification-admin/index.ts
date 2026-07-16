@@ -10,6 +10,12 @@ const corsHeaders = {
 interface RequestBody {
   booking_id: string;
   cancellation_id: string;
+  admin_cancellation?: boolean;
+  admin_reason_for_traveler?: string;
+  admin_reason_for_agency?: string;
+  refund_amount?: number;
+  refund_method?: string;
+  receipt_url?: string | null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -25,7 +31,12 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { booking_id, cancellation_id }: RequestBody = await req.json();
+    const body: RequestBody = await req.json();
+    const {
+      booking_id, cancellation_id,
+      admin_cancellation, admin_reason_for_traveler, admin_reason_for_agency,
+      refund_amount, refund_method, receipt_url
+    } = body;
 
     const { data: cancellation, error: cancellationError } = await supabase
       .from('booking_cancellations')
@@ -89,35 +100,99 @@ Deno.serve(async (req: Request) => {
     const { data: platformSettings } = await supabase
       .from('platform_settings')
       .select('agency_commission_percentage, platform_url')
-      .single();
+      .maybeSingle();
 
-    const commissionRate = platformSettings?.agency_commission_percentage || 15;
     const appUrl = platformSettings?.platform_url || "https://toursredmx.netlify.app";
 
     let policyTitle = '';
     let policyColor = '';
 
-    switch (cancellation.cancellation_policy_type) {
-      case '100_percent':
-        policyTitle = 'Reembolso Completo (15+ días)';
-        policyColor = '#10b981';
-        break;
-      case '50_percent':
-        policyTitle = 'Reembolso Parcial (7-14 días)';
-        policyColor = '#f59e0b';
-        break;
-      case 'no_refund':
-        policyTitle = 'Sin Reembolso (1-6 días)';
-        policyColor = '#ef4444';
-        break;
-      case 'no_show':
-        policyTitle = 'Cancelación Tardía - No Show';
-        policyColor = '#991b1b';
-        break;
-      case 'pending_approval':
-        policyTitle = 'Reserva Pendiente Cancelada';
-        policyColor = '#6b7280';
-        break;
+    if (admin_cancellation) {
+      policyTitle = 'Cancelación Administrativa';
+      policyColor = '#7c3aed';
+    } else {
+      switch (cancellation.cancellation_policy_type) {
+        case '100_percent':
+          policyTitle = 'Reembolso Completo (15+ días)';
+          policyColor = '#10b981';
+          break;
+        case '50_percent':
+          policyTitle = 'Reembolso Parcial (7-14 días)';
+          policyColor = '#f59e0b';
+          break;
+        case 'no_refund':
+          policyTitle = 'Sin Reembolso (1-6 días)';
+          policyColor = '#ef4444';
+          break;
+        case 'no_show':
+          policyTitle = 'Cancelación Tardía - No Show';
+          policyColor = '#991b1b';
+          break;
+        case 'pending_approval':
+          policyTitle = 'Reserva Pendiente Cancelada';
+          policyColor = '#6b7280';
+          break;
+      }
+    }
+
+    // Build admin-specific sections
+    let adminReasonsSection = '';
+    if (admin_cancellation && (admin_reason_for_traveler || admin_reason_for_agency)) {
+      adminReasonsSection = `
+      <div style="background-color: #faf5ff; border: 2px solid #7c3aed; padding: 20px; margin-bottom: 25px; border-radius: 8px;">
+        <h3 style="color: #5b21b6; margin: 0 0 15px 0; font-size: 16px;">Motivos de Cancelación Administrativa</h3>
+        ${admin_reason_for_traveler ? `
+        <div style="margin-bottom: 15px;">
+          <p style="color: #6d28d9; font-size: 13px; font-weight: 600; margin: 0 0 5px 0;">Motivo para el viajero:</p>
+          <p style="color: #4c1d95; font-size: 14px; line-height: 1.6; margin: 0; font-style: italic; padding-left: 15px; border-left: 3px solid #c4b5fd;">
+            "${admin_reason_for_traveler}"
+          </p>
+        </div>
+        ` : ''}
+        ${admin_reason_for_agency ? `
+        <div>
+          <p style="color: #6d28d9; font-size: 13px; font-weight: 600; margin: 0 0 5px 0;">Motivo para la agencia:</p>
+          <p style="color: #4c1d95; font-size: 14px; line-height: 1.6; margin: 0; font-style: italic; padding-left: 15px; border-left: 3px solid #c4b5fd;">
+            "${admin_reason_for_agency}"
+          </p>
+        </div>
+        ` : ''}
+      </div>`;
+    }
+
+    let adminRefundSection = '';
+    if (admin_cancellation) {
+      const refundAmt = Number(refund_amount || 0);
+      if (refundAmt > 0) {
+        const methodLabel = refund_method === 'toursred_cash' ? 'ToursRed Cash' : 'Transferencia Bancaria';
+        adminRefundSection = `
+        <div style="background-color: #ecfdf5; border: 2px solid #10b981; padding: 20px; margin-bottom: 25px; border-radius: 8px;">
+          <h3 style="color: #065f46; margin: 0 0 15px 0; font-size: 16px;">Reembolso Procesado</h3>
+          <table width="100%" style="border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px 0; color: #047857; font-size: 14px;">Monto reembolsado:</td>
+              <td style="padding: 8px 0; color: #065f46; font-size: 18px; font-weight: bold; text-align: right;">$${refundAmt.toFixed(2)} MXN</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #047857; font-size: 14px;">Método:</td>
+              <td style="padding: 8px 0; color: #047857; font-size: 14px; font-weight: 600; text-align: right;">${methodLabel}</td>
+            </tr>
+            ${refund_method === 'bank_transfer' && receipt_url ? `
+            <tr>
+              <td colspan="2" style="padding-top: 12px;">
+                <a href="${receipt_url}" style="color: #2563eb; font-size: 13px; text-decoration: underline;">Descargar comprobante de transferencia</a>
+              </td>
+            </tr>
+            ` : ''}
+          </table>
+        </div>`;
+      } else {
+        adminRefundSection = `
+        <div style="background-color: #f3f4f6; border: 2px solid #6b7280; padding: 20px; margin-bottom: 25px; border-radius: 8px;">
+          <h3 style="color: #374151; margin: 0 0 10px 0; font-size: 16px;">Sin Reembolso</h3>
+          <p style="color: #6b7280; font-size: 14px; margin: 0;">La cancelación se procesó sin reembolso al viajero.</p>
+        </div>`;
+      }
     }
 
     const emailHtml = `
@@ -137,7 +212,7 @@ Deno.serve(async (req: Request) => {
           <tr>
             <td style="background-color: #b8dfe6; padding: 30px 20px; text-align: center;">
               <img src="https://huzsedewwzjywcpbkjkm.supabase.co/storage/v1/object/public/images/email-logo.png" alt="ToursRed Logo" style="max-width: 200px; height: auto; margin-bottom: 10px;" />
-              <h1 style="color: #1e40af; margin: 0; font-size: 28px;">📊 Reporte de Cancelación</h1>
+              <h1 style="color: #1e40af; margin: 0; font-size: 28px;">${admin_cancellation ? 'Cancelación Administrativa' : 'Reporte de Cancelación'}</h1>
               <p style="color: #1e40af; margin: 10px 0 0 0; font-size: 16px;">Notificación para Administración</p>
             </td>
           </tr>
@@ -145,7 +220,7 @@ Deno.serve(async (req: Request) => {
           <tr>
             <td style="padding: 30px;">
               <p style="color: #1f2937; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-                Se ha procesado una nueva cancelación en el sistema.
+                ${admin_cancellation ? 'El equipo administrativo de ToursRed ha procesado una cancelación.' : 'Se ha procesado una nueva cancelación en el sistema.'}
               </p>
 
               <div style="background-color: #f9fafb; border-left: 4px solid ${policyColor}; padding: 20px; margin-bottom: 25px; border-radius: 4px;">
@@ -163,15 +238,19 @@ Deno.serve(async (req: Request) => {
                     <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Fecha de cancelación:</td>
                     <td style="padding: 8px 0; color: #1f2937; font-size: 14px; text-align: right;">${new Date(cancellation.cancelled_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                   </tr>
+                  ${!admin_cancellation ? `
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Días antes del tour:</td>
                     <td style="padding: 8px 0; color: #1f2937; font-size: 14px; font-weight: 600; text-align: right;">${cancellation.days_before_tour} día(s)</td>
                   </tr>
+                  ` : ''}
                 </table>
               </div>
 
+              ${adminReasonsSection}
+
               <div style="background-color: #eff6ff; border: 2px solid #3b82f6; padding: 20px; margin-bottom: 25px; border-radius: 8px;">
-                <h3 style="color: #1e40af; margin: 0 0 15px 0; font-size: 16px;">👤 Información del Viajero</h3>
+                <h3 style="color: #1e40af; margin: 0 0 15px 0; font-size: 16px;">Información del Viajero</h3>
                 <table width="100%" style="border-collapse: collapse;">
                   <tr>
                     <td style="padding: 6px 0; color: #1e3a8a; font-size: 14px; width: 40%;">Nombre:</td>
@@ -191,7 +270,7 @@ Deno.serve(async (req: Request) => {
               </div>
 
               <div style="background-color: #f0fdf4; border: 2px solid #10b981; padding: 20px; margin-bottom: 25px; border-radius: 8px;">
-                <h3 style="color: #065f46; margin: 0 0 15px 0; font-size: 16px;">🏢 Información del Tour y Agencia</h3>
+                <h3 style="color: #065f46; margin: 0 0 15px 0; font-size: 16px;">Tour y Agencia</h3>
                 <table width="100%" style="border-collapse: collapse;">
                   <tr>
                     <td style="padding: 6px 0; color: #047857; font-size: 14px; width: 40%;">Tour:</td>
@@ -212,8 +291,9 @@ Deno.serve(async (req: Request) => {
                 </table>
               </div>
 
+              ${admin_cancellation ? adminRefundSection : `
               <div style="background-color: #fef9c3; border: 2px solid #eab308; padding: 20px; margin-bottom: 25px; border-radius: 8px;">
-                <h3 style="color: #713f12; margin: 0 0 15px 0; font-size: 16px;">💰 Desglose Financiero</h3>
+                <h3 style="color: #713f12; margin: 0 0 15px 0; font-size: 16px;">Desglose Financiero</h3>
                 <table width="100%" style="border-collapse: collapse;">
                   <tr>
                     <td style="padding: 8px 0; color: #854d0e; font-size: 14px;">Anticipo original:</td>
@@ -224,7 +304,7 @@ Deno.serve(async (req: Request) => {
                     <td style="padding: 8px 0; color: #854d0e; font-size: 14px; font-weight: 600; text-align: right;">$${cancellation.original_service_charge.toFixed(2)}</td>
                   </tr>
                   <tr style="border-top: 2px solid #eab308;">
-                    <td style="padding: 12px 0 8px 0; color: #713f12; font-size: 14px; font-weight: bold;">Reembolsado al viajero (ToursRed Cash):</td>
+                    <td style="padding: 12px 0 8px 0; color: #713f12; font-size: 14px; font-weight: bold;">Reembolsado al viajero:</td>
                     <td style="padding: 12px 0 8px 0; color: #10b981; font-size: 16px; font-weight: bold; text-align: right;">$${cancellation.refund_amount_to_traveler.toFixed(2)}</td>
                   </tr>
                   <tr>
@@ -237,8 +317,9 @@ Deno.serve(async (req: Request) => {
                   </tr>
                 </table>
               </div>
+              `}
 
-              ${cancellation.cancellation_reason ? `
+              ${!admin_cancellation && cancellation.cancellation_reason ? `
               <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; padding: 15px; margin-bottom: 25px; border-radius: 8px;">
                 <h4 style="color: #374151; margin: 0 0 10px 0; font-size: 14px; font-weight: 600;">Motivo de cancelación:</h4>
                 <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 0; font-style: italic;">
@@ -247,20 +328,10 @@ Deno.serve(async (req: Request) => {
               </div>
               ` : ''}
 
-              <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin-bottom: 25px; border-radius: 4px;">
-                <p style="color: #991b1b; font-size: 13px; line-height: 1.6; margin: 0;">
-                  <strong>Nota importante:</strong> Los cargos por servicio y beneficios de ToursRed+ no son reembolsables ya que fueron cobrados por Stripe al momento de la reserva. ${cancellation.cancellation_policy_type === 'no_show' ? 'Esta cancelación incrementó el contador de No Show del viajero.' : ''}
-                </p>
-              </div>
-
               <div style="text-align: center; margin-top: 30px;">
-                <a href="${appUrl}/admin/dashboard"
-                   style="display: inline-block; background-color: #667eea; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; font-size: 15px; margin-right: 10px;">
-                  Ver Dashboard
-                </a>
-                <a href="${appUrl}/admin/agencies"
-                   style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; font-size: 15px;">
-                  Gestionar Agencias
+                <a href="${appUrl}/admin/bookings"
+                   style="display: inline-block; background-color: #667eea; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; font-size: 15px;">
+                  Ver Reservas
                 </a>
               </div>
             </td>
@@ -283,12 +354,9 @@ Deno.serve(async (req: Request) => {
 </html>
     `;
 
-    const emailData = {
-      from: `ToursRed <${emailSettings.contact_email}>`,
-      to: emailSettings.contact_email,
-      subject: `[Admin] Cancelación de Reserva - ${tour.name}`,
-      html: emailHtml,
-    };
+    const subject = admin_cancellation
+      ? `[Admin] Cancelación Administrativa - ${tour.name}`
+      : `[Admin] Cancelación de Reserva - ${tour.name}`;
 
     const sendEmailResponse = await fetch('https://api.smtp2go.com/v3/email/send', {
       method: 'POST',
@@ -299,8 +367,8 @@ Deno.serve(async (req: Request) => {
         api_key: emailSettings.smtp_api_key,
         to: [emailSettings.contact_email],
         sender: emailSettings.contact_email,
-        subject: emailData.subject,
-        html_body: emailData.html,
+        subject,
+        html_body: emailHtml,
       }),
     });
 

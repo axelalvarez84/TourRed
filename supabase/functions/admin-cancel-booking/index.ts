@@ -1,0 +1,416 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+};
+
+function ok(data: unknown) {
+  return new Response(JSON.stringify(data), {
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function err(message: string, status = 400) {
+  return new Response(JSON.stringify({ success: false, error: message }), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 200, headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) return err("No authorization header", 401);
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !user) return err("Token inválido", 401);
+
+    // Verify caller is super_admin or has can_cancel_bookings permission
+    const { data: adminUser } = await supabase
+      .from("users")
+      .select("id, role, email, first_name, last_name")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!adminUser || !["admin", "super_admin"].includes(adminUser.role)) {
+      return err("No tienes permisos para cancelar reservas", 403);
+    }
+
+    if (adminUser.role !== "super_admin") {
+      const { data: perms } = await supabase
+        .from("admin_permissions")
+        .select("can_cancel_bookings")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!perms?.can_cancel_bookings) {
+        return err("No tienes el permiso para cancelar reservas", 403);
+      }
+    }
+
+    const body = await req.json();
+    const {
+      booking_id,
+      reason_for_traveler,
+      reason_for_agency,
+      refund_method = "none",
+      refund_amount = 0,
+      receipt_base64,
+      receipt_filename,
+    } = body;
+
+    if (!booking_id) return err("booking_id es requerido");
+    if (!reason_for_traveler || reason_for_traveler.trim().length < 10)
+      return err("El motivo para el viajero debe tener al menos 10 caracteres");
+    if (!reason_for_agency || reason_for_agency.trim().length < 10)
+      return err("El motivo para la agencia debe tener al menos 10 caracteres");
+    if (!["none", "toursred_cash", "bank_transfer"].includes(refund_method))
+      return err("Método de reembolso inválido");
+    if (refund_method === "bank_transfer" && (!receipt_base64 || !receipt_filename))
+      return err("El comprobante de transferencia es obligatorio");
+
+    // Load booking with related data
+    const { data: booking, error: bookingError } = await supabase
+      .from("bookings")
+      .select(`
+        id, status, payment_status, deposit_amount, service_charge,
+        user_id, tour_id, agency_id, booking_code, cancelled_at,
+        points_earned, points_used, travel_insurance_included, travel_insurance_cost,
+        tours!bookings_tour_id_fkey(id, name, start_date, end_date),
+        agencies!bookings_agency_id_fkey(id, name, contact_email),
+        users!bookings_user_id_fkey(id, email, first_name, last_name)
+      `)
+      .eq("id", booking_id)
+      .maybeSingle();
+
+    if (bookingError || !booking) return err("Reserva no encontrada");
+    if (booking.cancelled_at || booking.status === "cancelled")
+      return err("Esta reserva ya fue cancelada");
+
+    const tour = (booking as any).tours;
+    const agency = (booking as any).agencies;
+    const bookingUser = (booking as any).users;
+
+    // Fetch refundable optional services for suggested amount (info only)
+    const { data: optionalServices } = await supabase
+      .from("booking_optional_services")
+      .select("subtotal, tour_optional_services(is_refundable)")
+      .eq("booking_id", booking_id)
+      .eq("is_cancelled", false);
+
+    let optionalServicesRefundable = 0;
+    for (const os of (optionalServices || [])) {
+      if ((os as any).tour_optional_services?.is_refundable !== false) {
+        optionalServicesRefundable += Number((os as any).subtotal || 0);
+      }
+    }
+
+    const insuranceCost = booking.travel_insurance_included
+      ? Number(booking.travel_insurance_cost || 0)
+      : 0;
+    const suggestedRefund = Number(booking.deposit_amount || 0) + insuranceCost + optionalServicesRefundable;
+
+    const now = new Date().toISOString();
+    let receiptFilePath: string | null = null;
+
+    // Handle refund based on method
+    let transactionId: string | null = null;
+
+    if (refund_method === "toursred_cash" && Number(refund_amount) > 0) {
+      // Get or create wallet
+      let { data: wallet } = await supabase
+        .from("toursred_cash_wallets")
+        .select("*")
+        .eq("user_id", booking.user_id)
+        .maybeSingle();
+
+      if (!wallet) {
+        const { data: newWallet, error: wErr } = await supabase
+          .from("toursred_cash_wallets")
+          .insert({ user_id: booking.user_id, balance: 0, currency: "MXN" })
+          .select()
+          .single();
+        if (wErr || !newWallet) return err("Error creando wallet del viajero");
+        wallet = newWallet;
+      }
+
+      const newBalance = Number(wallet.balance) + Number(refund_amount);
+
+      const { data: tx, error: txErr } = await supabase
+        .from("toursred_cash_transactions")
+        .insert({
+          wallet_id: wallet.id,
+          user_id: booking.user_id,
+          amount: Number(refund_amount),
+          balance_after: newBalance,
+          type: "refund",
+          description: `Reembolso por cancelación administrativa - ${tour?.name || ""}`,
+          reference_id: booking_id,
+          reference_type: "admin_cancellation",
+        })
+        .select()
+        .single();
+
+      if (txErr || !tx) return err("Error creando transacción de reembolso");
+      transactionId = tx.id;
+
+      const { error: walletErr } = await supabase
+        .from("toursred_cash_wallets")
+        .update({ balance: newBalance })
+        .eq("id", wallet.id);
+      if (walletErr) return err("Error actualizando balance del wallet");
+    }
+
+    if (refund_method === "bank_transfer" && receipt_base64 && receipt_filename) {
+      const fileExt = receipt_filename.split(".").pop()?.toLowerCase() || "pdf";
+      const filePath = `${booking_id}/${Date.now()}_${receipt_filename.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const contentType = fileExt === "pdf" ? "application/pdf"
+        : fileExt === "png" ? "image/png"
+        : "image/jpeg";
+
+      const { error: uploadErr } = await supabase.storage
+        .from("cancellation-receipts")
+        .upload(filePath, decode(receipt_base64), {
+          contentType,
+          upsert: false,
+        });
+
+      if (uploadErr) return err("Error subiendo comprobante: " + uploadErr.message);
+      receiptFilePath = filePath;
+    }
+
+    // Deduct points if the booking earned any
+    let pointsDeducted = 0;
+    if (booking.points_earned && booking.points_earned > 0) {
+      try {
+        const { error: deductErr } = await supabase.rpc("deduct_points", {
+          p_user_id: booking.user_id,
+          p_amount: booking.points_earned,
+          p_description: `Puntos revertidos por cancelación administrativa - ${tour?.name || ""}`,
+          p_reference_id: booking_id,
+          p_reference_type: "admin_cancellation",
+        });
+        if (deductErr) {
+          console.error("Error deducting points:", deductErr);
+        } else {
+          pointsDeducted = booking.points_earned;
+        }
+      } catch (e) {
+        console.error("Exception deducting points:", e);
+      }
+    }
+
+    // Cancel optional services
+    try {
+      await supabase.rpc("cancel_booking_optional_services", {
+        p_booking_id: booking_id,
+        p_cancelled_by_agency: false,
+      });
+    } catch (e) {
+      console.error("Error cancelling optional services:", e);
+    }
+
+    // Insert admin_booking_cancellations record
+    const { data: adminCancellation, error: acErr } = await supabase
+      .from("admin_booking_cancellations")
+      .insert({
+        booking_id,
+        admin_user_id: user.id,
+        reason_for_traveler: reason_for_traveler.trim(),
+        reason_for_agency: reason_for_agency.trim(),
+        refund_method,
+        refund_amount: Number(refund_amount) || 0,
+        receipt_file_path: receiptFilePath,
+        points_deducted: pointsDeducted,
+        cancelled_at: now,
+      })
+      .select()
+      .single();
+
+    if (acErr || !adminCancellation) {
+      return err("Error registrando cancelación administrativa: " + acErr?.message);
+    }
+
+    // Insert booking_cancellations record for system compatibility
+    const tourStartDate = tour?.start_date || new Date().toISOString().split("T")[0];
+    const { data: cancellationRecord } = await supabase
+      .from("booking_cancellations")
+      .insert({
+        booking_id,
+        cancelled_by_user_id: user.id,
+        cancelled_at: now,
+        tour_start_date: tourStartDate,
+        days_before_tour: 0,
+        cancellation_policy_type: "admin_cancelled",
+        original_deposit_amount: Number(booking.deposit_amount || 0),
+        original_service_charge: Number(booking.service_charge || 0),
+        refund_amount_to_traveler: Number(refund_amount) || 0,
+        amount_to_agency: 0,
+        amount_to_platform: 0,
+        toursred_cash_transaction_id: transactionId,
+        refund_processed: Number(refund_amount) > 0,
+        cancellation_reason: reason_for_traveler.trim(),
+        emails_sent: false,
+      })
+      .select()
+      .single();
+
+    // Update booking status
+    const { error: updateErr } = await supabase
+      .from("bookings")
+      .update({
+        status: "cancelled",
+        cancelled_at: now,
+        cancellation_type: "admin_cancelled",
+        cancellation_refund_amount: Number(refund_amount) || 0,
+        admin_cancellation_id: adminCancellation.id,
+      })
+      .eq("id", booking_id);
+
+    if (updateErr) {
+      console.error("Error updating booking:", updateErr);
+    }
+
+    // Audit log
+    try {
+      await supabase.rpc("insert_audit_log", {
+        p_tenant_type: "admin",
+        p_actor_id: user.id,
+        p_actor_email: adminUser.email ?? null,
+        p_actor_role: adminUser.role,
+        p_target_id: booking_id,
+        p_target_table: "bookings",
+        p_action: "admin_cancel",
+        p_severity: "high",
+        p_old_values: { status: booking.status },
+        p_new_values: { status: "cancelled", cancellation_type: "admin_cancelled", refund_method, refund_amount },
+        p_metadata: { admin_cancellation_id: adminCancellation.id, points_deducted: pointsDeducted },
+      });
+    } catch (e) {
+      console.error("Error audit log:", e);
+    }
+
+    // Get receipt public URL if exists
+    let receiptPublicUrl: string | null = null;
+    if (receiptFilePath) {
+      const { data: urlData } = supabase.storage
+        .from("cancellation-receipts")
+        .getPublicUrl(receiptFilePath);
+      receiptPublicUrl = urlData.publicUrl;
+
+      // For email attachment, download the file
+      // We'll pass the URL to the notification function
+    }
+
+    // Send notifications (non-blocking)
+    const notificationPromises: Promise<void>[] = [];
+
+    // 1. Notify traveler
+    notificationPromises.push(
+      fetch(`${supabaseUrl}/functions/v1/send-cancellation-notification-traveler`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${supabaseServiceKey}`,
+        },
+        body: JSON.stringify({
+          booking_id,
+          cancellation_id: cancellationRecord?.id,
+          admin_cancellation: true,
+          admin_reason: reason_for_traveler.trim(),
+          refund_amount: Number(refund_amount) || 0,
+          refund_method,
+          receipt_url: receiptPublicUrl,
+          receipt_file_path: receiptFilePath,
+        }),
+      }).then(() => {}).catch((e) => console.error("Error notifying traveler:", e))
+    );
+
+    // 2. Notify agency
+    if (agency?.contact_email) {
+      notificationPromises.push(
+        fetch(`${supabaseUrl}/functions/v1/send-cancellation-notification-agency`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({
+            booking_id,
+            cancellation_id: cancellationRecord?.id,
+            admin_cancellation: true,
+            admin_reason: reason_for_agency.trim(),
+          }),
+        }).then(() => {}).catch((e) => console.error("Error notifying agency:", e))
+      );
+    }
+
+    // 3. Notify admin (contacto@toursred.com)
+    notificationPromises.push(
+      fetch(`${supabaseUrl}/functions/v1/send-cancellation-notification-admin`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${supabaseServiceKey}`,
+        },
+        body: JSON.stringify({
+          booking_id,
+          cancellation_id: cancellationRecord?.id,
+          admin_cancellation: true,
+          admin_reason_for_traveler: reason_for_traveler.trim(),
+          admin_reason_for_agency: reason_for_agency.trim(),
+          refund_amount: Number(refund_amount) || 0,
+          refund_method,
+          receipt_url: receiptPublicUrl,
+        }),
+      }).then(() => {}).catch((e) => console.error("Error notifying admin:", e))
+    );
+
+    // Wait for all notifications
+    await Promise.allSettled(notificationPromises);
+
+    // Mark emails as sent
+    if (cancellationRecord) {
+      await supabase
+        .from("booking_cancellations")
+        .update({ emails_sent: true })
+        .eq("id", cancellationRecord.id);
+    }
+
+    return ok({
+      success: true,
+      message: "Reserva cancelada exitosamente",
+      admin_cancellation_id: adminCancellation.id,
+      refund_method,
+      refund_amount: Number(refund_amount) || 0,
+      points_deducted: pointsDeducted,
+      suggested_refund: suggestedRefund,
+    });
+  } catch (e: any) {
+    console.error("admin-cancel-booking error:", e);
+    return err(e.message || "Error interno", 500);
+  }
+});
+
+// Decode base64 to Uint8Array for storage upload
+function decode(base64: string): Uint8Array {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
