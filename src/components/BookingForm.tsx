@@ -1200,32 +1200,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         }
       }
 
-      // Enviar notificación de seguro de viaje si el viajero lo contrató
-      if (includeInsurance && data.id) {
-        supabase.functions.invoke('send-travel-insurance-notification', {
-          body: {
-            booking_id: data.id,
-            booking_code: data.booking_code || data.id,
-            tour_name: tour.name,
-            tour_start_date: isReceptivo && selectedSlot ? selectedSlot.slot_date : tour.start_date,
-            tour_end_date: isReceptivo && selectedSlot
-              ? (selectedSlot.end_date || selectedSlot.slot_date)
-              : tour.end_date,
-            agency_name: (tour as any).agencies?.name || '',
-            traveler_name: `${user?.user_metadata?.first_name || ''} ${user?.user_metadata?.last_name || ''}`.trim() || user?.email,
-            traveler_email: user?.email,
-            count_adultos: travelerCounts.adultos,
-            count_ninos: travelerCounts.ninos,
-            count_infantes: travelerCounts.infantes,
-            count_adultos_mayores: travelerCounts.adultos_mayores,
-            total_travelers: totalTravelers,
-            tour_days: tourDays,
-            insurance_cost: insuranceCost,
-            insurance_discount_amount: insuranceDiscountAmount,
-            insurance_effective_cost: effectiveInsuranceCost,
-          },
-        }).catch(err => console.error('Error sending insurance notification:', err));
-      }
+      // La notificación de seguro de viaje se envía desde send-booking-confirmation
+      // únicamente cuando el pago se confirma, no al crear la reserva en draft
 
       navigate(`/booking-travelers/${data.id}`);
 

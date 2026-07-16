@@ -1195,8 +1195,8 @@ Deno.serve(async (req: Request) => {
       console.error("Error sending referral bonus emails:", referralEmailErr);
     }
 
-    // Send insurance notification to seguros@toursred.com.mx if applicable
-    if (booking.travel_insurance_included && travelInsuranceCost > 0) {
+    // Send insurance notification to seguros@toursred.com.mx if applicable (only once)
+    if (booking.travel_insurance_included && travelInsuranceCost > 0 && !booking.insurance_email_sent) {
       try {
         const isReceptivoTour = !booking.tour.start_date && !booking.tour.end_date;
         const tourStartDate = isReceptivoTour
@@ -1234,6 +1234,8 @@ Deno.serve(async (req: Request) => {
             total_travelers: totalTravelers,
             tour_days: tourDays,
             insurance_cost: travelInsuranceCost,
+            insurance_discount_amount: insuranceDiscountAmount,
+            insurance_effective_cost: travelInsuranceCost - insuranceDiscountAmount,
           }),
         });
         console.log("✅ Insurance notification sent to seguros@toursred.com.mx for booking:", booking_id);
