@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, User, LogOut, Search, MessageCircle, ChevronDown, LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation, Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent, DollarSign, Gift, Megaphone, Ticket, BadgePercent, Sparkles, Send, ArrowLeftRight, FileText, FilePlus2, BookOpen, Headphones as HeadphonesIcon, TicketCheck, ShoppingBag, Trash2, Bus, BarChart2, Briefcase, FileSpreadsheet, Shield, Mail } from 'lucide-react';
+import { Menu, X, User, LogOut, Search, MessageCircle, ChevronDown, LayoutDashboard, Building2, Users, UserCheck, MapPin, Tag, Navigation, Star, MessageSquare, Globe, Settings, CreditCard, Coins, Percent, DollarSign, Gift, Megaphone, Ticket, BadgePercent, Sparkles, Send, ArrowLeftRight, FileText, FilePlus2, BookOpen, Headphones as HeadphonesIcon, TicketCheck, ShoppingBag, Trash2, Bus, BarChart2, Briefcase, FileSpreadsheet, Shield, Mail, TrendingUp } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import { useAuth } from '../context/AuthContext';
 import { signOut, supabase } from '../lib/supabase';
@@ -272,6 +272,7 @@ const NavBar: React.FC = () => {
       ejecutivosItems.push({ to: '/admin/ejecutivos', label: 'Ejecutivos', icon: <Briefcase className="h-4 w-4" /> });
       ejecutivosItems.push({ to: '/admin/ejecutivos/comisiones', label: 'Comisiones', icon: <DollarSign className="h-4 w-4" /> });
       ejecutivosItems.push({ to: '/admin/ejecutivos/configuracion', label: 'Configuracion', icon: <Settings className="h-4 w-4" /> });
+      ejecutivosItems.push({ to: '/admin/leads', label: 'Pipeline de Leads', icon: <TrendingUp className="h-4 w-4" /> });
     }
 
     if (ejecutivosItems.length > 0)

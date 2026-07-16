@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Search, ChevronDown, CreditCard as Edit2, Eye, ArrowRight, Trash2, User, Phone, Mail, MapPin, MessageSquare, Calendar, X, CheckCircle, Clock, AlertCircle, Building2, Upload, Loader2 } from 'lucide-react';
+import { Plus, Search, ChevronDown, CreditCard as Edit2, Eye, ArrowRight, Trash2, User, Phone, Mail, MapPin, MessageSquare, Calendar, X, CheckCircle, Clock, AlertCircle, Building2, Upload, Loader2, MailCheck, Send } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -38,6 +38,8 @@ interface AgencyLead {
   follow_up_log: any[];
   created_at: string;
   updated_at: string;
+  converted_agency_onboarding_status?: string | null;
+  converted_agency_name?: string | null;
 }
 
 const STATUS_CONFIG: Record<LeadStatus, { label: string; color: string; bg: string }> = {
@@ -169,6 +171,11 @@ export default function ExecutiveLeads() {
   const [convertTitularCuenta, setConvertTitularCuenta] = useState('');
   const [isConverting, setIsConverting] = useState(false);
   const [showFollowUp, setShowFollowUp] = useState<AgencyLead | null>(null);
+  const [fixEmailLead, setFixEmailLead] = useState<AgencyLead | null>(null);
+  const [resendLead, setResendLead] = useState<AgencyLead | null>(null);
+  const [fixEmailValue, setFixEmailValue] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionMessage, setActionMessage] = useState('');
   const [newNote, setNewNote] = useState('');
 
   const loadLeads = useCallback(async () => {
@@ -180,7 +187,23 @@ export default function ExecutiveLeads() {
         .select('*')
         .eq('executive_id', accountExecutiveInfo.executiveId)
         .order('created_at', { ascending: false });
-      setLeads(data || []);
+
+      const convertedIds = (data || []).filter(l => l.converted_agency_id).map(l => l.converted_agency_id);
+      if (convertedIds.length > 0) {
+        const { data: agenciesData } = await supabase
+          .from('agencies')
+          .select('id, onboarding_status, name')
+          .in('id', convertedIds);
+        const agencyMap = new Map((agenciesData || []).map(a => [a.id, a]));
+        const enriched = (data || []).map(l => ({
+          ...l,
+          converted_agency_onboarding_status: l.converted_agency_id ? agencyMap.get(l.converted_agency_id)?.onboarding_status || null : null,
+          converted_agency_name: l.converted_agency_id ? agencyMap.get(l.converted_agency_id)?.name || null : null,
+        }));
+        setLeads(enriched);
+      } else {
+        setLeads(data || []);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -408,6 +431,73 @@ export default function ExecutiveLeads() {
     loadLeads();
   };
 
+  const openFixEmail = (lead: AgencyLead) => {
+    setFixEmailLead(lead);
+    setFixEmailValue(lead.contact_email);
+    setActionMessage('');
+  };
+
+  const handleFixEmail = async () => {
+    if (!fixEmailLead?.converted_agency_id) return;
+    const trimmed = fixEmailValue.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setActionMessage('Formato de correo inválido');
+      return;
+    }
+    if (trimmed === fixEmailLead.contact_email.toLowerCase()) {
+      setActionMessage('El correo es el mismo, no hay cambios');
+      return;
+    }
+    setActionLoading(true);
+    setActionMessage('');
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fix-agency-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ agencyId: fixEmailLead.converted_agency_id, newEmail: trimmed }),
+      });
+      const result = await resp.json();
+      if (!resp.ok) throw new Error(result.error || 'Error al corregir el correo');
+      setActionMessage('Correo corregido y credenciales reenviadas correctamente');
+      setFixEmailLead(null);
+      setFixEmailValue('');
+      loadLeads();
+    } catch (err: any) {
+      setActionMessage(err.message || 'Error al corregir el correo');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleResendCredentials = async () => {
+    if (!resendLead?.converted_agency_id) return;
+    setActionLoading(true);
+    setActionMessage('');
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resend-agency-credentials`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ agencyId: resendLead.converted_agency_id }),
+      });
+      const result = await resp.json();
+      if (!resp.ok) throw new Error(result.error || 'Error al reenviar credenciales');
+      setActionMessage('Credenciales reenviadas correctamente');
+      setResendLead(null);
+    } catch (err: any) {
+      setActionMessage(err.message || 'Error al reenviar credenciales');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const filtered = leads.filter(l => {
     const matchSearch = !search ||
       l.agency_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -559,6 +649,29 @@ export default function ExecutiveLeads() {
                               <ArrowRight className="h-4 w-4" />
                             </button>
                           )}
+                          {lead.converted_agency_id && lead.converted_agency_onboarding_status !== 'active' && (
+                            <>
+                              <button
+                                onClick={() => openFixEmail(lead)}
+                                className="p-1.5 hover:bg-amber-50 rounded text-amber-600 hover:text-amber-700 transition-colors"
+                                title="Corregir email"
+                              >
+                                <MailCheck className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => { setResendLead(lead); setActionMessage(''); }}
+                                className="p-1.5 hover:bg-green-50 rounded text-green-600 hover:text-green-700 transition-colors"
+                                title="Reenviar credenciales"
+                              >
+                                <Send className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
+                          {lead.converted_agency_id && lead.converted_agency_onboarding_status === 'active' && (
+                            <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
+                              <CheckCircle className="h-3.5 w-3.5" /> Aprobada
+                            </span>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -700,8 +813,15 @@ export default function ExecutiveLeads() {
                           setForm(f => ({ ...f, contact_email: e.target.value }));
                           handleFieldChange('email', e.target.value);
                         }}
-                        className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${fieldStatus.email === 'error' ? 'border-red-400 focus:ring-red-500' : fieldStatus.email === 'ok' ? 'border-green-400 focus:ring-green-500' : 'border-gray-300 focus:ring-blue-500'} ${fieldStatus.email === 'ok' ? 'pr-9' : ''}`}
+                        disabled={!!editingLead?.converted_agency_id}
+                        className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${fieldStatus.email === 'error' ? 'border-red-400 focus:ring-red-500' : fieldStatus.email === 'ok' ? 'border-green-400 focus:ring-green-500' : 'border-gray-300 focus:ring-blue-500'} ${fieldStatus.email === 'ok' ? 'pr-9' : ''} ${editingLead?.converted_agency_id ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
                       />
+                      {editingLead?.converted_agency_id && (
+                        <p className="mt-1 text-xs text-amber-600 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          El correo no se puede editar aquí una vez convertido. Usa el botón de corregir email en el pipeline.
+                        </p>
+                      )}
                       {fieldStatus.email === 'checking' && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />}
                       {fieldStatus.email === 'ok' && <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />}
                     </div>
@@ -948,6 +1068,106 @@ export default function ExecutiveLeads() {
                 className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
               >
                 Agregar nota
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fix Email Modal */}
+      {fixEmailLead && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <MailCheck className="h-5 w-5 text-amber-600" /> Corregir correo
+              </h3>
+              <button onClick={() => setFixEmailLead(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600">
+              Agencia: <strong>{fixEmailLead.agency_name}</strong>
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">Correo actual</label>
+              <p className="text-sm text-gray-400">{fixEmailLead.contact_email}</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">Nuevo correo *</label>
+              <input
+                type="email"
+                value={fixEmailValue}
+                onChange={e => setFixEmailValue(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                placeholder="nuevo@correo.com"
+              />
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
+              Se anulara la contraseña anterior y se enviara una nueva contraseña temporal al correo corregido. La agencia debera cambiarla al iniciar sesion.
+            </div>
+            {actionMessage && (
+              <p className="text-sm text-red-600">{actionMessage}</p>
+            )}
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setFixEmailLead(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleFixEmail}
+                disabled={actionLoading}
+                className="px-4 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {actionLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                Corregir y reenviar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Resend Credentials Modal */}
+      {resendLead && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Send className="h-5 w-5 text-green-600" /> Reenviar credenciales
+              </h3>
+              <button onClick={() => setResendLead(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600">
+              Agencia: <strong>{resendLead.agency_name}</strong>
+            </p>
+            <p className="text-sm text-gray-600">
+              Se generara una nueva contraseña temporal y se enviara al correo actual:
+            </p>
+            <p className="text-sm font-semibold text-gray-900">{resendLead.contact_email}</p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700">
+              La contraseña anterior sera anulada. La agencia debera cambiar la nueva contraseña al iniciar sesion.
+            </div>
+            {actionMessage && (
+              <p className="text-sm text-red-600">{actionMessage}</p>
+            )}
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setResendLead(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleResendCredentials}
+                disabled={actionLoading}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {actionLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                Reenviar
               </button>
             </div>
           </div>

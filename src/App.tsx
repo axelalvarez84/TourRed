@@ -121,6 +121,7 @@ import AgencySupportTickets from './pages/agency/AgencySupportTickets';
 import AdminEjecutivos from './pages/admin/AdminEjecutivos';
 import AdminEjecutivosComisiones from './pages/admin/AdminEjecutivosComisiones';
 import AdminEjecutivosConfig from './pages/admin/AdminEjecutivosConfig';
+import AdminLeads from './pages/admin/AdminLeads';
 import ExecutiveDashboard from './pages/executive/ExecutiveDashboard';
 import ExecutiveLeads from './pages/executive/ExecutiveLeads';
 import ExecutiveMisAgencias from './pages/executive/ExecutiveMisAgencias';
@@ -811,6 +812,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                 <AdminEjecutivosConfig />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/leads"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                <AdminLeads />
               </ProtectedRoute>
             }
           />
