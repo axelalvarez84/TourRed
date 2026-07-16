@@ -328,7 +328,7 @@ const TravelerDashboard: React.FC = () => {
         throw new Error(data.error || 'Error al actualizar la suscripción');
       }
 
-      alert('¡Tu plan ha sido actualizado a Anual! Se te acreditó el tiempo restante de tu plan mensual y ahora pagarás la tarifa anual.');
+      alert('¡Tu plan se actualizó a Anual! Se cobró la diferencia prorrateada por los días restantes de tu mes actual. Tu membresía anual es válida por 12 meses desde hoy.');
       setShowUpgradeModal(false);
       await loadDashboardData();
     } catch (error: any) {
@@ -843,7 +843,7 @@ const TravelerDashboard: React.FC = () => {
               </ul>
             </div>
             <p className="text-gray-700 text-sm mb-6">
-              Tu plan mensual continuará hasta tu próxima fecha de renovación. A partir de esa fecha, tu membresía se convertirá automáticamente en plan anual y pagarás $490 MXN/año.
+              Al actualizar, se te cobrará de inmediato la diferencia prorrateada (el precio anual menos lo que ya pagaste este mes), y tu membresía se renovará cada 12 meses desde hoy.
             </p>
             <div className="flex gap-3">
               <button

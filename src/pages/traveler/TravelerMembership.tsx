@@ -361,8 +361,7 @@ export default function TravelerMembership() {
                     <div>
                       <p className="font-semibold text-gray-900 mb-1">Actualiza a Plan Anual y ahorra {prices.annualSavingsFormatted} MXN</p>
                       <p className="text-sm text-gray-700">
-                        Tu plan mensual continuará hasta el {formatDate(membership.current_period_end)}.
-                        A partir de esa fecha, pagarás solo {prices.annualPriceFormatted} MXN/año (equivale a {prices.annualMonthlyEquivalentFormatted}/mes).
+                        Al actualizar, se te cobrará de inmediato la diferencia prorrateada (el precio anual menos lo que ya pagaste este mes), y tu membresía se renovará cada 12 meses desde hoy. Precio anual: {prices.annualPriceFormatted} MXN (equivale a {prices.annualMonthlyEquivalentFormatted}/mes).
                       </p>
                     </div>
                   </div>

@@ -158,11 +158,10 @@ Deno.serve(async (req: Request) => {
 
       const subscription = await stripe.subscriptions.retrieve(membership.stripe_subscription_id);
 
-      const currentPeriodEnd = new Date(subscription.items.data[0].current_period_end * 1000);
-
-      await stripe.subscriptions.update(membership.stripe_subscription_id, {
+      const updatedSubscription = await stripe.subscriptions.update(membership.stripe_subscription_id, {
         cancel_at_period_end: false,
-        proration_behavior: 'none',
+        proration_behavior: 'always_invoice',
+        billing_cycle_anchor: 'now',
         items: [{
           id: subscription.items.data[0].id,
           price: settings.stripe_annual_price_id,
@@ -173,18 +172,21 @@ Deno.serve(async (req: Request) => {
         },
       });
 
+      const currentPeriodEnd = new Date(updatedSubscription.items.data[0].current_period_end * 1000);
+
       await supabase
         .from('memberships')
         .update({
           plan_type: 'annual',
           cancel_at_period_end: false,
           current_period_end: currentPeriodEnd.toISOString(),
+          current_period_start: new Date(updatedSubscription.items.data[0].current_period_start * 1000).toISOString(),
         })
         .eq('id', membership.id);
 
       return new Response(
         JSON.stringify({
-          message: 'Plan actualizado a anual. Tu plan mensual actual sigue vigente hasta el ' + currentPeriodEnd.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' }) + '. A partir de esa fecha se cobrará el plan anual y tu membresía se extenderá por 1 año adicional.',
+          message: 'Tu plan se actualizó a anual. Se cobró de inmediato la diferencia prorrateada por los días restantes de tu mes actual. Tu membresía anual es válida hasta el ' + currentPeriodEnd.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' }) + '.',
           current_period_end: currentPeriodEnd.toISOString()
         }),
         {
