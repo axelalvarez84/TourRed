@@ -124,6 +124,7 @@ const AgencyProfile: React.FC = () => {
           .from('bookings')
           .select('*', { count: 'exact', head: true })
           .eq('agency_id', agencyData.id)
+          .neq('status', 'draft')
       ]);
 
       const agencyWithStats = {

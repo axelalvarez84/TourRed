@@ -182,7 +182,8 @@ const AdminAgencies: React.FC = () => {
             const { count: bookingCount } = await supabase
               .from('bookings')
               .select('id', { count: 'exact', head: true })
-              .eq('agency_id', agency.id);
+              .eq('agency_id', agency.id)
+              .neq('status', 'draft');
 
             // Calcular ingresos totales (suma de agency_net_amount de commission_records)
             const { data: commissionData, error: commissionError } = await supabase

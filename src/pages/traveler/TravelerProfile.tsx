@@ -241,7 +241,8 @@ const TravelerProfile: React.FC = () => {
         supabase
           .from('bookings')
           .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id),
+          .eq('user_id', user.id)
+          .neq('status', 'draft'),
 
         // Calcular total gastado (suma de user_payment de reservas exitosas)
         supabase
