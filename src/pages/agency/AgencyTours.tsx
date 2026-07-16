@@ -666,7 +666,7 @@ const AgencyTours: React.FC = () => {
     setExcludes(['']);
     setDeparturePoints(['']);
     setSelectedDeparturePoints([]);
-    setTourImageData(null);
+
     setOptionalServices([]);
     setSupplements([]);
     setSchedulesDraft([]);
@@ -875,7 +875,7 @@ const AgencyTours: React.FC = () => {
       console.error('Error loading departure points:', err);
     }
 
-    setTourImageData(null); // Reset image data when editing
+
 
     // Load pickup and language data
     setPickupAvailable(tour.pickup_available || false);
