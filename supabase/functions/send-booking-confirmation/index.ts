@@ -151,7 +151,10 @@ Deno.serve(async (req: Request) => {
     const depositPercentage = booking.tour.deposit_percentage;
     const serviceChargePercentage = platformSettings.service_charge_percentage;
     const agencyCommission = Number(booking.commission_amount) || 0;
-    const agencyCommissionPercentage = platformSettings?.platform_commission_percentage ?? (totalPrice > 0 ? Math.round((agencyCommission / totalPrice) * 1000) / 10 : 0);
+    const agencyCommissionPercentage =
+      (booking.agency?.commission_rate != null ? Number(booking.agency.commission_rate) * 100 : null) ??
+      platformSettings?.agency_commission_percentage ??
+      (totalPrice > 0 ? Math.round((agencyCommission / totalPrice) * 1000) / 10 : 0);
     const serviceCharge = booking.service_charge || 0;
     const serviceChargeDiscount = Number(booking.service_charge_discount) || 0;
     const discountAmount = Number(booking.discount_amount) || 0;
