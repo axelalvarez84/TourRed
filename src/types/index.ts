@@ -447,6 +447,29 @@ export interface Booking {
   payment_plan?: BookingPaymentPlan;
 }
 
+export interface BookingOptionalService {
+  id?: string;
+  booking_id: string;
+  tour_optional_service_id?: string | null;
+  service_kind: 'optional_service' | 'pickup' | 'language';
+  description?: string | null;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+  is_cancelled?: boolean;
+  cancelled_at?: string | null;
+  refund_amount?: number;
+  cancelled_by_agency?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  service_charge?: number;
+  total_paid?: number;
+  agency_commission?: number;
+  membership_exemption_used?: number;
+  payment_method?: string | null;
+  paid_at?: string | null;
+}
+
 export interface BookingTraveler {
   id?: string;
   booking_id: string;

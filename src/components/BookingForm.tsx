@@ -831,8 +831,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const promoResult = calculatePromoDiscount();
   const promoDiscountAmount = promoResult.discount;
 
-  // Precio total del tour (sin descuento de código, pero con promo)
-  const grossTotalPrice = grossTourPrice - promoDiscountAmount + optionalServicesSubtotal + receptivoExtrasSubtotal;
+  // Precio total del tour (sin descuento de código, sin opcionales, sin extras receptivos)
+  // Los opcionales y extras se cobran al 100% como cubetas independientes
+  const grossTotalPrice = grossTourPrice - promoDiscountAmount;
+
+  // Total de extras (opcionales + pickup + idioma) — cobrados al 100%, fuera del total_price de la reserva
+  const extrasTotal = optionalServicesSubtotal + receptivoExtrasSubtotal;
 
   // Si el usuario es de alto riesgo (más de 3 no shows), debe pagar el 100%
   const effectiveDepositPercentage = isHighRisk ? 100 : tour.deposit_percentage;
@@ -990,9 +994,27 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
   const amountAfterPoints = userPayment - pointsDiscountAmount;
 
-  const cashBase = amountAfterPoints + effectiveInsuranceCost;
-  const toursRedCashApplied = useToursRedCash ? Math.min(walletBalance, cashBase) : 0;
-  const rawAmountAfterToursRedCash = cashBase - toursRedCashApplied;
+  // ToursRed Cash: bucket allocation — tour first, then extras, then insurance
+  // 1. Cash aplicado al depósito del tour (igual que antes)
+  // 2. Si sobra, se aplica a los extras (opcionales, pickup, idioma)
+  // 3. Si sobra, se aplica al seguro
+  // Lo que no alcance se cobra con el otro método de pago
+  const tourBucketAfterPoints = amountAfterPoints;
+  const cashForTour = useToursRedCash ? Math.min(walletBalance, tourBucketAfterPoints) : 0;
+  const walletRemainingAfterTour = useToursRedCash ? Math.max(0, walletBalance - cashForTour) : 0;
+
+  const cashForExtras = useToursRedCash ? Math.min(walletRemainingAfterTour, extrasTotal) : 0;
+  const walletRemainingAfterExtras = useToursRedCash ? Math.max(0, walletRemainingAfterTour - cashForExtras) : 0;
+
+  const cashForInsurance = useToursRedCash ? Math.min(walletRemainingAfterExtras, effectiveInsuranceCost) : 0;
+
+  const toursRedCashApplied = cashForTour + cashForExtras + cashForInsurance;
+
+  const tourAfterCash = tourBucketAfterPoints - cashForTour;
+  const extrasAfterCash = extrasTotal - cashForExtras;
+  const insuranceAfterCash = effectiveInsuranceCost - cashForInsurance;
+
+  const rawAmountAfterToursRedCash = tourAfterCash + extrasAfterCash + insuranceAfterCash;
   // Si el residuo es menor a $10 (mínimo de los procesadores de pago), absorberlo como $0
   const amountAfterToursRedCash = rawAmountAfterToursRedCash < 10 && rawAmountAfterToursRedCash > 0 ? 0 : rawAmountAfterToursRedCash;
 
@@ -1109,7 +1131,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         deposit_amount: effectiveDepositAmount,
         commission_amount: agencyCommission,
         service_charge: serviceCharge,
-        user_payment: userPayment + effectiveInsuranceCost + membershipCost,
+        user_payment: userPayment + extrasTotal + effectiveInsuranceCost + membershipCost,
         platform_revenue: platformRevenue,
         booking_date: isReceptivo && selectedSlot ? selectedSlot.slot_date : (isTransferCustomTime && selectedSlotDate ? selectedSlotDate.toISOString().split('T')[0] : tour.start_date),
         slot_id: isReceptivo && selectedSlot ? selectedSlot.id : null,
@@ -1133,11 +1155,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         promo_discount_amount: promoResult.isActive ? promoDiscountAmount : 0,
         pickup_type: isReceptivo && tour.pickup_available ? pickupType : null,
         pickup_zone_name: isReceptivo && pickupType === 'pickup' && selectedZoneData ? selectedZoneData.name : (isReceptivo && pickupType === 'pickup' ? (pickupHotelAddress || null) : null),
-        pickup_zone_extra_cost: isReceptivo && pickupType === 'pickup' ? (selectedZoneData?.extra_cost || 0) : 0,
-        pickup_cost_type: isReceptivo && pickupType === 'pickup' && selectedZoneData ? selectedZoneData.cost_type : null,
+        pickup_zone_extra_cost: 0,
+        pickup_cost_type: null,
         selected_language: isReceptivo && selectedLanguage ? selectedLanguage : null,
-        language_extra_cost: isReceptivo && selectedLanguageData ? (selectedLanguageData.extra_cost || 0) : 0,
-        language_cost_type: isReceptivo && selectedLanguageData ? selectedLanguageData.cost_type : null,
+        language_extra_cost: 0,
+        language_cost_type: null,
         restrictions_accepted: hasRestrictions ? restrictionsAccepted : false,
         selected_seats: hasSeatMap && selectedSeats.length > 0 ? selectedSeats : null,
         es_reserva_preventa: isEnPreventa && hasMembership,
@@ -1166,19 +1188,77 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
       console.log('✅ Reserva creada exitosamente:', data);
 
-      // Save selected optional services
-      const selectedOptionals = optionalServices
-        .filter(svc => (optionalServiceQuantities[svc.id] || 0) > 0)
-        .map(svc => ({
+      // Build optional services array with financial breakdown per bucket
+      const extrasServiceChargeRate = serviceChargePercentage / 100;
+      const extrasAgencyCommissionRate = agencyCommissionPercentage / 100;
+
+      const allExtras: Record<string, any>[] = [];
+
+      // Traditional optional services
+      for (const svc of optionalServices) {
+        const qty = optionalServiceQuantities[svc.id] || 0;
+        if (qty <= 0) continue;
+        const subtotal = qty * svc.price_per_person;
+        const svcServiceCharge = Math.round(subtotal * extrasServiceChargeRate * 100) / 100;
+        const svcAgencyCommission = Math.round(subtotal * extrasAgencyCommissionRate * 100) / 100;
+        allExtras.push({
           booking_id: data.id,
           tour_optional_service_id: svc.id,
-          quantity: optionalServiceQuantities[svc.id],
+          service_kind: 'optional_service',
+          description: svc.name || 'Servicio opcional',
+          quantity: qty,
           unit_price: svc.price_per_person,
-          subtotal: optionalServiceQuantities[svc.id] * svc.price_per_person,
-        }));
+          subtotal,
+          service_charge: svcServiceCharge,
+          agency_commission: svcAgencyCommission,
+          total_paid: subtotal + svcServiceCharge,
+        });
+      }
 
-      if (selectedOptionals.length > 0) {
-        await supabase.from('booking_optional_services').insert(selectedOptionals);
+      // Pickup extra (receptivo)
+      if (isReceptivo && pickupType === 'pickup' && pickupExtraCost > 0 && selectedZoneData) {
+        const svcServiceCharge = Math.round(pickupExtraCost * extrasServiceChargeRate * 100) / 100;
+        const svcAgencyCommission = Math.round(pickupExtraCost * extrasAgencyCommissionRate * 100) / 100;
+        const pickupDesc = selectedZoneData.name
+          ? `Pick Up — ${selectedZoneData.name}${selectedZoneData.cost_type === 'por_persona' ? ' (por persona)' : ' (por reserva)'}`
+          : 'Pick Up';
+        allExtras.push({
+          booking_id: data.id,
+          tour_optional_service_id: null,
+          service_kind: 'pickup',
+          description: pickupDesc,
+          quantity: selectedZoneData.cost_type === 'por_persona' ? totalTravelers : 1,
+          unit_price: selectedZoneData.extra_cost || 0,
+          subtotal: pickupExtraCost,
+          service_charge: svcServiceCharge,
+          agency_commission: svcAgencyCommission,
+          total_paid: pickupExtraCost + svcServiceCharge,
+        });
+      }
+
+      // Language extra (receptivo)
+      if (isReceptivo && languageExtraCost > 0 && selectedLanguageData) {
+        const svcServiceCharge = Math.round(languageExtraCost * extrasServiceChargeRate * 100) / 100;
+        const svcAgencyCommission = Math.round(languageExtraCost * extrasAgencyCommissionRate * 100) / 100;
+        const langDesc = selectedLanguage
+          ? `Idioma/Intérprete — ${selectedLanguage}${selectedLanguageData.cost_type === 'por_persona' ? ' (por persona)' : ' (fijo)'}`
+          : 'Idioma/Intérprete';
+        allExtras.push({
+          booking_id: data.id,
+          tour_optional_service_id: null,
+          service_kind: 'language',
+          description: langDesc,
+          quantity: selectedLanguageData.cost_type === 'por_persona' ? totalTravelers : 1,
+          unit_price: selectedLanguageData.extra_cost || 0,
+          subtotal: languageExtraCost,
+          service_charge: svcServiceCharge,
+          agency_commission: svcAgencyCommission,
+          total_paid: languageExtraCost + svcServiceCharge,
+        });
+      }
+
+      if (allExtras.length > 0) {
+        await supabase.from('booking_optional_services').insert(allExtras);
       }
 
       if (hasSeatMap && selectedSeats.length > 0) {

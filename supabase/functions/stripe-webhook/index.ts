@@ -962,6 +962,58 @@ Deno.serve(async (req) => {
               console.error('Error processing membership exemption:', membershipError);
             }
 
+            // Process unpaid optional services (pickup, language, traditional optionals)
+            try {
+              const { data: unpaidOptionals } = await supabase
+                .from('booking_optional_services')
+                .select('id, service_kind, subtotal, total_paid, is_cancelled, paid_at')
+                .eq('booking_id', bookingId)
+                .eq('is_cancelled', false)
+                .is('paid_at', null);
+
+              if (unpaidOptionals && unpaidOptionals.length > 0) {
+                const { data: settings } = await supabase
+                  .from('platform_settings')
+                  .select('service_charge_percentage')
+                  .maybeSingle();
+                const svcChargeRate = settings?.service_charge_percentage || 5;
+
+                for (const opt of unpaidOptionals) {
+                  if ((opt.total_paid || opt.subtotal) <= 0) continue;
+                  const grossSvcCharge = Math.round((opt.subtotal * svcChargeRate / 100) * 100) / 100;
+                  let exemptionUsed = 0;
+                  try {
+                    const { data: exemptResult } = await supabase
+                      .rpc('apply_membership_service_fee_exemption', {
+                        p_user_id: booking.user_id,
+                        p_gross_service_charge: grossSvcCharge,
+                      });
+                    exemptionUsed = parseFloat(exemptResult?.exemption_applied ?? '0');
+                  } catch (e) {
+                    console.error(`Error applying exemption for optional ${opt.id}:`, e);
+                  }
+
+                  const { error: optUpdateError } = await supabase
+                    .from('booking_optional_services')
+                    .update({
+                      paid_at: new Date().toISOString(),
+                      payment_method: 'stripe',
+                      service_charge: grossSvcCharge - exemptionUsed,
+                      membership_exemption_used: exemptionUsed,
+                      total_paid: opt.total_paid || opt.subtotal,
+                    })
+                    .eq('id', opt.id);
+
+                  if (optUpdateError) {
+                    console.error(`Error marking optional ${opt.id} as paid:`, optUpdateError.message);
+                  }
+                }
+                console.log(`Processed ${unpaidOptionals.length} optional services for booking ${bookingId}`);
+              }
+            } catch (optError) {
+              console.error('Error processing optional services:', optError);
+            }
+
             // Record discount code usage if applicable
             const discountCodeId = session.metadata?.discount_code_id;
             if (discountCodeId) {

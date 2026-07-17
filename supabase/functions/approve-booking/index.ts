@@ -238,6 +238,55 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // Process unpaid optional services (pickup, language, traditional optionals)
+      try {
+        const { data: unpaidOptionals } = await supabase
+          .from('booking_optional_services')
+          .select('id, subtotal, total_paid')
+          .eq('booking_id', booking_id)
+          .eq('is_cancelled', false)
+          .is('paid_at', null);
+
+        if (unpaidOptionals && unpaidOptionals.length > 0) {
+          const svcChargeRate = 5;
+          const paymentMethod = pointsValue > 0 && cashUsed > 0
+            ? "toursred_points_and_cash"
+            : cashUsed > 0
+              ? "toursred_cash"
+              : "toursred_points";
+
+          for (const opt of unpaidOptionals) {
+            if ((opt.total_paid || opt.subtotal) <= 0) continue;
+            const grossSvcCharge = Math.round((opt.subtotal * svcChargeRate / 100) * 100) / 100;
+            let optExemptionUsed = 0;
+            try {
+              const { data: optExemptResult } = await supabase
+                .rpc('apply_membership_service_fee_exemption', {
+                  p_user_id: booking.user_id,
+                  p_gross_service_charge: grossSvcCharge,
+                });
+              optExemptionUsed = parseFloat(optExemptResult?.exemption_applied ?? '0');
+            } catch (e) {
+              console.error(`Error applying exemption for optional ${opt.id} (approve-booking):`, e);
+            }
+
+            await supabase
+              .from('booking_optional_services')
+              .update({
+                paid_at: now,
+                payment_method: paymentMethod,
+                service_charge: grossSvcCharge - optExemptionUsed,
+                membership_exemption_used: optExemptionUsed,
+                total_paid: opt.total_paid || opt.subtotal,
+              })
+              .eq('id', opt.id);
+          }
+          console.log(`Processed ${unpaidOptionals.length} optional services for booking ${booking_id} (approve-booking)`);
+        }
+      } catch (optError) {
+        console.error('Error processing optional services (approve-booking):', optError);
+      }
+
       // Trigger CFDI si el PAC está configurado (pago con compensación: puntos y/o wallet)
       const { data: cfdiSettings } = await supabase
         .from("platform_settings")

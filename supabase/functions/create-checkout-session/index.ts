@@ -291,6 +291,73 @@ Deno.serve(async (req) => {
         quantity: 1,
       });
     } else {
+      // Query booking_optional_services for this booking to build separate line items
+      const { data: optionalServices, error: optError } = await supabase
+        .from("booking_optional_services")
+        .select("id, service_kind, description, subtotal, total_paid, is_cancelled, paid_at")
+        .eq("booking_id", bookingId)
+        .eq("is_cancelled", false)
+        .is("paid_at", null);
+
+      const unpaidOptionals = (optionalServices || []).filter(
+        (opt: any) => opt.paid_at === null && (opt.total_paid || opt.subtotal) > 0
+      );
+
+      // Split amount between tour and optionals
+      // The total amount includes tour + optionals + insurance + membership
+      // Optionals are paid at their total_paid value; the rest is the tour portion
+      const optionalsTotal = unpaidOptionals.reduce((sum: number, opt: any) => sum + (opt.total_paid || opt.subtotal), 0);
+      const tourPortion = Math.max(0, Math.round((amount - optionalsTotal) * 100) / 100);
+
+      const lineItems: any[] = [];
+
+      if (tourPortion > 0) {
+        lineItems.push({
+          price_data: {
+            currency: currency,
+            product_data: {
+              name: description || "Reserva de Tour",
+            },
+            unit_amount: Math.round(tourPortion * 100),
+          },
+          quantity: 1,
+        });
+      }
+
+      for (const opt of unpaidOptionals) {
+        const optAmount = opt.total_paid || opt.subtotal;
+        if (optAmount <= 0) continue;
+        const optLabel = opt.description || (opt.service_kind === 'pickup' ? 'Pick Up' : opt.service_kind === 'language' ? 'Idioma/Intérprete' : 'Servicio opcional');
+        lineItems.push({
+          price_data: {
+            currency: currency,
+            product_data: {
+              name: optLabel,
+            },
+            unit_amount: Math.round(optAmount * 100),
+          },
+          quantity: 1,
+          metadata: {
+            type: opt.service_kind || 'optional_service',
+            bos_id: opt.id,
+          },
+        });
+      }
+
+      // Fallback: if no line items were created (edge case), use single item
+      if (lineItems.length === 0) {
+        lineItems.push({
+          price_data: {
+            currency: currency,
+            product_data: {
+              name: description || "Reserva de Tour",
+            },
+            unit_amount: Math.round(amount * 100),
+          },
+          quantity: 1,
+        });
+      }
+
       sessionConfig.mode = "payment";
       sessionConfig.payment_method_types = ['card', 'oxxo', 'customer_balance'];
       sessionConfig.payment_method_options = {
@@ -301,18 +368,7 @@ Deno.serve(async (req) => {
           },
         },
       };
-      sessionConfig.line_items = [
-        {
-          price_data: {
-            currency: currency,
-            product_data: {
-              name: description || "Reserva de Tour",
-            },
-            unit_amount: Math.round(amount * 100),
-          },
-          quantity: 1,
-        },
-      ];
+      sessionConfig.line_items = lineItems;
       sessionConfig.payment_intent_data = {
         metadata: {
           booking_id: bookingId,

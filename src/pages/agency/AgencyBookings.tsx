@@ -1396,11 +1396,11 @@ const AgencyBookings: React.FC = () => {
                             <div>
                               <span className="text-xs text-teal-700 font-medium">Zona / Hotel: </span>
                               <span className="text-sm text-gray-800">{(booking as any).pickup_zone_name}</span>
-                              {(booking as any).pickup_zone_extra_cost > 0 && (
-                                <span className="ml-2 text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded">
-                                  +${(booking as any).pickup_zone_extra_cost} {(booking as any).pickup_cost_type === 'por_persona' ? '/persona' : '/reserva'}
+                              {(bookingOptionalServices[booking.id] || []).filter((bos: any) => bos.service_kind === 'pickup').map((bos: any) => (
+                                <span key={bos.id} className="ml-2 text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded">
+                                  +${bos.total_paid || bos.subtotal} {bos.quantity > 1 ? '/persona' : '/reserva'}
                                 </span>
-                              )}
+                              ))}
                             </div>
                           </div>
                         )}
@@ -1410,11 +1410,11 @@ const AgencyBookings: React.FC = () => {
                             <div>
                               <span className="text-xs text-teal-700 font-medium">Idioma seleccionado: </span>
                               <span className="text-sm text-gray-800 capitalize">{(booking as any).selected_language}</span>
-                              {(booking as any).language_extra_cost > 0 && (
-                                <span className="ml-2 text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded">
-                                  +${(booking as any).language_extra_cost} {(booking as any).language_cost_type === 'fijo' ? 'fijo' : '/persona'}
+                              {(bookingOptionalServices[booking.id] || []).filter((bos: any) => bos.service_kind === 'language').map((bos: any) => (
+                                <span key={bos.id} className="ml-2 text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded">
+                                  +${bos.total_paid || bos.subtotal} {bos.quantity > 1 ? '/persona' : 'fijo'}
                                 </span>
-                              )}
+                              ))}
                             </div>
                           </div>
                         )}
@@ -1431,9 +1431,9 @@ const AgencyBookings: React.FC = () => {
                           <div key={bos.id} className="flex items-center justify-between text-sm">
                             <div className="flex items-center gap-2">
                               <span className={bos.is_cancelled ? 'line-through text-gray-400' : 'text-gray-800'}>
-                                {bos.tour_optional_services?.name} × {bos.quantity}
+                                {bos.description || bos.tour_optional_services?.name || 'Servicio opcional'} × {bos.quantity}
                               </span>
-                              {!bos.tour_optional_services?.is_refundable && !bos.is_cancelled && (
+                              {!bos.tour_optional_services?.is_refundable && !bos.is_cancelled && bos.tour_optional_services && (
                                 <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">No reemb. del viajero</span>
                               )}
                               {bos.is_cancelled && (

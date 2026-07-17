@@ -461,11 +461,22 @@ Deno.serve(async (req: Request) => {
       effectivePaymentForm = payment_form || "03";
 
       if (discountAmountRaw > 0 || serviceChargeDiscountRaw > 0) {
-        console.log(`CFDI con descuento: tour -$${discountAmountRaw} MXN, servicio -$${serviceChargeDiscountRaw} MXN`);
+        console.log(`CFDI con descuento: tour -${discountAmountRaw} MXN, servicio -${serviceChargeDiscountRaw} MXN`);
       }
     }
 
-    // IVA como complemento del total exacto cobrado → subtotal + iva = exactTotal siempre
+    // Add paid optional services total to exactTotal and build concepts
+    const { data: paidOptionals } = await supabase
+      .from("booking_optional_services")
+      .select("service_kind, description, subtotal, total_paid")
+      .eq("booking_id", booking.id)
+      .eq("is_cancelled", false)
+      .not("paid_at", "is", null);
+
+    if (paidOptionals && paidOptionals.length > 0) {
+      const optionalsTotal = paidOptionals.reduce((sum: number, opt: any) => sum + (opt.total_paid || opt.subtotal), 0);
+      exactTotal = Math.round((exactTotal + optionalsTotal) * 100) / 100;
+    }
     const iva = Math.round(exactTotal * 16 / 116 * 100) / 100;
     const subtotal = Math.round((exactTotal - iva) * 100) / 100;
     const total = exactTotal;
@@ -573,6 +584,28 @@ Deno.serve(async (req: Request) => {
         descripcion: `Membresia ToursRed Plus (${planLabel}) - Reserva ${bookingRef}`,
         valor_unitario: precioMembresiaBruto,
       });
+    }
+
+    // Add paid optional services (pickup, language, traditional optionals) as separate concepts
+    if (paidOptionals && paidOptionals.length > 0) {
+      for (const opt of paidOptionals) {
+        const optAmount = opt.total_paid || opt.subtotal;
+        if (optAmount <= 0) continue;
+        const optBruto = Math.round((optAmount / 1.16) * 100) / 100;
+        const claveProdServ = opt.service_kind === "pickup"
+          ? "78111804"
+          : opt.service_kind === "language"
+            ? "90121702"
+            : "90121500";
+        conceptos.push({
+          clave_prod_serv: claveProdServ,
+          cantidad: 1,
+          clave_unidad: "E48",
+          descripcion: opt.description || (opt.service_kind === "pickup" ? "Pick Up" : opt.service_kind === "language" ? "Idioma/Intérprete" : "Servicio opcional"),
+          valor_unitario: optBruto,
+          tercero: terceroAgencia,
+        });
+      }
     }
 
     const cfdiRequest: CfdiRequest = {

@@ -97,6 +97,60 @@ async function confirmBooking(supabase: any, bookingId: string, paypalTransactio
     console.error("Error updating booking:", error);
   }
 
+  // Process unpaid optional services (pickup, language, traditional optionals)
+  try {
+    const { data: booking } = await supabase
+      .from("bookings")
+      .select("user_id")
+      .eq("id", bookingId)
+      .single();
+
+    const { data: unpaidOptionals } = await supabase
+      .from("booking_optional_services")
+      .select("id, subtotal, total_paid")
+      .eq("booking_id", bookingId)
+      .eq("is_cancelled", false)
+      .is("paid_at", null);
+
+    if (unpaidOptionals && unpaidOptionals.length > 0) {
+      const { data: settings } = await supabase
+        .from("platform_settings")
+        .select("service_charge_percentage")
+        .maybeSingle();
+      const svcChargeRate = settings?.service_charge_percentage || 5;
+
+      for (const opt of unpaidOptionals) {
+        if ((opt.total_paid || opt.subtotal) <= 0) continue;
+        const grossSvcCharge = Math.round((opt.subtotal * svcChargeRate / 100) * 100) / 100;
+        let exemptionUsed = 0;
+        try {
+          const { data: exemptResult } = await supabase
+            .rpc("apply_membership_service_fee_exemption", {
+              p_user_id: booking.user_id,
+              p_gross_service_charge: grossSvcCharge,
+            });
+          exemptionUsed = parseFloat(exemptResult?.exemption_applied ?? "0");
+        } catch (e) {
+          console.error(`Error applying exemption for optional ${opt.id} (PayPal):`, e);
+        }
+
+        await supabase
+          .from("booking_optional_services")
+          .update({
+            paid_at: new Date().toISOString(),
+            payment_method: "paypal",
+            service_charge: grossSvcCharge - exemptionUsed,
+            membership_exemption_used: exemptionUsed,
+            total_paid: opt.total_paid || opt.subtotal,
+          })
+          .eq("id", opt.id);
+      }
+      console.log(`Processed ${unpaidOptionals.length} optional services for booking ${bookingId} (PayPal)`);
+    }
+  } catch (optError) {
+    console.error("Error processing optional services (PayPal):", optError);
+  }
+
   // Apply preventa commission discount (10% on first 10 preventa bookings)
   EdgeRuntime.waitUntil(
     (async () => {

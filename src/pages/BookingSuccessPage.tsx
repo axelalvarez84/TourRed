@@ -12,6 +12,7 @@ const BookingSuccessPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [booking, setBooking] = useState<Booking | null>(null);
   const [tour, setTour] = useState<Tour | null>(null);
+  const [optionalServices, setOptionalServices] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
@@ -81,6 +82,15 @@ const BookingSuccessPage: React.FC = () => {
 
       setBooking(bookingData);
       setTour(bookingData.tours);
+
+      // Fetch optional services (pickup, language, traditional) for this booking
+      const { data: optServices } = await supabase
+        .from('booking_optional_services')
+        .select('id, service_kind, description, subtotal, total_paid, is_cancelled')
+        .eq('booking_id', bookingId)
+        .eq('is_cancelled', false)
+        .order('created_at', { ascending: true });
+      setOptionalServices(optServices || []);
 
       // Get payment method from payment_transactions
       const { data: paymentTransaction } = await supabase
@@ -339,23 +349,26 @@ const BookingSuccessPage: React.FC = () => {
                     </div>
                   )}
 
-                  {(booking.pickup_zone_extra_cost ?? 0) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">
-                        Pick Up — {booking.pickup_zone_name} ({booking.pickup_cost_type === 'por_persona' ? 'por persona' : 'por reserva'}):
-                      </span>
-                      <span className="font-medium">{formatCurrencyMXN(booking.pickup_zone_extra_cost ?? 0)}</span>
+                  {optionalServices.filter(opt => opt.service_kind === 'pickup').map(opt => (
+                    <div key={opt.id} className="flex justify-between">
+                      <span className="text-gray-600">{opt.description || 'Pick Up'}:</span>
+                      <span className="font-medium">{formatCurrencyMXN(opt.total_paid || opt.subtotal)}</span>
                     </div>
-                  )}
+                  ))}
 
-                  {(booking.language_extra_cost ?? 0) > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">
-                        Idioma — {booking.selected_language} ({booking.language_cost_type === 'por_persona' ? 'por persona' : 'fijo'}):
-                      </span>
-                      <span className="font-medium">{formatCurrencyMXN(booking.language_extra_cost ?? 0)}</span>
+                  {optionalServices.filter(opt => opt.service_kind === 'language').map(opt => (
+                    <div key={opt.id} className="flex justify-between">
+                      <span className="text-gray-600">{opt.description || 'Idioma'}:</span>
+                      <span className="font-medium">{formatCurrencyMXN(opt.total_paid || opt.subtotal)}</span>
                     </div>
-                  )}
+                  ))}
+
+                  {optionalServices.filter(opt => opt.service_kind === 'optional_service').map(opt => (
+                    <div key={opt.id} className="flex justify-between">
+                      <span className="text-gray-600">{opt.description || 'Servicio opcional'}:</span>
+                      <span className="font-medium">{formatCurrencyMXN(opt.total_paid || opt.subtotal)}</span>
+                    </div>
+                  ))}
 
                   {Number((booking as any).promo_discount_amount) > 0 && (
                     <div className="flex justify-between bg-emerald-50 border border-emerald-200 rounded px-2 py-1.5 -mx-1">
