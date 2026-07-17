@@ -1809,11 +1809,11 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
           </div>
 
           {/* Points info */}
-          {booking.points_earned > 0 && (
+          {refundMethod !== 'original_payment_method' && Math.floor(refundAmount) > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
               <Coins className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
               <p className="text-sm text-amber-700">
-                Se descontarán <strong>{booking.points_earned} puntos</strong> acumulados por esta reserva al viajero.
+                Se descontarán <strong>{Math.floor(refundAmount)} puntos</strong> acumulados por esta reserva al viajero.
               </p>
             </div>
           )}
@@ -1831,11 +1831,11 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
                       : withRefund && refundMethod === 'original_payment_method'
                       ? 'Se cancelará la reserva. Después podrás reembolsar cada pago individualmente.'
                       : 'No se procesará reembolso al viajero.'}
-                    {booking.points_earned > 0 && (
-                      refundMethod === 'original_payment_method'
-                        ? ' Los puntos se descontarán conforme reembolses cada línea.'
-                        : ` Se descontarán ${booking.points_earned} puntos.`
-                    )}
+                    {refundMethod === 'original_payment_method'
+                      ? ' Los puntos se descontarán conforme reembolses cada línea.'
+                      : Math.floor(refundAmount) > 0
+                      ? ` Se descontarán ${Math.floor(refundAmount)} puntos.`
+                      : null}
                     {' '}Se enviarán correos al viajero, agencia y a contacto@toursred.com.
                   </p>
                 </div>
