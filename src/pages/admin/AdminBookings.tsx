@@ -1004,7 +1004,9 @@ const DetailModal: React.FC<{ booking: BookingRow; onClose: () => void }> = ({ b
                 <h4 className="text-sm font-semibold text-gray-700 mb-3">Tour Principal</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
                   <Field label="Tasa comision agencia" value={commRec.agency_commission_rate != null ? `${(Number(commRec.agency_commission_rate) * 100).toFixed(1)}%` : '—'} />
-                  <Field label="Monto comision agencia" value={commRec.agency_commission_amount != null ? formatCurrencyMXN(Number(commRec.agency_commission_amount)) : '—'} />
+                  <Field label="Comision bruta" value={commRec.agency_commission_amount != null ? formatCurrencyMXN(Number(commRec.agency_commission_amount) + Number(commRec.preventa_comision_descuento ?? 0)) : '—'} />
+                  <Field label="Desc. comision preventa" value={formatCurrencyMXN(Number(commRec.preventa_comision_descuento ?? 0))} />
+                  <Field label="Comision agencia (neta)" value={commRec.agency_commission_amount != null ? formatCurrencyMXN(Number(commRec.agency_commission_amount)) : '—'} />
                   <Field label="Total tour" value={formatCurrencyMXN(Number(b.total_price))} />
                   <Field label="Cargo servicio bruto" value={commRec.gross_service_charge_amount != null ? formatCurrencyMXN(Number(commRec.gross_service_charge_amount)) : '—'} />
                   <Field label="Exencion membresia" value={commRec.membership_exemption_total != null ? formatCurrencyMXN(Number(commRec.membership_exemption_total)) : '—'} />
