@@ -635,54 +635,20 @@ Deno.serve(async (req: Request) => {
       );
     } catch (stampError) {
       const stampErrStr = String(stampError);
-      // CFDI40192: RFC del tercero no encontrado o cancelado en el SAT.
-      // Reintentar sin third_party (a cuenta de terceros) para no bloquear la facturación.
-      if (stampErrStr.includes("CFDI40192") || stampErrStr.includes("DomicilioFiscalACuentaTerceros") || stampErrStr.includes("40192")) {
-        console.warn(`CFDI40192 detectado, reintentando sin third_party: ${stampErrStr}`);
-        const conceptosNoTercero = cfdiRequest.conceptos.map(c => {
-          const { tercero, ...rest } = c;
-          return rest;
-        });
-        const retryRequest = { ...cfdiRequest, conceptos: conceptosNoTercero };
-        try {
-          cfdiResult = await stampCfdi(
-            settings.pac_provider,
-            settings.pac_api_key_encrypted!,
-            settings.pac_organization_id || "",
-            retryRequest,
-            settings.pac_sandbox_mode,
-            supabase
-          );
-        } catch (retryError) {
-          await supabase
-            .from("cfdi_invoices")
-            .update({
-              status: "error",
-              error_message: `Original: ${stampErrStr} | Retry without third_party: ${String(retryError)}`,
-              retry_count: cfdiRecord.retry_count + 1,
-            })
-            .eq("id", cfdiRecord.id);
+      console.error(`CFDI stamping failed for booking ${booking.id}: ${stampErrStr}`);
+      await supabase
+        .from("cfdi_invoices")
+        .update({
+          status: "error",
+          error_message: stampErrStr,
+          retry_count: cfdiRecord.retry_count + 1,
+        })
+        .eq("id", cfdiRecord.id);
 
-          return new Response(
-            JSON.stringify({ error: "PAC stamping failed (retry without third_party also failed)", detail: String(retryError) }),
-            { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-      } else {
-        await supabase
-          .from("cfdi_invoices")
-          .update({
-            status: "error",
-            error_message: stampErrStr,
-            retry_count: cfdiRecord.retry_count + 1,
-          })
-          .eq("id", cfdiRecord.id);
-
-        return new Response(
-          JSON.stringify({ error: "PAC stamping failed", detail: stampErrStr }),
-          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+      return new Response(
+        JSON.stringify({ error: "PAC stamping failed", detail: stampErrStr }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Update CFDI record with stamped data

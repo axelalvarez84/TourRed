@@ -87,10 +87,11 @@ const AgencySignupPage: React.FC = () => {
 
         const validateData = await validateRes.json();
         if (!validateData.valid) {
-          const errMsg = Array.isArray(validateData.errors)
-            ? validateData.errors.map((e: { message: string }) => e.message).join('; ')
-            : 'El RFC no es válido según el SAT';
-          setError(`RFC no válido: ${errMsg}`);
+          const errMsg = validateData.message
+            || (Array.isArray(validateData.errors)
+              ? validateData.errors.map((e: { message: string }) => e.message).join('; ')
+              : 'El RFC no es válido según el SAT');
+          setError(errMsg);
           setIsLoading(false);
           return;
         }

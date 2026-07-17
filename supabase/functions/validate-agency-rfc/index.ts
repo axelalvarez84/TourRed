@@ -100,11 +100,36 @@ Deno.serve(async (req: Request) => {
       });
     } else {
       const errData = await facturapiRes.json().catch(() => ({}));
-      const errors = errData.errors || errData.message || "RFC no válido según el SAT";
+      const rawMessage = String(errData.message || errData.errors?.[0]?.message || "RFC no válido según el SAT");
+      const errStr = rawMessage.toLowerCase();
+
+      let error_type: "rfc_not_found" | "postal_code_mismatch" | "other" = "other";
+
+      if (errStr.includes("domiciliofiscalreceptor") || errStr.includes("address.zip")) {
+        error_type = "postal_code_mismatch";
+      } else if (
+        errStr.includes("no se encontró") ||
+        errStr.includes("not found") ||
+        errStr.includes("no existe") ||
+        errStr.includes("cancelado") ||
+        errStr.includes("inscrito") ||
+        errStr.includes("cfdi40192") ||
+        errStr.includes("domiciliofiscalacuentaterceros")
+      ) {
+        error_type = "rfc_not_found";
+      }
+
+      const userMessage = error_type === "postal_code_mismatch"
+        ? "El código postal no coincide con el domicilio fiscal registrado en el SAT para este RFC. Verifica que el RFC, razón social y código postal sean exactamente los que aparecen en tu constancia de situación fiscal."
+        : error_type === "rfc_not_found"
+          ? "El RFC no está inscrito o está cancelado en el SAT. No es posible registrar esta agencia con un RFC inválido."
+          : rawMessage;
 
       return new Response(JSON.stringify({
         valid: false,
-        errors: Array.isArray(errors) ? errors : [{ message: String(errors) }],
+        error_type,
+        message: userMessage,
+        errors: [{ message: userMessage }],
         status_code: facturapiRes.status,
       }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
