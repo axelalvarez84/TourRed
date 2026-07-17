@@ -30,7 +30,15 @@ Deno.serve(async (req: Request) => {
       serviceKey
     );
 
-    const { booking_id, cancellation_id, partial_cancellation_id, amount, currency, requested_by } = await req.json();
+    const {
+      booking_id,
+      cancellation_id,
+      partial_cancellation_id,
+      amount,
+      currency,
+      requested_by = "admin_override",
+      created_by_user_id,
+    } = await req.json();
 
     if (!booking_id) {
       return new Response(JSON.stringify({ error: "booking_id es requerido" }), {
@@ -40,6 +48,14 @@ Deno.serve(async (req: Request) => {
 
     if (!amount || amount <= 0) {
       return new Response(JSON.stringify({ error: "amount debe ser mayor a 0" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate requested_by enum
+    const validRequestedBy = ["traveler_default", "traveler_profeco_request", "admin_override"];
+    if (!validRequestedBy.includes(requested_by)) {
+      return new Response(JSON.stringify({ error: `requested_by debe ser uno de: ${validRequestedBy.join(", ")}` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -155,7 +171,8 @@ Deno.serve(async (req: Request) => {
         currency: currency || "mxn",
         status: "pending",
         idempotency_key: idempotencyKey,
-        created_by_user_id: requested_by || null,
+        requested_by: requested_by,
+        created_by_user_id: created_by_user_id || null,
       })
       .select("id")
       .single();
