@@ -153,9 +153,9 @@ Deno.serve(async (req: Request) => {
       subtotal = parseFloat((Number(service.price_per_person) * quantity).toFixed(2));
       grossServiceCharge = parseFloat((subtotal * serviceChargePct / 100).toFixed(2));
 
-      const { data: exemptionResult } = await supabase.rpc("get_available_service_fee_exemption", { p_user_id: user.id });
-      exemptionApplied = Math.min(parseFloat(exemptionResult ?? "0"), grossServiceCharge);
-      netServiceCharge = parseFloat((grossServiceCharge - exemptionApplied).toFixed(2));
+      const { data: exemptionResult } = await supabase.rpc("apply_membership_service_fee_exemption", { p_user_id: user.id, p_gross_service_charge: grossServiceCharge });
+      exemptionApplied = parseFloat(exemptionResult?.exemption_applied ?? "0");
+      netServiceCharge = parseFloat(exemptionResult?.net_service_charge ?? grossServiceCharge.toString());
       agencyCommission = parseFloat((subtotal * agencyCommissionPct / 100).toFixed(2));
       totalToPay = parseFloat((subtotal + netServiceCharge).toFixed(2));
 
@@ -220,9 +220,9 @@ Deno.serve(async (req: Request) => {
       subtotal = insuranceCost;
       grossServiceCharge = parseFloat((insuranceCost * serviceChargePct / 100).toFixed(2));
 
-      const { data: exemptionResult } = await supabase.rpc("get_available_service_fee_exemption", { p_user_id: user.id });
-      exemptionApplied = Math.min(parseFloat(exemptionResult ?? "0"), grossServiceCharge);
-      netServiceCharge = parseFloat((grossServiceCharge - exemptionApplied).toFixed(2));
+      const { data: exemptionResult } = await supabase.rpc("apply_membership_service_fee_exemption", { p_user_id: user.id, p_gross_service_charge: grossServiceCharge });
+      exemptionApplied = parseFloat(exemptionResult?.exemption_applied ?? "0");
+      netServiceCharge = parseFloat(exemptionResult?.net_service_charge ?? grossServiceCharge.toString());
       totalToPay = parseFloat((insuranceCost + netServiceCharge).toFixed(2));
       // insurance commission is 0 (ToursRed keeps full amount)
       agencyCommission = 0;
@@ -235,22 +235,8 @@ Deno.serve(async (req: Request) => {
 
     // ── FINALIZE PAYMENT ─────────────────────────────────────────────────────
     const finalizePayment = async (method: string, intentId: string | null) => {
-      // Apply membership exemption
-      if (exemptionApplied > 0) {
-        const { data: membership } = await supabase
-          .from("memberships")
-          .select("id, service_fee_exemption_used")
-          .eq("user_id", user.id)
-          .eq("status", "active")
-          .maybeSingle();
-        if (membership) {
-          await supabase.from("memberships").update({
-            service_fee_exemption_used: (Number(membership.service_fee_exemption_used) || 0) + exemptionApplied,
-          }).eq("id", membership.id);
-        }
-      }
+      // Exemption already consumed atomically by apply_membership_service_fee_exemption RPC above
 
-      // Award points
       let pointsEarned = 0;
       const { data: activeMembership } = await supabase
         .from("memberships")

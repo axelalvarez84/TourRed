@@ -134,12 +134,11 @@ Deno.serve(async (req: Request) => {
     const subtotal = Number(suppReq.unit_price) * suppReq.quantity;
     const grossServiceCharge = parseFloat((subtotal * serviceChargePct / 100).toFixed(2));
 
-    // Membership exemption
+    // Membership exemption via centralized RPC (atomic, FOR UPDATE locked)
     const { data: exemptionResult } = await supabase
-      .rpc("get_available_service_fee_exemption", { p_user_id: user.id });
-    const exemptionAvailable = parseFloat(exemptionResult ?? "0");
-    const exemptionApplied = Math.min(exemptionAvailable, grossServiceCharge);
-    const netServiceCharge = parseFloat((grossServiceCharge - exemptionApplied).toFixed(2));
+      .rpc("apply_membership_service_fee_exemption", { p_user_id: user.id, p_gross_service_charge: grossServiceCharge });
+    const exemptionApplied = parseFloat(exemptionResult?.exemption_applied ?? "0");
+    const netServiceCharge = parseFloat(exemptionResult?.net_service_charge ?? grossServiceCharge.toString());
     const supplementCommission = parseFloat((subtotal * supplementCommissionPct / 100).toFixed(2));
     const totalToPay = parseFloat((subtotal + netServiceCharge).toFixed(2));
 
@@ -147,19 +146,7 @@ Deno.serve(async (req: Request) => {
 
     // Finalize payment: update membership, award points, mark as paid, trigger CFDI
     const finalizePayment = async (method: string, intentId: string | null) => {
-      if (exemptionApplied > 0) {
-        const { data: membership } = await supabase
-          .from("memberships")
-          .select("id, service_fee_exemption_used")
-          .eq("user_id", user.id)
-          .eq("status", "active")
-          .maybeSingle();
-        if (membership) {
-          await supabase.from("memberships").update({
-            service_fee_exemption_used: (Number(membership.service_fee_exemption_used) || 0) + exemptionApplied,
-          }).eq("id", membership.id);
-        }
-      }
+      // Exemption already consumed atomically by apply_membership_service_fee_exemption RPC above
 
       let pointsEarned = 0;
       const { data: activeMembership } = await supabase

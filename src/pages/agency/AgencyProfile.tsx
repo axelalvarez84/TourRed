@@ -229,6 +229,38 @@ const AgencyProfile: React.FC = () => {
       setError('');
       setSuccess('');
 
+      // Validar RFC contra el SAT si se está cambiando
+      if (editForm.rfc?.trim() && editForm.razon_social?.trim() && editForm.regimen_fiscal) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const validateRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/validate-agency-rfc`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              rfc: editForm.rfc.trim(),
+              razon_social: editForm.razon_social.trim(),
+              regimen_fiscal: editForm.regimen_fiscal,
+              postal_code: editForm.postal_code || undefined,
+            }),
+          });
+
+          if (validateRes.ok) {
+            const validateData = await validateRes.json();
+            if (!validateData.valid) {
+              const errMsg = Array.isArray(validateData.errors)
+                ? validateData.errors.map((e: { message: string }) => e.message).join('; ')
+                : 'El RFC no es válido según el SAT';
+              setError(`RFC no válido: ${errMsg}`);
+              setIsSaving(false);
+              return;
+            }
+          }
+        }
+      }
+
       console.log('💾 Guardando cambios del perfil...');
 
       // Actualizar datos de la agencia

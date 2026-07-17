@@ -135,7 +135,7 @@ Deno.serve(async (req: Request) => {
     // Calcular cargo por servicio bruto
     const grossServiceCharge = parseFloat((amountParsed * serviceChargePct / 100).toFixed(2));
 
-    // Obtener exencion disponible de membresia del viajero
+    // Obtener exencion disponible de membresia del viajero (solo lectura — el consumo atómico ocurre en confirm-checkin-wallet-charge)
     const { data: exemptionResult } = await supabase
       .rpc("get_available_service_fee_exemption", { p_user_id: booking.user_id });
     const exemptionAvailable = parseFloat(exemptionResult ?? 0);
