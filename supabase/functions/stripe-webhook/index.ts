@@ -2111,6 +2111,117 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case 'charge.refunded': {
+        const charge = event.data.object;
+        const refundId = charge.refunds?.data?.[0]?.id;
+        const metadataRefundId = charge.refunds?.data?.[0]?.metadata?.toursred_refund_id;
+        const paymentIntentId = charge.payment_intent;
+
+        console.log(`charge.refunded: refundId=${refundId}, metadataRefundId=${metadataRefundId}, PI=${paymentIntentId}`);
+
+        if (!refundId && !metadataRefundId) {
+          console.error("No refund ID or metadata in charge.refunded event");
+          break;
+        }
+
+        // Look up payment_refunds by processor_refund_id or by metadata toursred_refund_id
+        let refundQuery = supabase
+          .from("payment_refunds")
+          .select("id, processor_fee_lost, payment_processor, status")
+          .eq("payment_processor", "stripe");
+
+        if (metadataRefundId) {
+          refundQuery = refundQuery.eq("id", metadataRefundId);
+        } else if (refundId) {
+          refundQuery = refundQuery.eq("processor_refund_id", refundId);
+        }
+
+        const { data: refundRecord } = await refundQuery.maybeSingle();
+
+        if (!refundRecord) {
+          console.error(`No payment_refunds record found for Stripe refund: ${refundId || metadataRefundId}`);
+          break;
+        }
+
+        if (refundRecord.status === "succeeded") {
+          console.log(`Stripe refund ${refundId} already confirmed, skipping`);
+          break;
+        }
+
+        await supabase
+          .from("payment_refunds")
+          .update({
+            status: "succeeded",
+            confirmed_at: new Date().toISOString(),
+            webhook_last_event: "charge.refunded",
+            webhook_last_payload: event,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", refundRecord.id);
+
+        // Create accounting entry for non-recoverable processor fee
+        if (parseFloat(refundRecord.processor_fee_lost) > 0) {
+          try {
+            await createStripeRefundFeeAccountingEntry(supabase, refundRecord.id, parseFloat(refundRecord.processor_fee_lost));
+          } catch (acctErr) {
+            console.error("Error creating accounting entry for Stripe refund fee:", acctErr);
+          }
+        }
+
+        console.log(`Stripe refund confirmed for payment_refund ${refundRecord.id}`);
+        break;
+      }
+
+      case 'refund.failed': {
+        const refund = event.data.object;
+        const refundId = refund.id;
+        const metadataRefundId = refund.metadata?.toursred_refund_id;
+
+        console.log(`refund.failed: refundId=${refundId}, metadataRefundId=${metadataRefundId}`);
+
+        let refundQuery = supabase
+          .from("payment_refunds")
+          .select("id, status")
+          .eq("payment_processor", "stripe");
+
+        if (metadataRefundId) {
+          refundQuery = refundQuery.eq("id", metadataRefundId);
+        } else if (refundId) {
+          refundQuery = refundQuery.eq("processor_refund_id", refundId);
+        }
+
+        const { data: refundRecord } = await refundQuery.maybeSingle();
+
+        if (!refundRecord) {
+          console.error(`No payment_refunds record found for failed Stripe refund: ${refundId || metadataRefundId}`);
+          break;
+        }
+
+        const failureReason = refund.failure_reason || refund.failure_balance_transaction || "Unknown failure";
+
+        await supabase
+          .from("payment_refunds")
+          .update({
+            status: "failed",
+            failure_reason: failureReason,
+            webhook_last_event: "refund.failed",
+            webhook_last_payload: event,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", refundRecord.id);
+
+        EdgeRuntime.waitUntil(
+          fetch(`${supabaseUrl}/functions/v1/notify-ops-refund-failed`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${supabaseServiceKey}` },
+            body: JSON.stringify({ payment_refund_id: refundRecord.id }),
+          }).catch((err) => console.error("Error calling notify-ops-refund-failed:", err))
+        );
+
+        console.log(`Stripe refund ${refundId} marked as failed`);
+        break;
+      }
+
       default:
         console.log(`Unhandled event type: ${event.type}`);
     }
@@ -2136,3 +2247,58 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+async function createStripeRefundFeeAccountingEntry(supabase: any, refundId: string, feeAmount: number) {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth() + 1;
+
+  const { count } = await supabase
+    .from("accounting_entries")
+    .select("id", { count: "exact", head: true })
+    .eq("period_year", year)
+    .eq("period_month", month);
+
+  const entryNumber = `AS-${year}${String(month).padStart(2, "0")}-${String((count || 0) + 1).padStart(5, "0")}`;
+
+  const { data: entry, error: entryError } = await supabase
+    .from("accounting_entries")
+    .insert({
+      entry_number: entryNumber,
+      entry_type: "pago",
+      entry_date: today.toISOString().split("T")[0],
+      period_year: year,
+      period_month: month,
+      description: `Comision no recuperable de Stripe por reembolso (refund: ${refundId})`,
+      source_type: "payment_refund",
+      source_id: refundId,
+      is_posted: true,
+      posted_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+
+  if (entryError || !entry) {
+    console.error("Error creating accounting entry:", entryError);
+    return;
+  }
+
+  await supabase.from("accounting_entry_lines").insert([
+    {
+      entry_id: entry.id,
+      line_number: 1,
+      account_code: "606.02",
+      description: "Comision no recuperable - Stripe",
+      debit: feeAmount,
+      credit: 0,
+    },
+    {
+      entry_id: entry.id,
+      line_number: 2,
+      account_code: "102.03",
+      description: "Reduccion de saldo - Stripe",
+      debit: 0,
+      credit: feeAmount,
+    },
+  ]);
+}

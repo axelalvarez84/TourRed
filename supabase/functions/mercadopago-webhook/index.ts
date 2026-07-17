@@ -141,6 +141,48 @@ Deno.serve(async (req: Request) => {
 
     console.log("Payment details:", { externalReference, status });
 
+    // ============================================================
+    // Handle refund status — update payment_refunds if applicable
+    // ============================================================
+    if (status === "refunded" || status === "partially_refunded") {
+      try {
+        // Look up payment_transactions by mercadopago_payment_id, then find payment_refunds
+        const { data: tx } = await supabase
+          .from("payment_transactions")
+          .select("id")
+          .eq("mercadopago_payment_id", String(notificationId))
+          .maybeSingle();
+
+        if (tx) {
+          const { data: refundRecord } = await supabase
+            .from("payment_refunds")
+            .select("id, status, processor_fee_lost")
+            .eq("payment_transaction_id", tx.id)
+            .eq("payment_processor", "mercadopago")
+            .in("status", ["pending", "processing"])
+            .maybeSingle();
+
+          if (refundRecord) {
+            await supabase
+              .from("payment_refunds")
+              .update({
+                status: "succeeded",
+                confirmed_at: new Date().toISOString(),
+                webhook_last_event: `mercadopago.${status}`,
+                webhook_last_payload: payment,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", refundRecord.id);
+
+            console.log(`MercadoPago refund confirmed for payment_refund ${refundRecord.id} (payment ${notificationId})`);
+            // processor_fee_lost is always 0 for MP — no accounting entry needed
+          }
+        }
+      } catch (refundErr) {
+        console.error("Error updating MP refund status:", refundErr);
+      }
+    }
+
     if (!externalReference) {
       return new Response(JSON.stringify({ received: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

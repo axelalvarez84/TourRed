@@ -140,6 +140,40 @@ Deno.serve(async (req: Request) => {
       } else {
         console.log("Booking confirmed after MP payment approval:", bookingId);
 
+        // Persist payment_transactions record for multi-processor refund support
+        try {
+          const mpFee = Array.isArray(payment.fee_details)
+            ? payment.fee_details
+                .filter((fd: any) => fd.type === "mercadopago_fee")
+                .reduce((sum: number, fd: any) => sum + parseFloat(fd.amount || "0"), 0)
+            : 0;
+          const mpAmount = parseFloat(payment.transaction_amount || payment.amount || "0");
+
+          const { data: existingTx } = await supabase
+            .from("payment_transactions")
+            .select("id")
+            .eq("mercadopago_payment_id", String(payment.id))
+            .maybeSingle();
+
+          if (!existingTx) {
+            await supabase.from("payment_transactions").insert({
+              booking_id: bookingId,
+              mercadopago_payment_id: String(payment.id),
+              payment_processor: "mercadopago",
+              amount: mpAmount,
+              currency: "mxn",
+              status: "succeeded",
+              payment_method_type: "Tarjeta",
+              processor_fee: mpFee,
+              net_amount: mpAmount - mpFee,
+              metadata: payment,
+            });
+            console.log(`payment_transactions record created for MP payment ${payment.id}, fee=${mpFee}`);
+          }
+        } catch (txErr) {
+          console.error("Error inserting payment_transactions (MercadoPago):", txErr);
+        }
+
         const { data: booking } = await supabase
           .from("bookings")
           .select("agency_id, deposit_amount, service_charge")

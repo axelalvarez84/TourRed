@@ -79,7 +79,7 @@ async function activateGiftCard(supabase: any, giftCardId: string, paypalTransac
   );
 }
 
-async function confirmBooking(supabase: any, bookingId: string, paypalTransactionId: string | null) {
+async function confirmBooking(supabase: any, bookingId: string, paypalTransactionId: string | null, captureData?: any) {
   const { error } = await supabase
     .from("bookings")
     .update({
@@ -95,6 +95,40 @@ async function confirmBooking(supabase: any, bookingId: string, paypalTransactio
 
   if (error) {
     console.error("Error updating booking:", error);
+  }
+
+  // Persist payment_transactions record for multi-processor refund support
+  if (paypalTransactionId) {
+    try {
+      const capture = captureData?.purchase_units?.[0]?.payments?.captures?.[0] || captureData;
+      const amountValue = parseFloat(capture?.amount?.value ?? "0");
+      const currencyCode = (capture?.amount?.currency_code || "MXN").toLowerCase();
+      const paypalFee = parseFloat(capture?.seller_receivable_breakdown?.paypal_fee?.value || "0");
+
+      const { data: existingTx } = await supabase
+        .from("payment_transactions")
+        .select("id")
+        .eq("paypal_capture_id", paypalTransactionId)
+        .maybeSingle();
+
+      if (!existingTx) {
+        await supabase.from("payment_transactions").insert({
+          booking_id: bookingId,
+          paypal_capture_id: paypalTransactionId,
+          payment_processor: "paypal",
+          amount: amountValue,
+          currency: currencyCode,
+          status: "succeeded",
+          payment_method_type: "Tarjeta",
+          processor_fee: paypalFee,
+          net_amount: amountValue - paypalFee,
+          metadata: captureData || null,
+        });
+        console.log(`payment_transactions record created for PayPal capture ${paypalTransactionId}`);
+      }
+    } catch (txErr) {
+      console.error("Error inserting payment_transactions (PayPal):", txErr);
+    }
   }
 
   // Process unpaid optional services (pickup, language, traditional optionals)
@@ -328,7 +362,7 @@ Deno.serve(async (req: Request) => {
             } else if (context === "gift_card" && referenceId) {
               await activateGiftCard(supabase, referenceId, paypalTransactionId);
             } else if (referenceId) {
-              await confirmBooking(supabase, referenceId, paypalTransactionId);
+              await confirmBooking(supabase, referenceId, paypalTransactionId, orderDetails);
             }
 
             return new Response(JSON.stringify({ success: true, status: "COMPLETED", alreadyCaptured: true }), {
@@ -386,7 +420,7 @@ Deno.serve(async (req: Request) => {
       } else if (context === "gift_card" && referenceId) {
         await activateGiftCard(supabase, referenceId, paypalTransactionId);
       } else if (referenceId) {
-        await confirmBooking(supabase, referenceId, paypalTransactionId);
+        await confirmBooking(supabase, referenceId, paypalTransactionId, captureData);
       }
 
       return new Response(JSON.stringify({ success: true, status: captureStatus }), {
