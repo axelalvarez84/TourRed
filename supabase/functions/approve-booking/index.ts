@@ -213,7 +213,7 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // Actualizar service_fee_exemption_used en la membresía si aplica
+      // Aplicar exención de membresía via RPC centralizado (atómico, FOR UPDATE)
       if (!booking.used_membership_benefit) {
         const { data: platformSettings } = await supabase
           .from("platform_settings")
@@ -222,27 +222,12 @@ Deno.serve(async (req: Request) => {
 
         const serviceChargeRate = platformSettings?.service_charge_percentage || 5;
         const fullServiceCharge = ((booking.total_price || 0) * serviceChargeRate) / 100;
-        const actualServiceCharge = parseFloat(booking.service_charge || 0);
-        const codeDiscount = parseFloat(booking.service_charge_discount || 0);
-        const exemptionUsed = fullServiceCharge - actualServiceCharge - codeDiscount;
+
+        const { data: exemptionResult } = await supabase
+          .rpc("apply_membership_service_fee_exemption", { p_user_id: booking.user_id, p_gross_service_charge: fullServiceCharge });
+        const exemptionUsed = parseFloat(exemptionResult?.exemption_applied ?? "0");
 
         if (exemptionUsed > 0) {
-          const { data: membership } = await supabase
-            .from("memberships")
-            .select("id, service_fee_exemption_used")
-            .eq("user_id", booking.user_id)
-            .eq("status", "active")
-            .maybeSingle();
-
-          if (membership) {
-            await supabase
-              .from("memberships")
-              .update({
-                service_fee_exemption_used: (membership.service_fee_exemption_used || 0) + exemptionUsed,
-              })
-              .eq("id", membership.id);
-          }
-
           await supabase
             .from("bookings")
             .update({

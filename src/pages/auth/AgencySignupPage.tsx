@@ -59,6 +59,48 @@ const AgencySignupPage: React.FC = () => {
     if (!personaType) { setError('El tipo de persona es obligatorio'); setIsLoading(false); return; }
     if (!representanteLegalNombre.trim()) { setError('El nombre de quien firma el contrato es obligatorio'); setIsLoading(false); return; }
 
+    // Validar RFC contra el SAT antes de avanzar a la firma del contrato
+    if (rfc.trim() && razonSocial.trim() && formData.regimenFiscal) {
+      setIsLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('No hay sesión activa');
+
+        const validateRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/validate-agency-rfc`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            rfc: rfc.trim(),
+            razon_social: razonSocial.trim(),
+            regimen_fiscal: formData.regimenFiscal,
+            postal_code: formData.postalCode || undefined,
+          }),
+        });
+
+        if (!validateRes.ok) {
+          const errData = await validateRes.json().catch(() => ({}));
+          throw new Error(errData.error || `Error validando RFC (${validateRes.status})`);
+        }
+
+        const validateData = await validateRes.json();
+        if (!validateData.valid) {
+          const errMsg = Array.isArray(validateData.errors)
+            ? validateData.errors.map((e: { message: string }) => e.message).join('; ')
+            : 'El RFC no es válido según el SAT';
+          setError(`RFC no válido: ${errMsg}`);
+          setIsLoading(false);
+          return;
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error validando RFC contra el SAT');
+        setIsLoading(false);
+        return;
+      }
+    }
+
     try {
       const { data, error: signUpError, profileData, isExistingUser } = await signUp(email, password, UserRole.AGENCY);
 

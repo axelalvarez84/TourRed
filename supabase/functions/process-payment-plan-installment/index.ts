@@ -123,12 +123,11 @@ Deno.serve(async (req: Request) => {
     const serviceChargePct = Number(platformSettings?.payment_plan_service_charge_pct ?? 5);
     const grossServiceCharge = parseFloat((effectiveAmount * serviceChargePct / 100).toFixed(2));
 
-    // Membership exemption check
+    // Membership exemption via centralized RPC (atomic, FOR UPDATE locked)
     const { data: exemptionResult } = await supabase
-      .rpc("get_available_service_fee_exemption", { p_user_id: user.id });
-    const exemptionAvailable = parseFloat(exemptionResult ?? "0");
-    const exemptionApplied = Math.min(exemptionAvailable, grossServiceCharge);
-    const netServiceCharge = parseFloat((grossServiceCharge - exemptionApplied).toFixed(2));
+      .rpc("apply_membership_service_fee_exemption", { p_user_id: user.id, p_gross_service_charge: grossServiceCharge });
+    const exemptionApplied = parseFloat(exemptionResult?.exemption_applied ?? "0");
+    const netServiceCharge = parseFloat(exemptionResult?.net_service_charge ?? grossServiceCharge.toString());
     const totalToPay = parseFloat((effectiveAmount + netServiceCharge).toFixed(2));
 
     // Load overdue and pending installments ordered by due_date (oldest first)
@@ -164,20 +163,7 @@ Deno.serve(async (req: Request) => {
 
     // Helper: consume exemption, award points, create transaction + allocations
     const finalizePayment = async (provider: string, providerTransactionId: string | null) => {
-      // Consume membership exemption
-      if (exemptionApplied > 0) {
-        const { data: membership } = await supabase
-          .from("memberships")
-          .select("id, service_fee_exemption_used")
-          .eq("user_id", user.id)
-          .eq("status", "active")
-          .maybeSingle();
-        if (membership) {
-          await supabase.from("memberships").update({
-            service_fee_exemption_used: (Number(membership.service_fee_exemption_used) || 0) + exemptionApplied,
-          }).eq("id", membership.id);
-        }
-      }
+      // Exemption already consumed atomically by apply_membership_service_fee_exemption RPC above
 
       // Points: only if active membership, based on amount + service_charge
       let pointsEarned = 0;
@@ -234,6 +220,7 @@ Deno.serve(async (req: Request) => {
           user_id: user.id,
           amount: effectiveAmount,
           service_charge: netServiceCharge,
+          gross_service_charge: grossServiceCharge,
           payment_provider: provider,
           provider_transaction_id: providerTransactionId,
           membership_exemption_used: exemptionApplied > 0,
@@ -301,7 +288,7 @@ Deno.serve(async (req: Request) => {
                   installment_id: alloc.installment_id,
                   transaction_id: txRecord.id,
                 }),
-              }).catch(() => {})
+              }).catch((err) => console.error('Error generating installment CFDI:', err.message, err.stack))
             );
           }
         }

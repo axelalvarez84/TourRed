@@ -159,12 +159,11 @@ Deno.serve(async (req: Request) => {
     // Calcular cargos exactamente igual que en request
     const grossServiceCharge = parseFloat((amountToCharge * serviceChargePct / 100).toFixed(2));
 
+    // Aplicar exención de membresía via RPC centralizado (atómico, FOR UPDATE)
     const { data: exemptionResult } = await supabase
-      .rpc("get_available_service_fee_exemption", { p_user_id: booking.user_id });
-    const exemptionAvailable = parseFloat(exemptionResult ?? 0);
-
-    const exemptionApplied = Math.min(exemptionAvailable, grossServiceCharge);
-    const netServiceCharge = parseFloat((grossServiceCharge - exemptionApplied).toFixed(2));
+      .rpc("apply_membership_service_fee_exemption", { p_user_id: booking.user_id, p_gross_service_charge: grossServiceCharge });
+    const exemptionApplied = parseFloat(exemptionResult?.exemption_applied ?? "0");
+    const netServiceCharge = parseFloat(exemptionResult?.net_service_charge ?? grossServiceCharge.toString());
     const totalToDeduct = parseFloat((amountToCharge + netServiceCharge).toFixed(2));
 
     // Verificar saldo suficiente en el wallet
@@ -212,24 +211,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 3. Actualizar membresía si se aplicó exención
-    if (exemptionApplied > 0) {
-      const { data: membership } = await supabase
-        .from("memberships")
-        .select("id, service_fee_exemption_used")
-        .eq("user_id", booking.user_id)
-        .eq("status", "active")
-        .maybeSingle();
-
-      if (membership) {
-        await supabase
-          .from("memberships")
-          .update({
-            service_fee_exemption_used: (membership.service_fee_exemption_used || 0) + exemptionApplied,
-          })
-          .eq("id", membership.id);
-      }
-    }
+    // 3. La exención ya se consumió atómicamente en la RPC apply_membership_service_fee_exemption
 
     // 4. Actualizar wallet_charged_at_checkin en la reserva
     const newWalletCharged = parseFloat(((booking.wallet_charged_at_checkin || 0) + amountToCharge).toFixed(2));
