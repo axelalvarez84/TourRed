@@ -104,20 +104,31 @@ Deno.serve(async (req: Request) => {
     const agency = (booking as any).agencies;
     const bookingUser = (booking as any).users;
 
-    // Fetch refundable optional services for suggested amount (info only)
+    // Fetch refundable optional services — two-bucket model
+    // Each optional (pickup, language, traditional) has its own total_paid bucket.
+    // Admin cancellations refund ALL optionals regardless of is_refundable.
     const { data: optionalServices } = await supabase
       .from("booking_optional_services")
-      .select("subtotal, service_charge, total_paid, tour_optional_services(is_refundable)")
+      .select("id, service_kind, subtotal, service_charge, total_paid, membership_exemption_used, tour_optional_services(is_refundable)")
       .eq("booking_id", booking_id)
       .eq("is_cancelled", false);
 
-    let optionalServicesRefundable = 0;
+    // Bucket 1: tour refund (deposit_amount + service_charge + insurance — NO optionals)
+    const tourRefundBucket = Math.round((totalPaidByTraveler + insuranceCost) * 100) / 100;
+
+    // Bucket 2: optionals refund (sum of each optional's total_paid)
+    let optionalsRefundBucket = 0;
+    for (const os of (optionalServices || [])) {
+      // Admin cancellation: all optionals are refundable
+      optionalsRefundBucket += Number((os as any).total_paid || (os as any).subtotal || 0);
+    }
+    optionalsRefundBucket = Math.round(optionalsRefundBucket * 100) / 100;
+
+    // Keep legacy variable for backward compatibility in the response
+    let optionalServicesRefundable = optionalsRefundBucket;
     let optionalServicesServiceCharge = 0;
     for (const os of (optionalServices || [])) {
-      if ((os as any).tour_optional_services?.is_refundable !== false) {
-        optionalServicesRefundable += Number((os as any).total_paid || (os as any).subtotal || 0);
-        optionalServicesServiceCharge += Number((os as any).service_charge || 0);
-      }
+      optionalServicesServiceCharge += Number((os as any).service_charge || 0);
     }
 
     // Fetch refundable supplements (paid and cancellable)
@@ -164,7 +175,10 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const suggestedRefund = totalPaidByTraveler + insuranceCost + optionalServicesRefundable + supplementsRefundable;
+    // Two-bucket suggested refund: tour bucket + optionals bucket + supplements
+    // No double refund — optionals are cancelled via cancel_booking_optional_services RPC
+    // and their refund_amount is set there; the tour refund is separate.
+    const suggestedRefund = Math.round((tourRefundBucket + optionalsRefundBucket + supplementsRefundable) * 100) / 100;
 
     const now = new Date().toISOString();
     let receiptFilePath: string | null = null;
@@ -328,6 +342,9 @@ Deno.serve(async (req: Request) => {
         refund_amount_to_traveler: Number(refund_amount) || 0,
         amount_to_agency: 0,
         amount_to_platform: 0,
+        // Two-bucket breakdown for audit clarity
+        tour_refund_bucket: tourRefundBucket,
+        optionals_refund_bucket: optionalsRefundBucket,
         toursred_cash_transaction_id: transactionId,
         refund_processed: Number(refund_amount) > 0,
         cancellation_reason: reason_for_traveler.trim(),
@@ -466,6 +483,8 @@ Deno.serve(async (req: Request) => {
       refund_amount: Number(refund_amount) || 0,
       points_deducted: pointsDeducted,
       suggested_refund: suggestedRefund,
+      tour_refund_bucket: tourRefundBucket,
+      optionals_refund_bucket: optionalsRefundBucket,
     });
   } catch (e: any) {
     console.error("admin-cancel-booking error:", e);
