@@ -241,7 +241,7 @@ Deno.serve(async (req) => {
               .maybeSingle();
             if (!existingSuppTx && suppPaymentIntentId) {
               await supabase.from('payment_transactions').insert({
-                booking_id: bookingRow.id,
+                booking_id: suppReq.booking_id,
                 stripe_payment_intent_id: suppPaymentIntentId,
                 amount: totalToPay,
                 currency: 'mxn',
@@ -587,16 +587,17 @@ Deno.serve(async (req) => {
               .select('id')
               .eq('stripe_payment_intent_id', planPaymentIntentId)
               .maybeSingle();
+            const planTotalToPay = parseFloat((effectiveAmount + effectiveNetServiceCharge).toFixed(2));
             if (!existingPlanTx && planPaymentIntentId) {
               await supabase.from('payment_transactions').insert({
                 booking_id: bookingRow.id,
                 stripe_payment_intent_id: planPaymentIntentId,
-                amount: totalToPay,
+                amount: planTotalToPay,
                 currency: 'mxn',
                 status: 'succeeded',
                 payment_processor: 'stripe',
                 processor_fee: 0,
-                net_amount: totalToPay,
+                net_amount: planTotalToPay,
                 charge_context: 'payment_plan_installment',
                 charge_reference_id: txRecord.id,
               });
