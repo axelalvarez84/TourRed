@@ -42,15 +42,15 @@ Deno.serve(async (req: Request) => {
     // Verify caller is super_admin or has can_cancel_bookings permission
     const { data: adminUser } = await supabase
       .from("users")
-      .select("id, role, email, first_name, last_name")
+      .select("id, role, email, first_name, last_name, is_super_admin")
       .eq("id", user.id)
       .maybeSingle();
 
-    if (!adminUser || !["admin", "super_admin"].includes(adminUser.role)) {
+    if (!adminUser || adminUser.role !== "admin") {
       return err("No tienes permisos para cancelar reservas", 403);
     }
 
-    if (adminUser.role !== "super_admin") {
+    if (!adminUser.is_super_admin) {
       const { data: perms } = await supabase
         .from("admin_permissions")
         .select("can_cancel_bookings")
