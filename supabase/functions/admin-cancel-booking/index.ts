@@ -92,6 +92,7 @@ Deno.serve(async (req: Request) => {
         id, status, payment_status, deposit_amount, service_charge,
         user_id, tour_id, agency_id, booking_code, cancelled_at,
         points_earned, points_used, travel_insurance_included, travel_insurance_cost,
+        has_payment_plan,
         tours!bookings_tour_id_fkey(id, name, start_date, end_date),
         agencies!bookings_agency_id_fkey(id, name, contact_email),
         users!bookings_user_id_fkey(id, email, first_name, last_name)
@@ -115,38 +116,6 @@ Deno.serve(async (req: Request) => {
       .select("id, service_kind, subtotal, service_charge, total_paid, membership_exemption_used, tour_optional_services(is_refundable)")
       .eq("booking_id", booking_id)
       .eq("is_cancelled", false);
-
-    // Bucket 1: tour refund (deposit_amount + service_charge + insurance — NO optionals)
-    const tourRefundBucket = Math.round((totalPaidByTraveler + insuranceCost) * 100) / 100;
-
-    // Bucket 2: optionals refund (sum of each optional's total_paid)
-    let optionalsRefundBucket = 0;
-    for (const os of (optionalServices || [])) {
-      // Admin cancellation: all optionals are refundable
-      optionalsRefundBucket += Number((os as any).total_paid || (os as any).subtotal || 0);
-    }
-    optionalsRefundBucket = Math.round(optionalsRefundBucket * 100) / 100;
-
-    // Keep legacy variable for backward compatibility in the response
-    let optionalServicesRefundable = optionalsRefundBucket;
-    let optionalServicesServiceCharge = 0;
-    for (const os of (optionalServices || [])) {
-      optionalServicesServiceCharge += Number((os as any).service_charge || 0);
-    }
-
-    // Fetch refundable supplements (paid and cancellable)
-    const { data: supplements } = await supabase
-      .from("booking_supplements")
-      .select("id, total_paid, refund_amount, status, tour_supplements(is_cancellable)")
-      .eq("booking_id", booking_id)
-      .eq("status", "paid");
-
-    let supplementsRefundable = 0;
-    for (const supp of (supplements || [])) {
-      if ((supp as any).tour_supplements?.is_cancellable !== false) {
-        supplementsRefundable += Number((supp as any).total_paid || 0);
-      }
-    }
 
     const insuranceCost = booking.travel_insurance_included
       ? Number(booking.travel_insurance_cost || 0)
@@ -175,6 +144,38 @@ Deno.serve(async (req: Request) => {
 
       for (const tx of (ppTransactions || [])) {
         totalPaidByTraveler += Number(tx.service_charge || 0);
+      }
+    }
+
+    // Bucket 1: tour refund (totalPaidByTraveler + insurance — NO optionals)
+    const tourRefundBucket = Math.round((totalPaidByTraveler + insuranceCost) * 100) / 100;
+
+    // Bucket 2: optionals refund (sum of each optional's total_paid)
+    let optionalsRefundBucket = 0;
+    for (const os of (optionalServices || [])) {
+      // Admin cancellation: all optionals are refundable
+      optionalsRefundBucket += Number((os as any).total_paid || (os as any).subtotal || 0);
+    }
+    optionalsRefundBucket = Math.round(optionalsRefundBucket * 100) / 100;
+
+    // Keep legacy variable for backward compatibility in the response
+    let optionalServicesRefundable = optionalsRefundBucket;
+    let optionalServicesServiceCharge = 0;
+    for (const os of (optionalServices || [])) {
+      optionalServicesServiceCharge += Number((os as any).service_charge || 0);
+    }
+
+    // Fetch refundable supplements (paid and cancellable)
+    const { data: supplements } = await supabase
+      .from("booking_supplements")
+      .select("id, total_paid, refund_amount, status, tour_supplements(is_cancellable)")
+      .eq("booking_id", booking_id)
+      .eq("status", "paid");
+
+    let supplementsRefundable = 0;
+    for (const supp of (supplements || [])) {
+      if ((supp as any).tour_supplements?.is_cancellable !== false) {
+        supplementsRefundable += Number((supp as any).total_paid || 0);
       }
     }
 
@@ -331,7 +332,7 @@ Deno.serve(async (req: Request) => {
 
     // Insert booking_cancellations record for system compatibility
     const tourStartDate = tour?.start_date || new Date().toISOString().split("T")[0];
-    const { data: cancellationRecord } = await supabase
+    const { data: cancellationRecord, error: bcErr } = await supabase
       .from("booking_cancellations")
       .insert({
         booking_id,
@@ -356,6 +357,10 @@ Deno.serve(async (req: Request) => {
       .select()
       .single();
 
+    if (bcErr) {
+      console.error("Error inserting booking_cancellations record:", bcErr);
+    }
+
     // ============================================================
     // Process refund via original payment method (multi-processor)
     // ============================================================
@@ -372,7 +377,7 @@ Deno.serve(async (req: Request) => {
           },
           body: JSON.stringify({
             booking_id,
-            cancellation_id: cancellationRecord?.id || adminCancellation.id,
+            cancellation_id: cancellationRecord?.id || null,
             amount: Number(refund_amount),
             currency: "mxn",
             requested_by,
