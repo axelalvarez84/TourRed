@@ -202,6 +202,69 @@ Deno.serve(async (req: Request) => {
         updated_at: new Date().toISOString(),
       }).eq("id", booking_supplement_id);
 
+      // Record in payment_transactions for refund tracking (skip for points/cash internal methods)
+      if (method === "stripe" && intentId) {
+        const { data: existingSuppTx } = await supabase
+          .from("payment_transactions")
+          .select("id")
+          .eq("stripe_payment_intent_id", intentId)
+          .maybeSingle();
+        if (!existingSuppTx) {
+          await supabase.from("payment_transactions").insert({
+            booking_id: suppReq.booking_id,
+            stripe_payment_intent_id: intentId,
+            amount: totalToPay,
+            currency: "mxn",
+            status: "succeeded",
+            payment_processor: "stripe",
+            processor_fee: 0,
+            net_amount: totalToPay,
+            charge_context: "supplement",
+            charge_reference_id: booking_supplement_id,
+          });
+        }
+      } else if (method === "mercadopago" && intentId) {
+        const { data: existingSuppTx } = await supabase
+          .from("payment_transactions")
+          .select("id")
+          .eq("mercadopago_payment_id", intentId)
+          .maybeSingle();
+        if (!existingSuppTx) {
+          await supabase.from("payment_transactions").insert({
+            booking_id: suppReq.booking_id,
+            mercadopago_payment_id: intentId,
+            amount: totalToPay,
+            currency: "mxn",
+            status: "succeeded",
+            payment_processor: "mercadopago",
+            processor_fee: 0,
+            net_amount: totalToPay,
+            charge_context: "supplement",
+            charge_reference_id: booking_supplement_id,
+          });
+        }
+      } else if (method === "paypal" && intentId) {
+        const { data: existingSuppTx } = await supabase
+          .from("payment_transactions")
+          .select("id")
+          .eq("paypal_capture_id", intentId)
+          .maybeSingle();
+        if (!existingSuppTx) {
+          await supabase.from("payment_transactions").insert({
+            booking_id: suppReq.booking_id,
+            paypal_capture_id: intentId,
+            amount: totalToPay,
+            currency: "mxn",
+            status: "succeeded",
+            payment_processor: "paypal",
+            processor_fee: 0,
+            net_amount: totalToPay,
+            charge_context: "supplement",
+            charge_reference_id: booking_supplement_id,
+          });
+        }
+      }
+
       // Trigger CFDI generation synchronously (catch errors so payment isn't affected)
       const { data: cfdiSettings } = await supabase
         .from("platform_settings")

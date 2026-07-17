@@ -165,7 +165,7 @@ Deno.serve(async (req: Request) => {
     const finalizePayment = async (provider: string, providerTransactionId: string | null) => {
       // Exemption already consumed atomically by apply_membership_service_fee_exemption RPC above
 
-      // Points: only if active membership, based on amount + service_charge
+      // Calculate points earned (actual award happens after txRecord creation)
       let pointsEarned = 0;
       const { data: activeMembership } = await supabase
         .from("memberships")
@@ -177,38 +177,6 @@ Deno.serve(async (req: Request) => {
 
       if (activeMembership) {
         pointsEarned = Math.floor(effectiveAmount + netServiceCharge);
-        if (pointsEarned > 0) {
-          const { data: walletId } = await supabase.rpc("get_or_create_points_wallet", { p_user_id: user.id });
-          if (walletId) {
-            const { data: pWallet } = await supabase
-              .from("toursred_points_wallets")
-              .select("id, balance, total_earned")
-              .eq("id", walletId)
-              .maybeSingle();
-            if (pWallet) {
-              const newBalance = pWallet.balance + pointsEarned;
-              const { error: ptsTxError } = await supabase.from("toursred_points_transactions").insert({
-                wallet_id: walletId,
-                user_id: user.id,
-                amount: pointsEarned,
-                balance_after: newBalance,
-                type: "earned",
-                description: `Puntos por abono: ${tourName} (${bookingCode})`,
-                reference_id: plan_id,
-                reference_type: "payment_plan",
-                expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-              });
-              if (ptsTxError) {
-                console.error(`Error inserting points transaction for plan ${plan_id}: ${ptsTxError.message}`);
-              } else {
-                await supabase.from("toursred_points_wallets").update({
-                  balance: newBalance,
-                  total_earned: pWallet.total_earned + pointsEarned,
-                }).eq("id", walletId);
-              }
-            }
-          }
-        }
       }
 
       // Create transaction record
@@ -231,6 +199,103 @@ Deno.serve(async (req: Request) => {
         .single();
 
       if (txError || !txRecord) throw new Error(`Failed to create transaction: ${txError?.message}`);
+
+      // Record in payment_transactions for refund tracking (processor payments only)
+      if (provider === "stripe" && providerTransactionId) {
+        const { data: existingPlanTx } = await supabase
+          .from("payment_transactions")
+          .select("id")
+          .eq("stripe_payment_intent_id", providerTransactionId)
+          .maybeSingle();
+        if (!existingPlanTx) {
+          await supabase.from("payment_transactions").insert({
+            booking_id: booking.id,
+            stripe_payment_intent_id: providerTransactionId,
+            amount: totalToPay,
+            currency: "mxn",
+            status: "succeeded",
+            payment_processor: "stripe",
+            processor_fee: 0,
+            net_amount: totalToPay,
+            charge_context: "payment_plan_installment",
+            charge_reference_id: txRecord.id,
+          });
+        }
+      } else if (provider === "mercadopago" && providerTransactionId) {
+        const { data: existingPlanTx } = await supabase
+          .from("payment_transactions")
+          .select("id")
+          .eq("mercadopago_payment_id", providerTransactionId)
+          .maybeSingle();
+        if (!existingPlanTx) {
+          await supabase.from("payment_transactions").insert({
+            booking_id: booking.id,
+            mercadopago_payment_id: providerTransactionId,
+            amount: totalToPay,
+            currency: "mxn",
+            status: "succeeded",
+            payment_processor: "mercadopago",
+            processor_fee: 0,
+            net_amount: totalToPay,
+            charge_context: "payment_plan_installment",
+            charge_reference_id: txRecord.id,
+          });
+        }
+      } else if (provider === "paypal" && providerTransactionId) {
+        const { data: existingPlanTx } = await supabase
+          .from("payment_transactions")
+          .select("id")
+          .eq("paypal_capture_id", providerTransactionId)
+          .maybeSingle();
+        if (!existingPlanTx) {
+          await supabase.from("payment_transactions").insert({
+            booking_id: booking.id,
+            paypal_capture_id: providerTransactionId,
+            amount: totalToPay,
+            currency: "mxn",
+            status: "succeeded",
+            payment_processor: "paypal",
+            processor_fee: 0,
+            net_amount: totalToPay,
+            charge_context: "payment_plan_installment",
+            charge_reference_id: txRecord.id,
+          });
+        }
+      }
+
+      // Award points after txRecord exists, using txRecord.id as reference_id (1:1 match for clawback)
+      if (pointsEarned > 0) {
+        const { data: walletId } = await supabase.rpc("get_or_create_points_wallet", { p_user_id: user.id });
+        if (walletId) {
+          const { data: pWallet } = await supabase
+            .from("toursred_points_wallets")
+            .select("id, balance, total_earned")
+            .eq("id", walletId)
+            .maybeSingle();
+          if (pWallet) {
+            const newBalance = pWallet.balance + pointsEarned;
+            const { error: ptsTxError } = await supabase.from("toursred_points_transactions").insert({
+              wallet_id: walletId,
+              user_id: user.id,
+              amount: pointsEarned,
+              balance_after: newBalance,
+              type: "earned",
+              description: `Puntos por abono: ${tourName} (${bookingCode})`,
+              reference_id: txRecord.id,
+              reference_type: "payment_plan",
+              expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+            });
+            if (ptsTxError) {
+              console.error(`Error inserting points transaction for plan ${plan_id}: ${ptsTxError.message}`);
+            } else {
+              await supabase.from("toursred_points_wallets").update({
+                balance: newBalance,
+                total_earned: pWallet.total_earned + pointsEarned,
+              }).eq("id", walletId);
+            }
+          }
+        }
+      }
 
       // Create allocations
       if (allocations.length > 0) {

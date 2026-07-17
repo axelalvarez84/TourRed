@@ -232,6 +232,28 @@ Deno.serve(async (req) => {
 
             console.log(`✅ Supplement ${bookingSupplementId} marked as paid via Stripe`);
 
+            // Record in payment_transactions for refund tracking
+            const suppPaymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : null;
+            const { data: existingSuppTx } = await supabase
+              .from('payment_transactions')
+              .select('id')
+              .eq('stripe_payment_intent_id', suppPaymentIntentId)
+              .maybeSingle();
+            if (!existingSuppTx && suppPaymentIntentId) {
+              await supabase.from('payment_transactions').insert({
+                booking_id: bookingRow.id,
+                stripe_payment_intent_id: suppPaymentIntentId,
+                amount: totalToPay,
+                currency: 'mxn',
+                status: 'succeeded',
+                payment_processor: 'stripe',
+                processor_fee: 0,
+                net_amount: totalToPay,
+                charge_context: 'supplement',
+                charge_reference_id: bookingSupplementId,
+              });
+            }
+
             // Trigger CFDI async
             const { data: cfdiSettings } = await supabase
               .from('platform_settings')
@@ -382,6 +404,29 @@ Deno.serve(async (req) => {
               }
             }
 
+            // Record in payment_transactions for refund tracking
+            const extraPaymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : null;
+            const extraTotalAmount = session.amount_total ? session.amount_total / 100 : subtotal;
+            const { data: existingExtraTx } = await supabase
+              .from('payment_transactions')
+              .select('id')
+              .eq('stripe_payment_intent_id', extraPaymentIntentId)
+              .maybeSingle();
+            if (!existingExtraTx && extraPaymentIntentId) {
+              await supabase.from('payment_transactions').insert({
+                booking_id: extraBookingId,
+                stripe_payment_intent_id: extraPaymentIntentId,
+                amount: extraTotalAmount,
+                currency: 'mxn',
+                status: 'succeeded',
+                payment_processor: 'stripe',
+                processor_fee: 0,
+                net_amount: extraTotalAmount,
+                charge_context: extraType === 'insurance' ? 'insurance' : 'optional_service',
+                charge_reference_id: extraBosId || extraBookingId,
+              });
+            }
+
             // Trigger CFDI async
             if (platformSettings?.pac_provider && platformSettings.pac_provider !== 'none') {
               const cfdiFunction = extraType === 'optional_service'
@@ -497,7 +542,7 @@ Deno.serve(async (req) => {
             const netServiceChargePlan = parseFloat(exemptionResultPlan?.net_service_charge ?? grossServiceChargePlan.toString());
             const effectiveNetServiceCharge = netServiceCharge > 0 ? netServiceChargePlan : 0;
 
-            // Award points if active membership
+            // Calculate points earned (actual award happens after txRecord creation)
             let pointsEarned = 0;
             const { data: activeMembership } = await supabase
               .from('memberships')
@@ -509,38 +554,6 @@ Deno.serve(async (req) => {
 
             if (activeMembership) {
               pointsEarned = Math.floor(effectiveAmount + netServiceCharge);
-              if (pointsEarned > 0) {
-                const { data: walletId } = await supabase.rpc('get_or_create_points_wallet', { p_user_id: planUserId });
-                if (walletId) {
-                  const { data: pWallet } = await supabase
-                    .from('toursred_points_wallets')
-                    .select('id, balance, total_earned')
-                    .eq('id', walletId)
-                    .maybeSingle();
-                  if (pWallet) {
-                    const newBalance = pWallet.balance + pointsEarned;
-                    const { error: ptsTxError } = await supabase.from('toursred_points_transactions').insert({
-                      wallet_id: walletId,
-                      user_id: planUserId,
-                      amount: pointsEarned,
-                      balance_after: newBalance,
-                      type: 'earned',
-                      description: `Puntos por abono: ${bookingRow.tours?.name ?? 'Tour'} (${bookingRow.booking_code ?? ''})`,
-                      reference_id: planId,
-                      reference_type: 'payment_plan',
-                      expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-                    });
-                    if (ptsTxError) {
-                      console.error(`Error inserting points transaction for plan ${planId}: ${ptsTxError.message}`);
-                    } else {
-                      await supabase.from('toursred_points_wallets').update({
-                        balance: newBalance,
-                        total_earned: pWallet.total_earned + pointsEarned,
-                      }).eq('id', walletId);
-                    }
-                  }
-                }
-              }
             }
 
             // Create transaction record
@@ -565,6 +578,62 @@ Deno.serve(async (req) => {
             if (txError || !txRecord) {
               console.error(`Error creating payment plan transaction: ${txError?.message}`);
               break;
+            }
+
+            // Record in payment_transactions for refund tracking
+            const planPaymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : null;
+            const { data: existingPlanTx } = await supabase
+              .from('payment_transactions')
+              .select('id')
+              .eq('stripe_payment_intent_id', planPaymentIntentId)
+              .maybeSingle();
+            if (!existingPlanTx && planPaymentIntentId) {
+              await supabase.from('payment_transactions').insert({
+                booking_id: bookingRow.id,
+                stripe_payment_intent_id: planPaymentIntentId,
+                amount: totalToPay,
+                currency: 'mxn',
+                status: 'succeeded',
+                payment_processor: 'stripe',
+                processor_fee: 0,
+                net_amount: totalToPay,
+                charge_context: 'payment_plan_installment',
+                charge_reference_id: txRecord.id,
+              });
+            }
+
+            // Award points after txRecord exists, using txRecord.id as reference_id (1:1 match for clawback)
+            if (pointsEarned > 0) {
+              const { data: walletId } = await supabase.rpc('get_or_create_points_wallet', { p_user_id: planUserId });
+              if (walletId) {
+                const { data: pWallet } = await supabase
+                  .from('toursred_points_wallets')
+                  .select('id, balance, total_earned')
+                  .eq('id', walletId)
+                  .maybeSingle();
+                if (pWallet) {
+                  const newBalance = pWallet.balance + pointsEarned;
+                  const { error: ptsTxError } = await supabase.from('toursred_points_transactions').insert({
+                    wallet_id: walletId,
+                    user_id: planUserId,
+                    amount: pointsEarned,
+                    balance_after: newBalance,
+                    type: 'earned',
+                    description: `Puntos por abono: ${bookingRow.tours?.name ?? 'Tour'} (${bookingRow.booking_code ?? ''})`,
+                    reference_id: txRecord.id,
+                    reference_type: 'payment_plan',
+                    expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                  });
+                  if (ptsTxError) {
+                    console.error(`Error inserting points transaction for plan ${planId}: ${ptsTxError.message}`);
+                  } else {
+                    await supabase.from('toursred_points_wallets').update({
+                      balance: newBalance,
+                      total_earned: pWallet.total_earned + pointsEarned,
+                    }).eq('id', walletId);
+                  }
+                }
+              }
             }
 
             // Create allocations
@@ -2166,6 +2235,56 @@ Deno.serve(async (req) => {
           } catch (acctErr) {
             console.error("Error creating accounting entry for Stripe refund fee:", acctErr);
           }
+        }
+
+        // Claw back loyalty points for the refunded charge
+        try {
+          const { data: refundDetail } = await supabase
+            .from("payment_refunds")
+            .select("payment_transaction_id, requested_amount")
+            .eq("id", refundRecord.id)
+            .maybeSingle();
+
+          if (refundDetail?.payment_transaction_id) {
+            const { data: ptx } = await supabase
+              .from("payment_transactions")
+              .select("charge_context, charge_reference_id, booking_id")
+              .eq("id", refundDetail.payment_transaction_id)
+              .maybeSingle();
+
+            if (ptx?.charge_reference_id) {
+              const { data: booking } = await supabase
+                .from("bookings")
+                .select("user_id")
+                .eq("id", ptx.booking_id)
+                .maybeSingle();
+
+              if (booking?.user_id) {
+                const referenceTypeMap: Record<string, string> = {
+                  'payment_plan_installment': 'payment_plan',
+                  'supplement': 'supplement',
+                  'insurance': 'insurance_payment',
+                  'optional_service': 'optional_service_payment',
+                  'booking_deposit': 'booking',
+                };
+                const refType = referenceTypeMap[ptx.charge_context] || 'booking';
+                const { error: clawbackError } = await supabase.rpc("claw_back_points_for_refund", {
+                  p_user_id: booking.user_id,
+                  p_reference_id: ptx.charge_reference_id,
+                  p_reference_type: refType,
+                  p_refund_id: refundRecord.id,
+                  p_amount: Math.floor(parseFloat(refundDetail.requested_amount)),
+                });
+                if (clawbackError) {
+                  console.error(`Error clawing back points for refund ${refundRecord.id}: ${clawbackError.message}`);
+                } else {
+                  console.log(`Points clawback processed for refund ${refundRecord.id}`);
+                }
+              }
+            }
+          }
+        } catch (clawbackErr) {
+          console.error("Error during points clawback:", clawbackErr);
         }
 
         console.log(`Stripe refund confirmed for payment_refund ${refundRecord.id}`);

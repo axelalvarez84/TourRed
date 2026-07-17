@@ -321,6 +321,56 @@ async function confirmPayPalRefund(supabase: any, refundRecord: any, processorRe
     }
   }
 
+  // Claw back loyalty points for the refunded charge
+  try {
+    const { data: refundDetail } = await supabase
+      .from("payment_refunds")
+      .select("payment_transaction_id, requested_amount")
+      .eq("id", refundRecord.id)
+      .maybeSingle();
+
+    if (refundDetail?.payment_transaction_id) {
+      const { data: ptx } = await supabase
+        .from("payment_transactions")
+        .select("charge_context, charge_reference_id, booking_id")
+        .eq("id", refundDetail.payment_transaction_id)
+        .maybeSingle();
+
+      if (ptx?.charge_reference_id) {
+        const { data: booking } = await supabase
+          .from("bookings")
+          .select("user_id")
+          .eq("id", ptx.booking_id)
+          .maybeSingle();
+
+        if (booking?.user_id) {
+          const referenceTypeMap: Record<string, string> = {
+            'payment_plan_installment': 'payment_plan',
+            'supplement': 'supplement',
+            'insurance': 'insurance_payment',
+            'optional_service': 'optional_service_payment',
+            'booking_deposit': 'booking',
+          };
+          const refType = referenceTypeMap[ptx.charge_context] || 'booking';
+          const { error: clawbackError } = await supabase.rpc("claw_back_points_for_refund", {
+            p_user_id: booking.user_id,
+            p_reference_id: ptx.charge_reference_id,
+            p_reference_type: refType,
+            p_refund_id: refundRecord.id,
+            p_amount: Math.floor(parseFloat(refundDetail.requested_amount)),
+          });
+          if (clawbackError) {
+            console.error(`Error clawing back points for PayPal refund ${refundRecord.id}: ${clawbackError.message}`);
+          } else {
+            console.log(`Points clawback processed for PayPal refund ${refundRecord.id}`);
+          }
+        }
+      }
+    }
+  } catch (clawbackErr) {
+    console.error("Error during points clawback (PayPal):", clawbackErr);
+  }
+
   console.log(`PayPal refund ${processorRefundId} confirmed for payment_refund ${refundRecord.id}`);
 }
 

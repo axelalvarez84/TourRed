@@ -32,6 +32,7 @@ Deno.serve(async (req: Request) => {
 
     const {
       booking_id,
+      payment_transaction_id,
       cancellation_id,
       partial_cancellation_id,
       amount,
@@ -40,8 +41,19 @@ Deno.serve(async (req: Request) => {
       created_by_user_id,
     } = await req.json();
 
+    // ============================================================
+    // Validation: payment_transaction_id is now MANDATORY
+    // ============================================================
     if (!booking_id) {
       return new Response(JSON.stringify({ error: "booking_id es requerido" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!payment_transaction_id) {
+      return new Response(JSON.stringify({
+        error: "payment_transaction_id es requerido. Usa el endpoint de lineas reembolsables para obtenerlo.",
+      }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -52,7 +64,6 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Validate requested_by enum
     const validRequestedBy = ["traveler_default", "traveler_profeco_request", "admin_override"];
     if (!validRequestedBy.includes(requested_by)) {
       return new Response(JSON.stringify({ error: `requested_by debe ser uno de: ${validRequestedBy.join(", ")}` }), {
@@ -61,39 +72,25 @@ Deno.serve(async (req: Request) => {
     }
 
     // ============================================================
-    // Paso 1: Idempotencia — verificar si ya existe un reembolso activo
-    // ============================================================
-    const { data: existingRefunds } = await supabase
-      .from("payment_refunds")
-      .select("id, status, requested_amount")
-      .eq("booking_id", booking_id)
-      .in("status", ["pending", "processing", "succeeded"]);
-
-    if (existingRefunds && existingRefunds.length > 0) {
-      return new Response(
-        JSON.stringify({
-          error: "Ya existe un reembolso activo o completado para esta reserva",
-          existing_refunds: existingRefunds,
-        }),
-        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // ============================================================
-    // Paso 2: Lookup de la transacción original
+    // Paso 1: Lookup the SPECIFIC transaction (no more order+limit fallback)
     // ============================================================
     const { data: tx } = await supabase
       .from("payment_transactions")
-      .select("id, payment_processor, stripe_payment_intent_id, paypal_capture_id, mercadopago_payment_id, amount, payment_method_type, processor_fee")
-      .eq("booking_id", booking_id)
-      .order("created_at", { ascending: false })
-      .limit(1)
+      .select("id, booking_id, payment_processor, stripe_payment_intent_id, paypal_capture_id, mercadopago_payment_id, amount, payment_method_type, processor_fee, charge_context, charge_reference_id")
+      .eq("id", payment_transaction_id)
       .maybeSingle();
 
     if (!tx) {
       return new Response(
-        JSON.stringify({ error: "Esta reserva no tiene una referencia de pago valida para reembolso a metodo original. Usa Transferencia o ToursRed Cash." }),
+        JSON.stringify({ error: "La transaccion especificada no existe." }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (tx.booking_id !== booking_id) {
+      return new Response(
+        JSON.stringify({ error: "La transaccion no pertenece a la reserva indicada." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -105,7 +102,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Validar que el metodo de pago sea reembolsable
     if (tx.payment_method_type === "OXXO" || tx.payment_method_type === "Transferencia Bancaria") {
       return new Response(
         JSON.stringify({ error: `Los pagos via ${tx.payment_method_type} no son reembolsables a metodo original. Usa Transferencia o ToursRed Cash.` }),
@@ -113,7 +109,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Validar que exista la referencia del procesador
     let processorOriginalReference: string | null = null;
     if (processor === "stripe") {
       processorOriginalReference = tx.stripe_payment_intent_id;
@@ -131,14 +126,14 @@ Deno.serve(async (req: Request) => {
     }
 
     // ============================================================
-    // Paso 3: Validar monto contra reembolsos previos
+    // Paso 2: Validate amount against THIS specific transaction
     // ============================================================
     const originalAmount = parseFloat(tx.amount);
     const { data: priorRefunds } = await supabase
       .from("payment_refunds")
       .select("requested_amount")
       .eq("payment_transaction_id", tx.id)
-      .eq("status", "succeeded");
+      .in("status", ["succeeded", "processing", "pending"]);
 
     const alreadyRefunded = (priorRefunds || []).reduce((sum: number, r: any) => sum + parseFloat(r.requested_amount), 0);
     const maxRefundable = originalAmount - alreadyRefunded;
@@ -146,16 +141,36 @@ Deno.serve(async (req: Request) => {
     if (amount > maxRefundable) {
       return new Response(
         JSON.stringify({
-          error: `El monto solicitado (${amount}) excede el maximo reembolsable (${maxRefundable.toFixed(2)}). Ya reembolsado: ${alreadyRefunded.toFixed(2)}.`,
+          error: `El monto solicitado (${amount}) excede el maximo reembolsable para esta linea (${maxRefundable.toFixed(2)}). Ya reembolsado: ${alreadyRefunded.toFixed(2)}.`,
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // ============================================================
-    // Paso 4: Insertar payment_refunds con status = pending
+    // Paso 3: Idempotency — check for active refund on THIS transaction
     // ============================================================
-    const idempotencyKey = `${booking_id}_${cancellation_id || partial_cancellation_id || "admin"}_${Date.now()}`;
+    const { data: existingActiveRefund } = await supabase
+      .from("payment_refunds")
+      .select("id, status")
+      .eq("payment_transaction_id", tx.id)
+      .in("status", ["pending", "processing"])
+      .maybeSingle();
+
+    if (existingActiveRefund) {
+      return new Response(
+        JSON.stringify({
+          error: "Ya existe un reembolso en proceso para esta linea de pago.",
+          existing_refund_id: existingActiveRefund.id,
+        }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ============================================================
+    // Paso 4: Insert payment_refunds
+    // ============================================================
+    const idempotencyKey = `${tx.id}_${cancellation_id || partial_cancellation_id || "admin"}_${Date.now()}`;
 
     const { data: refundRecord, error: refundInsertError } = await supabase
       .from("payment_refunds")
@@ -188,7 +203,7 @@ Deno.serve(async (req: Request) => {
     const refundId = refundRecord.id;
 
     // ============================================================
-    // Paso 5: Adapter segun procesador
+    // Paso 5: Processor adapter
     // ============================================================
     let processorRefundId: string | null = null;
     let processorFeeLost = 0;
@@ -206,6 +221,7 @@ Deno.serve(async (req: Request) => {
           metadata: {
             booking_id,
             toursred_refund_id: refundId,
+            toursred_payment_transaction_id: tx.id,
           },
         }, {
           idempotencyKey,
@@ -300,7 +316,7 @@ Deno.serve(async (req: Request) => {
       }
 
       // ============================================================
-      // Paso 6: Actualizar payment_refunds con resultados
+      // Paso 6: Update payment_refunds with processor result
       // ============================================================
       await supabase
         .from("payment_refunds")
@@ -317,6 +333,8 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           success: true,
           payment_refund_id: refundId,
+          payment_transaction_id: tx.id,
+          charge_context: tx.charge_context,
           status: "processing",
           processor_refund_id: processorRefundId,
           processor_fee_lost: processorFeeLost,
@@ -325,9 +343,6 @@ Deno.serve(async (req: Request) => {
       );
 
     } catch (processorError: any) {
-      // ============================================================
-      // Paso 7: Fallo sincrono — marcar como failed
-      // ============================================================
       await supabase
         .from("payment_refunds")
         .update({
