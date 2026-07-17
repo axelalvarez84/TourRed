@@ -4,7 +4,7 @@ import {
   User, Building2, MapPin, Calendar, CreditCard, DollarSign,
   CheckCircle, Clock, XCircle, AlertTriangle, RefreshCw,
   Users, Star, Coins, Shield, FileText, ArrowLeftRight,
-  Phone, Mail, Package, Percent, Hash, Tag, Info,
+  Phone, Mail, Package, Percent, Hash, Tag, Info, Plus,
   TrendingUp, BarChart2, Activity, Upload, Ban, Loader2
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -132,10 +132,50 @@ interface BookingRow {
     agency_commission_amount: number | null;
     service_charge_rate: number | null;
     service_charge_amount: number | null;
+    gross_service_charge_amount: number | null;
+    membership_exemption_total: number | null;
+    payment_plan_service_charges: number | null;
+    payment_plan_membership_exemptions: number | null;
+    optional_services_subtotal: number | null;
+    optional_services_commission: number | null;
+    optional_services_service_charge: number | null;
+    optional_services_agency_net: number | null;
+    supplements_subtotal: number | null;
+    supplements_commission: number | null;
+    supplements_service_charge: number | null;
+    supplements_agency_net: number | null;
     platform_total_revenue: number | null;
     agency_net_amount: number | null;
     status: string | null;
     processed_at: string | null;
+  }[] | null;
+  optional_services?: {
+    id: string;
+    quantity: number;
+    unit_price: number;
+    subtotal: number;
+    service_charge: number;
+    total_paid: number;
+    agency_commission: number;
+    membership_exemption_used: number;
+    is_cancelled: boolean;
+    paid_at: string | null;
+    payment_method: string | null;
+    tour_optional_services: { name: string } | null;
+  }[] | null;
+  supplements?: {
+    id: string;
+    quantity: number;
+    unit_price: number;
+    service_charge: number;
+    membership_exemption_used: number;
+    supplement_commission: number;
+    total_paid: number;
+    status: string;
+    paid_at: string | null;
+    payment_method: string | null;
+    refund_amount: number | null;
+    tour_supplements: { name: string } | null;
   }[] | null;
 }
 
@@ -308,18 +348,36 @@ function AdminBookings() {
       // Queries paralelos de lookup
       const planBookingIds = rawBookings.filter(b => b.has_payment_plan).map(b => b.id);
 
-      const [usersRes, toursRes, agenciesRes, commRes, plansRes, installmentsRes] = await Promise.all([
+      const [usersRes, toursRes, agenciesRes, commRes, plansRes, installmentsRes, optSvcRes, supplementsRes] = await Promise.all([
         supabase.from('users').select('id, first_name, last_name, email, profile_picture_url, phone_number, is_active, curp, rfc, razon_social, regimen_fiscal, uso_cfdi, is_foreign_traveler, passport_number').in('id', userIds),
         supabase.from('tours').select('id, name, destination, start_date, end_date, image_url, price, deposit_percentage, booking_approval_type, category').in('id', tourIds),
         supabase.from('agencies').select('id, name, logo, contact_email, contact_phone, commission_rate').in('id', agencyIds),
-        supabase.from('commission_records').select('id, booking_id, agency_commission_rate, agency_commission_amount, service_charge_rate, service_charge_amount, platform_total_revenue, agency_net_amount, status, processed_at').in('booking_id', bookingIds),
+        supabase.from('commission_records').select('id, booking_id, agency_commission_rate, agency_commission_amount, service_charge_rate, service_charge_amount, gross_service_charge_amount, membership_exemption_total, payment_plan_service_charges, payment_plan_membership_exemptions, optional_services_subtotal, optional_services_commission, optional_services_service_charge, optional_services_agency_net, supplements_subtotal, supplements_commission, supplements_service_charge, supplements_agency_net, platform_total_revenue, agency_net_amount, status, processed_at').in('booking_id', bookingIds),
         planBookingIds.length > 0
           ? supabase.from('booking_payment_plans').select('id, booking_id, mode, total_plan_amount, total_amount_paid, status').in('booking_id', planBookingIds)
           : Promise.resolve({ data: [], error: null } as any),
         planBookingIds.length > 0
           ? supabase.from('booking_payment_plan_installments').select('id, plan_id, booking_id, installment_number, label, amount_due, amount_paid, due_date, status, paid_at').in('booking_id', planBookingIds).order('installment_number', { ascending: true })
           : Promise.resolve({ data: [], error: null } as any),
+        bookingIds.length > 0
+          ? supabase.from('booking_optional_services').select('id, booking_id, quantity, unit_price, subtotal, service_charge, total_paid, agency_commission, membership_exemption_used, is_cancelled, paid_at, payment_method, tour_optional_services(name)').in('booking_id', bookingIds)
+          : Promise.resolve({ data: [], error: null } as any),
+        bookingIds.length > 0
+          ? supabase.from('booking_supplements').select('id, booking_id, quantity, unit_price, service_charge, membership_exemption_used, supplement_commission, total_paid, status, paid_at, payment_method, refund_amount, tour_supplements(name)').in('booking_id', bookingIds)
+          : Promise.resolve({ data: [], error: null } as any),
       ]);
+
+      // Mapas para optional_services y supplements
+      const optSvcMap: Record<string, typeof optSvcRes.data> = {};
+      for (const os of (optSvcRes.data || [])) {
+        if (!optSvcMap[os.booking_id]) optSvcMap[os.booking_id] = [];
+        optSvcMap[os.booking_id]!.push(os);
+      }
+      const supplementsMap: Record<string, typeof supplementsRes.data> = {};
+      for (const sp of (supplementsRes.data || [])) {
+        if (!supplementsMap[sp.booking_id]) supplementsMap[sp.booking_id] = [];
+        supplementsMap[sp.booking_id]!.push(sp);
+      }
 
       // Mapas para lookup O(1)
       const usersMap = Object.fromEntries((usersRes.data || []).map(u => [u.id, u]));
@@ -349,6 +407,8 @@ function AdminBookings() {
         agencies: agenciesMap[b.agency_id] ?? null,
         commission_records: commMap[b.id] ?? null,
         payment_plan: plansMap[b.id] ?? null,
+        optional_services: optSvcMap[b.id] ?? null,
+        supplements: supplementsMap[b.id] ?? null,
       }));
 
       setBookings(enriched);
@@ -939,22 +999,168 @@ const DetailModal: React.FC<{ booking: BookingRow; onClose: () => void }> = ({ b
           {/* ── Comisiones ──────────────────────────────────────────────────────── */}
           {commRec && (
             <Section title="Registro de Comision" icon={<Percent className="h-4 w-4" />}>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                <Field label="Tasa comision agencia" value={commRec.agency_commission_rate != null ? `${(Number(commRec.agency_commission_rate) * 100).toFixed(1)}%` : '—'} />
-                <Field label="Monto comision agencia" value={commRec.agency_commission_amount != null ? formatCurrencyMXN(Number(commRec.agency_commission_amount)) : '—'} />
-                <Field label="Tasa cargo servicio" value={commRec.service_charge_rate != null ? `${(Number(commRec.service_charge_rate) * 100).toFixed(1)}%` : '—'} />
-                <Field label="Monto cargo servicio" value={commRec.service_charge_amount != null ? formatCurrencyMXN(Number(commRec.service_charge_amount)) : '—'} />
-                <Field label="Revenue total plataforma" value={commRec.platform_total_revenue != null ? formatCurrencyMXN(Number(commRec.platform_total_revenue)) : '—'} />
-                <Field label="Neto agencia" value={commRec.agency_net_amount != null ? formatCurrencyMXN(Number(commRec.agency_net_amount)) : '—'} />
-                <Field label="Estado pago comision" value={commRec.status ? (
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                    commRec.status === 'paid_out' ? 'bg-green-100 text-green-800' :
-                    commRec.status === 'processed' ? 'bg-blue-100 text-blue-800' :
-                    commRec.status === 'disputed' ? 'bg-red-100 text-red-800' :
-                    'bg-gray-100 text-gray-600'
-                  }`}>{commRec.status === 'paid_out' ? 'Pagado' : commRec.status === 'processed' ? 'Procesado' : commRec.status === 'disputed' ? 'Disputado' : commRec.status}</span>
-                ) : '—'} />
-                <Field label="Procesado el" value={fmtDateTime(commRec.processed_at)} />
+              {/* Tour principal */}
+              <div className="mb-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Tour Principal</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
+                  <Field label="Tasa comision agencia" value={commRec.agency_commission_rate != null ? `${(Number(commRec.agency_commission_rate) * 100).toFixed(1)}%` : '—'} />
+                  <Field label="Monto comision agencia" value={commRec.agency_commission_amount != null ? formatCurrencyMXN(Number(commRec.agency_commission_amount)) : '—'} />
+                  <Field label="Total tour" value={formatCurrencyMXN(Number(b.total_price))} />
+                  <Field label="Cargo servicio bruto" value={commRec.gross_service_charge_amount != null ? formatCurrencyMXN(Number(commRec.gross_service_charge_amount)) : '—'} />
+                  <Field label="Exencion membresia" value={commRec.membership_exemption_total != null ? formatCurrencyMXN(Number(commRec.membership_exemption_total)) : '—'} />
+                  <Field label="Cargo servicio neto" value={commRec.service_charge_amount != null ? formatCurrencyMXN(Number(commRec.service_charge_amount)) : '—'} />
+                  <Field label="Neto agencia (tour)" value={formatCurrencyMXN(Number(b.total_price) - Number(b.commission_amount))} />
+                </div>
+              </div>
+
+              {/* Plan de pagos */}
+              {(Number(commRec.payment_plan_service_charges) > 0 || Number(commRec.payment_plan_membership_exemptions) > 0) && (
+                <div className="mb-4 pt-3 border-t border-gray-100">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Plan de Pagos</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
+                    <Field label="Cargos servicio de abonos" value={formatCurrencyMXN(Number(commRec.payment_plan_service_charges ?? 0))} />
+                    <Field label="Exenciones en abonos" value={formatCurrencyMXN(Number(commRec.payment_plan_membership_exemptions ?? 0))} />
+                  </div>
+                </div>
+              )}
+
+              {/* Servicios opcionales */}
+              {Number(commRec.optional_services_subtotal) > 0 && (
+                <div className="mb-4 pt-3 border-t border-gray-100">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Servicios Opcionales</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3">
+                    <Field label="Subtotal opcionales" value={formatCurrencyMXN(Number(commRec.optional_services_subtotal ?? 0))} />
+                    <Field label="Comision agencia" value={formatCurrencyMXN(Number(commRec.optional_services_commission ?? 0))} />
+                    <Field label="Cargo servicio" value={formatCurrencyMXN(Number(commRec.optional_services_service_charge ?? 0))} />
+                    <Field label="Neto agencia" value={formatCurrencyMXN(Number(commRec.optional_services_agency_net ?? 0))} />
+                  </div>
+                </div>
+              )}
+
+              {/* Suplementos */}
+              {Number(commRec.supplements_subtotal) > 0 && (
+                <div className="mb-4 pt-3 border-t border-gray-100">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Suplementos</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3">
+                    <Field label="Subtotal suplementos" value={formatCurrencyMXN(Number(commRec.supplements_subtotal ?? 0))} />
+                    <Field label="Comision suplemento" value={formatCurrencyMXN(Number(commRec.supplements_commission ?? 0))} />
+                    <Field label="Cargo servicio" value={formatCurrencyMXN(Number(commRec.supplements_service_charge ?? 0))} />
+                    <Field label="Neto agencia" value={formatCurrencyMXN(Number(commRec.supplements_agency_net ?? 0))} />
+                  </div>
+                </div>
+              )}
+
+              {/* Totales consolidados */}
+              <div className="pt-3 border-t-2 border-gray-200">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                  <div className="rounded-lg p-3 bg-blue-50 border border-blue-100">
+                    <div className="text-base font-bold text-blue-700">{formatCurrencyMXN(Number(commRec.platform_total_revenue ?? 0))}</div>
+                    <div className="text-xs text-blue-600 mt-0.5">Revenue total plataforma</div>
+                  </div>
+                  <div className="rounded-lg p-3 bg-green-50 border border-green-100">
+                    <div className="text-base font-bold text-green-700">{formatCurrencyMXN(Number(commRec.agency_net_amount ?? 0))}</div>
+                    <div className="text-xs text-green-600 mt-0.5">Payout total agencia</div>
+                  </div>
+                  <Field label="Estado pago comision" value={commRec.status ? (
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      commRec.status === 'paid_out' ? 'bg-green-100 text-green-800' :
+                      commRec.status === 'processed' ? 'bg-blue-100 text-blue-800' :
+                      commRec.status === 'disputed' ? 'bg-red-100 text-red-800' :
+                      'bg-gray-100 text-gray-600'
+                    }`}>{commRec.status === 'paid_out' ? 'Pagado' : commRec.status === 'processed' ? 'Procesado' : commRec.status === 'disputed' ? 'Disputado' : commRec.status}</span>
+                  ) : '—'} />
+                  <Field label="Procesado el" value={fmtDateTime(commRec.processed_at)} />
+                </div>
+              </div>
+            </Section>
+          )}
+
+          {/* ── Servicios Opcionales ───────────────────────────────────────── */}
+          {b.optional_services && b.optional_services.length > 0 && (
+            <Section title="Servicios Opcionales" icon={<Plus className="h-4 w-4" />}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-gray-500 border-b border-gray-200">
+                      <th className="py-2 pr-4">Servicio</th>
+                      <th className="py-2 pr-4 text-center">Cant.</th>
+                      <th className="py-2 pr-4 text-right">Precio unit.</th>
+                      <th className="py-2 pr-4 text-right">Subtotal</th>
+                      <th className="py-2 pr-4 text-right">Cargo servicio</th>
+                      <th className="py-2 pr-4 text-right">Total pagado</th>
+                      <th className="py-2 pr-4 text-center">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {b.optional_services.map((os) => (
+                      <tr key={os.id} className="border-b border-gray-50">
+                        <td className="py-2 pr-4 font-medium text-gray-800">{os.tour_optional_services?.name ?? '—'}</td>
+                        <td className="py-2 pr-4 text-center">{os.quantity}</td>
+                        <td className="py-2 pr-4 text-right">{formatCurrencyMXN(Number(os.unit_price))}</td>
+                        <td className="py-2 pr-4 text-right">{formatCurrencyMXN(Number(os.subtotal))}</td>
+                        <td className="py-2 pr-4 text-right">{formatCurrencyMXN(Number(os.service_charge))}</td>
+                        <td className="py-2 pr-4 text-right font-medium">{formatCurrencyMXN(Number(os.total_paid))}</td>
+                        <td className="py-2 pr-4 text-center">
+                          {os.is_cancelled ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Cancelado</span>
+                          ) : os.paid_at ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Pagado</span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Pendiente</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Section>
+          )}
+
+          {/* ── Suplementos ────────────────────────────────────────────────── */}
+          {b.supplements && b.supplements.length > 0 && (
+            <Section title="Suplementos" icon={<Package className="h-4 w-4" />}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-gray-500 border-b border-gray-200">
+                      <th className="py-2 pr-4">Suplemento</th>
+                      <th className="py-2 pr-4 text-center">Cant.</th>
+                      <th className="py-2 pr-4 text-right">Precio unit.</th>
+                      <th className="py-2 pr-4 text-right">Subtotal</th>
+                      <th className="py-2 pr-4 text-right">Comision</th>
+                      <th className="py-2 pr-4 text-right">Cargo servicio</th>
+                      <th className="py-2 pr-4 text-right">Total pagado</th>
+                      <th className="py-2 pr-4 text-center">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {b.supplements.map((sp) => (
+                      <tr key={sp.id} className="border-b border-gray-50">
+                        <td className="py-2 pr-4 font-medium text-gray-800">{sp.tour_supplements?.name ?? '—'}</td>
+                        <td className="py-2 pr-4 text-center">{sp.quantity}</td>
+                        <td className="py-2 pr-4 text-right">{formatCurrencyMXN(Number(sp.unit_price))}</td>
+                        <td className="py-2 pr-4 text-right">{formatCurrencyMXN(Number(sp.unit_price) * Number(sp.quantity))}</td>
+                        <td className="py-2 pr-4 text-right">{formatCurrencyMXN(Number(sp.supplement_commission))}</td>
+                        <td className="py-2 pr-4 text-right">{formatCurrencyMXN(Number(sp.service_charge))}</td>
+                        <td className="py-2 pr-4 text-right font-medium">{formatCurrencyMXN(Number(sp.total_paid))}</td>
+                        <td className="py-2 pr-4 text-center">
+                          {sp.status === 'paid' ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Pagado</span>
+                          ) : sp.status === 'cancelled' ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Cancelado</span>
+                          ) : sp.status === 'pending_approval' ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Pendiente aprob.</span>
+                          ) : sp.status === 'approved' ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Aprobado</span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{sp.status}</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </Section>
           )}
@@ -1279,7 +1485,17 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
   const totalPaidByTraveler = booking.payment_plan?.installments?.length
     ? booking.payment_plan.installments.reduce((s, i) => s + Number(i.amount_paid || 0), 0)
     : Number(booking.user_payment ?? booking.deposit_amount ?? 0);
-  const suggestedAmount = totalPaidByTraveler + insuranceCost;
+  const optionalServicesRefundable = booking.optional_services
+    ? booking.optional_services
+        .filter(os => !os.is_cancelled && Number(os.total_paid || 0) > 0)
+        .reduce((s, os) => s + Number(os.total_paid || 0), 0)
+    : 0;
+  const supplementsRefundable = booking.supplements
+    ? booking.supplements
+        .filter(sp => sp.status === 'paid' && Number(sp.total_paid || 0) > 0)
+        .reduce((s, sp) => s + Number(sp.total_paid || 0), 0)
+    : 0;
+  const suggestedAmount = totalPaidByTraveler + insuranceCost + optionalServicesRefundable + supplementsRefundable;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
@@ -1314,8 +1530,17 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div><span className="text-gray-500">Tour:</span> <span className="font-medium text-gray-800">{booking.tours?.name}</span></div>
               <div><span className="text-gray-500">Viajero:</span> <span className="font-medium text-gray-800">{booking.users ? `${booking.users.first_name} ${booking.users.last_name}` : '—'}</span></div>
-              <div><span className="text-gray-500">Total pagado por viajero:</span> <span className="font-medium text-gray-800">{formatCurrencyMXN(totalPaidByTraveler)}</span></div>
+              <div><span className="text-gray-500">Pagado por viajero:</span> <span className="font-medium text-gray-800">{formatCurrencyMXN(totalPaidByTraveler)}</span></div>
               <div><span className="text-gray-500">Seguro:</span> <span className="font-medium text-gray-800">{insuranceCost > 0 ? formatCurrencyMXN(insuranceCost) : 'N/A'}</span></div>
+              {optionalServicesRefundable > 0 && (
+                <div><span className="text-gray-500">Opcionales reembolsables:</span> <span className="font-medium text-gray-800">{formatCurrencyMXN(optionalServicesRefundable)}</span></div>
+              )}
+              {supplementsRefundable > 0 && (
+                <div><span className="text-gray-500">Suplementos reembolsables:</span> <span className="font-medium text-gray-800">{formatCurrencyMXN(supplementsRefundable)}</span></div>
+              )}
+              <div className="col-span-2 pt-2 border-t border-gray-200 mt-1">
+                <div><span className="text-gray-600 font-semibold">Reembolso sugerido total:</span> <span className="font-bold text-red-600 text-base">{formatCurrencyMXN(suggestedAmount)}</span></div>
+              </div>
             </div>
           </div>
 
@@ -1383,7 +1608,7 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
                       Sugerido: {formatCurrencyMXN(suggestedAmount)}
                     </button>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">Sugerido: depósito + seguro = {formatCurrencyMXN(suggestedAmount)}</p>
+                  <p className="text-xs text-gray-400 mt-1">Sugerido: pagado + seguro + opcionales + suplementos = {formatCurrencyMXN(suggestedAmount)}</p>
                 </div>
 
                 <div>

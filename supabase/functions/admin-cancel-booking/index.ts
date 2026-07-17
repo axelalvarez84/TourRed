@@ -107,14 +107,30 @@ Deno.serve(async (req: Request) => {
     // Fetch refundable optional services for suggested amount (info only)
     const { data: optionalServices } = await supabase
       .from("booking_optional_services")
-      .select("subtotal, tour_optional_services(is_refundable)")
+      .select("subtotal, service_charge, total_paid, tour_optional_services(is_refundable)")
       .eq("booking_id", booking_id)
       .eq("is_cancelled", false);
 
     let optionalServicesRefundable = 0;
+    let optionalServicesServiceCharge = 0;
     for (const os of (optionalServices || [])) {
       if ((os as any).tour_optional_services?.is_refundable !== false) {
-        optionalServicesRefundable += Number((os as any).subtotal || 0);
+        optionalServicesRefundable += Number((os as any).total_paid || (os as any).subtotal || 0);
+        optionalServicesServiceCharge += Number((os as any).service_charge || 0);
+      }
+    }
+
+    // Fetch refundable supplements (paid and cancellable)
+    const { data: supplements } = await supabase
+      .from("booking_supplements")
+      .select("id, total_paid, refund_amount, status, tour_supplements(is_cancellable)")
+      .eq("booking_id", booking_id)
+      .eq("status", "paid");
+
+    let supplementsRefundable = 0;
+    for (const supp of (supplements || [])) {
+      if ((supp as any).tour_supplements?.is_cancellable !== false) {
+        supplementsRefundable += Number((supp as any).total_paid || 0);
       }
     }
 
@@ -122,7 +138,7 @@ Deno.serve(async (req: Request) => {
       ? Number(booking.travel_insurance_cost || 0)
       : 0;
 
-    // Calculate total actually paid by traveler (deposit + payment plan installments)
+    // Calculate total actually paid by traveler (deposit + payment plan installments + service charges)
     let totalPaidByTraveler = Number(booking.deposit_amount || 0);
 
     if (booking.has_payment_plan) {
@@ -135,9 +151,20 @@ Deno.serve(async (req: Request) => {
       for (const inst of (installments || [])) {
         totalPaidByTraveler += Number(inst.amount_paid || 0);
       }
+
+      // Add service charges from completed payment plan transactions
+      const { data: ppTransactions } = await supabase
+        .from("booking_payment_plan_transactions")
+        .select("service_charge")
+        .eq("booking_id", booking_id)
+        .eq("status", "completed");
+
+      for (const tx of (ppTransactions || [])) {
+        totalPaidByTraveler += Number(tx.service_charge || 0);
+      }
     }
 
-    const suggestedRefund = totalPaidByTraveler + insuranceCost + optionalServicesRefundable;
+    const suggestedRefund = totalPaidByTraveler + insuranceCost + optionalServicesRefundable + supplementsRefundable;
 
     const now = new Date().toISOString();
     let receiptFilePath: string | null = null;
@@ -237,6 +264,31 @@ Deno.serve(async (req: Request) => {
       });
     } catch (e) {
       console.error("Error cancelling optional services:", e);
+    }
+
+    // Cancel paid supplements that are cancellable
+    try {
+      const { data: paidSupplements } = await supabase
+        .from("booking_supplements")
+        .select("id, tour_supplements(is_cancellable)")
+        .eq("booking_id", booking_id)
+        .eq("status", "paid");
+
+      for (const supp of (paidSupplements || [])) {
+        if ((supp as any).tour_supplements?.is_cancellable !== false) {
+          await supabase.from("booking_supplements")
+            .update({
+              status: "cancelled",
+              cancelled_at: new Date().toISOString(),
+              cancelled_by: "tour_cancellation",
+              refund_amount: (supp as any).total_paid || 0,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", supp.id);
+        }
+      }
+    } catch (e) {
+      console.error("Error cancelling supplements:", e);
     }
 
     // Insert admin_booking_cancellations record

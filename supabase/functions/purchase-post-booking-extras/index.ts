@@ -168,6 +168,10 @@ Deno.serve(async (req: Request) => {
           quantity,
           unit_price: service.price_per_person,
           subtotal,
+          service_charge: netServiceCharge,
+          total_paid: totalToPay,
+          agency_commission: agencyCommission,
+          membership_exemption_used: exemptionApplied,
         })
         .select("id")
         .single();
@@ -331,6 +335,13 @@ Deno.serve(async (req: Request) => {
             body: JSON.stringify(cfdiBody),
           }).catch((e) => console.error(`${cfdiFunction} error:`, e))
         );
+      }
+
+      // Mark optional service as paid with payment method
+      if (bookingOptionalServiceId) {
+        await supabase.from("booking_optional_services")
+          .update({ paid_at: new Date().toISOString(), payment_method: method })
+          .eq("id", bookingOptionalServiceId);
       }
 
       return pointsEarned;
