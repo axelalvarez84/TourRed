@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { markPointsAsClawedBack } from "../_shared/pointsTraceability.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -122,6 +123,18 @@ Deno.serve(async (req: Request) => {
     const originalDepositAmount = Number((booking as any).deposit_amount || 0);
     const originalServiceCharge = Number((booking as any).service_charge || 0);
 
+    // Bug 2 fix: incluir parcialidades pagadas en el calculo del reembolso
+    let installmentsPaid = 0;
+    const { data: installments } = await supabase
+      .from("booking_payment_plan_installments")
+      .select("amount_paid")
+      .eq("booking_id", booking_id)
+      .in("status", ["paid", "partially_paid"]);
+    for (const inst of (installments || [])) {
+      installmentsPaid += Number((inst as any).amount_paid || 0);
+    }
+    const principalPaid = originalDepositAmount + installmentsPaid;
+
     // BUG FIX 1: include travel insurance in refund calculation
     const insuranceRefund = (booking as any).travel_insurance_included
       ? Number((booking as any).travel_insurance_cost || 0)
@@ -152,7 +165,7 @@ Deno.serve(async (req: Request) => {
     } else if (tour.cancellation_not_allowed) {
       policyType = "no_refund";
       refundPct = 0;
-      penaltyAmount = originalDepositAmount;
+      penaltyAmount = principalPaid;
     } else {
       const flexibleHours = Number(tour.flexible_hours ?? 48);
       const flexibleRefundPct = Number(tour.flexible_refund_percentage ?? 100) / 100;
@@ -161,22 +174,22 @@ Deno.serve(async (req: Request) => {
 
       if (hoursBeforeTour >= flexibleHours) {
         refundPct = flexibleRefundPct;
-        penaltyAmount = originalDepositAmount * (1 - flexibleRefundPct);
+        penaltyAmount = principalPaid * (1 - flexibleRefundPct);
         policyType = flexibleRefundPct >= 1 ? "100_percent" : "50_percent";
       } else if (hoursBeforeTour >= moderateHours) {
         refundPct = moderateRefundPct;
-        penaltyAmount = originalDepositAmount * (1 - moderateRefundPct);
+        penaltyAmount = principalPaid * (1 - moderateRefundPct);
         policyType = moderateRefundPct > 0 ? "50_percent" : "no_refund";
       } else {
         refundPct = 0;
-        penaltyAmount = originalDepositAmount;
+        penaltyAmount = principalPaid;
         policyType = "no_refund";
       }
     }
 
-    const depositRefund = originalDepositAmount * refundPct;
+    const principalRefund = principalPaid * refundPct;
     // BUG FIX 1: sum insurance refund into total
-    const refundAmountToTraveler = depositRefund + optionalServicesRefundable + insuranceRefund;
+    const refundAmountToTraveler = principalRefund + optionalServicesRefundable + insuranceRefund;
     // Penalty split: 60% to agency, 40% to platform (only applies when penaltyAmount > 0)
     const PENALTY_AGENCY_SHARE = 0.60;
     const PENALTY_PLATFORM_SHARE = 0.40;
@@ -254,6 +267,7 @@ Deno.serve(async (req: Request) => {
         cancellation_policy_type: policyType,
         original_deposit_amount: originalDepositAmount,
         original_service_charge: originalServiceCharge,
+        total_principal_paid: principalPaid,
         refund_amount_to_traveler: refundAmountToTraveler,
         amount_to_agency: amountToAgency,
         amount_to_platform: amountToPlatform,
@@ -267,6 +281,35 @@ Deno.serve(async (req: Request) => {
     if (cancellationError) {
       console.error("Error registrando booking_cancellations:", JSON.stringify(cancellationError));
       throw new Error(`Error registrando cancelación: ${cancellationError.message}`);
+    }
+
+    // Bug 3 fix: deducir puntos — 1 peso = 1 punto, una sola llamada a deduct_points
+    let pointsDeducted = 0;
+    if (refundAmountToTraveler > 0) {
+      const pointsToDeduct = Math.floor(refundAmountToTraveler);
+      if (pointsToDeduct > 0) {
+        try {
+          const { error: deductErr } = await supabase.rpc("deduct_points", {
+            p_user_id: booking.user_id,
+            p_amount: pointsToDeduct,
+            p_description: `Puntos revertidos por cancelación self-service - ${tour.name}`,
+            p_reference_id: booking_id,
+            p_reference_type: "traveler_cancellation",
+          });
+          if (deductErr) {
+            console.error("Error deducting points (traveler cancellation):", deductErr);
+          } else {
+            pointsDeducted = pointsToDeduct;
+          }
+        } catch (e: unknown) {
+          console.error("Exception deducting points (traveler cancellation):", e);
+        }
+      }
+    }
+
+    // Cierre de trazabilidad: registros clawback amount=0 por fuente
+    if (pointsDeducted > 0) {
+      await markPointsAsClawedBack(supabase, booking_id, cancellationRecord.id, "self-service");
     }
 
     // BUG FIX 2: update booking status — log error explicitly if it fails
@@ -354,6 +397,7 @@ Deno.serve(async (req: Request) => {
       refund_percentage: Math.round(refundPct * 100),
       policy_type: policyType,
       days_before_tour: daysBeforeTour,
+      points_deducted: pointsDeducted,
     });
 
   } catch (error: any) {

@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { markPointsAsClawedBack } from "../_shared/pointsTraceability.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -253,27 +254,29 @@ Deno.serve(async (req: Request) => {
       receiptFilePath = filePath;
     }
 
-    // Deduct points if the booking earned any.
-    // For original_payment_method, points are clawed back per-line via
-    // claw_back_points_for_refund when each refund is processed from the
-    // modal. Deducting here too would double-count.
+    // Deduct points: 1 peso = 1 punto. For original_payment_method, points are
+    // clawed back per-line via claw_back_points_for_refund when each refund is
+    // processed from the modal — deducting here too would double-count.
     let pointsDeducted = 0;
-    if (refund_method !== "original_payment_method" && booking.points_earned && booking.points_earned > 0) {
-      try {
-        const { error: deductErr } = await supabase.rpc("deduct_points", {
-          p_user_id: booking.user_id,
-          p_amount: booking.points_earned,
-          p_description: `Puntos revertidos por cancelación administrativa - ${tour?.name || ""}`,
-          p_reference_id: booking_id,
-          p_reference_type: "admin_cancellation",
-        });
-        if (deductErr) {
-          console.error("Error deducting points:", deductErr);
-        } else {
-          pointsDeducted = booking.points_earned;
+    if (refund_method !== "original_payment_method") {
+      const pointsToDeduct = Math.floor(Number(refund_amount));
+      if (pointsToDeduct > 0) {
+        try {
+          const { error: deductErr } = await supabase.rpc("deduct_points", {
+            p_user_id: booking.user_id,
+            p_amount: pointsToDeduct,
+            p_description: `Puntos revertidos por cancelación administrativa - ${tour?.name || ""}`,
+            p_reference_id: booking_id,
+            p_reference_type: "admin_cancellation",
+          });
+          if (deductErr) {
+            console.error("Error deducting points:", deductErr);
+          } else {
+            pointsDeducted = pointsToDeduct;
+          }
+        } catch (e) {
+          console.error("Exception deducting points:", e);
         }
-      } catch (e) {
-        console.error("Exception deducting points:", e);
       }
     }
 
@@ -346,6 +349,7 @@ Deno.serve(async (req: Request) => {
         cancellation_policy_type: "admin_cancelled",
         original_deposit_amount: Number(booking.deposit_amount || 0),
         original_service_charge: Number(booking.service_charge || 0),
+        total_principal_paid: totalPaidByTraveler,
         refund_amount_to_traveler: Number(refund_amount) || 0,
         amount_to_agency: 0,
         amount_to_platform: 0,
@@ -362,6 +366,12 @@ Deno.serve(async (req: Request) => {
 
     if (bcErr) {
       console.error("Error inserting booking_cancellations record:", bcErr);
+    }
+
+    // Cierre de trazabilidad: inserta registros clawback amount=0 por cada
+    // fuente de puntos earned, para que un reporte por fuente cuadre.
+    if (refund_method !== "original_payment_method" && pointsDeducted > 0) {
+      await markPointsAsClawedBack(supabase, booking_id, cancellationRecord?.id || null, "administrativa");
     }
 
     // ============================================================
