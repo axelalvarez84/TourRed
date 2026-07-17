@@ -253,9 +253,12 @@ Deno.serve(async (req: Request) => {
       receiptFilePath = filePath;
     }
 
-    // Deduct points if the booking earned any
+    // Deduct points if the booking earned any.
+    // For original_payment_method, points are clawed back per-line via
+    // claw_back_points_for_refund when each refund is processed from the
+    // modal. Deducting here too would double-count.
     let pointsDeducted = 0;
-    if (booking.points_earned && booking.points_earned > 0) {
+    if (refund_method !== "original_payment_method" && booking.points_earned && booking.points_earned > 0) {
       try {
         const { error: deductErr } = await supabase.rpc("deduct_points", {
           p_user_id: booking.user_id,

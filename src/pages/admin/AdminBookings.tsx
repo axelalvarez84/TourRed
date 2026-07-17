@@ -1831,7 +1831,11 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
                       : withRefund && refundMethod === 'original_payment_method'
                       ? 'Se cancelará la reserva. Después podrás reembolsar cada pago individualmente.'
                       : 'No se procesará reembolso al viajero.'}
-                    {booking.points_earned > 0 && ` Se descontarán ${booking.points_earned} puntos.`}
+                    {booking.points_earned > 0 && (
+                      refundMethod === 'original_payment_method'
+                        ? ' Los puntos se descontarán conforme reembolses cada línea.'
+                        : ` Se descontarán ${booking.points_earned} puntos.`
+                    )}
                     {' '}Se enviarán correos al viajero, agencia y a contacto@toursred.com.
                   </p>
                 </div>
