@@ -120,6 +120,8 @@ async function confirmBooking(supabase: any, bookingId: string, paypalTransactio
           currency: currencyCode,
           status: "succeeded",
           payment_method_type: "Tarjeta",
+          charge_context: "booking_deposit",
+          charge_reference_id: bookingId,
           processor_fee: paypalFee,
           net_amount: amountValue - paypalFee,
           metadata: captureData || null,

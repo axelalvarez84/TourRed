@@ -362,54 +362,12 @@ Deno.serve(async (req: Request) => {
     }
 
     // ============================================================
-    // Process refund via original payment method (multi-processor)
+    // Refund processing for original_payment_method is handled by the
+    // frontend (AdminBookings modal), which calls process-payment-refund
+    // per line using the cancellation_id returned here. This function's
+    // only responsibility for original_payment_method is to cancel the
+    // booking (status, points, optionals/supplements, notifications).
     // ============================================================
-    let paymentRefundId: string | null = null;
-    let refundProcessingStatus: string | null = null;
-
-    if (refund_method === "original_payment_method" && Number(refund_amount) > 0) {
-      try {
-        const refundResponse = await fetch(`${supabaseUrl}/functions/v1/process-payment-refund`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${supabaseServiceKey}`,
-          },
-          body: JSON.stringify({
-            booking_id,
-            cancellation_id: cancellationRecord?.id || null,
-            amount: Number(refund_amount),
-            currency: "mxn",
-            requested_by,
-            created_by_user_id: user.id,
-          }),
-        });
-
-        const refundResult = await refundResponse.json();
-
-        if (refundResult.success) {
-          paymentRefundId = refundResult.payment_refund_id || null;
-          refundProcessingStatus = refundResult.status || "processing";
-          console.log(`Refund initiated: ${paymentRefundId}, status: ${refundProcessingStatus}`);
-        } else {
-          // Synchronous failure — refund failed immediately
-          // The booking is already cancelled; ops will be notified by process-payment-refund
-          console.error("Refund failed synchronously:", refundResult.error);
-          refundProcessingStatus = "failed";
-        }
-      } catch (refundErr: any) {
-        console.error("Error calling process-payment-refund:", refundErr);
-        refundProcessingStatus = "failed";
-      }
-
-      // Link payment_refund_id to admin_booking_cancellations
-      if (paymentRefundId) {
-        await supabase
-          .from("admin_booking_cancellations")
-          .update({ payment_refund_id: paymentRefundId })
-          .eq("id", adminCancellation.id);
-      }
-    }
 
     // Update booking status
     const { error: updateErr } = await supabase
@@ -418,7 +376,7 @@ Deno.serve(async (req: Request) => {
         status: "cancelled",
         cancelled_at: now,
         cancellation_type: "admin_cancelled",
-        cancellation_refund_amount: Number(refund_amount) || 0,
+        cancellation_refund_amount: refund_method === "original_payment_method" ? 0 : (Number(refund_amount) || 0),
         admin_cancellation_id: adminCancellation.id,
       })
       .eq("id", booking_id);
@@ -543,8 +501,7 @@ Deno.serve(async (req: Request) => {
       suggested_refund: suggestedRefund,
       tour_refund_bucket: tourRefundBucket,
       optionals_refund_bucket: optionalsRefundBucket,
-      payment_refund_id: paymentRefundId,
-      refund_processing_status: refundProcessingStatus,
+      cancellation_id: cancellationRecord?.id || null,
     });
   } catch (e: any) {
     console.error("admin-cancel-booking error:", e);

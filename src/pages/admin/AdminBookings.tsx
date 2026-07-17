@@ -1379,6 +1379,15 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
   const [error, setError] = useState<string | null>(null);
   const [confirmStep, setConfirmStep] = useState(false);
 
+  // Two-phase flow for original_payment_method
+  const [bookingCancelled, setBookingCancelled] = useState(false);
+  const [cancellationId, setCancellationId] = useState<string | null>(null);
+  const [refundLines, setRefundLines] = useState<any[]>([]);
+  const [loadingLines, setLoadingLines] = useState(false);
+  const [lineStates, setLineStates] = useState<Record<string, 'pending' | 'processing' | 'succeeded' | 'failed'>>({});
+  const [lineErrors, setLineErrors] = useState<Record<string, string>>({});
+  const [refundAllProcessing, setRefundAllProcessing] = useState(false);
+
   useEffect(() => {
     // Suggest refund amount based on total actually paid by traveler
     const insurance = booking.travel_insurance_included ? Number(booking.travel_insurance_cost || 0) : 0;
@@ -1391,6 +1400,96 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
     setRefundAmount(totalPaid + insurance);
   }, [booking]);
 
+  const loadRefundLines = async () => {
+    setLoadingLines(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No hay sesión activa');
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-refundable-lines`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ booking_id: booking.id }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Error al cargar líneas reembolsables');
+
+      setRefundLines(result.lines || []);
+      const initialStates: Record<string, 'pending' | 'processing' | 'succeeded' | 'failed'> = {};
+      for (const line of result.lines || []) {
+        if (line.existing_refund?.status === 'succeeded') {
+          initialStates[line.payment_transaction_id] = 'succeeded';
+        } else if (line.existing_refund?.status === 'processing' || line.existing_refund?.status === 'pending') {
+          initialStates[line.payment_transaction_id] = 'processing';
+        } else if (line.existing_refund?.status === 'failed') {
+          initialStates[line.payment_transaction_id] = 'failed';
+        } else {
+          initialStates[line.payment_transaction_id] = 'pending';
+        }
+      }
+      setLineStates(initialStates);
+    } catch (e: any) {
+      setError(e.message || 'Error al cargar líneas reembolsables');
+    } finally {
+      setLoadingLines(false);
+    }
+  };
+
+  const handleRefundLine = async (txId: string) => {
+    const line = refundLines.find(l => l.payment_transaction_id === txId);
+    if (!line) return;
+
+    setLineStates(prev => ({ ...prev, [txId]: 'processing' }));
+    setLineErrors(prev => { const n = { ...prev }; delete n[txId]; return n; });
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No hay sesión activa');
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-payment-refund`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          payment_transaction_id: txId,
+          booking_id: booking.id,
+          cancellation_id: cancellationId,
+          amount: line.amount,
+          currency: line.currency || 'mxn',
+          requested_by: 'admin_override',
+          created_by_user_id: session.user.id,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Error al procesar reembolso');
+      }
+
+      setLineStates(prev => ({ ...prev, [txId]: result.status === 'succeeded' ? 'succeeded' : 'processing' }));
+    } catch (e: any) {
+      setLineStates(prev => ({ ...prev, [txId]: 'failed' }));
+      setLineErrors(prev => ({ ...prev, [txId]: e.message || 'Error' }));
+    }
+  };
+
+  const handleRefundAll = async () => {
+    setRefundAllProcessing(true);
+    const pendingLines = refundLines.filter(l =>
+      lineStates[l.payment_transaction_id] === 'pending' && l.refundable_to_original
+    );
+    for (const line of pendingLines) {
+      await handleRefundLine(line.payment_transaction_id);
+    }
+    setRefundAllProcessing(false);
+  };
+
   const handleSubmit = async () => {
     setError(null);
 
@@ -1402,16 +1501,12 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
       setError('El motivo para la agencia debe tener al menos 10 caracteres');
       return;
     }
-    if (withRefund && refundAmount <= 0) {
+    if (withRefund && refundMethod !== 'original_payment_method' && refundAmount <= 0) {
       setError('El monto del reembolso debe ser mayor a 0');
       return;
     }
     if (withRefund && refundMethod === 'bank_transfer' && !receiptFile) {
       setError('Debes subir el comprobante de transferencia');
-      return;
-    }
-    if (withRefund && refundMethod === 'original_payment_method' && booking.payment_method === 'Transferencia Bancaria') {
-      setError('Los pagos por transferencia no pueden ser reembolsados a método original. Usa ToursRed Cash o Transferencia manual.');
       return;
     }
 
@@ -1450,7 +1545,7 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
           reason_for_traveler: reasonForTraveler.trim(),
           reason_for_agency: reasonForAgency.trim(),
           refund_method: withRefund ? refundMethod : 'none',
-          refund_amount: withRefund ? Number(refundAmount) : 0,
+          refund_amount: withRefund && refundMethod !== 'original_payment_method' ? Number(refundAmount) : 0,
           receipt_base64: receiptBase64,
           receipt_filename: receiptFilename,
           requested_by: 'admin_override',
@@ -1463,7 +1558,13 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
         throw new Error(result.error || 'Error al cancelar la reserva');
       }
 
-      onSuccess();
+      if (withRefund && refundMethod === 'original_payment_method') {
+        setBookingCancelled(true);
+        setCancellationId(result.cancellation_id || null);
+        await loadRefundLines();
+      } else {
+        onSuccess();
+      }
     } catch (e: any) {
       setError(e.message || 'Error al procesar la cancelación');
       setConfirmStep(false);
@@ -1660,22 +1761,17 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
                   </div>
                 </div>
 
-                {refundMethod === 'original_payment_method' && (
+                {refundMethod === 'original_payment_method' && !bookingCancelled && (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1.5">
                     <div className="flex items-start gap-2">
                       <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
                       <p className="text-xs text-amber-800 font-semibold">
-                        Reembolso a método de pago original ({booking.payment_method || 'desconocido'})
+                        Reembolso a método de pago original (multi-pago)
                       </p>
                     </div>
                     <p className="text-xs text-amber-700 pl-6">
-                      Stripe y PayPal retienen la comisión de procesamiento original. El monto reembolsado al viajero será {formatCurrencyMXN(refundAmount)}, pero ToursRed absorbirá la comisión no recuperable.
+                      Al confirmar la cancelación, se mostrará la lista de pagos procesados (anticipo, parcialidades, suplementos, opcionales, seguro). Cada línea se reembolsa individualmente con su propio botón, o usa "Reembolsar todo".
                     </p>
-                    {(booking.payment_method === 'OXXO' || booking.payment_method === 'Transferencia Bancaria') && (
-                      <p className="text-xs text-red-700 pl-6 font-semibold">
-                        Este método de pago no es reembolsable a método original. Selecciona ToursRed Cash o Transferencia.
-                      </p>
-                    )}
                   </div>
                 )}
 
@@ -1723,15 +1819,17 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
           )}
 
           {/* Confirmation step */}
-          {confirmStep && (
+          {confirmStep && !bookingCancelled && (
             <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
               <div className="flex items-start gap-2 mb-2">
                 <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-semibold text-red-800">Confirmar cancelación</p>
                   <p className="text-xs text-red-600 mt-1">
-                    {withRefund
-                      ? `Se reembolsarán ${formatCurrencyMXN(refundAmount)} vía ${refundMethod === 'toursred_cash' ? 'ToursRed Cash' : refundMethod === 'bank_transfer' ? 'transferencia bancaria' : 'método de pago original'} al viajero.`
+                    {withRefund && refundMethod !== 'original_payment_method'
+                      ? `Se reembolsarán ${formatCurrencyMXN(refundAmount)} vía ${refundMethod === 'toursred_cash' ? 'ToursRed Cash' : 'transferencia bancaria'} al viajero.`
+                      : withRefund && refundMethod === 'original_payment_method'
+                      ? 'Se cancelará la reserva. Después podrás reembolsar cada pago individualmente.'
                       : 'No se procesará reembolso al viajero.'}
                     {booking.points_earned > 0 && ` Se descontarán ${booking.points_earned} puntos.`}
                     {' '}Se enviarán correos al viajero, agencia y a contacto@toursred.com.
@@ -1742,38 +1840,159 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
-          <button
-            onClick={() => confirmStep ? setConfirmStep(false) : onClose()}
-            disabled={submitting}
-            className="px-5 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
-          >
-            {confirmStep ? 'Volver' : 'Cancelar'}
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="inline-flex items-center gap-2 px-5 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50"
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Procesando...
-              </>
-            ) : confirmStep ? (
-              <>
-                <Ban className="h-4 w-4" />
-                Confirmar Cancelación
-              </>
-            ) : (
-              <>
-                <Ban className="h-4 w-4" />
-                Continuar
-              </>
-            )}
-          </button>
-        </div>
+        {/* Refund lines panel (phase 2) */}
+        {bookingCancelled && (
+          <div className="border-t border-gray-100 px-6 py-5 bg-gray-50 rounded-b-2xl">
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-800">Líneas reembolsables</h3>
+                  <p className="text-xs text-gray-500">Reserva cancelada. ID de cancelación: {cancellationId ? cancellationId.slice(0, 8) + '...' : 'N/A'}</p>
+                </div>
+                <button
+                  onClick={handleRefundAll}
+                  disabled={refundAllProcessing || loadingLines || !refundLines.some(l => lineStates[l.payment_transaction_id] === 'pending' && l.refundable_to_original)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {refundAllProcessing ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Reembolsando...</>
+                  ) : (
+                    <><RefreshCw className="h-4 w-4" /> Reembolsar todo</>
+                  )}
+                </button>
+              </div>
+
+              {loadingLines ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                  <span className="ml-2 text-sm text-gray-500">Cargando pagos...</span>
+                </div>
+              ) : refundLines.length === 0 ? (
+                <div className="text-center py-8 text-sm text-gray-500">
+                  No se encontraron pagos reembolsables para esta reserva.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {refundLines.map((line) => {
+                    const state = lineStates[line.payment_transaction_id] || 'pending';
+                    const err = lineErrors[line.payment_transaction_id];
+                    return (
+                      <div
+                        key={line.payment_transaction_id}
+                        className={`flex items-center justify-between gap-3 rounded-lg border p-3 transition ${
+                          state === 'succeeded' ? 'border-emerald-200 bg-emerald-50' :
+                          state === 'failed' ? 'border-red-200 bg-red-50' :
+                          state === 'processing' ? 'border-amber-200 bg-amber-50' :
+                          'border-gray-200 bg-white'
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold text-gray-800 truncate">{line.description}</p>
+                            {!line.refundable_to_original && (
+                              <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">No reembolsable</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 mt-0.5">
+                            <span className="text-sm text-gray-700 font-medium">{formatCurrencyMXN(line.amount)}</span>
+                            <span className="text-xs text-gray-400">{line.payment_processor || 'N/A'}</span>
+                            {line.points_earned > 0 && (
+                              <span className="text-xs text-amber-600">- {line.points_earned} pts</span>
+                            )}
+                          </div>
+                          {state === 'processing' && (
+                            <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                              <Loader2 className="h-3 w-3 animate-spin" /> Procesando reembolso...
+                            </p>
+                          )}
+                          {state === 'succeeded' && (
+                            <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                              <CheckCircle className="h-3 w-3" /> Reembolso procesado
+                            </p>
+                          )}
+                          {state === 'failed' && (
+                            <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" /> {err || 'Error al reembolsar'}
+                            </p>
+                          )}
+                        </div>
+
+                        {state === 'pending' && line.refundable_to_original && (
+                          <button
+                            onClick={() => handleRefundLine(line.payment_transaction_id)}
+                            disabled={refundAllProcessing}
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition disabled:opacity-50"
+                          >
+                            Reembolsar
+                          </button>
+                        )}
+                        {state === 'processing' && (
+                          <Loader2 className="h-4 w-4 animate-spin text-amber-500" />
+                        )}
+                        {state === 'succeeded' && (
+                          <CheckCircle className="h-5 w-5 text-emerald-500" />
+                        )}
+                        {state === 'failed' && line.refundable_to_original && (
+                          <button
+                            onClick={() => handleRefundLine(line.payment_transaction_id)}
+                            disabled={refundAllProcessing}
+                            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition disabled:opacity-50"
+                          >
+                            Reintentar
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="mt-4 pt-3 border-t border-gray-200">
+                <button
+                  onClick={onSuccess}
+                  className="w-full px-4 py-2.5 bg-gray-800 hover:bg-gray-900 text-white text-sm font-medium rounded-lg transition"
+                >
+                  Finalizar y cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Footer (hidden when in phase 2 — lines panel has its own close button) */}
+        {!bookingCancelled && (
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+            <button
+              onClick={() => confirmStep ? setConfirmStep(false) : onClose()}
+              disabled={submitting}
+              className="px-5 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
+            >
+              {confirmStep ? 'Volver' : 'Cancelar'}
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="inline-flex items-center gap-2 px-5 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Procesando...
+                </>
+              ) : confirmStep ? (
+                <>
+                  <Ban className="h-4 w-4" />
+                  Confirmar Cancelación
+                </>
+              ) : (
+                <>
+                  <Ban className="h-4 w-4" />
+                  Continuar
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
