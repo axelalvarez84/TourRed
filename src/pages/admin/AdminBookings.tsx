@@ -1373,7 +1373,7 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
   const [reasonForAgency, setReasonForAgency] = useState('');
   const [withRefund, setWithRefund] = useState(true);
   const [refundAmount, setRefundAmount] = useState(0);
-  const [refundMethod, setRefundMethod] = useState<'toursred_cash' | 'bank_transfer'>('toursred_cash');
+  const [refundMethod, setRefundMethod] = useState<'toursred_cash' | 'bank_transfer' | 'original_payment_method'>('toursred_cash');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1408,6 +1408,10 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
     }
     if (withRefund && refundMethod === 'bank_transfer' && !receiptFile) {
       setError('Debes subir el comprobante de transferencia');
+      return;
+    }
+    if (withRefund && refundMethod === 'original_payment_method' && booking.payment_method === 'Transferencia Bancaria') {
+      setError('Los pagos por transferencia no pueden ser reembolsados a método original. Usa ToursRed Cash o Transferencia manual.');
       return;
     }
 
@@ -1449,6 +1453,7 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
           refund_amount: withRefund ? Number(refundAmount) : 0,
           receipt_base64: receiptBase64,
           receipt_filename: receiptFilename,
+          requested_by: 'admin_override',
         }),
       });
 
@@ -1615,8 +1620,8 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-2">Método de reembolso</label>
-                  <div className="flex gap-3">
-                    <label className={`flex-1 cursor-pointer border-2 rounded-lg p-3 text-center text-sm transition ${refundMethod === 'toursred_cash' ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
+                  <div className="grid grid-cols-3 gap-3">
+                    <label className={`cursor-pointer border-2 rounded-lg p-3 text-center text-sm transition ${refundMethod === 'toursred_cash' ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
                       <input
                         type="radio"
                         name="refundMethod"
@@ -1628,7 +1633,7 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
                       <Coins className="h-5 w-5 mx-auto mb-1" />
                       ToursRed Cash
                     </label>
-                    <label className={`flex-1 cursor-pointer border-2 rounded-lg p-3 text-center text-sm transition ${refundMethod === 'bank_transfer' ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
+                    <label className={`cursor-pointer border-2 rounded-lg p-3 text-center text-sm transition ${refundMethod === 'bank_transfer' ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
                       <input
                         type="radio"
                         name="refundMethod"
@@ -1640,8 +1645,39 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
                       <CreditCard className="h-5 w-5 mx-auto mb-1" />
                       Transferencia
                     </label>
+                    <label className={`cursor-pointer border-2 rounded-lg p-3 text-center text-sm transition ${refundMethod === 'original_payment_method' ? 'border-emerald-500 bg-emerald-50 text-emerald-700 font-semibold' : 'border-gray-200 hover:border-gray-300 text-gray-600'}`}>
+                      <input
+                        type="radio"
+                        name="refundMethod"
+                        value="original_payment_method"
+                        checked={refundMethod === 'original_payment_method'}
+                        onChange={() => setRefundMethod('original_payment_method')}
+                        className="sr-only"
+                      />
+                      <RefreshCw className="h-5 w-5 mx-auto mb-1" />
+                      Método original
+                    </label>
                   </div>
                 </div>
+
+                {refundMethod === 'original_payment_method' && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1.5">
+                    <div className="flex items-start gap-2">
+                      <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-amber-800 font-semibold">
+                        Reembolso a método de pago original ({booking.payment_method || 'desconocido'})
+                      </p>
+                    </div>
+                    <p className="text-xs text-amber-700 pl-6">
+                      Stripe y PayPal retienen la comisión de procesamiento original. El monto reembolsado al viajero será {formatCurrencyMXN(refundAmount)}, pero ToursRed absorbirá la comisión no recuperable.
+                    </p>
+                    {(booking.payment_method === 'OXXO' || booking.payment_method === 'Transferencia Bancaria') && (
+                      <p className="text-xs text-red-700 pl-6 font-semibold">
+                        Este método de pago no es reembolsable a método original. Selecciona ToursRed Cash o Transferencia.
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {refundMethod === 'bank_transfer' && (
                   <div>
@@ -1695,7 +1731,7 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
                   <p className="text-sm font-semibold text-red-800">Confirmar cancelación</p>
                   <p className="text-xs text-red-600 mt-1">
                     {withRefund
-                      ? `Se reembolsarán ${formatCurrencyMXN(refundAmount)} vía ${refundMethod === 'toursred_cash' ? 'ToursRed Cash' : 'transferencia bancaria'} al viajero.`
+                      ? `Se reembolsarán ${formatCurrencyMXN(refundAmount)} vía ${refundMethod === 'toursred_cash' ? 'ToursRed Cash' : refundMethod === 'bank_transfer' ? 'transferencia bancaria' : 'método de pago original'} al viajero.`
                       : 'No se procesará reembolso al viajero.'}
                     {booking.points_earned > 0 && ` Se descontarán ${booking.points_earned} puntos.`}
                     {' '}Se enviarán correos al viajero, agencia y a contacto@toursred.com.

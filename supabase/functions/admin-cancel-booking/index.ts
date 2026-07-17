@@ -70,6 +70,7 @@ Deno.serve(async (req: Request) => {
       refund_amount = 0,
       receipt_base64,
       receipt_filename,
+      requested_by = "admin_override",
     } = body;
 
     if (!booking_id) return err("booking_id es requerido");
@@ -77,10 +78,12 @@ Deno.serve(async (req: Request) => {
       return err("El motivo para el viajero debe tener al menos 10 caracteres");
     if (!reason_for_agency || reason_for_agency.trim().length < 10)
       return err("El motivo para la agencia debe tener al menos 10 caracteres");
-    if (!["none", "toursred_cash", "bank_transfer"].includes(refund_method))
+    if (!["none", "toursred_cash", "bank_transfer", "original_payment_method"].includes(refund_method))
       return err("Método de reembolso inválido");
     if (refund_method === "bank_transfer" && (!receipt_base64 || !receipt_filename))
       return err("El comprobante de transferencia es obligatorio");
+    if (!["traveler_default", "traveler_profeco_request", "admin_override"].includes(requested_by))
+      return err("requested_by inválido");
 
     // Load booking with related data
     const { data: booking, error: bookingError } = await supabase
@@ -353,6 +356,56 @@ Deno.serve(async (req: Request) => {
       .select()
       .single();
 
+    // ============================================================
+    // Process refund via original payment method (multi-processor)
+    // ============================================================
+    let paymentRefundId: string | null = null;
+    let refundProcessingStatus: string | null = null;
+
+    if (refund_method === "original_payment_method" && Number(refund_amount) > 0) {
+      try {
+        const refundResponse = await fetch(`${supabaseUrl}/functions/v1/process-payment-refund`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({
+            booking_id,
+            cancellation_id: cancellationRecord?.id || adminCancellation.id,
+            amount: Number(refund_amount),
+            currency: "mxn",
+            requested_by,
+            created_by_user_id: user.id,
+          }),
+        });
+
+        const refundResult = await refundResponse.json();
+
+        if (refundResult.success) {
+          paymentRefundId = refundResult.payment_refund_id || null;
+          refundProcessingStatus = refundResult.status || "processing";
+          console.log(`Refund initiated: ${paymentRefundId}, status: ${refundProcessingStatus}`);
+        } else {
+          // Synchronous failure — refund failed immediately
+          // The booking is already cancelled; ops will be notified by process-payment-refund
+          console.error("Refund failed synchronously:", refundResult.error);
+          refundProcessingStatus = "failed";
+        }
+      } catch (refundErr: any) {
+        console.error("Error calling process-payment-refund:", refundErr);
+        refundProcessingStatus = "failed";
+      }
+
+      // Link payment_refund_id to admin_booking_cancellations
+      if (paymentRefundId) {
+        await supabase
+          .from("admin_booking_cancellations")
+          .update({ payment_refund_id: paymentRefundId })
+          .eq("id", adminCancellation.id);
+      }
+    }
+
     // Update booking status
     const { error: updateErr } = await supabase
       .from("bookings")
@@ -485,6 +538,8 @@ Deno.serve(async (req: Request) => {
       suggested_refund: suggestedRefund,
       tour_refund_bucket: tourRefundBucket,
       optionals_refund_bucket: optionalsRefundBucket,
+      payment_refund_id: paymentRefundId,
+      refund_processing_status: refundProcessingStatus,
     });
   } catch (e: any) {
     console.error("admin-cancel-booking error:", e);
