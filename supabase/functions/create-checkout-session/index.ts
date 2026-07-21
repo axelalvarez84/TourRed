@@ -100,6 +100,8 @@ Deno.serve(async (req) => {
         travelers_count,
         travel_insurance_included,
         travel_insurance_cost,
+        deposit_amount,
+        service_charge,
         tours (
           id,
           max_travelers,
@@ -281,98 +283,63 @@ Deno.serve(async (req) => {
         },
       };
 
-      // Include the deposit as a second line_item so it's charged in the same session
-      sessionConfig.line_items.push({
-        price_data: {
-          currency: currency,
-          product_data: {
-            name: description || "Reserva de Tour",
-          },
-          unit_amount: Math.round(amount * 100),
-        },
-        quantity: 1,
-      });
-    } else {
-      // Query booking_optional_services for this booking to build separate line items
-      const { data: optionalServices, error: optError } = await supabase
+      // Build desglose line items (deposit, optionals, insurance, service charge)
+      // using the same pure-lines + progressive-discount algorithm as the payment branch.
+      // In this branch, `amount` already has membershipCost subtracted (TravelersInfoPage).
+      const { data: optDataSub, error: optErrorSub } = await supabase
         .from("booking_optional_services")
-        .select("id, service_kind, description, subtotal, total_paid, is_cancelled, paid_at")
+        .select("id, service_kind, description, subtotal, service_charge, total_paid, is_cancelled, paid_at")
         .eq("booking_id", bookingId)
         .eq("is_cancelled", false)
         .is("paid_at", null);
 
-      const unpaidOptionals = (optionalServices || []).filter(
-        (opt: any) => opt.paid_at === null && (opt.total_paid || opt.subtotal) > 0
+      if (optErrorSub) {
+        console.warn("Error fetching optional services:", optErrorSub.message);
+      }
+
+      const unpaidOptionalsSub = (optDataSub || []).filter(
+        (opt: any) => opt.paid_at === null && Number(opt.subtotal) > 0
       );
 
-      // Split amount between tour and optionals
-      // The total amount includes tour + optionals + insurance + membership
-      // Optionals are paid at their total_paid value; the rest is the tour portion
-      const optionalsTotal = unpaidOptionals.reduce((sum: number, opt: any) => sum + (opt.total_paid || opt.subtotal), 0);
-      let tourPortion = Math.max(0, Math.round((amount - optionalsTotal) * 100) / 100);
+      const desgloseItemsSub = buildDesgloseLineItems(
+        booking,
+        unpaidOptionalsSub,
+        amount,
+        pointsUsed,
+        toursRedCashUsed,
+        currency,
+        description
+      );
 
-      const lineItems: any[] = [];
+      for (const item of desgloseItemsSub) {
+        sessionConfig.line_items.push(item);
+      }
+    } else {
+      // Query booking_optional_services for this booking to build separate line items
+      const { data: optionalServices, error: optError } = await supabase
+        .from("booking_optional_services")
+        .select("id, service_kind, description, subtotal, service_charge, total_paid, is_cancelled, paid_at")
+        .eq("booking_id", bookingId)
+        .eq("is_cancelled", false)
+        .is("paid_at", null);
 
-      if (booking.travel_insurance_included && Number(booking.travel_insurance_cost) > 0) {
-        const insuranceCost = Number(booking.travel_insurance_cost);
-        tourPortion = Math.max(0, Math.round((tourPortion - insuranceCost) * 100) / 100);
-        lineItems.push({
-          price_data: {
-            currency: currency,
-            product_data: { name: "Seguro de Viaje" },
-            unit_amount: Math.round(insuranceCost * 100),
-          },
-          quantity: 1,
-          metadata: { type: 'insurance' },
-        });
+      if (optError) {
+        console.warn("Error fetching optional services:", optError.message);
       }
 
-      if (tourPortion > 0) {
-        lineItems.push({
-          price_data: {
-            currency: currency,
-            product_data: {
-              name: description || "Reserva de Tour",
-            },
-            unit_amount: Math.round(tourPortion * 100),
-          },
-          quantity: 1,
-        });
-      }
+      const unpaidOptionals = (optionalServices || []).filter(
+        (opt: any) => opt.paid_at === null && Number(opt.subtotal) > 0
+      );
 
-      for (const opt of unpaidOptionals) {
-        const optAmount = opt.total_paid || opt.subtotal;
-        if (optAmount <= 0) continue;
-        const optLabel = opt.description || (opt.service_kind === 'pickup' ? 'Pick Up' : opt.service_kind === 'language' ? 'Idioma/Intérprete' : 'Servicio opcional');
-        lineItems.push({
-          price_data: {
-            currency: currency,
-            product_data: {
-              name: optLabel,
-            },
-            unit_amount: Math.round(optAmount * 100),
-          },
-          quantity: 1,
-          metadata: {
-            type: opt.service_kind || 'optional_service',
-            bos_id: opt.id,
-          },
-        });
-      }
-
-      // Fallback: if no line items were created (edge case), use single item
-      if (lineItems.length === 0) {
-        lineItems.push({
-          price_data: {
-            currency: currency,
-            product_data: {
-              name: description || "Reserva de Tour",
-            },
-            unit_amount: Math.round(amount * 100),
-          },
-          quantity: 1,
-        });
-      }
+      const lineItems = buildDesgloseLineItems(
+        booking,
+        unpaidOptionals,
+        amount,
+        pointsUsed,
+        toursRedCashUsed,
+        currency,
+        description
+      );
 
       sessionConfig.mode = "payment";
       sessionConfig.payment_method_types = ['card', 'oxxo', 'customer_balance'];
@@ -422,3 +389,151 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+// Build Stripe line items with pure amounts and a progressive discount.
+// Order of discount application: deposit → optionals → insurance → service charge.
+// The service charge line is protected last so it only absorbs leftover discount.
+function buildDesgloseLineItems(
+  booking: any,
+  unpaidOptionals: any[],
+  amount: number,
+  pointsUsed: number,
+  toursRedCashUsed: number,
+  currency: string,
+  description: string
+): any[] {
+  const totalDiscount = (Number(pointsUsed) || 0) / 100 + (Number(toursRedCashUsed) || 0);
+
+  // --- Raw gross amounts (verified stored as pre-discount) ---
+  const depositRaw = Number(booking.deposit_amount) || 0;
+  const serviceChargeTourRaw = Number(booking.service_charge) || 0;
+  const insuranceRaw =
+    booking.travel_insurance_included && Number(booking.travel_insurance_cost) > 0
+      ? Number(booking.travel_insurance_cost)
+      : 0;
+
+  // Optionals: subtotal is pure agency amount, service_charge is ToursRed's 5%
+  const optionalLines = unpaidOptionals.map((opt: any) => ({
+    id: opt.id,
+    description: opt.description || (opt.service_kind === 'pickup' ? 'Pick Up' : opt.service_kind === 'language' ? 'Idioma/Intérprete' : 'Servicio opcional'),
+    service_kind: opt.service_kind || 'optional_service',
+    subtotal: Number(opt.subtotal) || 0,
+    service_charge: Number(opt.service_charge) || 0,
+  }));
+
+  const optionalsSubtotalTotal = optionalLines.reduce((s: number, o: any) => s + o.subtotal, 0);
+  const optionalsServiceChargeTotal = optionalLines.reduce((s: number, o: any) => s + o.service_charge, 0);
+
+  // Combined service charge line: tour's service charge + all optionals' service charges
+  const serviceChargeCombinedRaw = serviceChargeTourRaw + optionalsServiceChargeTotal;
+
+  // --- Apply progressive discount in order: deposit → optionals → insurance → service charge ---
+  let remainingDiscount = totalDiscount;
+
+  const depositFinal = Math.max(0, Math.round((depositRaw - remainingDiscount) * 100) / 100);
+  remainingDiscount = Math.max(0, Math.round((remainingDiscount - depositRaw) * 100) / 100);
+
+  // Optionals: apply discount across all subtotals proportionally is over-complex;
+  // apply sequentially per optional for transparency
+  let optionalsAfterDiscount = optionalLines.map((o: any) => {
+    if (remainingDiscount <= 0) return { ...o, final: o.subtotal };
+    const applied = Math.min(o.subtotal, remainingDiscount);
+    remainingDiscount = Math.max(0, Math.round((remainingDiscount - applied) * 100) / 100);
+    return { ...o, final: Math.max(0, Math.round((o.subtotal - applied) * 100) / 100) };
+  });
+
+  const insuranceFinal = Math.max(0, Math.round((insuranceRaw - remainingDiscount) * 100) / 100);
+  remainingDiscount = Math.max(0, Math.round((remainingDiscount - insuranceRaw) * 100) / 100);
+
+  const serviceChargeFinal = Math.max(0, Math.round((serviceChargeCombinedRaw - remainingDiscount) * 100) / 100);
+
+  // --- Build line items ---
+  const lineItems: any[] = [];
+
+  // 1. Depósito (tour portion) — pure, no service charge mixed in
+  if (depositFinal > 0) {
+    lineItems.push({
+      price_data: {
+        currency,
+        product_data: { name: description || "Reserva de Tour" },
+        unit_amount: Math.round(depositFinal * 100),
+      },
+      quantity: 1,
+      metadata: { type: 'deposit' },
+    });
+  }
+
+  // 2. Opcionales — pure subtotal per item, no service charge mixed in
+  for (const opt of optionalsAfterDiscount) {
+    if (opt.final > 0) {
+      lineItems.push({
+        price_data: {
+          currency,
+          product_data: { name: opt.description },
+          unit_amount: Math.round(opt.final * 100),
+        },
+        quantity: 1,
+        metadata: {
+          type: opt.service_kind,
+          bos_id: opt.id,
+        },
+      });
+    }
+  }
+
+  // 3. Seguro de Viaje — pure insurance amount
+  if (insuranceFinal > 0) {
+    lineItems.push({
+      price_data: {
+        currency,
+        product_data: { name: "Seguro de Viaje" },
+        unit_amount: Math.round(insuranceFinal * 100),
+      },
+      quantity: 1,
+      metadata: { type: 'insurance' },
+    });
+  }
+
+  // 4. Cargo por Servicio (combined: tour + optionals service charges)
+  if (serviceChargeFinal > 0) {
+    lineItems.push({
+      price_data: {
+        currency,
+        product_data: { name: "Cargo por Servicio" },
+        unit_amount: Math.round(serviceChargeFinal * 100),
+      },
+      quantity: 1,
+      metadata: { type: 'service_charge' },
+    });
+  }
+
+  // Fallback: if all lines were discounted to 0, create a single zero-amount line
+  // to avoid Stripe rejecting an empty line_items array.
+  if (lineItems.length === 0) {
+    lineItems.push({
+      price_data: {
+        currency,
+        product_data: { name: description || "Reserva de Tour" },
+        unit_amount: 0,
+      },
+      quantity: 1,
+    });
+  }
+
+  // Safety: verify sum matches `amount`; if drift, adjust the deposit line to compensate
+  const linesSum = lineItems.reduce((s: number, li: any) => s + (li.price_data.unit_amount / 100), 0);
+  const drift = Math.round((amount - linesSum) * 100) / 100;
+  if (Math.abs(drift) >= 0.01) {
+    // Adjust the deposit line (first line) to absorb rounding drift
+    const depositLi = lineItems.find((li: any) => li.metadata?.type === 'deposit');
+    if (depositLi) {
+      depositLi.price_data.unit_amount = Math.round((Number(depositLi.price_data.unit_amount) / 100 + drift) * 100);
+    } else {
+      // No deposit line (fully discounted) — adjust the service charge line or first line
+      const adjustLi = lineItems.find((li: any) => li.metadata?.type === 'service_charge') || lineItems[0];
+      adjustLi.price_data.unit_amount = Math.max(0, Math.round((Number(adjustLi.price_data.unit_amount) / 100 + drift) * 100));
+    }
+  }
+
+  return lineItems;
+}
