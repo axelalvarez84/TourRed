@@ -2556,7 +2556,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                       Vas a acumular ToursRed Points
                     </h4>
                     <p className="text-xs text-gray-700">
-                      Ganarás <span className="font-bold text-green-700">{Math.floor(userPayment).toLocaleString()} puntos</span> con esta reserva
+                      Ganarás <span className="font-bold text-green-700">{Math.floor(userPayment + extrasTotalWithServiceCharge + effectiveInsuranceCost + membershipCost).toLocaleString()} puntos</span> con esta reserva
                     </p>
                   </div>
                 </div>
