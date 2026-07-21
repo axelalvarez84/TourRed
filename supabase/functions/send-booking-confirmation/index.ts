@@ -179,6 +179,8 @@ Deno.serve(async (req: Request) => {
       .from("booking_optional_services")
       .select(`
         total_paid,
+        service_charge,
+        agency_commission,
         tour_optional_services!inner(name)
       `)
       .eq("booking_id", booking_id)
@@ -188,8 +190,12 @@ Deno.serve(async (req: Request) => {
     const paidOptionals = (paidOptionalsData || []).map((row: any) => ({
       name: row.tour_optional_services?.name || "Servicio opcional",
       total_paid: Number(row.total_paid) || 0,
+      service_charge: Number(row.service_charge) || 0,
+      agency_commission: Number(row.agency_commission) || 0,
     }));
     const optionalsTotal = paidOptionals.reduce((sum, o) => sum + o.total_paid, 0);
+    const optionalsCommissionTotal = paidOptionals.reduce((sum, o) => sum + o.agency_commission, 0);
+    const optionalsServiceChargeTotal = paidOptionals.reduce((sum, o) => sum + o.service_charge, 0);
 
     // Monto real cobrado al viajero hoy: depósito + seguro + membresía + opcionales (calculado, no el campo stale de BD)
     const adminTotalCobrado = depositAmount + travelInsuranceCost + membershipCost + optionalsTotal;
@@ -1006,10 +1012,10 @@ Deno.serve(async (req: Request) => {
         <div class="highlight">
           <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold;">
             <span>Ingresos netos de la plataforma:</span>
-            <span style="color: #059669;">${formatCurrency(agencyCommission + serviceCharge + membershipCost)}</span>
+            <span style="color: #059669;">${formatCurrency(agencyCommission + serviceCharge + membershipCost + optionalsCommissionTotal + optionalsServiceChargeTotal)}</span>
           </div>
           <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">
-            Comisión ${formatCurrency(agencyCommission)} + Cargo ${formatCurrency(serviceCharge)}${membershipCost > 0 ? ` + Membresía ${formatCurrency(membershipCost)}` : ''}
+            Comisión ${formatCurrency(agencyCommission)} + Cargo ${formatCurrency(serviceCharge)}${membershipCost > 0 ? ` + Membresía ${formatCurrency(membershipCost)}` : ''}${optionalsTotal > 0 ? ` + Opcionales (comisión ${formatCurrency(optionalsCommissionTotal)} + cargo ${formatCurrency(optionalsServiceChargeTotal)})` : ''}
           </div>
         </div>
         <div class="info-row">
