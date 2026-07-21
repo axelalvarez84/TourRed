@@ -1,4 +1,12 @@
-import type { Config, Context } from "@netlify/edge-functions";
+import type { Context, Netlify } from "@netlify/edge-functions";
+
+const EDGE_FUNCTION_HEADER = { "X-Edge-Function": "tour-slug-redirect" };
+
+async function nextWithHeader(context: Context): Promise<Response> {
+  const response = await context.next();
+  response.headers.set("X-Edge-Function", "tour-slug-redirect");
+  return response;
+}
 
 export default async (request: Request, context: Context): Promise<Response | void> => {
   const url = new URL(request.url);
@@ -6,7 +14,7 @@ export default async (request: Request, context: Context): Promise<Response | vo
   // Only handle /tours/{slug} paths
   const match = url.pathname.match(/^\/tours\/([^/]+)$/);
   if (!match) {
-    return context.next();
+    return nextWithHeader(context);
   }
 
   const slug = decodeURIComponent(match[1]);
@@ -14,14 +22,15 @@ export default async (request: Request, context: Context): Promise<Response | vo
   // Skip UUIDs — handled by _redirects
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
   if (isUuid) {
-    return context.next();
+    return nextWithHeader(context);
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const supabaseUrl = Netlify.env.get("SUPABASE_URL");
+  const supabaseAnonKey = Netlify.env.get("SUPABASE_ANON_KEY");
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    return context.next();
+    console.error("tour-slug-redirect: SUPABASE_URL or SUPABASE_ANON_KEY not set in Netlify env (Functions scope)");
+    return nextWithHeader(context);
   }
 
   try {
@@ -35,7 +44,7 @@ export default async (request: Request, context: Context): Promise<Response | vo
     });
 
     if (!response.ok) {
-      return context.next();
+      return nextWithHeader(context);
     }
 
     const data = await response.json();
@@ -49,6 +58,7 @@ export default async (request: Request, context: Context): Promise<Response | vo
           headers: {
             "Location": redirectUrl,
             "Cache-Control": "public, max-age=86400",
+            ...EDGE_FUNCTION_HEADER,
           },
         });
       }
@@ -57,9 +67,5 @@ export default async (request: Request, context: Context): Promise<Response | vo
     console.error("tour-slug-redirect error:", err);
   }
 
-  return context.next();
-};
-
-export const config: Config = {
-  path: "/tours/*",
+  return nextWithHeader(context);
 };
