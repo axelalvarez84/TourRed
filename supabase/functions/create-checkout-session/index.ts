@@ -98,6 +98,8 @@ Deno.serve(async (req) => {
         user_id,
         tour_id,
         travelers_count,
+        travel_insurance_included,
+        travel_insurance_cost,
         tours (
           id,
           max_travelers,
@@ -307,9 +309,23 @@ Deno.serve(async (req) => {
       // The total amount includes tour + optionals + insurance + membership
       // Optionals are paid at their total_paid value; the rest is the tour portion
       const optionalsTotal = unpaidOptionals.reduce((sum: number, opt: any) => sum + (opt.total_paid || opt.subtotal), 0);
-      const tourPortion = Math.max(0, Math.round((amount - optionalsTotal) * 100) / 100);
+      let tourPortion = Math.max(0, Math.round((amount - optionalsTotal) * 100) / 100);
 
       const lineItems: any[] = [];
+
+      if (booking.travel_insurance_included && Number(booking.travel_insurance_cost) > 0) {
+        const insuranceCost = Number(booking.travel_insurance_cost);
+        tourPortion = Math.max(0, Math.round((tourPortion - insuranceCost) * 100) / 100);
+        lineItems.push({
+          price_data: {
+            currency: currency,
+            product_data: { name: "Seguro de Viaje" },
+            unit_amount: Math.round(insuranceCost * 100),
+          },
+          quantity: 1,
+          metadata: { type: 'insurance' },
+        });
+      }
 
       if (tourPortion > 0) {
         lineItems.push({
