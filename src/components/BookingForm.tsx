@@ -47,6 +47,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const [error, setError] = useState('');
   const [serviceChargePercentage, setServiceChargePercentage] = useState(5);
   const [agencyCommissionPercentage, setAgencyCommissionPercentage] = useState(0);
+  const [optionalServiceCommissionPercentage, setOptionalServiceCommissionPercentage] = useState(15);
   const [availableSpots, setAvailableSpots] = useState<number | null>(null);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(true);
   const [showTravelerSelector, setShowTravelerSelector] = useState(false);
@@ -176,7 +177,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         // Leer settings de plataforma
         const { data: platformData } = await supabase
           .from('platform_settings')
-          .select('service_charge_percentage, agency_commission_percentage, travel_insurance_price_per_day_per_traveler')
+          .select('service_charge_percentage, agency_commission_percentage, optional_service_commission_percentage, travel_insurance_price_per_day_per_traveler')
           .maybeSingle();
 
         if (platformData) {
@@ -203,6 +204,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
           }
 
           setAgencyCommissionPercentage(effectiveCommission);
+          setOptionalServiceCommissionPercentage(platformData.optional_service_commission_percentage ?? 15);
         }
       } catch (err) {
         console.error('Error loading commission rates:', err);
@@ -1195,7 +1197,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
 
       // Build optional services array with financial breakdown per bucket
       const extrasServiceChargeRate = serviceChargePercentage / 100;
-      const extrasAgencyCommissionRate = agencyCommissionPercentage / 100;
+      const extrasAgencyCommissionRate = optionalServiceCommissionPercentage / 100;
 
       const allExtras: Record<string, any>[] = [];
 

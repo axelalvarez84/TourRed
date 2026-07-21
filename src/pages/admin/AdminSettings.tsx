@@ -53,6 +53,7 @@ interface PlatformSettings {
   travel_insurance_cost_per_day_per_traveler: number;
   travel_insurance_commission_pct: number;
   supplement_commission_percentage: number;
+  optional_service_commission_percentage: number;
   hero_background_url: string | null;
   maintenance_mode: boolean;
   maintenance_message: string;
@@ -126,6 +127,7 @@ const AdminSettings: React.FC = () => {
     travel_insurance_cost_per_day_per_traveler: 59,
     travel_insurance_commission_pct: 20,
     supplement_commission_percentage: 10,
+    optional_service_commission_percentage: 15,
     hero_background_url: null,
     maintenance_mode: false,
     maintenance_message: 'Estamos realizando tareas de mantenimiento. Estaremos de vuelta muy pronto.',
@@ -396,6 +398,7 @@ const AdminSettings: React.FC = () => {
             travel_insurance_cost_per_day_per_traveler: platformSettings.travel_insurance_cost_per_day_per_traveler ?? 59,
             travel_insurance_commission_pct: platformSettings.travel_insurance_commission_pct ?? 20,
             supplement_commission_percentage: platformSettings.supplement_commission_percentage,
+            optional_service_commission_percentage: platformSettings.optional_service_commission_percentage,
             maintenance_mode: platformSettings.maintenance_mode,
             maintenance_message: platformSettings.maintenance_message,
             maintenance_enabled_at: platformSettings.maintenance_mode
@@ -458,7 +461,7 @@ const AdminSettings: React.FC = () => {
 
   const handlePlatformChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    const numericFields = ['service_charge_percentage', 'agency_commission_percentage', 'supplement_commission_percentage', 'membership_monthly_price', 'membership_annual_price', 'default_max_referrals_per_user', 'referral_bonus_points'];
+    const numericFields = ['service_charge_percentage', 'agency_commission_percentage', 'supplement_commission_percentage', 'optional_service_commission_percentage', 'membership_monthly_price', 'membership_annual_price', 'default_max_referrals_per_user', 'referral_bonus_points'];
     const booleanFields = ['referral_program_enabled', 'mercadopago_enabled', 'paypal_enabled', 'oauth_google_login_enabled', 'oauth_azure_login_enabled', 'oauth_twitter_login_enabled', 'oauth_facebook_login_enabled', 'oauth_google_link_enabled', 'oauth_azure_link_enabled', 'oauth_twitter_link_enabled', 'oauth_facebook_link_enabled', 'stripe_bookings_enabled', 'stripe_gift_cards_enabled', 'stripe_memberships_enabled'];
     setPlatformSettings(prev => ({
       ...prev,
@@ -628,6 +631,34 @@ const AdminSettings: React.FC = () => {
             </div>
             <p className="text-xs text-gray-500 mt-1">
               Ejemplo: Suplemento de $500. Comision {platformSettings.supplement_commission_percentage}% = ${(500 * platformSettings.supplement_commission_percentage / 100).toFixed(2)} para la plataforma.
+            </p>
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <label htmlFor="optional_service_commission_percentage" className="block text-sm font-medium text-gray-700 mb-1">
+              Comision de Opcionales (%)
+            </label>
+            <p className="text-xs text-gray-500 mb-2">
+              Porcentaje que la plataforma retiene del precio de servicios opcionales (ej. senderismo, fotografia).
+            </p>
+            <div className="relative max-w-xs">
+              <input
+                type="number"
+                id="optional_service_commission_percentage"
+                name="optional_service_commission_percentage"
+                value={platformSettings.optional_service_commission_percentage}
+                onChange={handlePlatformChange}
+                min="0"
+                max="100"
+                step="0.01"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 pr-10"
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <Percent className="w-4 h-4 text-gray-400" />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Ejemplo: Opcional de $100. Comision {platformSettings.optional_service_commission_percentage}% = ${(100 * platformSettings.optional_service_commission_percentage / 100).toFixed(2)} para la plataforma.
             </p>
           </div>
         </div>

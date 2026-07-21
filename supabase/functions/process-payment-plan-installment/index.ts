@@ -457,20 +457,34 @@ Deno.serve(async (req: Request) => {
       const stripe = new Stripe(stripeKey, { apiVersion: "2026-06-24.dahlia" });
       const origin = req.headers.get("origin") || req.headers.get("referer")?.split("/").slice(0, 3).join("/") || "https://toursred.com";
 
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ["card"],
-        mode: "payment",
-        line_items: [{
+      const lineItems: any[] = [{
+        price_data: {
+          currency: "mxn",
+          product_data: {
+            name: `Abono plan de pago: ${tourName}`,
+            description: `Reserva ${bookingCode}`,
+          },
+          unit_amount: Math.round(effectiveAmount * 100),
+        },
+        quantity: 1,
+      }];
+      if (netServiceCharge > 0) {
+        lineItems.push({
           price_data: {
             currency: "mxn",
             product_data: {
-              name: `Abono plan de pago: ${tourName}`,
-              description: `Reserva ${bookingCode}`,
+              name: "Cargo por Servicio",
             },
-            unit_amount: Math.round(totalToPay * 100),
+            unit_amount: Math.round(netServiceCharge * 100),
           },
           quantity: 1,
-        }],
+        });
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        mode: "payment",
+        line_items: lineItems,
         metadata: {
           plan_id,
           payment_for: "payment_plan_installment",

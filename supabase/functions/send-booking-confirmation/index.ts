@@ -174,8 +174,25 @@ Deno.serve(async (req: Request) => {
     const membershipPurchased = booking.membership_purchased || false;
     const membershipPlan = booking.membership_plan || null;
     const membershipCost = Number(booking.membership_cost) || 0;
-    // Monto real cobrado al viajero hoy: depósito + seguro + membresía (calculado, no el campo stale de BD)
-    const adminTotalCobrado = depositAmount + travelInsuranceCost + membershipCost;
+
+    const { data: paidOptionalsData } = await supabase
+      .from("booking_optional_services")
+      .select(`
+        total_paid,
+        tour_optional_services!inner(name)
+      `)
+      .eq("booking_id", booking_id)
+      .not("paid_at", "is", null)
+      .eq("is_cancelled", false);
+
+    const paidOptionals = (paidOptionalsData || []).map((row: any) => ({
+      name: row.tour_optional_services?.name || "Servicio opcional",
+      total_paid: Number(row.total_paid) || 0,
+    }));
+    const optionalsTotal = paidOptionals.reduce((sum, o) => sum + o.total_paid, 0);
+
+    // Monto real cobrado al viajero hoy: depósito + seguro + membresía + opcionales (calculado, no el campo stale de BD)
+    const adminTotalCobrado = depositAmount + travelInsuranceCost + membershipCost + optionalsTotal;
 
     const formatDate = (dateString: string | null | undefined) => {
       if (!dateString) return 'No disponible';
@@ -195,8 +212,15 @@ Deno.serve(async (req: Request) => {
       : null;
 
     const formatCurrency = (amount: number) => {
-      return `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      return `${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
+
+    const optionalsHtml = paidOptionals.length > 0
+      ? paidOptionals.map(o => `        <div class="info-row">
+          <span class="info-label">🎟️ ${o.name}:</span>
+          <span class="info-value">${formatCurrency(o.total_paid)}</span>
+        </div>`).join('\n')
+      : '';
 
     console.log("Sending booking confirmation emails for booking:", booking_id);
 
@@ -403,8 +427,9 @@ Deno.serve(async (req: Request) => {
           <span class="info-label" style="color:#4338ca;font-weight:600;">⭐ Membresía ToursRed Plus (${membershipPlan === 'monthly' ? 'Mensual' : 'Anual'}):</span>
           <span class="info-value" style="color:#4338ca;font-weight:600;">${formatCurrency(membershipCost)}</span>
         </div>` : ''}
-        <div class="info-row" style="${travelInsuranceCost > 0 || membershipPurchased ? 'background-color: #f0fdf4; padding: 8px 5px; margin: 5px -5px;' : ''}">
-          <span class="info-label" style="font-weight: ${travelInsuranceCost > 0 || membershipPurchased ? '700' : '400'};">Total cobrado hoy${travelInsuranceCost > 0 && membershipPurchased ? ' (anticipo + seguro + membresía)' : travelInsuranceCost > 0 ? ' (anticipo + seguro)' : membershipPurchased ? ' (anticipo + membresía)' : ''}:</span>
+        ${optionalsHtml}
+        <div class="info-row" style="${travelInsuranceCost > 0 || membershipPurchased || optionalsTotal > 0 ? 'background-color: #f0fdf4; padding: 8px 5px; margin: 5px -5px;' : ''}">
+          <span class="info-label" style="font-weight: ${travelInsuranceCost > 0 || membershipPurchased || optionalsTotal > 0 ? '700' : '400'};">Total cobrado hoy${travelInsuranceCost > 0 && membershipPurchased && optionalsTotal > 0 ? ' (anticipo + seguro + membresía + opcionales)' : travelInsuranceCost > 0 && membershipPurchased ? ' (anticipo + seguro + membresía)' : travelInsuranceCost > 0 && optionalsTotal > 0 ? ' (anticipo + seguro + opcionales)' : travelInsuranceCost > 0 ? ' (anticipo + seguro)' : membershipPurchased && optionalsTotal > 0 ? ' (anticipo + membresía + opcionales)' : membershipPurchased ? ' (anticipo + membresía)' : optionalsTotal > 0 ? ' (anticipo + opcionales)' : ''}:</span>
           <span class="info-value" style="${travelInsuranceCost > 0 || membershipPurchased ? 'font-weight: 700;' : ''}">${formatCurrency(userPayment)}</span>
         </div>
         ${serviceChargeDiscount > 0 ? `
@@ -683,8 +708,11 @@ Deno.serve(async (req: Request) => {
           <span class="info-value">${travelInsuranceCost === 0 ? 'GRATIS' : formatCurrency(travelInsuranceCost)}</span>
         </div>
         ${insuranceDiscountAmount > 0 ? `<div class="info-row"><span class="info-label" style="color:#059669;">Descuento en seguro:</span><span class="info-value" style="color:#059669;">-${formatCurrency(insuranceDiscountAmount)}</span></div>` : ''}
+        ` : ''}
+        ${optionalsHtml}
+        ${travelInsuranceCost > 0 || insuranceDiscountAmount > 0 || optionalsTotal > 0 ? `
         <div class="info-row" style="background-color: #f0fdf4; padding: 8px 5px; margin: 5px -5px;">
-          <span class="info-label" style="font-weight: 700;">Total cobrado al viajero hoy (anticipo + seguro):</span>
+          <span class="info-label" style="font-weight: 700;">Total cobrado al viajero hoy (anticipo + seguro${optionalsTotal > 0 ? ' + opcionales' : ''}):</span>
           <span class="info-value" style="font-weight: 700;">${formatCurrency(userPayment)}</span>
         </div>
         ` : ''}
@@ -888,8 +916,11 @@ Deno.serve(async (req: Request) => {
           <span class="info-value">${travelInsuranceCost === 0 ? 'GRATIS' : formatCurrency(travelInsuranceCost)}</span>
         </div>
         ${insuranceDiscountAmount > 0 ? `<div class="info-row"><span class="info-label" style="color:#059669;">Descuento en seguro (plataforma absorbe):</span><span class="info-value" style="color:#059669;">-${formatCurrency(insuranceDiscountAmount)}</span></div>` : ''}
+        ` : ''}
+        ${optionalsHtml}
+        ${travelInsuranceCost > 0 || insuranceDiscountAmount > 0 || optionalsTotal > 0 ? `
         <div class="info-row" style="background-color: #f0fdf4; padding: 8px 5px; margin: 5px -5px;">
-          <span class="info-label" style="font-weight: 700;">Total cobrado al viajero hoy:</span>
+          <span class="info-label" style="font-weight: 700;">Total cobrado al viajero hoy${optionalsTotal > 0 ? ' (anticipo + seguro + opcionales)' : ''}:</span>
           <span class="info-value" style="font-weight: 700;">${formatCurrency(adminTotalCobrado)}</span>
         </div>
         ` : ''}

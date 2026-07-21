@@ -94,7 +94,7 @@ Deno.serve(async (req: Request) => {
     const { data: platformSettings } = await supabase
       .from("platform_settings")
       .select(`
-        service_charge_percentage, agency_commission_percentage,
+        service_charge_percentage, agency_commission_percentage, optional_service_commission_percentage,
         travel_insurance_price_per_day_per_traveler,
         mercadopago_access_token, paypal_client_id, paypal_client_secret, paypal_sandbox,
         pac_provider, pac_api_key_encrypted
@@ -102,7 +102,7 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     const serviceChargePct = platformSettings?.service_charge_percentage ?? 5;
-    const agencyCommissionPct = platformSettings?.agency_commission_percentage ?? 10;
+    const agencyCommissionPct = platformSettings?.optional_service_commission_percentage ?? 15;
 
     // ── OPTIONAL SERVICE ─────────────────────────────────────────────────────
     let bookingOptionalServiceId: string | null = null;
