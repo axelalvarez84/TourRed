@@ -429,6 +429,7 @@ export const getTours = async (filters: any = {}) => {
         .from('tours')
         .select(`
           id,
+          slug,
           name,
           image_url,
           destination,
@@ -502,6 +503,7 @@ export const getTours = async (filters: any = {}) => {
 
     const selectColumns = `
       id,
+      slug,
       name,
       image_url,
       destination,
@@ -600,6 +602,7 @@ export const getPopularTours = async (limit = 20) => {
       .from('tours')
       .select(`
         id,
+        slug,
         name,
         image_url,
         destination,
@@ -660,6 +663,7 @@ export const getActiveFeaturedTours = async () => {
         expires_at,
         tours(
           id,
+          slug,
           name,
           image_url,
           destination,
@@ -710,6 +714,7 @@ export const getNewTours = async (limit = 20) => {
       .from('tours')
       .select(`
         id,
+        slug,
         name,
         image_url,
         destination,
