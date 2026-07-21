@@ -5,7 +5,7 @@ import BookingForm from '../components/BookingForm';
 import AgencyReviews from '../components/AgencyReviews';
 import ShareTourModal from '../components/ShareTourModal';
 import { Tour } from '../types';
-import { getTourById, getTourBySlug, supabase, parseDateFromDB } from '../lib/supabase';
+import { getTourById, getTourBySlug, resolveTourSlug, supabase, parseDateFromDB } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrencyMXN } from '../utils/formatCurrency';
 import { format } from 'date-fns';
@@ -94,6 +94,13 @@ const TourDetailPage: React.FC = () => {
         }
 
         if (!data) {
+          if (!isUuid) {
+            const resolvedSlug = await resolveTourSlug(slug);
+            if (resolvedSlug && resolvedSlug !== slug) {
+              navigate(`/tours/${resolvedSlug}`, { replace: true });
+              return;
+            }
+          }
           throw new Error('Tour no encontrado');
         }
         

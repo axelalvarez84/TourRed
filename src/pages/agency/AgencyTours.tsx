@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAgencyId } from '../../hooks/useAgencyId';
-import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination, getTourCategories, getFeaturedPlans, getAgencyFeaturedSlots, joinFeaturedWaitlist } from '../../lib/supabase';
+import { createTour, searchDestinations, supabase, updateTour, deleteTour, getAllDestinations, createDestination, getTourCategories, getFeaturedPlans, getAgencyFeaturedSlots, joinFeaturedWaitlist, checkSlugAvailable, updateTourSlug } from '../../lib/supabase';
 import { Plus, Search, X, CreditCard, Trash2, Eye, Calendar, MapPin, Users, DollarSign, Save, Minus, Upload, Copy, CalendarX, AlertCircle, XCircle, FileText, Image, CheckSquare, Tag, PawPrint, Clock, Settings, List, Ban, ShoppingBag, Info, Percent, Route, RefreshCw, Layers, Car, Globe, AlertTriangle, Bus, Pencil, Sparkles, Star, TrendingUp, CheckCircle, Loader2, Lock, ChevronDown } from 'lucide-react';
 import { VehicleMapType } from '../../types/seats';
 import TourPromotionsManager from '../../components/TourPromotionsManager';
@@ -123,6 +123,11 @@ const AgencyTours: React.FC = () => {
   });
 
   const [editingTourHasActiveBookings, setEditingTourHasActiveBookings] = useState(false);
+  const [editingSlug, setEditingSlug] = useState('');
+  const [originalSlug, setOriginalSlug] = useState('');
+  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
+  const [slugConfirm, setSlugConfirm] = useState(false);
+  const [slugSaving, setSlugSaving] = useState(false);
 
   const [cancelModal, setCancelModal] = useState<{
     open: boolean;
@@ -997,6 +1002,10 @@ const AgencyTours: React.FC = () => {
     }
 
     setEditingTour(tour);
+    setEditingSlug(tour.slug);
+    setOriginalSlug(tour.slug);
+    setSlugAvailable(true);
+    setSlugConfirm(false);
     setIsCreating(false);
   };
 
@@ -1006,6 +1015,10 @@ const AgencyTours: React.FC = () => {
     resetForm();
     setError('');
     setEditingTourHasActiveBookings(false);
+    setEditingSlug('');
+    setOriginalSlug('');
+    setSlugAvailable(null);
+    setSlugConfirm(false);
   };
 
   const handleOpenFeatured = async (tour: Tour) => {
@@ -2444,6 +2457,32 @@ const AgencyTours: React.FC = () => {
       // Recargar tours después de crear/actualizar
       await fetchAgencyTours();
 
+      // Slug update: if editing and slug changed, call update_tour_slug
+      if (editingTour && editingSlug && editingSlug !== originalSlug) {
+        if (editingTour.is_published && !slugConfirm) {
+          setError('Confirmación requerida para cambiar la URL de un tour publicado');
+          setIsSubmitting(false);
+          return;
+        }
+        setSlugSaving(true);
+        try {
+          const result = await updateTourSlug(editingTour.id, editingSlug, slugConfirm);
+          if (!result.success) {
+            setError(`Error al actualizar la URL: ${result.message}`);
+            setSlugSaving(false);
+            setIsSubmitting(false);
+            return;
+          }
+          await fetchAgencyTours();
+        } catch (slugErr: any) {
+          setError(`Error al actualizar la URL: ${slugErr.message}`);
+          setSlugSaving(false);
+          setIsSubmitting(false);
+          return;
+        }
+        setSlugSaving(false);
+      }
+
       if (createdTour) {
         // Después de crear, pasar a modo edición para configurar promociones grupales
         localStorage.removeItem(DRAFT_KEY);
@@ -2885,6 +2924,90 @@ const AgencyTours: React.FC = () => {
                   />
                   <p className="text-xs text-gray-500 mt-1">{isTicket ? 'Sé descriptivo y atractivo. Incluye el nombre del lugar o evento y el tipo de acceso.' : 'Sé descriptivo y atractivo. Incluye el destino y la duración cuando aplique. Ej: '}<em>{isTicket ? '' : '"Snorkel en Cenotes — Tulum"'}</em>{isTicket ? '' : ', '}<em>{isTicket ? '' : '"Traslado Aeropuerto-Hotel Cancún"'}</em>{isTicket ? '' : '.'}</p>
                 </div>
+
+                {editingTour && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      URL del tour (slug)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-500 whitespace-nowrap">/tours/</span>
+                      <input
+                        type="text"
+                        value={editingSlug}
+                        onChange={(e) => {
+                          const val = e.target.value
+                            .toLowerCase()
+                            .trim()
+                            .replace(/[^a-z0-9-]/g, '')
+                            .replace(/-+/g, '-')
+                            .replace(/^-|-$/g, '');
+                          setEditingSlug(val);
+                          setSlugConfirm(false);
+                          if (val && val !== originalSlug) {
+                            const timer = setTimeout(async () => {
+                              const available = await checkSlugAvailable(val, editingTour.id);
+                              setSlugAvailable(available);
+                            }, 400);
+                            return () => clearTimeout(timer);
+                          } else if (val === originalSlug) {
+                            setSlugAvailable(true);
+                          } else {
+                            setSlugAvailable(null);
+                          }
+                        }}
+                        className="input flex-1"
+                        placeholder="mi-tour-agencia"
+                      />
+                    </div>
+                    {editingSlug !== originalSlug && editingSlug && (
+                      <div className="mt-2">
+                        {slugAvailable === false && (
+                          <p className="text-sm text-red-600 flex items-center gap-1">
+                            <AlertCircle className="w-4 h-4" />
+                            Este slug ya está en uso por otro tour o fue usado históricamente
+                          </p>
+                        )}
+                        {slugAvailable === true && (
+                          <>
+                            {editingTour.is_published && (
+                              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 mt-2">
+                                <p className="text-sm font-semibold text-amber-800 mb-1.5">
+                                  Advertencia: cambio de URL en tour publicado
+                                </p>
+                                <p className="text-xs text-amber-700 mb-2">
+                                  Google tendrá que reindexar la nueva URL. La URL vieja se redireccionará automáticamente (301) a la nueva, pero puede tomar días. Asegúrate de que el nuevo slug sea el definitivo.
+                                </p>
+                                <label className="flex items-start gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={slugConfirm}
+                                    onChange={(e) => setSlugConfirm(e.target.checked)}
+                                    className="mt-0.5"
+                                  />
+                                  <span className="text-xs text-amber-800 font-medium">
+                                    Entiendo que cambiar la URL afecta el SEO y confirmo que quiero proceder
+                                  </span>
+                                </label>
+                              </div>
+                            )}
+                            {!editingTour.is_published && (
+                              <p className="text-sm text-green-600 flex items-center gap-1">
+                                <CheckCircle className="w-4 h-4" />
+                                Slug disponible
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                    {editingSlug === originalSlug && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        URL actual: <span className="font-mono text-gray-700">/tours/{originalSlug}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">

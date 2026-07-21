@@ -6,7 +6,6 @@ publish = "dist"
 SECRETS_SCAN_ENABLED = "false"
 NODE_VERSION = "20"
 
-[[redirects]]
-from = "/*"
-to = "/index.html"
-status = 200
+[[edge_functions]]
+function = "tour-slug-redirect"
+path = "/tours/*"

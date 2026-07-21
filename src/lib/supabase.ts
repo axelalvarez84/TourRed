@@ -895,6 +895,80 @@ export const getTourBySlug = async (slug: string) => {
   }
 };
 
+export const resolveTourSlug = async (oldSlug: string): Promise<string | null> => {
+  try {
+    const { data, error } = await supabase
+      .rpc('resolve_tour_slug', { p_old_slug: oldSlug });
+
+    if (error) {
+      console.error('❌ Error en resolveTourSlug:', error);
+      return null;
+    }
+
+    if (data && data.length > 0 && data[0].current_slug) {
+      return data[0].current_slug as string;
+    }
+
+    return null;
+  } catch (error: any) {
+    console.error('❌ Error en resolveTourSlug:', error);
+    return null;
+  }
+};
+
+export const checkSlugAvailable = async (slug: string, excludeTourId?: string): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .rpc('check_slug_available', {
+        p_slug: slug,
+        p_exclude_tour_id: excludeTourId || null,
+      });
+
+    if (error) {
+      console.error('❌ Error en checkSlugAvailable:', error);
+      return false;
+    }
+
+    return data as boolean;
+  } catch (error: any) {
+    console.error('❌ Error en checkSlugAvailable:', error);
+    return false;
+  }
+};
+
+export const updateTourSlug = async (
+  tourId: string,
+  newSlug: string,
+  confirm: boolean
+): Promise<{ success: boolean; slug: string | null; message: string }> => {
+  try {
+    const { data, error } = await supabase
+      .rpc('update_tour_slug', {
+        p_tour_id: tourId,
+        p_new_slug: newSlug,
+        p_confirm: confirm,
+      });
+
+    if (error) {
+      console.error('❌ Error en updateTourSlug:', error);
+      return { success: false, slug: null, message: error.message };
+    }
+
+    if (data && data.length > 0) {
+      return {
+        success: data[0].success,
+        slug: data[0].slug,
+        message: data[0].message,
+      };
+    }
+
+    return { success: false, slug: null, message: 'Respuesta vacía del servidor' };
+  } catch (error: any) {
+    console.error('❌ Error en updateTourSlug:', error);
+    return { success: false, slug: null, message: error.message };
+  }
+};
+
 export const createTour = async (tourData: any, destinations: string[], userId: string) => {
   try {
     console.log('🏞️ Creando tour con datos:', tourData);
