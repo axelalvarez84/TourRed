@@ -353,9 +353,6 @@ Deno.serve(async (req: Request) => {
         refund_amount_to_traveler: Number(refund_amount) || 0,
         amount_to_agency: 0,
         amount_to_platform: 0,
-        // Two-bucket breakdown for audit clarity
-        tour_refund_bucket: tourRefundBucket,
-        optionals_refund_bucket: optionalsRefundBucket,
         toursred_cash_transaction_id: transactionId,
         refund_processed: Number(refund_amount) > 0,
         cancellation_reason: reason_for_traveler.trim(),

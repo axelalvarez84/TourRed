@@ -193,6 +193,68 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Legacy fallback for payment_plan_installment lines: points may be stored
+    // with reference_id = plan_id (not the transaction id). Replicates the same
+    // fallback logic as claw_back_points_for_refund().
+    const installmentTxIds = transactions
+      .filter((t) => t.charge_context === "payment_plan_installment" && t.charge_reference_id)
+      .map((t) => String(t.charge_reference_id));
+
+    let planPointsMap: Record<string, number> = {};
+    let planTotalAmountMap: Record<string, number> = {};
+    let txToPlanIdMap: Record<string, string> = {};
+
+    if (installmentTxIds.length > 0) {
+      const { data: planTxRows } = await supabase
+        .from("booking_payment_plan_transactions")
+        .select("id, plan_id, amount, status")
+        .in("id", installmentTxIds);
+
+      const planIds = [...new Set((planTxRows || []).map((r: any) => r.plan_id))];
+      txToPlanIdMap = {};
+      for (const r of (planTxRows || [])) {
+        txToPlanIdMap[String((r as any).id)] = String((r as any).plan_id);
+      }
+
+      if (planIds.length > 0) {
+        // Net points per plan_id (earned - clawed back)
+        const { data: planEarned } = await supabase
+          .from("toursred_points_transactions")
+          .select("reference_id, amount, type")
+          .in("reference_id", planIds)
+          .eq("reference_type", "payment_plan")
+          .eq("type", "earned");
+
+        const { data: planDeducted } = await supabase
+          .from("toursred_points_transactions")
+          .select("reference_id, amount, type")
+          .in("reference_id", planIds)
+          .eq("reference_type", "payment_plan")
+          .in("type", ["deducted", "clawback", "refund_deduction"]);
+
+        for (const pt of (planEarned || [])) {
+          const key = String(pt.reference_id);
+          planPointsMap[key] = (planPointsMap[key] || 0) + Number(pt.amount || 0);
+        }
+        for (const pt of (planDeducted || [])) {
+          const key = String(pt.reference_id);
+          planPointsMap[key] = (planPointsMap[key] || 0) - Number(pt.amount || 0);
+        }
+
+        // Total completed amount per plan_id for proportional allocation
+        const { data: allPlanTx } = await supabase
+          .from("booking_payment_plan_transactions")
+          .select("plan_id, amount, status")
+          .in("plan_id", planIds)
+          .eq("status", "completed");
+
+        for (const r of (allPlanTx || [])) {
+          const key = String((r as any).plan_id);
+          planTotalAmountMap[key] = (planTotalAmountMap[key] || 0) + Number((r as any).amount || 0);
+        }
+      }
+    }
+
     // Build line descriptions
     const lines = transactions.map((tx) => {
       const ctx = tx.charge_context || "booking_deposit";
@@ -224,7 +286,23 @@ Deno.serve(async (req: Request) => {
           description = "Pago";
       }
 
-      const pointsEarned = refId ? pointsMap[refId] || 0 : 0;
+      let pointsEarned = refId ? pointsMap[refId] || 0 : 0;
+      let pointsEstimated = false;
+
+      // Legacy fallback: if no direct points found and this is a payment plan
+      // installment, look up points via plan_id
+      if (pointsEarned === 0 && ctx === "payment_plan_installment" && refId) {
+        const planId = txToPlanIdMap[refId];
+        if (planId) {
+          const netPlanPoints = planPointsMap[planId] || 0;
+          const totalPlanAmount = planTotalAmountMap[planId] || 0;
+          if (netPlanPoints > 0 && totalPlanAmount > 0) {
+            pointsEarned = Math.floor((Number(tx.amount) / totalPlanAmount) * netPlanPoints);
+            pointsEstimated = true;
+          }
+        }
+      }
+
       const existingRefund = refundMap[tx.id];
       const isNonRefundable =
         NON_REFUNDABLE_METHODS.includes(tx.payment_method_type || "") ||
@@ -240,6 +318,7 @@ Deno.serve(async (req: Request) => {
         charge_context: ctx,
         charge_reference_id: tx.charge_reference_id,
         points_earned: pointsEarned,
+        points_earned_is_estimated: pointsEstimated,
         refundable_to_original: !isNonRefundable,
         existing_refund: existingRefund
           ? {

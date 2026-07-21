@@ -1901,7 +1901,7 @@ const AdminCancelBookingModal: React.FC<AdminCancelModalProps> = ({ booking, adm
                             <span className="text-sm text-gray-700 font-medium">{formatCurrencyMXN(line.amount)}</span>
                             <span className="text-xs text-gray-400">{line.payment_processor || 'N/A'}</span>
                             {line.points_earned > 0 && (
-                              <span className="text-xs text-amber-600">- {line.points_earned} pts</span>
+                              <span className="text-xs text-amber-600">- {line.points_earned} pts{line.points_earned_is_estimated ? ' (est.)' : ''}</span>
                             )}
                           </div>
                           {state === 'processing' && (
