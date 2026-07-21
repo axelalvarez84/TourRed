@@ -74,23 +74,25 @@ const TourDetailPage: React.FC = () => {
 
   useEffect(() => {
     const fetchTour = async () => {
-      if (!id) return;
-      
+      // Salvaguarda: slug vacío o literal "undefined"/"null" → no buscar
+      if (!slug || slug === 'undefined' || slug === 'null') {
+        setError('Tour no encontrado');
+        setIsLoading(false);
+        return;
+      }
+
       try {
         setIsLoading(true);
         setError('');
-        
-        console.log('🔍 Cargando tour desde BD:', slug);
 
         // Detectar si el param es UUID (legacy) o slug
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug || '');
-        const { data, error } = isUuid ? await getTourById(slug!) : await getTourBySlug(slug!);
-        
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
+        const { data, error } = isUuid ? await getTourById(slug) : await getTourBySlug(slug);
+
         if (error) {
-          console.error('❌ Error cargando tour:', error);
           throw new Error(error.message);
         }
-        
+
         if (!data) {
           throw new Error('Tour no encontrado');
         }
