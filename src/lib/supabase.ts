@@ -863,11 +863,29 @@ export const getTourById = async (id: string) => {
         agencies(id, name, rating, logo, description, contact_email, is_active, commission_rate)
       `)
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
     return { data, error };
   } catch (error: any) {
     console.error('❌ Error en getTourById:', error);
+    return { data: null, error };
+  }
+};
+
+export const getTourBySlug = async (slug: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('tours')
+      .select(`
+        *,
+        agencies(id, name, rating, logo, description, contact_email, is_active, commission_rate)
+      `)
+      .eq('slug', slug)
+      .maybeSingle();
+
+    return { data, error };
+  } catch (error: any) {
+    console.error('❌ Error en getTourBySlug:', error);
     return { data: null, error };
   }
 };
@@ -1045,7 +1063,7 @@ const BOOKING_SELECT_FIELDS = `
   travel_insurance_included, travel_insurance_cost,
   has_payment_plan, payment_plan_total, payment_plan_paid, payment_plan_status,
   discount_codes:discount_code_id(code, discount_type, discount_value), created_at, updated_at,
-  tours:tour_id(id, name, destination, image_url, start_date, end_date, name_changes_not_allowed, vehicle_map_type),
+  tours:tour_id(id, name, slug, destination, image_url, start_date, end_date, name_changes_not_allowed, vehicle_map_type),
   agencies:agency_id(id, name, contact_email)
 `;
 
@@ -1127,7 +1145,7 @@ export const getAgencyBookings = async (agencyId: string) => {
       .from('bookings')
       .select(`
         *,
-        tours:tour_id(id, name, destination, image_url, start_date, end_date),
+        tours:tour_id(id, name, slug, destination, image_url, start_date, end_date),
         users:user_id(id, first_name, last_name, email, profile_picture_url, phone_number)
       `)
       .eq('agency_id', agencyId)

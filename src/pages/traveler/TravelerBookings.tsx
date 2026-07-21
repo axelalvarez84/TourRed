@@ -2282,7 +2282,7 @@ const TravelerBookings: React.FC = () => {
                   {/* Actions */}
                   <div className="flex flex-wrap gap-3">
                     <Link
-                      to={`/tours/${booking.tour_id}`}
+                      to={`/tours/${booking.tours?.slug || booking.tour_id}`}
                       className="btn btn-outline flex items-center justify-center"
                     >
                       <Eye className="h-4 w-4 mr-2" />
@@ -2749,7 +2749,7 @@ const TravelerBookings: React.FC = () => {
                       </div>
                     )}
                     <div className="flex flex-wrap gap-2">
-                      <Link to={`/tours/${booking.tour_id}`} className="btn btn-outline btn-sm flex items-center gap-1 text-sm py-1.5 px-3">
+                      <Link to={`/tours/${booking.tours?.slug || booking.tour_id}`} className="btn btn-outline btn-sm flex items-center gap-1 text-sm py-1.5 px-3">
                         <Eye className="h-3.5 w-3.5" />Ver Tour
                       </Link>
                       <button onClick={() => handleOpenTravelersModal(booking)} className="btn btn-outline btn-sm flex items-center gap-1 text-sm py-1.5 px-3">

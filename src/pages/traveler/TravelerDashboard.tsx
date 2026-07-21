@@ -786,7 +786,7 @@ const TravelerDashboard: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-blue-600">${savedTour.tours.price}</span>
                     <Link
-                      to={`/tours/${savedTour.tour_id}`}
+                      to={`/tours/${savedTour.tours?.slug || savedTour.tour_id}`}
                       className="text-sm text-blue-600 hover:text-blue-700 font-medium"
                     >
                       Ver detalles

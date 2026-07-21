@@ -1227,7 +1227,7 @@ const TravelersInfoPage: React.FC = () => {
                                 <p className="mt-2 text-xs">
                                   Verifica la fecha de nacimiento o{' '}
                                   <Link
-                                    to={`/tours/${tour?.id}`}
+                                    to={`/tours/${tour?.slug || tour?.id}`}
                                     className="font-semibold text-red-800 underline hover:text-red-900"
                                   >
                                     regresa a actualizar la reserva

@@ -1,1 +1,11 @@
+# Redirects 301 permanentes de UUIDs a slugs para tours
+# Generado en build time desde la migración de slugs (Fase 1 SEO)
+# El universo de UUIDs viejos es finito y conocido en este momento.
+# De aquí en adelante todo el código enlaza con slug.
+/tours/24a45977-053f-41f6-9cd5-64e80f6b8253  /tours/tlaxcala  301
+/tours/3c005f2f-5959-451b-8e82-fb27b9501fad  /tours/tour-a-teotihuacan  301
+/tours/fcac1662-c34b-4741-8a29-628b694c1396  /tours/tlaxcala-agosto  301
+/tours/d463b7d1-b933-4b56-8688-85cbea3d57e2  /tours/islas-marias  301
+
+# SPA fallback — debe ir al final
 /*    /index.html   200

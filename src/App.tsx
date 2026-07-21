@@ -189,7 +189,7 @@ const App: React.FC = () => {
           <Route path="/mantenimiento-admin" element={<MaintenanceAdminPage />} />
           <Route path="/" element={<HomePage />} />
           <Route path="/tours" element={<TourCatalogPage />} />
-          <Route path="/tours/:id" element={<TourDetailPage />} />
+          <Route path="/tours/:slug" element={<TourDetailPage />} />
           <Route path="/tours/international/mega-travel" element={<MegaTravelPage />} />
           <Route path="/tours/international/nefertari-travel" element={<NefertariTravelPage />} />
           <Route path="/tours/international/exoticca" element={<ExoticcaPage />} />

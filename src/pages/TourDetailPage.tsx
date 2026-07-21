@@ -5,7 +5,7 @@ import BookingForm from '../components/BookingForm';
 import AgencyReviews from '../components/AgencyReviews';
 import ShareTourModal from '../components/ShareTourModal';
 import { Tour } from '../types';
-import { getTourById, supabase, parseDateFromDB } from '../lib/supabase';
+import { getTourById, getTourBySlug, supabase, parseDateFromDB } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrencyMXN } from '../utils/formatCurrency';
 import { format } from 'date-fns';
@@ -22,7 +22,7 @@ interface DeparturePointInfo {
 }
 
 const TourDetailPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const { user, isAgency } = useAuth();
   const navigate = useNavigate();
   const [tour, setTour] = useState<Tour | null>(null);
@@ -80,9 +80,11 @@ const TourDetailPage: React.FC = () => {
         setIsLoading(true);
         setError('');
         
-        console.log('🔍 Cargando tour desde BD:', id);
-        
-        const { data, error } = await getTourById(id);
+        console.log('🔍 Cargando tour desde BD:', slug);
+
+        // Detectar si el param es UUID (legacy) o slug
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug || '');
+        const { data, error } = isUuid ? await getTourById(slug!) : await getTourBySlug(slug!);
         
         if (error) {
           console.error('❌ Error cargando tour:', error);
@@ -155,7 +157,7 @@ const TourDetailPage: React.FC = () => {
     };
 
     fetchTour();
-  }, [id, user, isAgency]);
+  }, [slug, user, isAgency]);
 
   useEffect(() => {
     if (user && tour) {

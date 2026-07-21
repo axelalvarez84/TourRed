@@ -165,7 +165,7 @@ const TourCard: React.FC<TourCardProps> = ({
     return (
       <Link
         ref={cardRef as React.RefObject<HTMLAnchorElement>}
-        to={`/tours/${tour.id}`}
+        to={`/tours/${tour.slug}`}
         onClick={handleFeaturedClick}
         className={`group bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col transition-all hover:shadow-md hover:-translate-y-0.5 animate-fade-in ${
           isFeaturedTour ? 'border-amber-300 ring-1 ring-amber-200' : 'border-gray-100'
@@ -252,7 +252,7 @@ const TourCard: React.FC<TourCardProps> = ({
         isFeaturedTour ? 'border-amber-300 ring-1 ring-amber-200' : 'border-gray-100'
       } ${className}`}
     >
-      <Link to={`/tours/${tour.id}`} onClick={handleFeaturedClick} className="block">
+      <Link to={`/tours/${tour.slug}`} onClick={handleFeaturedClick} className="block">
       <div className="relative overflow-hidden aspect-[4/3]">
         <img
           src={tour.image_url || 'https://images.pexels.com/photos/2245436/pexels-photo-2245436.png'}
@@ -422,7 +422,7 @@ const TourCard: React.FC<TourCardProps> = ({
             })()}
           </div>
 
-          <Link to={`/tours/${tour.id}`} onClick={handleFeaturedClick} className="btn btn-primary">
+          <Link to={`/tours/${tour.slug}`} onClick={handleFeaturedClick} className="btn btn-primary">
             Ver Detalles
           </Link>
         </div>

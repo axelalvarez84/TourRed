@@ -207,7 +207,7 @@ const PreventasSection: React.FC = () => {
                     </div>
 
                     <Link
-                      to={`/tours/${tour.id}`}
+                      to={`/tours/${tour.slug}`}
                       className="flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
                     >
                       Ver tour

@@ -163,6 +163,7 @@ export interface Tour {
   id: string;
   agency_id: string;
   name: string;
+  slug: string;
   destination: string;
   description: string;
   category: string | string[];

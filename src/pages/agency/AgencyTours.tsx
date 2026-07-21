@@ -6685,7 +6685,7 @@ const AgencyTours: React.FC = () => {
                     </span>
                     <div className="flex items-center gap-0.5">
                       <button
-                        onClick={() => window.open(`/tours/${tour.id}`, '_blank')}
+                        onClick={() => window.open(`/tours/${tour.slug}`, '_blank')}
                         className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
                         title="Ver tour"
                       >
