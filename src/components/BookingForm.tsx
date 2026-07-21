@@ -838,6 +838,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   // Total de extras (opcionales + pickup + idioma) — cobrados al 100%, fuera del total_price de la reserva
   const extrasTotal = optionalServicesSubtotal + receptivoExtrasSubtotal;
 
+  // Service charge sobre los extras (5% sobre el subtotal de opcionales + pickup + idioma)
+  // Se calcula aqui (no en handleSubmit) para que user_payment, cubetas de cash y UI lo reflejen
+  const extrasServiceChargeTotal = Math.round(extrasTotal * (serviceChargePercentage / 100) * 100) / 100;
+  const extrasTotalWithServiceCharge = extrasTotal + extrasServiceChargeTotal;
+
   // Si el usuario es de alto riesgo (más de 3 no shows), debe pagar el 100%
   const effectiveDepositPercentage = isHighRisk ? 100 : tour.deposit_percentage;
 
@@ -1003,7 +1008,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const cashForTour = useToursRedCash ? Math.min(walletBalance, tourBucketAfterPoints) : 0;
   const walletRemainingAfterTour = useToursRedCash ? Math.max(0, walletBalance - cashForTour) : 0;
 
-  const cashForExtras = useToursRedCash ? Math.min(walletRemainingAfterTour, extrasTotal) : 0;
+  const cashForExtras = useToursRedCash ? Math.min(walletRemainingAfterTour, extrasTotalWithServiceCharge) : 0;
   const walletRemainingAfterExtras = useToursRedCash ? Math.max(0, walletRemainingAfterTour - cashForExtras) : 0;
 
   const cashForInsurance = useToursRedCash ? Math.min(walletRemainingAfterExtras, effectiveInsuranceCost) : 0;
@@ -1011,7 +1016,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
   const toursRedCashApplied = cashForTour + cashForExtras + cashForInsurance;
 
   const tourAfterCash = tourBucketAfterPoints - cashForTour;
-  const extrasAfterCash = extrasTotal - cashForExtras;
+  const extrasAfterCash = extrasTotalWithServiceCharge - cashForExtras;
   const insuranceAfterCash = effectiveInsuranceCost - cashForInsurance;
 
   const rawAmountAfterToursRedCash = tourAfterCash + extrasAfterCash + insuranceAfterCash;
@@ -1131,7 +1136,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         deposit_amount: effectiveDepositAmount,
         commission_amount: agencyCommission,
         service_charge: serviceCharge,
-        user_payment: userPayment + extrasTotal + effectiveInsuranceCost + membershipCost,
+        user_payment: userPayment + extrasTotalWithServiceCharge + effectiveInsuranceCost + membershipCost,
         platform_revenue: platformRevenue,
         booking_date: isReceptivo && selectedSlot ? selectedSlot.slot_date : (isTransferCustomTime && selectedSlotDate ? selectedSlotDate.toISOString().split('T')[0] : tour.start_date),
         slot_id: isReceptivo && selectedSlot ? selectedSlot.id : null,
@@ -2900,6 +2905,15 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
                     <span className="font-medium">{formatCurrencyMXN(languageExtraCost)}</span>
                   </div>
                 )}
+              </div>
+            )}
+
+            {extrasServiceChargeTotal > 0 && (
+              <div className="border-t pt-2 mt-1">
+                <div className="flex justify-between text-sm text-orange-600">
+                  <span>Cargo por Servicio extras ({serviceChargePercentage}%):</span>
+                  <span className="font-medium">+{formatCurrencyMXN(extrasServiceChargeTotal)}</span>
+                </div>
               </div>
             )}
 
