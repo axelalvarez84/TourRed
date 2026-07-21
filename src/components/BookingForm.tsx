@@ -27,6 +27,7 @@ import { useAuth } from '../context/AuthContext';
 import { createBooking, formatDateForDB, supabase } from '../lib/supabase';
 import { formatCurrency, formatCurrencyMXN } from '../utils/formatCurrency';
 import { useMembershipPrices } from '../hooks/useMembershipPrices';
+import { isCrawler } from '../utils/isCrawler';
 
 interface BookingFormProps {
   tour: Tour;
@@ -504,6 +505,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
     };
 
     fetchAvailability();
+
+    if (isCrawler()) return;
 
     const channel = supabase
       .channel(`tour_availability:${tour.id}`)

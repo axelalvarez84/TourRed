@@ -6,6 +6,7 @@ import AgencyReviews from '../components/AgencyReviews';
 import ShareTourModal from '../components/ShareTourModal';
 import { Tour } from '../types';
 import { getTourById, getTourBySlug, resolveTourSlug, supabase, parseDateFromDB } from '../lib/supabase';
+import { isCrawler } from '../utils/isCrawler';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrencyMXN } from '../utils/formatCurrency';
 import { format } from 'date-fns';
@@ -251,6 +252,8 @@ const TourDetailPage: React.FC = () => {
     };
 
     fetchAvailability();
+
+    if (isCrawler()) return;
 
     const channel = supabase
       .channel(`tour_detail_availability:${tour.id}`)

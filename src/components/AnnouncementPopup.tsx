@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Megaphone, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { isCrawler } from '../utils/isCrawler';
 
 interface AnnouncementData {
   announcement_active: boolean;
@@ -51,6 +52,8 @@ const AnnouncementPopup: React.FC = () => {
     };
 
     load();
+
+    if (isCrawler()) return;
 
     const channel = supabase
       .channel(`announcement_popup_${Math.random().toString(36).slice(2)}`)
