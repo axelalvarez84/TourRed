@@ -122,18 +122,22 @@ Deno.serve(async (req: Request) => {
       ? Number(booking.travel_insurance_cost || 0)
       : 0;
 
-    // Calculate total actually paid by traveler (deposit + payment plan installments + service charges)
+    // Calculate total actually paid by traveler.
+    // When has_payment_plan, installment 1 ("Anticipo") already represents the
+    // deposit — adding deposit_amount on top would double-count it.
     let totalPaidByTraveler = Number(booking.deposit_amount || 0);
 
     if (booking.has_payment_plan) {
       const { data: installments } = await supabase
         .from("booking_payment_plan_installments")
-        .select("amount_paid")
+        .select("installment_number, amount_paid")
         .eq("booking_id", booking_id)
         .in("status", ["paid", "partially_paid"]);
 
       for (const inst of (installments || [])) {
-        totalPaidByTraveler += Number(inst.amount_paid || 0);
+        if ((inst as any).installment_number > 1) {
+          totalPaidByTraveler += Number(inst.amount_paid || 0);
+        }
       }
 
       // Add service charges from completed payment plan transactions
