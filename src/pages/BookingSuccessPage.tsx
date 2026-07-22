@@ -86,7 +86,7 @@ const BookingSuccessPage: React.FC = () => {
       // Fetch optional services (pickup, language, traditional) for this booking
       const { data: optServices } = await supabase
         .from('booking_optional_services')
-        .select('id, service_kind, description, subtotal, total_paid, is_cancelled')
+        .select('id, service_kind, description, subtotal, total_paid, service_charge, is_cancelled')
         .eq('booking_id', bookingId)
         .eq('is_cancelled', false)
         .order('created_at', { ascending: true });
@@ -363,12 +363,24 @@ const BookingSuccessPage: React.FC = () => {
                     </div>
                   ))}
 
+                  {optionalServices.filter(opt => opt.service_kind === 'optional_service').length > 0 && (
+                    <div className="flex justify-between border-t pt-2 mt-2">
+                      <span className="text-gray-700 font-semibold">Servicios Adicionales:</span>
+                      <span className="font-medium"></span>
+                    </div>
+                  )}
                   {optionalServices.filter(opt => opt.service_kind === 'optional_service').map(opt => (
                     <div key={opt.id} className="flex justify-between">
                       <span className="text-gray-600">{opt.description || 'Servicio opcional'}:</span>
                       <span className="font-medium">{formatCurrencyMXN(opt.total_paid || opt.subtotal)}</span>
                     </div>
                   ))}
+                  {optionalServices.filter(opt => opt.service_kind === 'optional_service').reduce((sum, opt) => sum + Number(opt.service_charge || 0), 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Cargo por Servicio extras:</span>
+                      <span className="font-medium">{formatCurrencyMXN(optionalServices.filter(opt => opt.service_kind === 'optional_service').reduce((sum, opt) => sum + Number(opt.service_charge || 0), 0))}</span>
+                    </div>
+                  )}
 
                   {Number((booking as any).promo_discount_amount) > 0 && (
                     <div className="flex justify-between bg-emerald-50 border border-emerald-200 rounded px-2 py-1.5 -mx-1">
@@ -454,7 +466,7 @@ const BookingSuccessPage: React.FC = () => {
                     <div className="flex justify-between items-center bg-blue-50 border border-blue-200 rounded px-2 py-1.5 -mx-1">
                       <span className="text-blue-700 font-medium flex items-center">
                         <ShieldCheck className="h-4 w-4 mr-1" />
-                        Seguro de Viaje:
+                        Seguro de viaje ({(booking as any).insurance_days || 0} {((booking as any).insurance_days || 0) === 1 ? 'día' : 'días'} × {booking.travelers_count} {booking.travelers_count === 1 ? 'viajero' : 'viajeros'}):
                       </span>
                       <span className="font-bold text-blue-700 flex items-center gap-2">
                         {Number((booking as any).insurance_discount_amount) > 0 && (

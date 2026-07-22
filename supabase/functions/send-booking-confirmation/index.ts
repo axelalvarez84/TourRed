@@ -197,6 +197,21 @@ Deno.serve(async (req: Request) => {
     const optionalsCommissionTotal = paidOptionals.reduce((sum, o) => sum + o.agency_commission, 0);
     const optionalsServiceChargeTotal = paidOptionals.reduce((sum, o) => sum + o.service_charge, 0);
 
+    const { data: companionsData } = await supabase
+      .from("booking_travelers")
+      .select("nombre, apellido, categoria_viajero")
+      .eq("booking_id", booking_id)
+      .order("created_at", { ascending: true });
+
+    const companions = (companionsData || []).map((c: any) => ({
+      nombre: c.nombre,
+      apellido: c.apellido || '',
+      categoria: c.categoria_viajero,
+    }));
+
+    const insuranceDays = Number(booking.insurance_days) || 0;
+    const insuranceTravelers = booking.travelers_count || 0;
+
     // Monto real cobrado al viajero hoy: depósito + seguro + membresía + opcionales (calculado, no el campo stale de BD)
     const adminTotalCobrado = depositAmount + travelInsuranceCost + membershipCost + optionalsTotal;
 
@@ -222,9 +237,24 @@ Deno.serve(async (req: Request) => {
     };
 
     const optionalsHtml = paidOptionals.length > 0
-      ? paidOptionals.map(o => `        <div class="info-row">
-          <span class="info-label">🎟️ ${o.name}:</span>
+      ? `        <div class="info-row" style="margin-top: 10px;">
+          <span class="info-label" style="font-weight: 700; color: #1e40af;">🎟️ Servicios Adicionales:</span>
+          <span class="info-value"></span>
+        </div>
+` + paidOptionals.map(o => `        <div class="info-row">
+          <span class="info-label">${o.name}:</span>
           <span class="info-value">${formatCurrency(o.total_paid)}</span>
+        </div>`).join('\n') + (optionalsServiceChargeTotal > 0 ? `
+        <div class="info-row">
+          <span class="info-label">Cargo por Servicio extras (${serviceChargePercentage}%):</span>
+          <span class="info-value">${formatCurrency(optionalsServiceChargeTotal)}</span>
+        </div>` : '')
+      : '';
+
+    const companionsHtml = companions.length > 0
+      ? companions.map(c => `        <div class="info-row">
+          <span class="info-label">${c.categoria === 'adulto' ? 'Adulto' : c.categoria === 'nino' ? 'Niño' : c.categoria === 'infante' ? 'Infante' : c.categoria === 'adulto_mayor' ? 'Adulto Mayor' : c.categoria}:</span>
+          <span class="info-value">${c.nombre}${c.apellido ? ' ' + c.apellido : ''}</span>
         </div>`).join('\n')
       : '';
 
@@ -417,17 +447,6 @@ Deno.serve(async (req: Request) => {
           <span class="info-label">Anticipo (${depositPercentage}%):</span>
           <span class="info-value">${formatCurrency(depositAmount)}</span>
         </div>
-        ${travelInsuranceCost > 0 || (travelInsuranceCost === 0 && insuranceDiscountAmount > 0) ? `
-        <div class="info-row">
-          <span class="info-label">🛡️ Seguro de Viajero${insuranceDiscountAmount > 0 ? ` <span style="text-decoration:line-through;color:#9ca3af;font-size:12px;">${formatCurrency(travelInsuranceCost + insuranceDiscountAmount)}</span>` : ''}:</span>
-          <span class="info-value">${travelInsuranceCost === 0 ? 'GRATIS' : formatCurrency(travelInsuranceCost)}</span>
-        </div>
-        ${insuranceDiscountAmount > 0 ? `
-        <div class="info-row">
-          <span class="info-label" style="color:#059669;">Descuento en seguro:</span>
-          <span class="info-value" style="color:#059669;">-${formatCurrency(insuranceDiscountAmount)}</span>
-        </div>` : ''}
-        ` : ''}
         ${membershipPurchased && membershipCost > 0 ? `
         <div class="info-row" style="background-color:#eef2ff;padding:8px 5px;margin:5px -5px;">
           <span class="info-label" style="color:#4338ca;font-weight:600;">⭐ Membresía ToursRed Plus (${membershipPlan === 'monthly' ? 'Mensual' : 'Anual'}):</span>
@@ -481,6 +500,17 @@ Deno.serve(async (req: Request) => {
           <span class="info-label" style="font-weight: 600;">💰 ToursRed Cash Aplicado:</span>
           <span class="info-value" style="color: #d97706;">-${formatCurrency(toursRedCashUsed)}</span>
         </div>
+        ` : ''}
+        ${travelInsuranceCost > 0 || (travelInsuranceCost === 0 && insuranceDiscountAmount > 0) ? `
+        <div class="info-row">
+          <span class="info-label">🛡️ Seguro de viaje (${insuranceDays} ${insuranceDays === 1 ? 'día' : 'días'} × ${insuranceTravelers} ${insuranceTravelers === 1 ? 'viajero' : 'viajeros'})${insuranceDiscountAmount > 0 ? ` <span style="text-decoration:line-through;color:#9ca3af;font-size:12px;">${formatCurrency(travelInsuranceCost + insuranceDiscountAmount)}</span>` : ''}:</span>
+          <span class="info-value">${travelInsuranceCost === 0 ? 'GRATIS' : formatCurrency(travelInsuranceCost)}</span>
+        </div>
+        ${insuranceDiscountAmount > 0 ? `
+        <div class="info-row">
+          <span class="info-label" style="color:#059669;">Descuento en seguro:</span>
+          <span class="info-value" style="color:#059669;">-${formatCurrency(insuranceDiscountAmount)}</span>
+        </div>` : ''}
         ` : ''}
         <div class="total-box" style="margin-top: 15px;">
           <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: bold;">
@@ -699,26 +729,67 @@ Deno.serve(async (req: Request) => {
       </div>
 
       <div class="section">
-        <div class="section-title">💰 Información Financiera</div>
+        <div class="section-title">💰 Desglose de Costos</div>
+        ${booking.adults_count > 0 ? `
         <div class="info-row">
-          <span class="info-label">Precio total del tour:</span>
-          <span class="info-value">${formatCurrency(totalPrice)}</span>
+          <span class="info-label">${booking.adults_count} ${booking.adults_count === 1 ? 'Adulto' : 'Adultos'} × ${formatCurrency(booking.adult_price || 0)}:</span>
+          <span class="info-value">${formatCurrency((booking.adult_price || 0) * (booking.adults_count || 0))}</span>
+        </div>
+        ` : ''}
+        ${booking.children_count > 0 ? `
+        <div class="info-row">
+          <span class="info-label">${booking.children_count} ${booking.children_count === 1 ? 'Niño' : 'Niños'} × ${formatCurrency(booking.child_price || 0)}:</span>
+          <span class="info-value">${formatCurrency((booking.child_price || 0) * (booking.children_count || 0))}</span>
+        </div>
+        ` : ''}
+        ${booking.infants_count > 0 ? `
+        <div class="info-row">
+          <span class="info-label">${booking.infants_count} ${booking.infants_count === 1 ? 'Infante' : 'Infantes'} × ${formatCurrency(booking.infant_price || 0)}:</span>
+          <span class="info-value">${formatCurrency((booking.infant_price || 0) * (booking.infants_count || 0))}</span>
+        </div>
+        ` : ''}
+        ${booking.seniors_count > 0 ? `
+        <div class="info-row">
+          <span class="info-label">${booking.seniors_count} ${booking.seniors_count === 1 ? 'Adulto Mayor' : 'Adultos Mayores'} × ${formatCurrency(booking.senior_price || 0)}:</span>
+          <span class="info-value">${formatCurrency((booking.senior_price || 0) * (booking.seniors_count || 0))}</span>
+        </div>
+        ` : ''}
+        ${booking.pets_count > 0 ? `
+        <div class="info-row">
+          <span class="info-label">${booking.pets_count} ${booking.pets_count === 1 ? 'Mascota' : 'Mascotas'} × ${formatCurrency(booking.pet_price || 0)}:</span>
+          <span class="info-value">${formatCurrency((booking.pet_price || 0) * (booking.pets_count || 0))}</span>
+        </div>
+        ` : ''}
+        ${pickupExtraCost > 0 ? `
+        <div class="info-row">
+          <span class="info-label">🚗 Pick Up — ${booking.pickup_zone_name} (${booking.pickup_cost_type === 'por_persona' ? 'por persona' : 'por reserva'}):</span>
+          <span class="info-value">${formatCurrency(pickupExtraCost)}</span>
+        </div>
+        ` : ''}
+        ${languageExtraCost > 0 ? `
+        <div class="info-row">
+          <span class="info-label">🌐 Idioma — ${booking.selected_language} (${booking.language_cost_type === 'por_persona' ? 'por persona' : 'fijo'}):</span>
+          <span class="info-value">${formatCurrency(languageExtraCost)}</span>
+        </div>
+        ` : ''}
+        ${promoDiscountAmount > 0 ? `
+        <div class="info-row" style="background-color: #dcfce7; margin: 5px -5px; padding: 8px 5px;">
+          <span class="info-label" style="font-weight: 600;">🏷️ Descuento Grupal:</span>
+          <span class="info-value" style="color: #059669;">-${formatCurrency(promoDiscountAmount)}</span>
+        </div>
+        ` : ''}
+        <div class="info-row" style="border-top: 2px solid #e5e7eb; padding-top: 10px; margin-top: 10px;">
+          <span class="info-label" style="font-weight: 700;">Precio Total del Tour:</span>
+          <span class="info-value" style="font-weight: 700;">${formatCurrency(totalPrice)}</span>
         </div>
         <div class="info-row">
           <span class="info-label">Anticipo pagado por el viajero (${depositPercentage}%):</span>
           <span class="info-value">${formatCurrency(depositAmount)}</span>
         </div>
-        ${travelInsuranceCost > 0 || insuranceDiscountAmount > 0 ? `
-        <div class="info-row">
-          <span class="info-label">🛡️ Seguro de Viajero (cobro separado, no pertenece a la agencia)${insuranceDiscountAmount > 0 ? ` <span style="text-decoration:line-through;color:#9ca3af;font-size:12px;">${formatCurrency(travelInsuranceCost + insuranceDiscountAmount)}</span>` : ''}:</span>
-          <span class="info-value">${travelInsuranceCost === 0 ? 'GRATIS' : formatCurrency(travelInsuranceCost)}</span>
-        </div>
-        ${insuranceDiscountAmount > 0 ? `<div class="info-row"><span class="info-label" style="color:#059669;">Descuento en seguro:</span><span class="info-value" style="color:#059669;">-${formatCurrency(insuranceDiscountAmount)}</span></div>` : ''}
-        ` : ''}
         ${optionalsHtml}
-        ${travelInsuranceCost > 0 || insuranceDiscountAmount > 0 || optionalsTotal > 0 ? `
+        ${optionalsTotal > 0 ? `
         <div class="info-row" style="background-color: #f0fdf4; padding: 8px 5px; margin: 5px -5px;">
-          <span class="info-label" style="font-weight: 700;">Total cobrado al viajero hoy (anticipo + seguro${optionalsTotal > 0 ? ' + opcionales' : ''}):</span>
+          <span class="info-label" style="font-weight: 700;">Total cobrado al viajero hoy (anticipo${optionalsTotal > 0 ? ' + opcionales' : ''}):</span>
           <span class="info-value" style="font-weight: 700;">${formatCurrency(userPayment)}</span>
         </div>
         ` : ''}
@@ -765,6 +836,13 @@ Deno.serve(async (req: Request) => {
         </div>
         ` : ''}
       </div>
+
+      ${companions.length > 0 ? `
+      <div class="section">
+        <div class="section-title">👥 Acompañantes</div>
+        ${companionsHtml}
+      </div>
+      ` : ''}
 
       <div class="highlight">
         <strong>Próximos pasos:</strong><br>
@@ -918,7 +996,7 @@ Deno.serve(async (req: Request) => {
         </div>
         ${travelInsuranceCost > 0 || insuranceDiscountAmount > 0 ? `
         <div class="info-row">
-          <span class="info-label">🛡️ Seguro de Viajero (va a aseguradora)${insuranceDiscountAmount > 0 ? ` <span style="text-decoration:line-through;color:#9ca3af;font-size:12px;">${formatCurrency(travelInsuranceCost + insuranceDiscountAmount)}</span>` : ''}:</span>
+          <span class="info-label">🛡️ Seguro de viaje (${insuranceDays} ${insuranceDays === 1 ? 'día' : 'días'} × ${insuranceTravelers} ${insuranceTravelers === 1 ? 'viajero' : 'viajeros'}) (va a aseguradora)${insuranceDiscountAmount > 0 ? ` <span style="text-decoration:line-through;color:#9ca3af;font-size:12px;">${formatCurrency(travelInsuranceCost + insuranceDiscountAmount)}</span>` : ''}:</span>
           <span class="info-value">${travelInsuranceCost === 0 ? 'GRATIS' : formatCurrency(travelInsuranceCost)}</span>
         </div>
         ${insuranceDiscountAmount > 0 ? `<div class="info-row"><span class="info-label" style="color:#059669;">Descuento en seguro (plataforma absorbe):</span><span class="info-value" style="color:#059669;">-${formatCurrency(insuranceDiscountAmount)}</span></div>` : ''}
@@ -1015,7 +1093,7 @@ Deno.serve(async (req: Request) => {
             <span style="color: #059669;">${formatCurrency(agencyCommission + serviceCharge + membershipCost + optionalsCommissionTotal + optionalsServiceChargeTotal)}</span>
           </div>
           <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">
-            Comisión ${formatCurrency(agencyCommission)} + Cargo ${formatCurrency(serviceCharge)}${membershipCost > 0 ? ` + Membresía ${formatCurrency(membershipCost)}` : ''}${optionalsTotal > 0 ? ` + Opcionales (comisión ${formatCurrency(optionalsCommissionTotal)} + cargo ${formatCurrency(optionalsServiceChargeTotal)})` : ''}
+            Comisión ${formatCurrency(agencyCommission)} + Cargo ${formatCurrency(serviceCharge)}${membershipCost > 0 ? ` + Membresía ${formatCurrency(membershipCost)}` : ''}${optionalsTotal > 0 ? ` + Opcionales (comisión ${formatCurrency(optionalsCommissionTotal)} + cargo por servicio extras ${formatCurrency(optionalsServiceChargeTotal)})` : ''}
           </div>
         </div>
         <div class="info-row">
