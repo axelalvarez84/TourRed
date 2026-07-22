@@ -199,7 +199,10 @@ export default function MercadoPagoBrick({
             },
             onError: (error: any) => {
               console.error('Brick error:', error);
-              if (mountedRef.current) {
+              // NON_FATAL errors (e.g. get_card_bin_payment_methods_failed) are
+              // transient BIN-lookup failures — the brick remains usable, so we
+              // only surface fatal errors that prevent the form from working.
+              if (mountedRef.current && error?.type !== 'NON_FATAL') {
                 setLoadError(error?.message || 'Error en el formulario de pago');
               }
             },
