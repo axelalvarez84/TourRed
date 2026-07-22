@@ -1139,7 +1139,7 @@ const BOOKING_SELECT_FIELDS = `
   reschedule_responded_at, has_pending_slot_reschedule, slot_reschedule_response,
   slot_reschedule_responded_at, selected_date, selected_time, slot_id, selected_seats,
   previous_selected_seats, needs_seat_reselection, discount_amount, discount_code_id,
-  travel_insurance_included, travel_insurance_cost,
+  travel_insurance_included, travel_insurance_cost, insurance_days,
   has_payment_plan, payment_plan_total, payment_plan_paid, payment_plan_status,
   discount_codes:discount_code_id(code, discount_type, discount_value), created_at, updated_at,
   tours:tour_id(id, name, slug, destination, image_url, start_date, end_date, name_changes_not_allowed, vehicle_map_type),

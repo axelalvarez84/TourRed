@@ -1175,6 +1175,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ tour }) => {
         es_reserva_preventa: isEnPreventa && hasMembership,
         travel_insurance_included: includeInsurance,
         travel_insurance_cost: effectiveInsuranceCost,
+        insurance_days: includeInsurance ? tourDays : null,
         insurance_discount_code_id: appliedInsuranceDiscount?.code_id || null,
         insurance_discount_amount: insuranceDiscountAmount,
         selected_payment_mode: hasPaymentPlan ? selectedPaymentMode : 'standard',
