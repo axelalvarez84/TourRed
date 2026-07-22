@@ -54,6 +54,7 @@ export default function MercadoPagoBrick({
   const [brickReady, setBrickReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const brickControllerRef = useRef<any>(null);
   const mountedRef = useRef(true);
   const initializedRef = useRef(false);
@@ -101,16 +102,18 @@ export default function MercadoPagoBrick({
   useEffect(() => {
     if (!sdkLoaded || !preferenceId || !publicKey || !amount || initializedRef.current) return;
 
-    initializedRef.current = true;
-
     const initBrick = async () => {
+      initializedRef.current = true;
+      setLoadError(null);
+      setBrickReady(false);
+
       try {
         if (brickControllerRef.current) {
           try { brickControllerRef.current.unmount(); } catch (_) {}
           brickControllerRef.current = null;
         }
 
-        const mp = new window.MercadoPago(publicKey);
+        const mp = new window.MercadoPago(publicKey, { locale: 'es-MX' });
         const bricksBuilder = mp.bricks();
 
         const controller = await bricksBuilder.create('payment', 'mp-payment-brick-container', {
@@ -129,6 +132,7 @@ export default function MercadoPagoBrick({
                 theme: 'default',
               },
             },
+            hidePaymentButton: false,
           },
           callbacks: {
             onReady: () => {
@@ -199,9 +203,6 @@ export default function MercadoPagoBrick({
             },
             onError: (error: any) => {
               console.error('Brick error:', error);
-              // NON_FATAL errors (e.g. get_card_bin_payment_methods_failed) are
-              // transient BIN-lookup failures — the brick remains usable, so we
-              // only surface fatal errors that prevent the form from working.
               if (mountedRef.current && error?.type !== 'NON_FATAL') {
                 setLoadError(error?.message || 'Error en el formulario de pago');
               }
@@ -212,20 +213,35 @@ export default function MercadoPagoBrick({
         brickControllerRef.current = controller;
       } catch (err: any) {
         console.error('Error initializing brick:', err);
+        initializedRef.current = false;
         if (mountedRef.current) {
-          setLoadError(err.message || 'Error al inicializar el pago');
+          setLoadError('No se pudo cargar el formulario de pago. Esto puede ser un problema temporal de MercadoPago.');
         }
       }
     };
 
     initBrick();
-  }, [sdkLoaded, preferenceId, publicKey, amount]);
+  }, [sdkLoaded, preferenceId, publicKey, amount, retryCount]);
+
+  const handleRetry = () => {
+    initializedRef.current = false;
+    setLoadError(null);
+    setRetryCount(c => c + 1);
+  };
 
   if (loadError) {
     return (
-      <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-        <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-        <span>{loadError}</span>
+      <div className="flex flex-col items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+        <div className="flex items-start gap-3 w-full">
+          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <span>{loadError}</span>
+        </div>
+        <button
+          onClick={handleRetry}
+          className="self-end px-4 py-2 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 transition-colors"
+        >
+          Reintentar
+        </button>
       </div>
     );
   }
