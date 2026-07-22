@@ -361,6 +361,40 @@ Deno.serve(async (req: Request) => {
           })
           .eq("id", externalReference);
 
+        // Persist payment_transactions record for multi-processor refund support
+        try {
+          const mpAmount = parseFloat(payment.transaction_amount || payment.amount || "0");
+          const mpFee = Array.isArray(payment.fee_details)
+            ? payment.fee_details
+                .filter((fd: any) => fd.type === "mercadopago_fee")
+                .reduce((sum: number, fd: any) => sum + parseFloat(fd.amount || "0"), 0)
+            : 0;
+
+          const { data: existingTx } = await supabase
+            .from("payment_transactions")
+            .select("id")
+            .eq("mercadopago_payment_id", String(notificationId))
+            .maybeSingle();
+
+          if (!existingTx) {
+            await supabase.from("payment_transactions").insert({
+              booking_id: externalReference,
+              mercadopago_payment_id: String(notificationId),
+              payment_processor: "mercadopago",
+              amount: mpAmount,
+              currency: "mxn",
+              status: "succeeded",
+              payment_method_type: "Tarjeta",
+              processor_fee: mpFee,
+              net_amount: mpAmount - mpFee,
+              metadata: payment,
+            });
+            console.log(`payment_transactions record created for MP payment ${notificationId} (webhook), fee=${mpFee}`);
+          }
+        } catch (txErr) {
+          console.error("Error inserting payment_transactions (MP webhook):", txErr);
+        }
+
         // Apply preventa commission discount (10% on first 10 preventa bookings)
         try {
           const { data: bookingForPreventa } = await supabase
@@ -482,6 +516,106 @@ Deno.serve(async (req: Request) => {
           }
         } catch (optError) {
           console.error('Error processing optional services (MP):', optError);
+        }
+
+        // Activate payment plan if the booking was created with selected_payment_mode === 'plan'
+        try {
+          const { data: bkForPlan } = await supabase
+            .from('bookings')
+            .select(`
+              id, selected_payment_mode, total_price, deposit_amount,
+              tours:tour_id(payment_option, payment_plan_mode, installment_definitions, start_date, full_payment_days_before_departure)
+            `)
+            .eq('id', externalReference)
+            .maybeSingle();
+
+          if (bkForPlan?.selected_payment_mode === 'plan') {
+            const tour = bkForPlan.tours as any;
+            const totalPrice = parseFloat(bkForPlan.total_price) || 0;
+            const depositPaid = parseFloat(bkForPlan.deposit_amount) || 0;
+            const defs: any[] = tour?.installment_definitions || [];
+
+            if (defs.length > 0) {
+              const { data: existingPlan } = await supabase
+                .from('booking_payment_plans')
+                .select('id')
+                .eq('booking_id', externalReference)
+                .maybeSingle();
+
+              if (!existingPlan) {
+                const { data: plan, error: planErr } = await supabase
+                  .from('booking_payment_plans')
+                  .insert({
+                    booking_id: externalReference,
+                    mode: 'installments',
+                    total_plan_amount: totalPrice,
+                    total_amount_paid: depositPaid,
+                    status: 'active',
+                    paid_100_pct_at_booking: false,
+                  })
+                  .select('id')
+                  .single();
+
+                if (planErr || !plan) {
+                  console.error('Error creating payment plan (MP webhook):', planErr);
+                } else {
+                  const bookingDate = new Date();
+                  const departureDate = tour?.start_date ? new Date(tour.start_date) : null;
+
+                  const installments = defs.map((def: any, idx: number) => {
+                    const amount = Math.round(totalPrice * (def.pct_of_total / 100) * 100) / 100;
+                    let dueDate: Date;
+                    if (def.specific_date) {
+                      dueDate = new Date(def.specific_date + 'T12:00:00');
+                    } else if (def.days_before_departure !== undefined && departureDate) {
+                      dueDate = new Date(departureDate);
+                      dueDate.setDate(dueDate.getDate() - def.days_before_departure);
+                    } else {
+                      dueDate = new Date(bookingDate);
+                      dueDate.setDate(dueDate.getDate() + (def.days_after_booking || 0));
+                    }
+
+                    const isFirstInstallment = idx === 0;
+                    const amountPaidForThisInstallment = isFirstInstallment ? Math.min(depositPaid, amount) : 0;
+                    const isPaid = isFirstInstallment && amountPaidForThisInstallment >= amount;
+
+                    return {
+                      plan_id: plan.id,
+                      booking_id: externalReference,
+                      installment_number: idx + 1,
+                      label: def.label || `Pago ${idx + 1}`,
+                      amount_due: amount,
+                      amount_paid: amountPaidForThisInstallment,
+                      due_date: dueDate.toISOString().split('T')[0],
+                      status: isPaid ? 'paid' : 'pending',
+                      paid_at: isPaid ? new Date().toISOString() : null,
+                    };
+                  });
+
+                  const { error: instErr } = await supabase
+                    .from('booking_payment_plan_installments')
+                    .insert(installments);
+
+                  if (instErr) {
+                    console.error('Error creating installments (MP webhook):', instErr);
+                  } else {
+                    await supabase
+                      .from('bookings')
+                      .update({
+                        has_payment_plan: true,
+                        payment_plan_status: 'active',
+                        payment_plan_total: totalPrice,
+                        payment_plan_paid: depositPaid,
+                      })
+                      .eq('id', externalReference);
+                    console.log(`✅ Payment plan created for booking ${externalReference} with ${installments.length} installments (MP webhook)`);
+                  }
+                }
+              }
+            }
+          }
+        } catch (planErr) {
+          console.error('Error creating payment plan (MP webhook):', planErr);
         }
       }
 

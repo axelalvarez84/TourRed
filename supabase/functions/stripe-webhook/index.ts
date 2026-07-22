@@ -1333,6 +1333,7 @@ Deno.serve(async (req) => {
           .insert({
             booking_id: bookingId,
             stripe_payment_intent_id: paymentIntentId,
+            payment_processor: 'stripe',
             amount: session.amount_total / 100,
             currency: session.currency,
             status: 'succeeded',
@@ -1666,6 +1667,7 @@ Deno.serve(async (req) => {
               .insert({
                 booking_id: bookingId,
                 stripe_payment_intent_id: paymentIntent.id,
+                payment_processor: 'stripe',
                 amount: paymentIntent.amount / 100,
                 currency: paymentIntent.currency,
                 status: 'succeeded',
