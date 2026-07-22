@@ -1,9 +1,15 @@
 import { Link } from 'react-router-dom';
 import { Shield, Mail, Clock, UserCheck } from 'lucide-react';
+import Seo from '../components/Seo';
 
 export default function PrivacyPolicyPage() {
   return (
     <div className="min-h-screen bg-gray-50">
+      <Seo
+        title="Aviso de Privacidad | ToursRed"
+        description="Aviso de privacidad de ToursRed. Conoce cómo protegemos tus datos personales conforme a la LFPDPPP."
+        type="website"
+      />
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 mb-4">

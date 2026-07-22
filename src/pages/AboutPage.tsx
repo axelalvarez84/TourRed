@@ -1,9 +1,15 @@
 import React from 'react';
 import { Target, Eye, Briefcase, Shield, Users, Lightbulb, Handshake } from 'lucide-react';
+import Seo from '../components/Seo';
 
 const AboutPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-blue-50">
+      <Seo
+        title="Quiénes Somos | ToursRed"
+        description="Conoce ToursRed, la plataforma mexicana que conecta viajeros con agencias locales para descubrir y reservar experiencias turísticas auténticas en todo México."
+        type="website"
+      />
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-blue-900 to-blue-800 text-white py-16">
         <div className="container mx-auto px-4">

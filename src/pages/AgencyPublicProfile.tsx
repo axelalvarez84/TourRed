@@ -4,6 +4,9 @@ import { Star, MapPin, Globe, Phone, Mail, Building, Calendar, Award } from 'luc
 import { supabase } from '../lib/supabase';
 import TourCard from '../components/TourCard';
 import AgencyReviews from '../components/AgencyReviews';
+import Seo from '../components/Seo';
+
+const SITE_URL = (import.meta.env.VITE_APP_URL || 'https://toursredmx.netlify.app/').replace(/\/$/, '');
 
 interface Agency {
   id: string;
@@ -44,6 +47,7 @@ const AgencyPublicProfile: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'tours' | 'reviews'>('tours');
+  const [reviewCount, setReviewCount] = useState(0);
 
   useEffect(() => {
     if (agencyId) {
@@ -89,6 +93,12 @@ const AgencyPublicProfile: React.FC = () => {
 
       if (toursError) throw toursError;
       setTours(toursData || []);
+
+      const { count } = await supabase
+        .from('agency_reviews')
+        .select('*', { count: 'exact', head: true })
+        .eq('agency_id', agencyData.id);
+      setReviewCount(count || 0);
     } catch (err: any) {
       console.error('Error cargando datos de agencia:', err);
       setError(err.message || 'Error al cargar la información de la agencia');
@@ -121,8 +131,40 @@ const AgencyPublicProfile: React.FC = () => {
     );
   }
 
+  const agencyDescription = agency.description
+    ? agency.description.slice(0, 160)
+    : `${agency.name} - Agencia de viajes y tours en México. Reserva experiencias auténticas con ToursRed.`;
+
+  const agencyJsonLd: object = {
+    '@context': 'https://schema.org',
+    '@type': 'LocalBusiness',
+    name: agency.name,
+    image: (agency as any).cover_image_url || agency.logo || undefined,
+    description: agencyDescription,
+    url: `${SITE_URL}/agencies/${(agency as any).custom_slug || agency.id}`,
+    ...(agency.website ? { sameAs: [agency.website] } : {}),
+    ...(agency.contact_phone ? { telephone: agency.contact_phone } : {}),
+    ...(agency.contact_email ? { email: agency.contact_email } : {}),
+    ...(reviewCount > 0 && agency.rating
+      ? {
+          aggregateRating: {
+            '@type': 'AggregateRating',
+            ratingValue: agency.rating,
+            reviewCount,
+          },
+        }
+      : {}),
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <Seo
+        title={`${agency.name} | ToursRed`}
+        description={agencyDescription}
+        image={(agency as any).cover_image_url || agency.logo}
+        type="profile"
+        jsonLd={agencyJsonLd}
+      />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-8">
           {/* Header / Cover con logo superpuesto */}

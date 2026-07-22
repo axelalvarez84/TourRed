@@ -10,6 +10,9 @@ import { isCrawler } from '../utils/isCrawler';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrencyMXN } from '../utils/formatCurrency';
 import { format } from 'date-fns';
+import Seo from '../components/Seo';
+
+const SITE_URL = (import.meta.env.VITE_APP_URL || 'https://toursredmx.netlify.app/').replace(/\/$/, '');
 
 interface DeparturePointInfo {
   id: string;
@@ -460,8 +463,58 @@ const TourDetailPage: React.FC = () => {
     ];
   };
 
+  const seoDescription = tour.description
+    ? `${tour.description.slice(0, 150)}${tour.description.length > 150 ? '...' : ''} ${tour.destination ? `- ${tour.destination}` : ''}`
+    : `${tour.name} en ${tour.destination}. Reserva en línea con ToursRed.`;
+
+  const tourJsonLd: object[] = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: tour.name,
+      image: tour.image_url || undefined,
+      description: seoDescription,
+      brand: { '@type': 'Brand', name: tour.agencies?.name || 'ToursRed' },
+      offers: {
+        '@type': 'Offer',
+        price: tour.price,
+        priceCurrency: 'MXN',
+        availability: (availableSpots !== null && availableSpots > 0) ? 'https://schema.org/InStock' : 'https://schema.org/PreOrder',
+        url: `${SITE_URL}/tours/${tour.slug}`,
+      },
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Inicio', item: SITE_URL },
+        { '@type': 'ListItem', position: 2, name: 'Tours', item: `${SITE_URL}/tours` },
+        { '@type': 'ListItem', position: 3, name: tour.destination || 'Destinos', item: `${SITE_URL}/tours?destination=${encodeURIComponent(tour.destination || '')}` },
+        { '@type': 'ListItem', position: 4, name: tour.name, item: `${SITE_URL}/tours/${tour.slug}` },
+      ],
+    },
+  ];
+
+  if (tour.itinerary) {
+    tourJsonLd.push({
+      '@context': 'https://schema.org',
+      '@type': 'TouristTrip',
+      name: tour.name,
+      description: seoDescription,
+      provider: { '@type': 'LocalBusiness', name: tour.agencies?.name || 'ToursRed' },
+      itinerary: tour.itinerary,
+    });
+  }
+
   return (
     <>
+      <Seo
+        title={`${tour.name} | ToursRed`}
+        description={seoDescription}
+        image={tour.image_url}
+        type="product"
+        jsonLd={tourJsonLd}
+      />
       <div className="bg-gray-50 pb-12">
       {/* Tour Image Gallery */}
       <div className="relative bg-gray-900 h-[300px] md:h-[400px] lg:h-[500px]">

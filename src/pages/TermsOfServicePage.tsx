@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FileText, Scale } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import Seo from '../components/Seo';
 
 interface ActiveTerms {
   id: string;
@@ -27,6 +28,11 @@ export default function TermsOfServicePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Seo
+        title="Términos y Condiciones de Servicio | ToursRed"
+        description="Términos y condiciones de servicio de ToursRed. Reglas y políticas para el uso de nuestra plataforma de tours y excursiones."
+        type="website"
+      />
       <div className="bg-gradient-to-r from-green-600 to-green-800 text-white py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 mb-4">

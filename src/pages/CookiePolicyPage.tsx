@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Cookie, Settings, Trash2, ExternalLink } from 'lucide-react';
+import Seo from '../components/Seo';
 
 export default function CookiePolicyPage() {
   const handleResetPreferences = () => {
@@ -9,6 +10,11 @@ export default function CookiePolicyPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Seo
+        title="Política de Cookies | ToursRed"
+        description="Política de cookies de ToursRed. Información sobre el uso de cookies en nuestra plataforma y cómo gestionar tus preferencias."
+        type="website"
+      />
       <div className="bg-gradient-to-r from-orange-600 to-orange-800 text-white py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 mb-4">

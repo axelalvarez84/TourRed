@@ -144,6 +144,16 @@ import MaintenanceBanner from './components/MaintenanceBanner';
 import AnnouncementPopup from './components/AnnouncementPopup';
 import MaintenanceAdminPage from './pages/auth/MaintenanceAdminPage';
 import FirstLoginPasswordGate from './components/FirstLoginPasswordGate';
+import { useSEO } from './hooks/useSEO';
+
+const PROTECTED_PREFIXES = ['/admin', '/traveler', '/agency', '/executive', '/accounting', '/auth', '/messages', '/mantenimiento-admin'];
+
+const ProtectedRouteSeo: React.FC = () => {
+  const location = useLocation();
+  const isProtected = PROTECTED_PREFIXES.some((p) => location.pathname.startsWith(p));
+  useSEO({ title: 'ToursRed', noindex: isProtected });
+  return null;
+};
 
 const App: React.FC = () => {
   const { isLoading, isOnboardingPending, mustChangePassword, user, refreshAuthState } = useAuth();
@@ -181,6 +191,7 @@ const App: React.FC = () => {
     <div className="flex flex-col min-h-screen">
       <ScrollToTop />
       <GoogleAnalytics />
+      <ProtectedRouteSeo />
       <MaintenanceBanner />
       <MaintenanceGate>
       <NavBar />

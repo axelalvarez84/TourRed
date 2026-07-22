@@ -11,6 +11,9 @@ import { Tour } from '../types';
 import { getActiveFeaturedTours, getPopularTours, getNewTours, supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useTourPromotionsBatch } from '../hooks/useSharedData';
+import Seo from '../components/Seo';
+
+const SITE_URL = (import.meta.env.VITE_APP_URL || 'https://toursredmx.netlify.app/').replace(/\/$/, '');
 
 const HomePage: React.FC = () => {
   const [featuredTours, setFeaturedTours] = useState<Tour[]>([]);
@@ -58,6 +61,44 @@ const HomePage: React.FC = () => {
 
   return (
     <div>
+      <Seo
+        title="ToursRed | Tours y Excursiones en México"
+        description="Marketplace de tours y excursiones en México. Compara tours de agencias verificadas, reserva en línea y descubre experiencias auténticas en todo el país."
+        type="website"
+        jsonLd={[
+          {
+            '@context': 'https://schema.org',
+            '@type': 'Organization',
+            name: 'ToursRed',
+            url: SITE_URL,
+            logo: `${SITE_URL}/LogoFinal.jpg`,
+            description: 'Plataforma mexicana que conecta viajeros con agencias locales para descubrir y reservar experiencias turísticas.',
+            email: 'contacto@toursred.com',
+            telephone: '+52 55 47127668',
+            sameAs: [
+              'https://www.facebook.com/ToursRedMX',
+              'https://www.instagram.com/toursredmx',
+              'https://www.tiktok.com/@toursredmx',
+              'https://www.linkedin.com/company/toursredmx',
+            ],
+          },
+          {
+            '@context': 'https://schema.org',
+            '@type': 'WebSite',
+            name: 'ToursRed',
+            url: SITE_URL,
+            inLanguage: 'es-MX',
+            potentialAction: {
+              '@type': 'SearchAction',
+              target: {
+                '@type': 'EntryPoint',
+                urlTemplate: `${SITE_URL}/tours?tourName={search_term_string}`,
+              },
+              'query-input': 'required name=search_term_string',
+            },
+          },
+        ]}
+      />
       {/* Hero Section */}
       <section
         className="relative bg-blue-900 text-white"

@@ -6,6 +6,9 @@ import TourCard from '../components/TourCard';
 import { Tour, SearchFilters } from '../types';
 import { getTours, getActiveFeaturedTours, supabase } from '../lib/supabase';
 import { useTourPromotionsBatch } from '../hooks/useSharedData';
+import Seo from '../components/Seo';
+
+const SITE_URL = (import.meta.env.VITE_APP_URL || 'https://toursredmx.netlify.app/').replace(/\/$/, '');
 
 const PAGE_SIZE = 20;
 
@@ -236,8 +239,29 @@ const TourCatalogPage: React.FC = () => {
     return () => { document.body.style.overflow = ''; };
   }, [drawerOpen]);
 
+  const catalogTitle = initialFilters.destination
+    ? `Tours a ${initialFilters.destination} | ToursRed`
+    : 'Tours Nacionales | ToursRed';
+
+  const catalogDescription = initialFilters.destination
+    ? `Descubre tours y excursiones a ${initialFilters.destination}. Compara precios, reserva en línea y vive experiencias auténticas con agencias verificadas.`
+    : 'Descubre los mejores tours y excursiones en México. Compara precios, destinos y agencias verificadas. Reserva en línea con ToursRed.';
+
   return (
     <div className="bg-slate-50 min-h-screen">
+      <Seo
+        title={catalogTitle}
+        description={catalogDescription}
+        type="website"
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Inicio', item: SITE_URL },
+            { '@type': 'ListItem', position: 2, name: initialFilters.destination ? `Tours a ${initialFilters.destination}` : 'Tours Nacionales', item: `${SITE_URL}/tours${initialFilters.destination ? `?destination=${encodeURIComponent(initialFilters.destination)}` : ''}` },
+          ],
+        }}
+      />
 
       {/* Page header */}
       <div className="bg-white border-b border-gray-100 shadow-sm">

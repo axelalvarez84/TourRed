@@ -6,6 +6,7 @@ import { useFormPersistence } from '../hooks/useFormPersistence';
 import { usePreventUnload } from '../hooks/usePreventUnload';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrencyMXN } from '../utils/formatCurrency';
+import Seo from '../components/Seo';
 import PaymentProviderSelector, { PaymentProvider } from '../components/PaymentProviderSelector';
 import MercadoPagoBrick from '../components/MercadoPagoBrick';
 
@@ -358,6 +359,11 @@ export default function GiftCardsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 py-12 px-4">
+      <Seo
+        title="Tarjetas de Regalo | ToursRed"
+        description="Regala experiencias inolvidables con tarjetas de regalo ToursRed. Válidas por 1 año para cualquier tour o excursión en México."
+        type="website"
+      />
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full mb-6">

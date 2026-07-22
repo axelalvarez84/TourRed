@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Mail, Phone, MapPin, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 import { useFormPersistence } from '../hooks/useFormPersistence';
 import { usePreventUnload } from '../hooks/usePreventUnload';
+import Seo from '../components/Seo';
 
 const ContactPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -79,6 +80,11 @@ const ContactPage: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <Seo
+        title="Contáctanos | ToursRed"
+        description="¿Tienes preguntas? Contáctanos en ToursRed. Escríbenos por correo, teléfono o WhatsApp y te ayudaremos con tus tours y reservas."
+        type="website"
+      />
       <h1 className="text-4xl font-bold text-gray-900 mb-6">Contáctanos</h1>
       <div className="grid md:grid-cols-2 gap-8">
         <div className="bg-white p-6 rounded-lg shadow-md">
