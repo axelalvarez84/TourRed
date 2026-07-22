@@ -24,6 +24,9 @@ export interface Agency {
   name: string;
   description?: string;
   logo?: string;
+  cover_image_url?: string;
+  custom_slug?: string;
+  rnt?: string;
   contact_email: string;
   contact_phone?: string;
   website?: string;
@@ -31,6 +34,14 @@ export interface Agency {
   is_active: boolean;
   created_at: string;
   commission_rate?: number;
+  street?: string;
+  exterior_number?: string;
+  interior_number?: string;
+  colony?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
 }
 
 export interface Destination {

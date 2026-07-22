@@ -135,16 +135,34 @@ const AgencyPublicProfile: React.FC = () => {
     ? agency.description.slice(0, 160)
     : `${agency.name} - Agencia de viajes y tours en México. Reserva experiencias auténticas con ToursRed.`;
 
+  const streetAddress = [agency.street, agency.exterior_number, agency.interior_number, agency.colony]
+    .filter(Boolean)
+    .join(', ');
+
+  const hasAddress = Boolean(streetAddress || agency.city || agency.state || agency.postal_code || agency.country);
+
   const agencyJsonLd: object = {
     '@context': 'https://schema.org',
     '@type': 'LocalBusiness',
     name: agency.name,
-    image: (agency as any).cover_image_url || agency.logo || undefined,
+    image: agency.cover_image_url || agency.logo || undefined,
     description: agencyDescription,
-    url: `${SITE_URL}/agencies/${(agency as any).custom_slug || agency.id}`,
+    url: `${SITE_URL}/agencies/${agency.custom_slug || agency.id}`,
     ...(agency.website ? { sameAs: [agency.website] } : {}),
     ...(agency.contact_phone ? { telephone: agency.contact_phone } : {}),
     ...(agency.contact_email ? { email: agency.contact_email } : {}),
+    ...(hasAddress
+      ? {
+          address: {
+            '@type': 'PostalAddress',
+            ...(streetAddress ? { streetAddress } : {}),
+            ...(agency.city ? { addressLocality: agency.city } : {}),
+            ...(agency.state ? { addressRegion: agency.state } : {}),
+            ...(agency.postal_code ? { postalCode: agency.postal_code } : {}),
+            ...(agency.country ? { addressCountry: agency.country } : {}),
+          },
+        }
+      : {}),
     ...(reviewCount > 0 && agency.rating
       ? {
           aggregateRating: {
@@ -161,7 +179,7 @@ const AgencyPublicProfile: React.FC = () => {
       <Seo
         title={`${agency.name} | ToursRed`}
         description={agencyDescription}
-        image={(agency as any).cover_image_url || agency.logo}
+        image={agency.cover_image_url || agency.logo}
         type="profile"
         jsonLd={agencyJsonLd}
       />
