@@ -146,7 +146,14 @@ import MaintenanceAdminPage from './pages/auth/MaintenanceAdminPage';
 import FirstLoginPasswordGate from './components/FirstLoginPasswordGate';
 import { useSEO } from './hooks/useSEO';
 
-const PROTECTED_PREFIXES = ['/admin', '/traveler', '/agency', '/executive', '/accounting', '/auth', '/messages', '/mantenimiento-admin'];
+const PROTECTED_PREFIXES = [
+  '/admin', '/traveler', '/agency', '/executive', '/accounting', '/auth', '/messages', '/mantenimiento-admin',
+  '/login', '/signup', '/agency-signup', '/verify-email', '/forgot-password', '/reset-password',
+  '/success', '/cancel', '/booking-success', '/booking-cancel', '/booking-pending', '/booking-travelers',
+  '/supplement-success', '/payment-plan-success', '/extras-success', '/notifications',
+  '/gift-card/redeem', '/gift-card/success', '/payment-return', '/booking-checkin',
+  '/soporte/viajero', '/soporte/agencia', '/unsubscribe',
+];
 
 const ProtectedRouteSeo: React.FC = () => {
   const location = useLocation();
