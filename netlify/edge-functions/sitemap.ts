@@ -91,7 +91,7 @@ export default async (request: Request, _context: Context): Promise<Response> =>
 
     const [tours, agencies, destinations] = await Promise.all([
       fetchSupabase(baseUrl, supabaseAnonKey, "tours",
-        "slug,updated_at", "&is_active=eq.true"),
+        "slug,updated_at", "&is_published=eq.true"),
       fetchSupabase(baseUrl, supabaseAnonKey, "agencies",
         "custom_slug,id,updated_at", "&is_active=eq.true&is_approved=eq.true"),
       fetchSupabase(baseUrl, supabaseAnonKey, "destinations",
