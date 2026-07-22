@@ -159,7 +159,7 @@ const AgencyPublicProfile: React.FC = () => {
             ...(agency.city ? { addressLocality: agency.city } : {}),
             ...(agency.state ? { addressRegion: agency.state } : {}),
             ...(agency.postal_code ? { postalCode: agency.postal_code } : {}),
-            ...(agency.country ? { addressCountry: agency.country } : {}),
+            ...(agency.country ? { addressCountry: 'MX' } : {}),
           },
         }
       : {}),
