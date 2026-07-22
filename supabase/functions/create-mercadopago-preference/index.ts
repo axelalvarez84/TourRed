@@ -53,12 +53,13 @@ Deno.serve(async (req: Request) => {
 
     let mpAccessToken = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
 
-    if (!mpAccessToken) {
-      const { data: settings } = await supabase
-        .from("platform_settings")
-        .select("mercadopago_access_token")
-        .maybeSingle();
-      if (settings?.mercadopago_access_token) mpAccessToken = settings.mercadopago_access_token;
+    const { data: platformSettings } = await supabase
+      .from("platform_settings")
+      .select("mercadopago_access_token, mercadopago_public_key, platform_url")
+      .maybeSingle();
+
+    if (!mpAccessToken && platformSettings?.mercadopago_access_token) {
+      mpAccessToken = platformSettings.mercadopago_access_token;
     }
 
     if (!mpAccessToken) {
@@ -68,7 +69,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const origin = req.headers.get("origin") || "https://toursred.com";
+    // Always use the configured platform URL for back_urls so MercadoPago receives
+    // a valid public HTTPS domain instead of the local dev/webcontainer URL.
+    const origin = platformSettings?.platform_url?.replace(/\/$/, "") || "https://toursred.com";
 
     let items: any[] = [];
     let successUrl = "";
@@ -116,12 +119,8 @@ Deno.serve(async (req: Request) => {
     }
 
     let mpPublicKey = Deno.env.get("MERCADOPAGO_PUBLIC_KEY");
-    if (!mpPublicKey) {
-      const { data: settings } = await supabase
-        .from("platform_settings")
-        .select("mercadopago_public_key")
-        .maybeSingle();
-      if (settings?.mercadopago_public_key) mpPublicKey = settings.mercadopago_public_key;
+    if (!mpPublicKey && platformSettings?.mercadopago_public_key) {
+      mpPublicKey = platformSettings.mercadopago_public_key;
     }
 
     const externalReference = context === "supplement" ? supplementId : bookingId;
